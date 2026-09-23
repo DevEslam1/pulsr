@@ -22,7 +22,13 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
 
   Future<void> toggleRepeat() => transportController.toggleRepeat();
 
-  Future<void> toggleFavorite(dynamic target) =>
+  Future<void> toggleFavoriteSong(SongsTableData song) =>
+      transportController.toggleFavoriteSong(song);
+
+  Future<void> toggleFavoriteById(int songId) =>
+      transportController.toggleFavoriteById(songId);
+
+  Future<void> toggleFavorite([dynamic target]) =>
       transportController.toggleFavorite(target);
 
   Future<void> fastForward([Duration step = const Duration(seconds: 10)]) =>

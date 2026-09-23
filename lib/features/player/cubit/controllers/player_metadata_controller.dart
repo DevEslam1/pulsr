@@ -9,6 +9,7 @@ import '../../../../domain/models/lyrics_line.dart';
 import '../../../../domain/repositories/music_repository_interface.dart';
 import '../managers/player_lyrics_manager.dart';
 import '../managers/player_sponsorblock_manager.dart';
+import '../player_constants.dart';
 import '../player_state.dart';
 
 /// Manages track metadata, lyrics resolution, SponsorBlock skipping, and CUE chapters.
@@ -42,17 +43,27 @@ class PlayerMetadataController {
 
     final cached = _lyricsManager.getCachedLyrics(song);
     if (cached != null) {
-      if (_isSameTrack(_getState().currentSong, song)) {
-        final s = _getState();
-        _emit(s.copyWith(
-          lyricsSlice: s.lyricsSlice.copyWith(
-            lyrics: cached.lines,
-            lyricsSource: cached.source,
-            isLoadingLyrics: false,
-          ),
-        ));
-        return;
-      }
+      final s = _getState();
+      _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+          lyrics: cached.lines,
+          lyricsSource: cached.source,
+          isLoadingLyrics: false,
+        ),
+      ));
+      return;
+    }
+
+    if (_lyricsManager.hasFreshNegativeCache(song)) {
+      final s = _getState();
+      _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+          lyrics: const [],
+          lyricsSource: LyricsSource.none,
+          isLoadingLyrics: false,
+        ),
+      ));
+      return;
     }
 
     final gen = _lyricsManager.bumpGeneration();
@@ -65,7 +76,7 @@ class PlayerMetadataController {
               gen != _lyricsManager.generation ||
               !_isSameTrack(_getState().currentSong, song),
         )
-        .timeout(const Duration(seconds: 10), onTimeout: () => null);
+        .timeout(PlayerConstants.lyricsTimeout, onTimeout: () => null);
 
     if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) {
       return;
@@ -165,4 +176,6 @@ class PlayerMetadataController {
       }),
     ], eagerError: false);
   }
+
+  void dispose() {}
 }

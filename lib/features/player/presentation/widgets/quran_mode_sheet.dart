@@ -1,4 +1,4 @@
-// lib/features/player/presentation/widgets/quran_mode_sheet.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -111,7 +111,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ),
                   PulsrSwitch(
                     value: enabled,
-                    onChanged: (v) => cubit.setQuranModeEnabled(v),
+                    onChanged: (v) => unawaited(cubit.setQuranModeEnabled(v)),
                   ),
                 ],
               ),

@@ -73,13 +73,9 @@ class AudioVisualizer extends StatefulWidget {
     int? audioSessionId,
   }) {
     if (trackSeed != null) return trackSeed;
-    if (trackId != null) return trackId * 2654435761 & 0x7fffffff;
+    if (trackId != null) return Object.hash(trackId, 'pulsr_visualizer_seed');
     if (trackPath != null && trackPath.isNotEmpty) {
-      var h = 0;
-      for (var i = 0; i < trackPath.length; i++) {
-        h = (h * 31 + trackPath.codeUnitAt(i)) & 0x7fffffff;
-      }
-      return h;
+      return Object.hash(trackPath, 'pulsr_visualizer_seed');
     }
     if (audioSessionId != null) return audioSessionId;
     return 0;

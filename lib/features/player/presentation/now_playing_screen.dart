@@ -58,10 +58,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         ));
 
     return BlocConsumer<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) =>
-          prev.differsFromBeyondPosition(curr) ||
-          prev.lyricsSlice != curr.lyricsSlice ||
-          prev.isDspActive != curr.isDspActive,
+      buildWhen: (prev, curr) => prev.differsFromBeyondPosition(curr),
       listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
       listener: (context, state) {
         final song = state.currentSong;
@@ -171,6 +168,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
   late final CurvedAnimation _curvedAnimation;
+  late final Tween<double> _tween;
   late Animation<double> _anim;
   double _dragOffset = 0.0;
   int _activePointers = 0;
@@ -187,7 +185,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       parent: _animController,
       curve: Curves.easeOutCubic,
     );
-    _anim = Tween<double>(begin: 0.0, end: 0.0).animate(_curvedAnimation);
+    _tween = Tween<double>(begin: 0.0, end: 0.0);
+    _anim = _tween.animate(_curvedAnimation);
   }
 
   @override
@@ -226,8 +225,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     if (!_singleTouch) {
       // Second finger joined mid-gesture — snap back instead of dismissing.
       if (_dragOffset > 0) {
-        _anim = Tween<double>(begin: _dragOffset, end: 0.0)
-            .animate(_curvedAnimation);
+        _tween.begin = _dragOffset;
+        _tween.end = 0.0;
         _animController.forward(from: 0.0);
       }
       return;
@@ -236,8 +235,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
     } else if (_dragOffset > 0) {
-      _anim =
-          Tween<double>(begin: _dragOffset, end: 0.0).animate(_curvedAnimation);
+      _tween.begin = _dragOffset;
+      _tween.end = 0.0;
       _animController.forward(from: 0.0);
     }
   }

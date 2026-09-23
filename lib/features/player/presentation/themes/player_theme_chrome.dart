@@ -25,6 +25,7 @@ import '../widgets/equalizer_sheet.dart';
 import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
 import '../../../../domain/services/cast_service.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import 'player_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -527,7 +528,7 @@ class PlayerViewSwitcher extends StatelessWidget {
 /// add-to-playlist).
 class PlayerBottomActionDock extends StatelessWidget {
   final PlayerThemeProps props;
-  final SettingsState settingsState;
+  final SettingsState? settingsState;
   final bool isTablet;
   final double barWidth;
   final double barHeight;
@@ -536,7 +537,7 @@ class PlayerBottomActionDock extends StatelessWidget {
   const PlayerBottomActionDock({
     super.key,
     required this.props,
-    required this.settingsState,
+    this.settingsState,
     required this.isTablet,
     required this.barWidth,
     required this.barHeight,
@@ -548,14 +549,22 @@ class PlayerBottomActionDock extends StatelessWidget {
     final song = props.state.currentSong;
     final p = context.palette;
     final l10n = context.l10n;
-    final isUsb = settingsState.currentOutputDevice?.isUsbDac == true;
+    final outputDevice = settingsState?.currentOutputDevice ??
+        context.select<SettingsCubit, AudioOutputInfo?>(
+            (c) => c.state.currentOutputDevice);
+    final isUsb = outputDevice?.isUsbDac == true;
     final isCast = CastService().sessionStatus.connected;
-    final outputDevice = settingsState.currentOutputDevice;
     final isEqActive = props.state.isEqEnabled;
     final speed = props.state.playbackSpeed;
-    final remainingTracks =
-        props.state.sleepTimerRemainingTracks ?? props.cubit.sleepTimerRemainingTracks;
-    final isEndQ = props.cubit.isEndOfQueueSleepTimer;
+    int? remainingTracks;
+    try {
+      remainingTracks = props.state.sleepTimerRemainingTracks ??
+          props.cubit.sleepTimerRemainingTracks;
+    } catch (_) {}
+    bool isEndQ = false;
+    try {
+      isEndQ = props.cubit.isEndOfQueueSleepTimer == true;
+    } catch (_) {}
     final hasTimer = props.state.sleepTimerRemaining != null ||
         remainingTracks != null ||
         isEndQ;

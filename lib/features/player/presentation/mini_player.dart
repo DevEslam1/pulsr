@@ -675,9 +675,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   }
 
   void _syncWave() {
-    // Never tick a decorative animation while the app is backgrounded or
-    final isTest = const bool.fromEnvironment('FLUTTER_TEST') ||
-        WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    final isTest = const bool.fromEnvironment('FLUTTER_TEST');
     final shouldAnimate = _isAppActive &&
         widget.isPlaying &&
         context.motionEnabled &&

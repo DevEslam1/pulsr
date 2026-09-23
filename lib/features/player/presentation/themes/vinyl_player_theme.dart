@@ -115,7 +115,16 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     final p = context.palette;
     final song = state.currentSong;
     final activeColor = widget.props.activeColor;
-    final settingsState = context.watch<SettingsCubit>().state;
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+            ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -163,7 +172,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
         final bottomDock = PlayerBottomActionDock(
           props: widget.props,
-          settingsState: settingsState,
           isTablet: isTablet,
           barWidth: pillBarWidth,
           barHeight: pillBarHeight,
@@ -202,7 +210,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     child: GestureDetector(
                     onTap: () => cubit.togglePlayPause(),
                     onDoubleTap: () {
-                      switch (settingsState.nowPlayingDoubleTap) {
+                      switch (nowPlayingDoubleTap) {
                         case NowPlayingDoubleTapAction.toggleFavorite:
                           final s = state.currentSong;
                           if (s != null) cubit.toggleFavorite(s.id);
@@ -215,7 +223,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       }
                     },
                     onHorizontalDragEnd: (details) {
-                      if (settingsState.nowPlayingArtworkSwipe ==
+                      if (nowPlayingArtworkSwipe ==
                               NowPlayingArtworkSwipeAction.nextPrev &&
                           details.primaryVelocity != null) {
                         if (details.primaryVelocity! < -200) {
@@ -1043,6 +1051,12 @@ class _TonearmPainter extends CustomPainter {
   final Color activeColor;
   final double armLength;
 
+  static const double _gimbalRadius = 22.0;
+  static const double _screwCircleRadius = 16.0;
+  static const double _collarRadius = 3.2;
+  static const double _pivotBearingRadius = 6.5;
+  static const double _pivotCenterScrewRadius = 2.5;
+
   _TonearmPainter({
     required this.pivot,
     required this.angle,
@@ -1057,30 +1071,7 @@ class _TonearmPainter extends CustomPainter {
     _drawArmRest(canvas, restBase);
 
     // 2. Gimbal Base Mounting Plate (below the pivot)
-    final basePaint = Paint()
-      ..shader = RadialGradient(
-        colors: const [
-          Color(0xFF2C2F3C),
-          Color(0xFF1B1D26),
-          Color(0xFF0F1015),
-        ],
-      ).createShader(Rect.fromCircle(center: pivot, radius: 22));
-    canvas.drawCircle(pivot, 22, basePaint);
-
-    final baseRimPaint = Paint()
-      ..color = const Color(0xFF424658)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawCircle(pivot, 22, baseRimPaint);
-
-    // Bearing ring screws (4 small silver dots)
-    final screwPaint = Paint()..color = Colors.grey.shade400;
-    for (int i = 0; i < 4; i++) {
-      final a = (i * math.pi) / 2 + 0.4;
-      final sx = pivot.dx + 16 * math.cos(a);
-      final sy = pivot.dy + 16 * math.sin(a);
-      canvas.drawCircle(Offset(sx, sy), 1.2, screwPaint);
-    }
+    _drawGimbalBase(canvas);
 
     // Save canvas to rotate the tonearm around the pivot
     canvas.save();
@@ -1088,8 +1079,53 @@ class _TonearmPainter extends CustomPainter {
     canvas.rotate(angle);
 
     // --- EVERYTHING BELOW IS IN LOCAL TONEARM COORDINATES (pivot at 0,0) ---
+    final l = armLength;
 
-    // 3. Counterweight (behind the pivot: y < 0)
+    // 3. Counterweight
+    _drawCounterweight(canvas);
+
+    // 4. Drop Shadow
+    _drawTonearmShadow(canvas, l);
+
+    // 5. Tonearm Tube
+    _drawTube(canvas, l);
+
+    // 6 & 7. Headshell & Cartridge
+    _drawHeadshell(canvas, l);
+
+    // 8. Pivot Bearing Cap
+    _drawPivotCap(canvas);
+
+    canvas.restore();
+  }
+
+  void _drawGimbalBase(Canvas canvas) {
+    final basePaint = Paint()
+      ..shader = RadialGradient(
+        colors: const [
+          Color(0xFF2C2F3C),
+          Color(0xFF1B1D26),
+          Color(0xFF0F1015),
+        ],
+      ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius));
+    canvas.drawCircle(pivot, _gimbalRadius, basePaint);
+
+    final baseRimPaint = Paint()
+      ..color = const Color(0xFF424658)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(pivot, _gimbalRadius, baseRimPaint);
+
+    final screwPaint = Paint()..color = Colors.grey.shade400;
+    for (int i = 0; i < 4; i++) {
+      final a = (i * math.pi) / 2 + 0.4;
+      final sx = pivot.dx + _screwCircleRadius * math.cos(a);
+      final sy = pivot.dy + _screwCircleRadius * math.sin(a);
+      canvas.drawCircle(Offset(sx, sy), 1.2, screwPaint);
+    }
+  }
+
+  void _drawCounterweight(Canvas canvas) {
     final stemPaint = Paint()
       ..shader = const LinearGradient(
         colors: [Color(0xFF8B8E9B), Color(0xFF535664)],
@@ -1103,7 +1139,6 @@ class _TonearmPainter extends CustomPainter {
       stemPaint,
     );
 
-    // Counterweight cylinder
     final weightRect = const Rect.fromLTWH(-10, -28, 20, 16);
     final weightPaint = Paint()
       ..shader = const LinearGradient(
@@ -1122,31 +1157,22 @@ class _TonearmPainter extends CustomPainter {
       weightPaint,
     );
 
-    // Black calibration ring on counterweight
     final calibRect = const Rect.fromLTWH(-10, -18, 20, 4);
     final calibPaint = Paint()..color = const Color(0xFF14151B);
     canvas.drawRect(calibRect, calibPaint);
 
-    // White calibration tick marks
     final tickPaint = Paint()
       ..color = Colors.white70
       ..strokeWidth = 0.8;
     for (double tx = -7; tx <= 7; tx += 3.5) {
       canvas.drawLine(Offset(tx, -18), Offset(tx, -14), tickPaint);
     }
+  }
 
-    // 4. Drop Shadow of the Tonearm onto the Platter/Record
+  void _drawTonearmShadow(Canvas canvas, double l) {
     final shadowPath = Path();
-    final l = armLength;
     shadowPath.moveTo(0, 8);
-    shadowPath.cubicTo(
-      6,
-      l * 0.30,
-      -8,
-      l * 0.65,
-      -3,
-      l * 0.90,
-    );
+    shadowPath.cubicTo(6, l * 0.30, -8, l * 0.65, -3, l * 0.90);
     shadowPath.lineTo(-6, l);
 
     final shadowPaint = Paint()
@@ -1156,21 +1182,15 @@ class _TonearmPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
 
     canvas.save();
-    canvas.translate(7, 7); // shadow offset
+    canvas.translate(7, 7);
     canvas.drawPath(shadowPath, shadowPaint);
     canvas.restore();
+  }
 
-    // 5. Tonearm Tube (Polished Chrome S-Curve)
+  void _drawTube(Canvas canvas, double l) {
     final tubePath = Path();
     tubePath.moveTo(0, 6);
-    tubePath.cubicTo(
-      6,
-      l * 0.30,
-      -8,
-      l * 0.65,
-      -3,
-      l * 0.90,
-    );
+    tubePath.cubicTo(6, l * 0.30, -8, l * 0.65, -3, l * 0.90);
 
     final tubePaint = Paint()
       ..shader = LinearGradient(
@@ -1188,18 +1208,17 @@ class _TonearmPainter extends CustomPainter {
       ..strokeWidth = 3.4
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(tubePath, tubePaint);
+  }
 
-    // 6. Headshell Collar (Connector Ring at l * 0.90)
+  void _drawHeadshell(Canvas canvas, double l) {
     final collarPaint = Paint()
       ..color = const Color(0xFFC0C3D0)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(-3, l * 0.90), 3.2, collarPaint);
+    canvas.drawCircle(Offset(-3, l * 0.90), _collarRadius, collarPaint);
 
-    // 7. Headshell & Cartridge
     final headshellStart = Offset(-3, l * 0.90);
     final headshellEnd = Offset(-7, l);
 
-    // Headshell Body (Angled studio cartridge)
     final headshellPath = Path();
     headshellPath.moveTo(headshellStart.dx - 4, headshellStart.dy);
     headshellPath.lineTo(headshellStart.dx + 4, headshellStart.dy);
@@ -1216,7 +1235,6 @@ class _TonearmPainter extends CustomPainter {
           Rect.fromLTWH(headshellEnd.dx - 6, headshellStart.dy, 12, 22));
     canvas.drawPath(headshellPath, headshellPaint);
 
-    // Cartridge Tip / Stylus Housing (with activeColor accent)
     final stylusHousingRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(headshellEnd.dx - 3.5, headshellEnd.dy + 3, 7, 6),
       const Radius.circular(1.5),
@@ -1224,7 +1242,6 @@ class _TonearmPainter extends CustomPainter {
     final stylusHousingPaint = Paint()..color = activeColor;
     canvas.drawRRect(stylusHousingRect, stylusHousingPaint);
 
-    // Stylus Needle Point
     final needlePaint = Paint()
       ..color = Colors.white
       ..strokeWidth = 1.5;
@@ -1234,7 +1251,6 @@ class _TonearmPainter extends CustomPainter {
       needlePaint,
     );
 
-    // Finger Lift (slender curved lever on the right of headshell)
     final fingerLiftPath = Path();
     fingerLiftPath.moveTo(headshellEnd.dx + 4, headshellEnd.dy + 2);
     fingerLiftPath.cubicTo(
@@ -1251,8 +1267,9 @@ class _TonearmPainter extends CustomPainter {
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(fingerLiftPath, fingerLiftPaint);
+  }
 
-    // 8. Pivot Bearing Cap (on top of gimbal)
+  void _drawPivotCap(Canvas canvas) {
     final bearingPaint = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -1261,12 +1278,10 @@ class _TonearmPainter extends CustomPainter {
           Colors.grey.shade800,
         ],
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
-    canvas.drawCircle(Offset.zero, 6.5, bearingPaint);
+    canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);
 
     final centerScrewPaint = Paint()..color = const Color(0xFF1A1C24);
-    canvas.drawCircle(Offset.zero, 2.5, centerScrewPaint);
-
-    canvas.restore();
+    canvas.drawCircle(Offset.zero, _pivotCenterScrewRadius, centerScrewPaint);
   }
 
   void _drawArmRest(Canvas canvas, Offset pos) {

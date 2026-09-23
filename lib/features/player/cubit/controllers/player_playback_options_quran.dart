@@ -67,15 +67,26 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       final snapshot = _captureQuranRestoreSnapshot(s);
       await _persistQuranSnapshot(snapshot);
       _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: true)));
+      final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
+      await _applyQuranProfile(profile);
     } else {
+      final snapshot = await loadQuranSnapshot();
+      if (snapshot != null) {
+        await _restoreFromSnapshot(snapshot);
+      }
       await _clearQuranSnapshot();
-      _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: false)));
+      final current = _getState();
+      _emit(current.copyWith(dsp: current.dsp.copyWith(isQuranModeEnabled: false)));
     }
   }
 
   void setQuranReciterStyle(QuranReciterStyle style) {
     final s = _getState();
     _emit(s.copyWith(dsp: s.dsp.copyWith(quranReciterStyle: style)));
+    if (s.isQuranModeEnabled) {
+      final profile = QuranModeProfile.forStyle(style);
+      unawaited(_applyQuranProfile(profile));
+    }
   }
 
   Future<void> setQuranAmbience(double v) async {
@@ -89,5 +100,121 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     await _audioHandler.setReverb(enable, wetDry: v);
   }
 
-  Future<void> reapplyQuranProfile() async {}
+  Future<void> _restoreFromSnapshot(QuranRestoreSnapshot snapshot) async {
+    final s = _getState();
+    _emit(s.copyWith(
+      dsp: s.dsp.copyWith(
+        isEqEnabled: snapshot.isEqEnabled,
+        eqPreset: snapshot.eqPreset,
+        selectedHeadphoneProfile: snapshot.headphoneProfile,
+        isReverbEnabled: snapshot.isReverbEnabled,
+        reverbPreset: snapshot.reverbPreset,
+        reverbWetDry: snapshot.reverbWetDry,
+        isSaturationEnabled: snapshot.isSaturationEnabled,
+        saturationDrive: snapshot.saturationDrive,
+        saturationMix: snapshot.saturationMix,
+        saturationTilt: snapshot.saturationTilt,
+        isDynamicsEnabled: snapshot.isDynamicsEnabled,
+        dynamicsPreset: snapshot.dynamicsPreset,
+      ),
+      playback: s.playback.copyWith(
+        playbackSpeed: snapshot.playbackSpeed,
+        isShuffle: snapshot.isShuffle,
+      ),
+    ));
+
+    try {
+      await _audioHandler.setEqualizerEnabled(snapshot.isEqEnabled);
+      await _audioHandler.applyPreset(snapshot.eqPreset);
+      await _audioHandler.setReverb(
+        snapshot.isReverbEnabled,
+        preset: snapshot.reverbPreset,
+        wetDry: snapshot.reverbWetDry,
+      );
+      await _audioHandler.setSaturation(
+        snapshot.isSaturationEnabled,
+        drive: snapshot.saturationDrive,
+        mix: snapshot.saturationMix,
+        tilt: snapshot.saturationTilt,
+      );
+      await _audioHandler.setDynamicsPreset(
+        snapshot.dynamicsPreset,
+        enabled: snapshot.isDynamicsEnabled,
+      );
+      await setPlaybackSpeed(snapshot.playbackSpeed);
+      if (snapshot.isShuffle != s.isShuffle) {
+        await _audioHandler.setShuffleMode(
+          snapshot.isShuffle
+              ? AudioServiceShuffleMode.all
+              : AudioServiceShuffleMode.none,
+        );
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore from Quran snapshot',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsQuran');
+    }
+  }
+
+  Future<void> _applyQuranProfile(QuranModeProfile profile) async {
+    final s = _getState();
+    final eqPreset = profile.toEqPreset();
+
+    _emit(s.copyWith(
+      dsp: s.dsp.copyWith(
+        isEqEnabled: true,
+        eqPreset: eqPreset,
+        isReverbEnabled: profile.reverbEnabled,
+        reverbPreset: profile.reverbPreset.wireValue,
+        reverbWetDry: profile.reverbWetDry,
+        isSaturationEnabled: profile.saturationEnabled,
+        saturationDrive: profile.saturationDrive,
+        saturationMix: profile.saturationMix,
+        saturationTilt: profile.saturationTilt,
+        isDynamicsEnabled: profile.dynamicsEnabled,
+        dynamicsPreset: profile.dynamicsPreset,
+      ),
+      playback: s.playback.copyWith(
+        playbackSpeed: profile.playbackSpeed,
+      ),
+    ));
+
+    try {
+      await _audioHandler.setEqualizerEnabled(true);
+      await _audioHandler.applyPreset(eqPreset);
+      await _audioHandler.setReverb(
+        profile.reverbEnabled,
+        preset: profile.reverbPreset.wireValue,
+        wetDry: profile.reverbWetDry,
+      );
+      await _audioHandler.setSaturation(
+        profile.saturationEnabled,
+        drive: profile.saturationDrive,
+        mix: profile.saturationMix,
+        tilt: profile.saturationTilt,
+      );
+      await _audioHandler.setDynamicsPreset(
+        profile.dynamicsPreset,
+        enabled: profile.dynamicsEnabled,
+      );
+      await setPlaybackSpeed(profile.playbackSpeed);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply Quran profile',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsQuran');
+    }
+  }
+
+  Future<void> reapplyQuranProfile() async {
+    final snapshot = await loadQuranSnapshot();
+    if (snapshot != null) {
+      await _restoreFromSnapshot(snapshot);
+      return;
+    }
+    final s = _getState();
+    final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
+    await _applyQuranProfile(profile);
+  }
 }

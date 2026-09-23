@@ -7,6 +7,7 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/toggle_favorite_usecase.dart';
+import '../player_constants.dart';
 import '../player_state.dart';
 
 /// Owns audio transport controls: play, pause, seek, track skipping, shuffle, repeat, and favorite toggle.
@@ -123,11 +124,13 @@ class PlayerTransportController {
     _emit(state.copyWith(playback: state.playback.copyWith(position: target)));
 
     final nowMs = _seekStopwatch.elapsedMilliseconds;
-    if (nowMs - _lastSeekMs < 100) {
+    if (nowMs - _lastSeekMs < PlayerConstants.seekThrottleMs) {
       _pendingSeek = target;
       _seekThrottleTimer?.cancel();
       _seekThrottleTimer = Timer(
-        Duration(milliseconds: 100 - (nowMs - _lastSeekMs)),
+        Duration(
+            milliseconds: (PlayerConstants.seekThrottleMs - (nowMs - _lastSeekMs))
+                .clamp(16, PlayerConstants.seekThrottleMs)),
         () {
           if (_isClosed()) {
             _pendingSeek = null;
@@ -248,21 +251,33 @@ class PlayerTransportController {
     }
   }
 
-  Future<void> toggleFavorite(dynamic target) async {
-    if (_toggleFavoriteUseCase == null) return;
-    SongsTableData? song;
-    if (target is SongsTableData) {
-      song = target;
-    } else if (target is int) {
-      final state = _getState();
-      if (state.currentSong?.id == target) {
-        song = state.currentSong;
-      } else {
-        song = state.queue.where((s) => s.id == target).firstOrNull ??
-            _slotLookupCache?[target];
-      }
+  Future<void> toggleFavoriteSong(SongsTableData song) =>
+      _executeToggleFavorite(song);
+
+  Future<void> toggleFavoriteById(int songId) async {
+    final state = _getState();
+    final song = (state.currentSong?.id == songId)
+        ? state.currentSong
+        : (state.queue.where((s) => s.id == songId).firstOrNull ??
+            _slotLookupCache?[songId]);
+    if (song != null) {
+      await _executeToggleFavorite(song);
     }
-    if (song == null) return;
+  }
+
+  Future<void> toggleFavorite([dynamic target]) async {
+    if (target is SongsTableData) {
+      return toggleFavoriteSong(target);
+    } else if (target is int) {
+      return toggleFavoriteById(target);
+    } else if (target == null) {
+      final current = _getState().currentSong;
+      if (current != null) return toggleFavoriteSong(current);
+    }
+  }
+
+  Future<void> _executeToggleFavorite(SongsTableData song) async {
+    if (_toggleFavoriteUseCase == null) return;
     final songId = song.id;
     final result = await _toggleFavoriteUseCase!(song.id);
     if (_isClosed()) return;

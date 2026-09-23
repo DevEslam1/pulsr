@@ -106,5 +106,6 @@ class PlayerScrobbleCoordinator {
   void dispose() {
     _debounce?.cancel();
     _debounce = null;
+    _monotonicClock.stop();
   }
 }

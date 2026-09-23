@@ -7,6 +7,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import '../../cubit/player_constants.dart';
 
 /// Interactive gesture-driven waveform seek bar widget with pinch-to-zoom and chapter marker support.
 class WaveformSeekBar extends StatefulWidget {
@@ -65,7 +66,9 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   // FIX-M8: Guard against totalCount <= 1 to prevent division by zero in calculations
   ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
     if (totalCount <= 1) return (startIndex: 0, visibleCount: totalCount);
-    final int visibleCount = (totalCount / _zoomScale.clamp(1.0, 8.0))
+    final int visibleCount = (totalCount /
+            _zoomScale.clamp(PlayerConstants.waveformMinZoom,
+                PlayerConstants.waveformMaxZoom))
         .round()
         .clamp(2, totalCount);
     final effectiveMs = _dragValue ?? widget.position.inMilliseconds.toDouble();
@@ -165,8 +168,9 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         if (now - _lastScaleMs >= 33) {
                           _lastScaleMs = now;
                           setState(() {
-                            _zoomScale =
-                                (_zoomScale * details.scale).clamp(1.0, 4.0);
+                            _zoomScale = (_zoomScale * details.scale).clamp(
+                                PlayerConstants.waveformMinZoom,
+                                PlayerConstants.waveformMaxZoom);
                           });
                         }
                       }

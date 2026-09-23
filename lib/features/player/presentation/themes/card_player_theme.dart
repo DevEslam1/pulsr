@@ -45,7 +45,18 @@ class CardPlayerTheme extends StatelessWidget {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
-    final settingsState = context.watch<SettingsCubit>().state;
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe, :visualizerStyle) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+              VisualizerStyle visualizerStyle,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+              visualizerStyle: c.state.visualizerStyle,
+            ));
     final isTablet = context.isTablet;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -139,7 +150,6 @@ class CardPlayerTheme extends StatelessWidget {
 
               final bottomDock = PlayerBottomActionDock(
                 props: props,
-                settingsState: settingsState,
                 isTablet: isTablet,
                 barWidth: pillBarWidth,
                 barHeight: pillBarHeight,
@@ -149,7 +159,7 @@ class CardPlayerTheme extends StatelessWidget {
               final centerDisplay = GestureDetector(
                 onTap: () => cubit.toggleLyricsVisibility(),
                 onDoubleTap: () {
-                  switch (settingsState.nowPlayingDoubleTap) {
+                  switch (nowPlayingDoubleTap) {
                     case NowPlayingDoubleTapAction.toggleFavorite:
                       if (song != null) cubit.toggleFavorite(song.id);
                       break;
@@ -161,7 +171,7 @@ class CardPlayerTheme extends StatelessWidget {
                   }
                 },
                 onHorizontalDragEnd: (details) {
-                  if (settingsState.nowPlayingArtworkSwipe ==
+                  if (nowPlayingArtworkSwipe ==
                           NowPlayingArtworkSwipeAction.nextPrev &&
                       details.primaryVelocity != null) {
                     if (details.primaryVelocity! < -200) {
@@ -248,7 +258,7 @@ class CardPlayerTheme extends StatelessWidget {
               );
 
               final visualizer =
-                  (settingsState.visualizerStyle != VisualizerStyle.off &&
+                  (visualizerStyle != VisualizerStyle.off &&
                           !state.isLyricsVisible &&
                           !state.isQueueVisible)
                       ? Padding(
@@ -256,9 +266,9 @@ class CardPlayerTheme extends StatelessWidget {
 
                               horizontal: AppSpacing.lg, vertical: AppSpacing.s2),
                           child: AudioVisualizer(
-                            style: settingsState.visualizerStyle,
+                            style: visualizerStyle,
                             color: activeColor,
-                            height: settingsState.visualizerStyle ==
+                            height: visualizerStyle ==
                                     VisualizerStyle.circular
                                 ? 64
                                 : 40,

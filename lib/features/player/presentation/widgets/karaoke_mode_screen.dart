@@ -183,6 +183,27 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
                       ),
                     ),
                   ),
+                )
+              else if (effectiveLyrics.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.music_note_rounded,
+                          size: 32, color: p.primary.withValues(alpha: 0.7)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '•••',
+                        style: TextStyle(
+                          fontSize: AppFontSize.display,
+                          fontWeight: FontWeight.w700,
+                          color: p.textTertiary,
+                          letterSpacing: 4.0,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               const SizedBox(height: AppSpacing.lg),
               // Next Upcoming Line (Tappable)

@@ -92,7 +92,16 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
     final activeColor = widget.props.activeColor;
     final bgColor = widget.props.bgColor;
     final song = state.currentSong;
-    final settingsState = context.watch<SettingsCubit>().state;
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+            ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -153,7 +162,6 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
             final bottomDock = PlayerBottomActionDock(
               props: widget.props,
-              settingsState: settingsState,
               isTablet: isTablet,
               barWidth: pillBarWidth,
               barHeight: pillBarHeight,
@@ -163,7 +171,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             final centerDisplay = GestureDetector(
               onTap: () => cubit.toggleLyricsVisibility(),
               onDoubleTap: () {
-                switch (settingsState.nowPlayingDoubleTap) {
+                switch (nowPlayingDoubleTap) {
                   case NowPlayingDoubleTapAction.toggleFavorite:
                     if (song != null) cubit.toggleFavorite(song.id);
                     break;
@@ -175,7 +183,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 }
               },
               onHorizontalDragEnd: (details) {
-                if (settingsState.nowPlayingArtworkSwipe ==
+                if (nowPlayingArtworkSwipe ==
                         NowPlayingArtworkSwipeAction.nextPrev &&
                     details.primaryVelocity != null) {
                   if (details.primaryVelocity! < -200) {

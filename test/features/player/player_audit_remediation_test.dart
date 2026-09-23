@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/models/audio_effects_config.dart';
+import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/features/player/cubit/controllers/player_dsp_controller.dart';
 import 'package:pulsr/features/player/cubit/player_scrobble_coordinator.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/cubit/player_widget_coordinator.dart';
+import 'package:pulsr/features/player/cubit/quran_restore_snapshot.dart';
 import 'package:pulsr/features/player/presentation/widgets/dsp_inspector_sheet.dart';
 
 SongsTableData _makeSong(int id, String title, String artist) {
@@ -124,6 +127,65 @@ DSP Chain Status:
 
       final state = PlayerState(playback: slice1);
       expect(state.sleepTimerRemainingTracks, 3);
+    });
+
+    test('PlayerState.differsFromBeyondPosition ignores internal DSP parameters but triggers on user-visible toggles', () {
+      final base = PlayerState();
+      
+      // Internal DSP parameter tweak (e.g. saturation drive / stereo width) should NOT trigger full screen rebuild
+      final internalTweak = base.copyWith(
+        dsp: base.dsp.copyWith(saturationDrive: 0.8, stereoWidthLow: 0.5),
+      );
+      expect(base.differsFromBeyondPosition(internalTweak), isFalse);
+
+      // User-visible DSP mode toggles DO trigger
+      final eqToggled = base.copyWith(
+        dsp: base.dsp.copyWith(isEqEnabled: !base.isEqEnabled),
+      );
+      expect(base.differsFromBeyondPosition(eqToggled), isTrue);
+
+      final quranToggled = base.copyWith(
+        dsp: base.dsp.copyWith(isQuranModeEnabled: !base.isQuranModeEnabled),
+      );
+      expect(base.differsFromBeyondPosition(quranToggled), isTrue);
+    });
+
+    test('QuranRestoreSnapshot serializes and deserializes correctly', () {
+      final rockPreset = EqPreset.defaultPresets.firstWhere((p) => p.name == 'Rock');
+      final snapshot = QuranRestoreSnapshot(
+        eqPreset: rockPreset,
+        isEqEnabled: true,
+        headphoneProfile: null,
+        isReverbEnabled: true,
+        reverbPreset: 2,
+        reverbWetDry: 0.35,
+        isDynamicsEnabled: true,
+        dynamicsPreset: DynamicsPreset.vocalFocus,
+        isSaturationEnabled: true,
+        saturationDrive: 0.4,
+        saturationMix: 0.5,
+        saturationTilt: -0.2,
+        playbackSpeed: 1.25,
+        isShuffle: true,
+        preampDb: -1.5,
+      );
+
+      final json = snapshot.toJson();
+      final restored = QuranRestoreSnapshot.fromJson(json);
+
+      expect(restored.eqPreset.name, 'Rock');
+      expect(restored.isEqEnabled, isTrue);
+      expect(restored.headphoneProfile, isNull);
+      expect(restored.isReverbEnabled, isTrue);
+      expect(restored.reverbPreset, 2);
+      expect(restored.reverbWetDry, 0.35);
+      expect(restored.isDynamicsEnabled, isTrue);
+      expect(restored.dynamicsPreset, DynamicsPreset.vocalFocus);
+      expect(restored.isSaturationEnabled, isTrue);
+      expect(restored.saturationDrive, 0.4);
+      expect(restored.playbackSpeed, 1.25);
+      expect(restored.isShuffle, isTrue);
+      expect(restored.preampDb, -1.5);
     });
   });
 }

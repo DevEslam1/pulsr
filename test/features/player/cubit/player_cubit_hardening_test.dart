@@ -11,9 +11,19 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/models/headphone_profile.dart';
+import 'package:mutex/mutex.dart';
+import 'package:pulsr/core/services/hires_audio_service.dart';
+import 'package:pulsr/core/utils/lrc_parser.dart';
+import 'package:pulsr/domain/models/lyrics_line.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
+import 'package:pulsr/features/player/cubit/controllers/player_controllers.dart';
+import 'package:pulsr/features/player/cubit/managers/player_managers.dart';
+import 'package:pulsr/features/player/cubit/player_constants.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
@@ -21,6 +31,10 @@ class MockMusicRepository extends Mock implements IMusicRepository {}
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 
 class MockScrobblerService extends Mock implements ScrobblerService {}
+
+class MockHiResAudioService extends Mock implements HiResAudioService {}
+
+class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler
@@ -487,6 +501,186 @@ void main() {
       expect(cubit.state.queue.length, equals(500));
 
       await cubit.close();
+    });
+
+    test('Fix #1: PlayerTransportController wires slot cache, debounced persist, and widget updater on favorite toggle', () async {
+      final slotCache = <int, SongsTableData>{
+        1: sampleSong1.copyWith(isFavorite: false),
+      };
+      var debouncedPersistCalled = false;
+      var updateWidgetCalled = false;
+
+      when(() => mockToggleFavorite(1)).thenAnswer((_) async => const Right(true));
+
+      var state = PlayerState(
+        playback: const PlaybackSlice().copyWith(currentSong: sampleSong1.copyWith(isFavorite: false)),
+        queueSlice: QueueSlice(queue: [sampleSong1.copyWith(isFavorite: false)], currentIndex: 0),
+      );
+
+      final controller = PlayerTransportController(
+        audioHandler: testAudioHandler,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        slotLookupCache: slotCache,
+        debouncedPersistQueueSlots: () => debouncedPersistCalled = true,
+        updateWidgetThrottled: ({bool force = false}) => updateWidgetCalled = true,
+      );
+
+      await controller.toggleFavoriteById(1);
+
+      // Verify slotLookupCache updated
+      expect(slotCache[1]?.isFavorite, isTrue);
+      // Verify debounced persistence invoked
+      expect(debouncedPersistCalled, isTrue);
+      // Verify widget throttled update invoked
+      expect(updateWidgetCalled, isTrue);
+      // Verify state was updated
+      expect(state.currentSong?.isFavorite, isTrue);
+    });
+
+    test('Fix #3: Lyrics negative cache freshness respects TTL and prevents refetching', () async {
+      LrcParser.invalidateCache(songId: sampleSong1.id, path: sampleSong1.path);
+      final lyricsManager = PlayerLyricsManager();
+
+      // Initially no cached lyrics
+      expect(lyricsManager.getCachedLyrics(sampleSong1), isNull);
+      expect(lyricsManager.hasFreshNegativeCache(sampleSong1), isFalse);
+
+      // Cache a negative result (null)
+      lyricsManager.cacheNegativeResult(sampleSong1);
+
+      // Fresh negative cache should return true
+      expect(lyricsManager.hasFreshNegativeCache(sampleSong1), isTrue);
+      expect(lyricsManager.getCachedLyrics(sampleSong1), isNull);
+
+      // Positive cache overrides negative
+      final positiveResult = LyricsResult(
+        lines: [LyricsLine(timestamp: Duration.zero, text: 'Hello', source: LyricsSource.embedded)],
+        source: LyricsSource.embedded,
+      );
+      LrcParser.cacheLyricsResult(positiveResult, songId: sampleSong1.id, path: sampleSong1.path);
+
+      expect(lyricsManager.hasFreshNegativeCache(sampleSong1), isFalse);
+      expect(lyricsManager.getCachedLyrics(sampleSong1), isNotNull);
+    });
+
+    test('Fix #4: restoreQueueSlots continues remaining slots when one slot lookup fails', () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.queueSlots: '''{
+          "schemaVersion": 1,
+          "0": {"songIds": [1], "currentIndex": 0, "positionMs": 0, "speed": 1.0},
+          "1": {"songIds": [2], "currentIndex": 0, "positionMs": 0, "speed": 1.0},
+          "activeSlot": 0
+        }''',
+      });
+
+      final song2 = SongsTableData(
+        id: 2,
+        title: 'Track 2',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 100000,
+        path: '/path/2.mp3',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      // Slot 0 throws an exception
+      when(() => mockRepository.getSongsByIds([1])).thenThrow(Exception('DB error'));
+      // Slot 1 succeeds with matching id 2
+      when(() => mockRepository.getSongsByIds([2]))
+          .thenAnswer((_) async => right([song2]));
+
+      var state = const PlayerState();
+      final slots = <int, QueueSlotData>{};
+      final controller = PlayerQueueController(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false,
+        queueMutex: Mutex(),
+        slotLookupCache: <int, SongsTableData>{},
+        queueSlots: slots,
+        updateWidgetThrottled: ({bool force = false}) {},
+        loadLyrics: (_) {},
+        bumpQueueVersion: () {},
+        isSameTrack: (a, b) => a?.id == b?.id,
+      );
+
+      await controller.restoreQueueSlots();
+
+      // Slot 0 failed, but slot 1 must have restored successfully
+      expect(slots.containsKey(1), isTrue);
+      expect(slots[1]?.songIds.first, equals(2));
+    });
+
+    test('Fix #6: maybeFollowTrackSampleRate defaults bitDepth to 16 when track lacks bitDepth', () async {
+      final mockHiRes = MockHiResAudioService();
+      final mockSettings = MockSettingsCubit();
+      when(() => mockSettings.state).thenReturn(
+        const SettingsState(followTrackSampleRate: true),
+      );
+      when(() => mockSettings.refreshOutputDevice()).thenAnswer((_) async {});
+      when(() => mockHiRes.setTargetOutputFormat(
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+          )).thenAnswer((_) async => true);
+
+      var state = const PlayerState();
+      final dspController = PlayerDspController(
+        audioHandler: testAudioHandler,
+        settingsCubit: mockSettings,
+        hiResAudioService: mockHiRes,
+        getState: () => state,
+        emit: (s) => state = s,
+        syncAudioEffects: ({bool force = false}) {},
+        isClosed: () => false,
+      );
+
+      final trackWithZeroDepth = SongsTableData(
+        id: 200,
+        title: 'Zero Depth Track',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 100000,
+        path: '/path/zero.mp3',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        bitDepth: 0,
+        sampleRate: 44100,
+      );
+      await dspController.maybeFollowTrackSampleRate(trackWithZeroDepth);
+
+      // Verify PlayerConstants.defaultBitDepth (16) was sent rather than 0
+      verify(() => mockHiRes.setTargetOutputFormat(
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: PlayerConstants.defaultBitDepth,
+          )).called(1);
+    });
+
+    test('Fix #10: PlayerCubit.close() isolates controller disposal failures', () async {
+      SharedPreferences.setMockInitialValues({});
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        scrobblerService: mockScrobblerService,
+      );
+
+      // Close must complete cleanly without throwing
+      await expectLater(cubit.close(), completes);
+      expect(cubit.isClosed, isTrue);
     });
   });
 }

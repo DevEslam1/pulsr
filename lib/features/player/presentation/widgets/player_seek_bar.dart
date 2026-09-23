@@ -151,7 +151,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 stackTrace: snapshot.stackTrace,
                 category: 'WaveformSeekBar',
               );
-              _cachedWaveformFuture = null;
             }
             // Hard failure fallback to standard seek bar
             return _buildStandardSeekBar(context);
@@ -166,6 +165,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   /// Adds the "Up Next" strip below the seek bar (shared by every theme).
   Widget _withUpNext(Widget seek) {
     if (!widget.showUpNext) return seek;
+    final hasNext = context.select<PlayerCubit, bool>((c) {
+      final q = c.state.queue;
+      final i = c.state.currentIndex;
+      return i >= 0 && i + 1 < q.length && q[i + 1].title.isNotEmpty;
+    });
+    if (!hasNext) return seek;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [seek, _upNextRow(context)],

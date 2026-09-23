@@ -269,13 +269,6 @@ class PlayerQueueController {
 
     _updateWidgetThrottled(force: true);
 
-    // FIX (Bug 1): Dispatch lyrics pre-load immediately so lyrics resolve
-    // concurrently with audio buffering. If loadQueue fails, _lyricsGuard.invalidate()
-    // cancels any late emissions.
-    if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-      _loadLyrics(song);
-    }
-
     try {
       await _audioHandler.loadQueue(
         effectiveQueue,
@@ -283,6 +276,9 @@ class PlayerQueueController {
         initialPosition: startPos,
         autoPlay: true,
       );
+      if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
+        _loadLyrics(song);
+      }
     } catch (e, st) {
       ErrorLogger.log('Load queue failed for song ${song.id}',
           error: e, stackTrace: st, category: 'PlayerQueueController');
@@ -404,5 +400,14 @@ class PlayerQueueController {
       ErrorLogger.log('Find next local match failed',
           error: e, stackTrace: st, category: 'PlayerQueueController');
     });
+  }
+
+  void dispose() {
+    _persistQueueDebounce?.cancel();
+    _persistQueueDebounce = null;
+    _mediaItemResolutionGuard.invalidate();
+    _localMatchSwapGuard.invalidate();
+    _mediaItemGuard.invalidate();
+    _lyricsGuard.invalidate();
   }
 }

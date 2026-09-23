@@ -1,15 +1,12 @@
 // lib/features/player/presentation/themes/player_theme_scaffold.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
-import '../../../settings/cubit/settings_cubit.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/advanced_playback_bar.dart';
@@ -216,7 +213,6 @@ class PlayerThemeScaffold extends StatelessWidget {
     final cubit = props.cubit;
     final song = state.currentSong;
     final activeColor = props.activeColor;
-    final settingsState = context.watch<SettingsCubit>().state;
 
     return AnimatedContainer(
       duration: context.motionMs(400),
@@ -249,7 +245,6 @@ class PlayerThemeScaffold extends StatelessWidget {
                     ? bottomDock!(context, metrics)
                     : PlayerBottomActionDock(
                         props: props,
-                        settingsState: settingsState,
                         isTablet: metrics.isTablet,
                         barWidth: metrics.pillBarWidth,
                         barHeight: metrics.pillBarHeight,

@@ -40,7 +40,6 @@ class TabletPlayerBar extends StatefulWidget {
 
 class _TabletPlayerBarState extends State<TabletPlayerBar> {
   final ValueNotifier<double?> _dragVolumeNotifier = ValueNotifier<double?>(null);
-  double _preMuteVolume = 1.0;
   final ValueNotifier<double?> _dragSeekNotifier = ValueNotifier<double?>(null);
   double? _lastDockHeight;
   bool? _lastMiniPlayer;
@@ -482,7 +481,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           builder: (context, dragVolume, _) {
                             final effectiveVolume =
                                 (dragVolume ?? handlerVolume).clamp(0.0, 1.0);
-                            final isMuted = effectiveVolume <= 0.0;
+                            final isMuted =
+                                cubit.isMuted || effectiveVolume <= 0.0;
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -502,17 +502,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   ),
                                   tooltip: isMuted ? l10n.unmute : l10n.mute,
                                   onPressed: () {
-                                    if (isMuted) {
-                                      final restore =
-                                          _preMuteVolume <= 0.0 ? 1.0 : _preMuteVolume;
-                                      _preMuteVolume = restore;
-                                      _dragVolumeNotifier.value = null;
-                                      cubit.setVolume(restore);
-                                    } else {
-                                      _preMuteVolume = effectiveVolume;
-                                      _dragVolumeNotifier.value = null;
-                                      cubit.setVolume(0.0);
-                                    }
+                                    _dragVolumeNotifier.value = null;
+                                    cubit.toggleMute();
                                   },
                                 ),
                                 SizedBox(
@@ -533,7 +524,6 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                       onChangeEnd: (v) {
                                         _dragVolumeNotifier.value = null;
                                         cubit.setVolume(v);
-                                        if (v > 0.0) _preMuteVolume = v;
                                       },
                                     ),
                                   ),

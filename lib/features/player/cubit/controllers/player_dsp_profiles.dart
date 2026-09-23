@@ -10,6 +10,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       final key = DeviceProfileService.deviceKeyFromInfo(device);
       await service.rememberDevice(key, device.deviceName);
       if (_lastAutoAppliedDeviceKey == key) return;
+      _lastAutoAppliedDeviceKey = null;
 
       final smart = _smartAudioService;
       final smartEnabled = smart != null && await smart.isEnabled();
@@ -52,7 +53,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     AudioOutputInfo device,
   ) async {
     try {
-      final repo = HeadphoneProfilesRepository();
+      final repo = _headphoneProfilesRepo;
       await repo.loadProfiles();
       if (_isClosed() || repo.profiles.isEmpty) return null;
 
@@ -158,7 +159,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         );
       }
       if (profile.headphoneProfileId != null) {
-        final repo = HeadphoneProfilesRepository();
+        final repo = _headphoneProfilesRepo;
         await repo.loadProfiles();
         final hpProfile = repo.getProfileById(profile.headphoneProfileId!);
         await applyHeadphoneProfile(hpProfile);

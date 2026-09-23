@@ -57,23 +57,28 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         final decoded = QueueSlotCodec.decodeSlot(
             Map<String, dynamic>.from(rawSlot), PlayerQueueController.maxQueueSize);
         if (decoded == null) continue;
-        final songsResult = await _repository.getSongsByIds(decoded.songIds);
-        final songsMap = {
-          for (final s
-              in songsResult.fold((_) => <SongsTableData>[], (r) => r))
-            s.id: s
-        };
-        final songs = QueueSlotCodec.mergeInPersistedOrder(
-            decoded.songIds, songsMap, decoded.onlineSongsById);
-        if (songs.isEmpty) continue;
-        setQueueSlot(
-          slotIndex,
-          songs: songs,
-          currentIndex: QueueSlotCodec.clampCurrentIndex(
-              decoded.currentIndex, songs.length),
-          position: QueueSlotCodec.clampPosition(decoded.positionMs),
-          speed: QueueSlotCodec.clampSpeed(decoded.speed),
-        );
+        try {
+          final songsResult = await _repository.getSongsByIds(decoded.songIds);
+          final songsMap = {
+            for (final s
+                in songsResult.fold((_) => <SongsTableData>[], (r) => r))
+              s.id: s
+          };
+          final songs = QueueSlotCodec.mergeInPersistedOrder(
+              decoded.songIds, songsMap, decoded.onlineSongsById);
+          if (songs.isEmpty) continue;
+          setQueueSlot(
+            slotIndex,
+            songs: songs,
+            currentIndex: QueueSlotCodec.clampCurrentIndex(
+                decoded.currentIndex, songs.length),
+            position: QueueSlotCodec.clampPosition(decoded.positionMs),
+            speed: QueueSlotCodec.clampSpeed(decoded.speed),
+          );
+        } catch (e, st) {
+          ErrorLogger.log('Failed to restore queue slot $slotIndex',
+              error: e, stackTrace: st, category: 'PlayerQueueController');
+        }
       }
       if (!_isClosed()) {
         final restoredSlot = QueueSlotCodec.activeSlotFrom(data['activeSlot']);
