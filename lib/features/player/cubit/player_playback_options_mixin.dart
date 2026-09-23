@@ -73,6 +73,8 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   /// A-06: Toggle output mute (restores pre-mute volume on unmute).
   Future<void> toggleMute() => playbackOptionsController.toggleMute();
 
+  bool get isMuted => playbackOptionsController.isMuted;
+
   /// A-01: Restore a resumed track's per-song speed/pitch/volume/EQ memory.
   Future<void> applyPerSongPlaybackMemory(SongsTableData song) =>
       playbackOptionsController.applyPerSongPlaybackMemory(song);
@@ -110,7 +112,7 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   void setSilenceSkipSensitivity(int sensitivity) =>
       playbackOptionsController.setSilenceSkipSensitivity(sensitivity);
 
-  void setQuranModeEnabled(bool enabled) =>
+  Future<void> setQuranModeEnabled(bool enabled) =>
       playbackOptionsController.setQuranModeEnabled(enabled);
 
   void setQuranReciterStyle(QuranReciterStyle style) =>

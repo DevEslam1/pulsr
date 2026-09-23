@@ -207,27 +207,26 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     }
   }
 
-  Future<void> setVolumeBoost(double value) async {
-    if (value > 0.01 && !guardDsp('Volume Boost')) return;
+  Future<void> setVolumeBoost(double value) {
     final state = _getState();
     final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
     var safeValue = value.clamp(0.0, 1.0);
     if ((preampDb + safeValue * 10.0) > 6.0) {
       safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
+      if (safeValue < value - 0.01) {
+        ErrorLogger.log(
+          'Volume boost request (${(value * 10).toStringAsFixed(1)} dB) clamped to '
+          '+${(safeValue * 10).toStringAsFixed(1)} dB to prevent clipping with preamp (${preampDb.toStringAsFixed(1)} dB)',
+          category: 'PlayerDspEffects',
+        );
+      }
     }
-    _emit(state.copyWith(
-      dsp: state.dsp.copyWith(volumeBoost: safeValue),
-      playback: state.playback.copyWith(errorMessage: null),
-    ));
-    try {
-      await _audioHandler.setVolumeBoost(safeValue);
-    } catch (e) {
-      _syncAudioEffects();
-      final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback
-              .copyWith(errorMessage: 'Failed to set volume boost: $e')));
-    }
+    return applyDspEffect(
+      featureName: 'Volume Boost',
+      guardCondition: safeValue > 0.01,
+      updateDsp: (dsp) => dsp.copyWith(volumeBoost: safeValue),
+      applyAudioHandler: () => _audioHandler.setVolumeBoost(safeValue),
+    );
   }
 
   Future<void> setSpatializerEnabled(bool enabled) => applyDspEffect(
@@ -254,7 +253,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
 
   Future<void> setCrossfeedMode(int mode) => applyDspEffect(
         featureName: 'Crossfeed Mode',
-        requiresGuard: false,
+        requiresGuard: true,
+        guardCondition: _getState().isCrossfeedEnabled,
+        showErrorOnGuard: false,
         updateDsp: (dsp) => dsp.copyWith(crossfeedMode: mode),
         applyAudioHandler: () => _audioHandler.setCrossfeedMode(mode),
       );
@@ -353,22 +354,16 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     }
   }
 
-  Future<void> setStereoBalance(double balance) async {
-    if (balance.abs() > 0.01 && !guardDsp('Stereo Balance', showError: false)) {
-      return;
-    }
+  Future<void> setStereoBalance(double balance) {
     final clamped = balance.clamp(-1.0, 1.0);
-    final state = _getState();
-    _emit(state.copyWith(dsp: state.dsp.copyWith(stereoBalance: clamped)));
-    try {
-      await _audioHandler.setStereoBalance(clamped);
-    } catch (e) {
-      _syncAudioEffects();
-      final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback
-              .copyWith(errorMessage: 'Failed to set stereo balance: $e')));
-    }
+    return applyDspEffect(
+      featureName: 'Stereo Balance',
+      requiresGuard: true,
+      guardCondition: clamped.abs() > 0.01,
+      showErrorOnGuard: false,
+      updateDsp: (dsp) => dsp.copyWith(stereoBalance: clamped),
+      applyAudioHandler: () => _audioHandler.setStereoBalance(clamped),
+    );
   }
 
   Future<void> setMonoMix(bool mono) => applyDspEffect(
@@ -432,7 +427,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
 
   Future<void> setSaturationMultiband(bool multiband) => applyDspEffect(
         featureName: 'Saturation Multiband',
-        requiresGuard: false,
+        requiresGuard: true,
+        guardCondition: _getState().isSaturationEnabled,
+        showErrorOnGuard: false,
         updateDsp: (dsp) => dsp.copyWith(saturationMultiband: multiband),
         applyAudioHandler: () => _audioHandler.setSaturationMultiband(multiband),
       );

@@ -56,7 +56,7 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     final song = s.currentSong;
     if (song == null) return false;
     final posMs = s.position.inMilliseconds;
-    if (posMs < 5000) return false;
+    if (posMs < 0) return false;
     try {
       final key = PlaybackBookmarkStore.keyFor(
           songId: song.id, remoteId: song.remoteId, path: song.path);
@@ -142,7 +142,24 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     }
   }
 
-  Future<void> refreshLyrics() async {}
+  Future<void> refreshLyrics() async {
+    final s = _getState();
+    final song = s.currentSong;
+    if (song == null) return;
+
+    LrcParser.invalidateSong(songId: song.id, path: song.path);
+    _emit(s.copyWith(
+      lyricsSlice: s.lyricsSlice.copyWith(
+        isLoadingLyrics: true,
+        lyrics: const [],
+        lyricsSource: LyricsSource.none,
+      ),
+    ));
+
+    if (_onLoadLyrics != null) {
+      await _onLoadLyrics!(song, isOfflineOnly: false);
+    }
+  }
 
   Future<EarbudCapabilities> detectEarbudCapabilities() async {
     final service = _earbudOptimizationService;

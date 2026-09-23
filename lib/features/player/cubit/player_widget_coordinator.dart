@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../widgets/widget_service.dart';
+import 'player_constants.dart';
 import 'player_state.dart';
 
 /// Owns the home-screen widget push throttles and the "next 3 titles" cache so
@@ -63,7 +64,7 @@ class PlayerWidgetCoordinator {
     final now = DateTime.now();
     if (!force &&
         _lastUpdateTime != null &&
-        now.difference(_lastUpdateTime!).inMilliseconds < 1000) {
+        now.difference(_lastUpdateTime!) < PlayerConstants.widgetThrottleDuration) {
       return;
     }
     _lastUpdateTime = now;
@@ -87,7 +88,7 @@ class PlayerWidgetCoordinator {
   void updateProgressThrottled(PlayerState s) {
     final now = DateTime.now();
     if (_lastProgressUpdateTime != null &&
-        now.difference(_lastProgressUpdateTime!).inMilliseconds < 1000) {
+        now.difference(_lastProgressUpdateTime!) < PlayerConstants.widgetThrottleDuration) {
       return;
     }
     _lastProgressUpdateTime = now;

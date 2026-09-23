@@ -46,8 +46,20 @@ class ClassicPlayerTheme extends StatelessWidget {
     final bgColor = props.bgColor;
     final song = state.currentSong;
 
-    final settingsState = context.watch<SettingsCubit>().state;
-    final visualizerStyle = settingsState.visualizerStyle;
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe, :visualizerStyle, :waveformSeekBarEnabled) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+              VisualizerStyle visualizerStyle,
+              bool waveformSeekBarEnabled,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+              visualizerStyle: c.state.visualizerStyle,
+              waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+            ));
 
     // Custom Theme Studio: the user's corner radius drives the artwork squircle
     // when the custom colour source is active; preset themes keep their own.
@@ -58,7 +70,7 @@ class ClassicPlayerTheme extends StatelessWidget {
     // Only show standalone audio visualizer if waveform seekbar is NOT already
     // visualizing the audio and the visualizer is explicitly turned on.
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-        !settingsState.waveformSeekBarEnabled &&
+        !waveformSeekBarEnabled &&
         !state.isLyricsVisible &&
         !state.isQueueVisible;
 
@@ -329,7 +341,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                     final centerDisplay = GestureDetector(
                       onTap: () => cubit.toggleLyricsVisibility(),
                       onDoubleTap: () {
-                        switch (settingsState.nowPlayingDoubleTap) {
+                        switch (nowPlayingDoubleTap) {
                           case NowPlayingDoubleTapAction.toggleFavorite:
                             if (song != null) cubit.toggleFavorite(song.id);
                             break;
@@ -341,7 +353,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                         }
                       },
                       onHorizontalDragEnd: (details) {
-                        if (settingsState.nowPlayingArtworkSwipe ==
+                        if (nowPlayingArtworkSwipe ==
                                 NowPlayingArtworkSwipeAction.nextPrev &&
                             details.primaryVelocity != null) {
                           if (details.primaryVelocity! < -200) {
@@ -639,7 +651,6 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                         PlayerBottomActionDock(
                           props: props,
-                          settingsState: settingsState,
                           isTablet: isTablet,
                           barWidth: pillBarWidth,
                           barHeight: pillBarHeight,

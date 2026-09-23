@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/prefs_keys.dart';
@@ -33,6 +34,10 @@ class PlayerPlaybackOptionsController {
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
   final bool Function() _isClosed;
+  final Future<void> Function(SongsTableData song, {bool isOfflineOnly})? _onLoadLyrics;
+  final PerSongPlaybackStore _perSongPlaybackStore;
+  final PerSongVolumeStore _perSongVolumeStore;
+  final PerSongEqStore _perSongEqStore;
 
   bool get isClosed => _isClosed();
 
@@ -40,15 +45,23 @@ class PlayerPlaybackOptionsController {
     required PulsrAudioHandler audioHandler,
     EarbudOptimizationService? earbudOptimizationService,
     HiResAudioService? hiResAudioService,
+    PerSongPlaybackStore? perSongPlaybackStore,
+    PerSongVolumeStore? perSongVolumeStore,
+    PerSongEqStore? perSongEqStore,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
+    Future<void> Function(SongsTableData song, {bool isOfflineOnly})? onLoadLyrics,
   })  : _audioHandler = audioHandler,
         _earbudOptimizationService = earbudOptimizationService,
         _hiResAudioService = hiResAudioService,
         _getState = getState,
         _emit = emit,
-        _isClosed = isClosed;
+        _isClosed = isClosed,
+        _onLoadLyrics = onLoadLyrics,
+        _perSongPlaybackStore = perSongPlaybackStore ?? PerSongPlaybackStore(),
+        _perSongVolumeStore = perSongVolumeStore ?? PerSongVolumeStore(),
+        _perSongEqStore = perSongEqStore ?? PerSongEqStore();
 
   // ──────────────────────────────────────────────
   // Sleep Timer
@@ -135,7 +148,7 @@ class PlayerPlaybackOptionsController {
       // A-01: remember this track's speed for its next resume.
       final songId = s.currentSong?.id;
       if (songId != null) {
-        await PerSongPlaybackStore().setSpeed(songId.toString(), clamped);
+        await _perSongPlaybackStore.setSpeed(songId.toString(), clamped);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback speed',
@@ -157,7 +170,7 @@ class PlayerPlaybackOptionsController {
       // A-01: remember this track's pitch for its next resume.
       final songId = s.currentSong?.id;
       if (songId != null) {
-        await PerSongPlaybackStore().setPitch(songId.toString(), clamped);
+        await _perSongPlaybackStore.setPitch(songId.toString(), clamped);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback pitch',
@@ -202,8 +215,7 @@ class PlayerPlaybackOptionsController {
   }
 
   Future<void> setSongEqOverrideById(int songId, String? presetName) async {
-    final store = PerSongEqStore();
-    await store.setPresetForTrack(songId.toString(), presetName);
+    await _perSongEqStore.setPresetForTrack(songId.toString(), presetName);
     final s = _getState();
     if (s.currentSong?.id == songId) {
       _emit(s.copyWith(
@@ -230,8 +242,7 @@ class PlayerPlaybackOptionsController {
   }
 
   Future<void> setSongVolumeOverride(int songId, double gainDb) async {
-    final store = PerSongVolumeStore();
-    await store.setGainDbForTrack(songId.toString(), gainDb);
+    await _perSongVolumeStore.setGainDbForTrack(songId.toString(), gainDb);
     final s = _getState();
     if (s.currentSong?.id == songId) {
       _emit(s.copyWith(
@@ -267,16 +278,23 @@ class PlayerPlaybackOptionsController {
 
   bool _muted = false;
   double _volumeBeforeMute = 1.0;
+  bool _isMuting = false;
 
   /// A-06: Toggle output mute, remembering the pre-mute volume so unmuting
   /// restores it. Exposed for the global keyboard-shortcut layer.
   Future<void> toggleMute() async {
+    if (_isMuting) return;
+    _isMuting = true;
     try {
       if (_muted) {
-        await _audioHandler.setVolume(_volumeBeforeMute);
+        final targetVol = _volumeBeforeMute > 0.0 ? _volumeBeforeMute : 1.0;
+        await _audioHandler.setVolume(targetVol);
         _muted = false;
       } else {
-        _volumeBeforeMute = _audioHandler.volume;
+        final currentVol = _audioHandler.volume;
+        if (currentVol > 0.0) {
+          _volumeBeforeMute = currentVol;
+        }
         await _audioHandler.setVolume(0.0);
         _muted = true;
       }
@@ -285,29 +303,40 @@ class PlayerPlaybackOptionsController {
           error: e,
           stackTrace: st,
           category: 'PlayerPlaybackOptionsController');
+    } finally {
+      _isMuting = false;
     }
   }
 
   bool get isMuted => _muted;
+
+  int _playbackMemoryGen = 0;
 
   /// A-01: Restore a track's remembered speed/pitch and reflect its persisted
   /// volume/EQ overrides in state when it is resumed from a bookmark or its
   /// last position. Volume gain is already applied dynamically by the audio
   /// handler from [PerSongVolumeStore]; EQ is applied by the EQ engine.
   Future<void> applyPerSongPlaybackMemory(SongsTableData song) async {
+    final gen = ++_playbackMemoryGen;
     final key = song.id.toString();
-    final store = PerSongPlaybackStore();
-    final speed = store.getSpeed(key);
-    final pitch = store.getPitch(key);
-    final gainDb = PerSongVolumeStore().getGainDbForTrack(key);
-    final eqPreset = PerSongEqStore().getPresetForTrack(key);
+    final speed = _perSongPlaybackStore.getSpeed(key);
+    final pitch = _perSongPlaybackStore.getPitch(key);
+    final gainDb = _perSongVolumeStore.getGainDbForTrack(key);
+    final eqPreset = _perSongEqStore.getPresetForTrack(key);
 
-    if (_isClosed()) return;
+    if (_isClosed() || gen != _playbackMemoryGen) return;
     if (_getState().currentSong?.id != song.id) return;
 
     try {
-      if (speed != null) await _audioHandler.setSpeed(speed);
-      if (pitch != null) await _audioHandler.setPitch(pitch);
+      if (speed != null) {
+        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
+        await _audioHandler.setSpeed(speed);
+      }
+      if (pitch != null) {
+        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
+        await _audioHandler.setPitch(pitch);
+        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore per-song playback memory',
           error: e,
@@ -315,7 +344,7 @@ class PlayerPlaybackOptionsController {
           category: 'PlayerPlaybackOptionsController');
     }
 
-    if (_isClosed()) return;
+    if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
     final s = _getState();
     if (s.currentSong?.id != song.id) return;
     _emit(s.copyWith(
@@ -387,4 +416,6 @@ class PlayerPlaybackOptionsController {
     final s = _getState();
     _emit(s.copyWith(playback: s.playback.copyWith(silenceSkipSensitivity: sensitivity)));
   }
+
+  void dispose() {}
 }

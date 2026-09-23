@@ -77,6 +77,13 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
           coeffs.add(val);
         }
 
+        if (coeffs.length < 5 ||
+            (coeffs.length % 5 != 0 &&
+                coeffs.length % 6 != 0 &&
+                (coeffs.length - 1) % 5 != 0)) {
+          throw 'Invalid VDC coefficient structure (expected biquad stages)';
+        }
+
         if (coeffs.isNotEmpty && context.mounted) {
           final fileName = result.name.replaceAll(RegExp(r'\.vdc$', caseSensitive: false), '');
           await context.read<PlayerCubit>().setViperDdcEnabled(

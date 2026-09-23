@@ -7,8 +7,9 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/lrc_parser.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
+import '../player_constants.dart';
 
-/// Manages fetching, caching, and resolution of lyrics across local, LRCLIB, and YTM sources.
+/// Owns multi-source lyrics fetching (local file, LRCLIB, YTM) with generation guards.
 class PlayerLyricsManager {
   final LrclibService? _lrclibService;
   final YtmAccountService? _ytmAccountService;
@@ -24,20 +25,29 @@ class PlayerLyricsManager {
 
   int bumpGeneration() => ++_generation;
 
-  /// Checks whether fresh cached lyrics exist in LrcParser cache.
+  /// Checks whether fresh positive cached lyrics exist in LrcParser cache.
   LyricsResult? getCachedLyrics(SongsTableData song) {
     if (!LrcParser.hasCachedLyrics(songId: song.id, path: song.path)) {
       return null;
     }
-    final cached = LrcParser.getCachedLyrics(songId: song.id, path: song.path);
-    final cacheTs = LrcParser.getCacheTimestamp(songId: song.id, path: song.path);
-    final isNegative = cached == null;
-    final isFresh = cacheTs == null ||
-        DateTime.now().difference(cacheTs) <= const Duration(minutes: 10);
-    if (!isNegative || isFresh) {
-      return cached;
+    return LrcParser.getCachedLyrics(songId: song.id, path: song.path);
+  }
+
+  /// Checks whether a fresh negative cache entry exists (lyrics were searched and not found within TTL).
+  bool hasFreshNegativeCache(SongsTableData song) {
+    if (!LrcParser.hasCachedLyrics(songId: song.id, path: song.path)) {
+      return false;
     }
-    return null;
+    final cached = LrcParser.getCachedLyrics(songId: song.id, path: song.path);
+    if (cached != null) return false;
+    final cacheTs = LrcParser.getCacheTimestamp(songId: song.id, path: song.path);
+    return cacheTs != null &&
+        DateTime.now().difference(cacheTs) <= PlayerConstants.lyricsNegativeCacheTtl;
+  }
+
+  /// Caches a negative lookup result so callers avoid hammering network APIs within TTL.
+  void cacheNegativeResult(SongsTableData song) {
+    LrcParser.cacheLyricsResult(null, songId: song.id, path: song.path);
   }
 
   /// Resolves lyrics from available sources (local metadata, LRCLIB, YTM).
@@ -114,6 +124,10 @@ class PlayerLyricsManager {
               error: e, stackTrace: st, category: 'PlayerLyricsManager');
         }
       }
+    }
+
+    if ((result == null || result.lines.isEmpty) && !isOfflineOnly) {
+      cacheNegativeResult(song);
     }
 
     return result;

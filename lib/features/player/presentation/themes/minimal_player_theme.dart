@@ -45,8 +45,18 @@ class MinimalPlayerTheme extends StatelessWidget {
     final activeColor = props.activeColor;
     final bgColor = props.bgColor;
     final song = state.currentSong;
-    final settingsState = context.watch<SettingsCubit>().state;
-    final visualizerStyle = settingsState.visualizerStyle;
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe, :visualizerStyle) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+              VisualizerStyle visualizerStyle,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+              visualizerStyle: c.state.visualizerStyle,
+            ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -98,7 +108,6 @@ class MinimalPlayerTheme extends StatelessWidget {
 
             final bottomDock = PlayerBottomActionDock(
               props: props,
-              settingsState: settingsState,
               isTablet: isTablet,
               barWidth: pillBarWidth,
               barHeight: pillBarHeight,
@@ -108,7 +117,7 @@ class MinimalPlayerTheme extends StatelessWidget {
             final centerDisplay = GestureDetector(
               onTap: () => cubit.toggleLyricsVisibility(),
               onDoubleTap: () {
-                switch (settingsState.nowPlayingDoubleTap) {
+                switch (nowPlayingDoubleTap) {
                   case NowPlayingDoubleTapAction.toggleFavorite:
                     if (song != null) cubit.toggleFavorite(song.id);
                     break;
@@ -120,7 +129,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                 }
               },
               onHorizontalDragEnd: (details) {
-                if (settingsState.nowPlayingArtworkSwipe ==
+                if (nowPlayingArtworkSwipe ==
                         NowPlayingArtworkSwipeAction.nextPrev &&
                     details.primaryVelocity != null) {
                   if (details.primaryVelocity! < -200) {

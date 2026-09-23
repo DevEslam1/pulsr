@@ -391,11 +391,15 @@ abstract class PlayerState with _$PlayerState {
   int get activeDspEffectStagesCount => dsp.activeDspEffectStagesCount;
 
   /// High-performance diff: skips high-frequency position ticks while reacting
-  /// to playback, queue, and lyrics/overlay view changes.
+  /// to playback, queue, and lyrics/overlay view changes, plus user-visible
+  /// DSP active status toggles (EQ, Quran mode, active DSP stages).
   bool differsFromBeyondPosition(PlayerState other) {
     return playback.differsBeyondPosition(other.playback) ||
         queueSlice.differs(other.queueSlice) ||
-        lyricsSlice != other.lyricsSlice;
+        lyricsSlice != other.lyricsSlice ||
+        isEqEnabled != other.isEqEnabled ||
+        isQuranModeEnabled != other.isQuranModeEnabled ||
+        isDspActive != other.isDspActive;
   }
 
   bool get hasPreviousNeighbour => _hasQueueNeighbour(forward: false);

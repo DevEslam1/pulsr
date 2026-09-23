@@ -17,6 +17,7 @@ import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../../../domain/models/reverb_preset.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'dart:async';
@@ -183,6 +184,7 @@ class _DspSubState {
           runtimeType == other.runtimeType &&
           isEqEnabled == other.isEqEnabled &&
           eqPresetName == other.eqPresetName &&
+          eqGainsHash == other.eqGainsHash &&
           listEquals(eqGains, other.eqGains) &&
           eqBassBoost == other.eqBassBoost &&
           isVirtualizerEnabled == other.isVirtualizerEnabled &&
@@ -5422,7 +5424,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       return ActionChip(
         avatar: Icon(Icons.file_upload_outlined,
             size: 14, color: isSelected ? p.accent : p.textSecondary),
-        label: Text(isSelected ? 'Custom (Loaded)' : 'Load WAV IR...'),
+        label: Text(isSelected ? 'Custom (Loaded)' : 'Load WAV IR (≤25MB)...'),
         backgroundColor:
             isSelected ? p.accent.withValues(alpha: 0.22) : p.surface,
         side: BorderSide(color: isSelected ? p.accent : p.hairline),
@@ -5465,6 +5467,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     required double max,
     double? defaultValue,
     int? divisions,
+    bool enabled = true,
     required ValueChanged<double> onChanged,
   }) {
     final isDefault =
@@ -5477,7 +5480,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             Text(label,
                 style: TextStyle(
                     fontSize: AppFontSize.label,
-                    color: p.textSecondary,
+                    color: enabled ? p.textSecondary : p.textTertiary,
                     fontWeight: FontWeight.w600)),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -5486,13 +5489,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     style: TextStyle(
                         fontSize: AppFontSize.label,
                         fontWeight: FontWeight.w700,
-                        color: p.accent)),
+                        color: enabled ? p.accent : p.textTertiary)),
                 if (defaultValue != null) ...[
                   const SizedBox(width: AppSpacing.xxs),
                   IconButton(
                     icon: Icon(Icons.settings_backup_restore,
                         size: 15,
-                        color: isDefault
+                        color: !enabled || isDefault
                             ? p.textTertiary.withValues(alpha: 0.35)
                             : p.accent),
                     tooltip: context.l10n.dspResetToDefault,
@@ -5500,7 +5503,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     padding: EdgeInsets.zero,
                     constraints:
                         const BoxConstraints(minWidth: 20, minHeight: 20),
-                    onPressed: isDefault ? null : () => onChanged(defaultValue),
+                    onPressed: !enabled || isDefault ? null : () => onChanged(defaultValue),
                   ),
                 ],
               ],
@@ -5511,9 +5514,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           data: SliderTheme.of(context).copyWith(
             trackHeight: 4,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-            activeTrackColor: p.accent,
+            activeTrackColor:
+                enabled ? p.accent : p.textTertiary.withValues(alpha: 0.3),
             inactiveTrackColor: p.surface,
-            thumbColor: p.accent,
+            thumbColor: enabled ? p.accent : p.textTertiary,
           ),
           child: Semantics(
             slider: true,
@@ -5524,7 +5528,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               min: min,
               max: max,
               divisions: divisions,
-              onChanged: onChanged,
+              onChanged: enabled ? onChanged : null,
             ),
           ),
         ),
@@ -6183,6 +6187,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: DropdownButtonFormField<int>(
+                        // Flutter 3.33+ deprecated `value:` in favor of `initialValue:` on DropdownButtonFormField
                         initialValue: band.filterType,
                         decoration: InputDecoration(
                           isDense: true,
@@ -6623,7 +6628,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   Widget _buildHardwareDeviceProfileBar(BuildContext context, PlayerCubit cubit,
       PlayerState state, PulsrPalette p) {
-    final output = context.watch<SettingsCubit?>()?.state.currentOutputDevice;
+    final output = context.select<SettingsCubit?, AudioOutputInfo?>(
+        (c) => c?.state.currentOutputDevice);
     final devType = output?.activeDeviceType.toLowerCase() ?? '';
     final devName = (output?.deviceName ?? '').toLowerCase();
 

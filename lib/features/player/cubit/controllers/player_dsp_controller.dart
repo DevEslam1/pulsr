@@ -25,6 +25,7 @@ import '../../../../domain/services/headphone_device_matcher.dart';
 import '../../../../domain/services/settings_profiles_service.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../player_constants.dart';
 import '../player_state.dart';
 
 part 'player_dsp_effects.dart';
@@ -41,6 +42,7 @@ class PlayerDspController {
   final DeviceProfileService? _deviceProfileService;
   final HiResAudioService? _hiResAudioService;
   final SmartAudioService? _smartAudioService;
+  final HeadphoneProfilesRepository _headphoneProfilesRepo;
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
   final void Function() _syncAudioEffects;
@@ -69,6 +71,7 @@ class PlayerDspController {
     DeviceProfileService? deviceProfileService,
     HiResAudioService? hiResAudioService,
     SmartAudioService? smartAudioService,
+    HeadphoneProfilesRepository? headphoneProfilesRepo,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required void Function() syncAudioEffects,
@@ -79,6 +82,7 @@ class PlayerDspController {
         _deviceProfileService = deviceProfileService,
         _hiResAudioService = hiResAudioService,
         _smartAudioService = smartAudioService,
+        _headphoneProfilesRepo = headphoneProfilesRepo ?? HeadphoneProfilesRepository(),
         _getState = getState,
         _emit = emit,
         _syncAudioEffects = syncAudioEffects,
@@ -117,7 +121,9 @@ class PlayerDspController {
     );
     if (rate == null) return;
     try {
-      final depth = song.bitDepth ?? 0;
+      final depth = (song.bitDepth != null && song.bitDepth! > 0)
+          ? song.bitDepth!
+          : PlayerConstants.defaultBitDepth;
       await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
       if (_isClosed() || gen != _followSampleRateGen) return;
       _lastFollowedSampleRate = rate;

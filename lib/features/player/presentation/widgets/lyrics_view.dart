@@ -535,9 +535,14 @@ class _LyricsViewState extends State<LyricsView> {
       _audibleOffset = Duration.zero;
     }
     try {
-      final songPath =
-          context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
-      _syncManualOffset(songPath);
+      final songKey = context.select<PlayerCubit, String?>((c) {
+        final s = c.state.currentSong;
+        if (s == null) return null;
+        if (s.path.isNotEmpty) return s.path;
+        if (s.remoteId != null && s.remoteId!.isNotEmpty) return s.remoteId;
+        return 'song_${s.id}';
+      });
+      _syncManualOffset(songKey);
     } catch (_) {}
 
     if (widget.isLoading) {
