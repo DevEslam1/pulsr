@@ -3,6 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <cmath>
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
+#define PULSR_HAS_SSE2 1
+#endif
 
 namespace {
 std::vector<double> parseFloats(const std::string& str) {
@@ -282,6 +291,82 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
         if (!std::isfinite(l)) l = 0.0;
         if (!std::isfinite(r)) r = 0.0;
 
+#if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
+        float64x2_t vin = { l, r };
+        for (auto& sec : activeSections_) {
+            float64x2_t vv1 = { sec.v1L, sec.v1R };
+            float64x2_t vv2 = { sec.v2L, sec.v2R };
+            float64x2_t va1 = vdupq_n_f64(sec.a1);
+            float64x2_t va2 = vdupq_n_f64(sec.a2);
+            float64x2_t vb0 = vdupq_n_f64(sec.b0);
+            float64x2_t vb1 = vdupq_n_f64(sec.b1);
+            float64x2_t vb2 = vdupq_n_f64(sec.b2);
+
+            // w = in - a1 * v1 - a2 * v2
+            float64x2_t vw = vsubq_f64(vin, vaddq_f64(vmulq_f64(va1, vv1), vmulq_f64(va2, vv2)));
+            // y = b0 * w + b1 * v1 + b2 * v2
+            float64x2_t vy = vaddq_f64(vmulq_f64(vb0, vw), vaddq_f64(vmulq_f64(vb1, vv1), vmulq_f64(vb2, vv2)));
+
+            double w0 = vgetq_lane_f64(vw, 0);
+            double w1 = vgetq_lane_f64(vw, 1);
+            double y0 = vgetq_lane_f64(vy, 0);
+            double y1 = vgetq_lane_f64(vy, 1);
+
+            if (!std::isfinite(w0) || !std::isfinite(y0)) {
+                sec.v1L = 0.0; sec.v2L = 0.0; w0 = 0.0; y0 = 0.0;
+            }
+            if (std::abs(w0) < 1e-30) w0 = 0.0;
+            sec.v2L = sec.v1L; sec.v1L = w0;
+
+            if (!std::isfinite(w1) || !std::isfinite(y1)) {
+                sec.v1R = 0.0; sec.v2R = 0.0; w1 = 0.0; y1 = 0.0;
+            }
+            if (std::abs(w1) < 1e-30) w1 = 0.0;
+            sec.v2R = sec.v1R; sec.v1R = w1;
+
+            vin = { y0, y1 };
+        }
+        buffer[i * channels] = static_cast<float>(vgetq_lane_f64(vin, 0));
+        buffer[i * channels + 1] = static_cast<float>(vgetq_lane_f64(vin, 1));
+#elif defined(PULSR_HAS_SSE2)
+        __m128d vin = _mm_set_pd(r, l);
+        for (auto& sec : activeSections_) {
+            __m128d vv1 = _mm_set_pd(sec.v1R, sec.v1L);
+            __m128d vv2 = _mm_set_pd(sec.v2R, sec.v2L);
+            __m128d va1 = _mm_set1_pd(sec.a1);
+            __m128d va2 = _mm_set1_pd(sec.a2);
+            __m128d vb0 = _mm_set1_pd(sec.b0);
+            __m128d vb1 = _mm_set1_pd(sec.b1);
+            __m128d vb2 = _mm_set1_pd(sec.b2);
+
+            // w = in - a1 * v1 - a2 * v2
+            __m128d vw = _mm_sub_pd(vin, _mm_add_pd(_mm_mul_pd(va1, vv1), _mm_mul_pd(va2, vv2)));
+            // y = b0 * w + b1 * v1 + b2 * v2
+            __m128d vy = _mm_add_pd(_mm_mul_pd(vb0, vw), _mm_add_pd(_mm_mul_pd(vb1, vv1), _mm_mul_pd(vb2, vv2)));
+
+            alignas(16) double w_arr[2], y_arr[2];
+            _mm_store_pd(w_arr, vw);
+            _mm_store_pd(y_arr, vy);
+
+            if (!std::isfinite(w_arr[0]) || !std::isfinite(y_arr[0])) {
+                sec.v1L = 0.0; sec.v2L = 0.0; w_arr[0] = 0.0; y_arr[0] = 0.0;
+            }
+            if (std::abs(w_arr[0]) < 1e-30) w_arr[0] = 0.0;
+            sec.v2L = sec.v1L; sec.v1L = w_arr[0];
+
+            if (!std::isfinite(w_arr[1]) || !std::isfinite(y_arr[1])) {
+                sec.v1R = 0.0; sec.v2R = 0.0; w_arr[1] = 0.0; y_arr[1] = 0.0;
+            }
+            if (std::abs(w_arr[1]) < 1e-30) w_arr[1] = 0.0;
+            sec.v2R = sec.v1R; sec.v1R = w_arr[1];
+
+            vin = _mm_set_pd(y_arr[1], y_arr[0]);
+        }
+        alignas(16) double out_arr[2];
+        _mm_store_pd(out_arr, vin);
+        buffer[i * channels] = static_cast<float>(out_arr[0]);
+        buffer[i * channels + 1] = static_cast<float>(out_arr[1]);
+#else
         for (auto& sec : activeSections_) {
             double wL = l - sec.a1 * sec.v1L - sec.a2 * sec.v2L;
             double yL = sec.b0 * wL + sec.b1 * sec.v1L + sec.b2 * sec.v2L;
@@ -304,5 +389,6 @@ void ViperDdc::processInterleaved(float* buffer, int frames, int channels) {
 
         buffer[i * channels] = static_cast<float>(l);
         buffer[i * channels + 1] = static_cast<float>(r);
+#endif
     }
 }

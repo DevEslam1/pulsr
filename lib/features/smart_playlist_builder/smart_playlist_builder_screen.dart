@@ -331,8 +331,17 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                           color: p.textSecondary)),
                                   const SizedBox(height: AppSpacing.xxs),
                                   DropdownButtonFormField<String>(
-                                    initialValue:
-                                        state.criteria.sortBy ?? 'title',
+                                    initialValue: const {
+                                      'title',
+                                      'dateAdded',
+                                      'playCount',
+                                      'lastPlayed',
+                                      'durationMs',
+                                      'year',
+                                      'rating',
+                                    }.contains(state.criteria.sortBy)
+                                        ? state.criteria.sortBy!
+                                        : 'title',
                                     decoration: InputDecoration(
                                       filled: true,
                                       fillColor: p.surface,

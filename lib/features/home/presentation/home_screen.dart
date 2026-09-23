@@ -121,7 +121,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         _cachedSongs200Stopwatch!.elapsed < const Duration(seconds: 60)) {
       return _cachedSongs200!;
     }
-    final res = await useCase.getAllSongs(limit: 200);
+    final res = await useCase.getAllSongs(limit: 50);
     final list = res.fold((_) => <SongsTableData>[], (r) => r);
     _cachedSongs200 = list;
     _cachedSongs200Stopwatch = Stopwatch()..start();
@@ -1466,6 +1466,11 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
       _isLoadingMore = true;
       _currentLimit += _pageSize;
     });
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _isLoadingMore) {
+        setState(() => _isLoadingMore = false);
+      }
+    });
   }
 
   @override
@@ -1478,25 +1483,41 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
       stream: widget.getSongsUseCase.watchRecentlyAdded(limit: _currentLimit).distinct(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
+          if (_isLoadingMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _isLoadingMore) {
+                setState(() => _isLoadingMore = false);
+              }
+            });
+          }
           return _SectionError(onRetry: () => setState(() {}));
         }
         final songs =
             snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
-        if (songs.isEmpty) return const _EmptyLibrary();
+        if (songs.isEmpty) {
+          if (_isLoadingMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _isLoadingMore) {
+                setState(() => _isLoadingMore = false);
+              }
+            });
+          }
+          return const _EmptyLibrary();
+        }
 
         final hasMore = songs.length >= _currentLimit;
-        final loading = _isLoadingMore && songs.length < _currentLimit;
-        final totalItemCount = songs.length + (hasMore ? 1 : 0);
-        // The requested page has arrived; clear the guard so "Load more" can be
-        // tapped again (previously it stayed set and disabled the button forever).
-        if (_isLoadingMore && !loading) {
+        // As soon as the active stream emits, clear the guard so "Load more"
+        // does not remain stuck when reaching the end of the collection.
+        if (_isLoadingMore && snapshot.connectionState != ConnectionState.waiting) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _isLoadingMore) {
               setState(() => _isLoadingMore = false);
             }
           });
         }
+        final loading = _isLoadingMore;
+        final totalItemCount = songs.length + (hasMore ? 1 : 0);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

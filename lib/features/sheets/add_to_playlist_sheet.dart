@@ -77,11 +77,17 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
         if (createdId == null) return;
         // Await the insert inside the try so `_isMutating` is not cleared before
         // the write completes (the previous async `fold` callback was dropped).
-        if (_allSongs.length == 1) {
-          await _useCases.addSongToPlaylist(createdId, widget.song.id);
-        } else {
-          await _useCases.addSongsToPlaylist(
-              createdId, _allSongs.map((s) => s.id).toList());
+        final insertResult = _allSongs.length == 1
+            ? await _useCases.addSongToPlaylist(createdId, widget.song.id)
+            : await _useCases.addSongsToPlaylist(
+                createdId, _allSongs.map((s) => s.id).toList());
+        if (!context.mounted) return;
+        final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
+        if (insertFailure != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(insertFailure)),
+          );
+          return;
         }
         if (context.mounted) {
           Navigator.pop(context);
@@ -106,11 +112,17 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
     if (_isMutating) return;
     setState(() => _isMutating = true);
     try {
-      if (_allSongs.length == 1) {
-        await _useCases.addSongToPlaylist(playlist.id, widget.song.id);
-      } else {
-        await _useCases.addSongsToPlaylist(
-            playlist.id, _allSongs.map((s) => s.id).toList());
+      final insertResult = _allSongs.length == 1
+          ? await _useCases.addSongToPlaylist(playlist.id, widget.song.id)
+          : await _useCases.addSongsToPlaylist(
+              playlist.id, _allSongs.map((s) => s.id).toList());
+      if (!context.mounted) return;
+      final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
+      if (insertFailure != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(insertFailure)),
+        );
+        return;
       }
       if (context.mounted) {
         Navigator.pop(context);

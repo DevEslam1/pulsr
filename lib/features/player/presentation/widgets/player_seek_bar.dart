@@ -69,7 +69,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   @override
   void didUpdateWidget(PlayerSeekBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.songId != widget.songId || oldWidget.filePath != widget.filePath) {
+    if (oldWidget.songId != widget.songId ||
+        oldWidget.filePath != widget.filePath ||
+        oldWidget.duration != widget.duration) {
       _dragValue = null;
       _tapSeekPending = false;
       _tapSeekRatio = null;

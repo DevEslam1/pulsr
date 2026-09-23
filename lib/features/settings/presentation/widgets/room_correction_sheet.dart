@@ -91,7 +91,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     } catch (_) {}
     _player = null;
     if (_service.isCapturing) {
-      _service.stopCapture();
+      try {
+        _service.stopCapture();
+      } catch (_) {}
     }
     super.dispose();
   }
@@ -162,6 +164,15 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       await _player?.dispose();
       _player = null;
 
+      if (mounted) {
+        try {
+          final playerCubit = context.read<PlayerCubit?>();
+          if (playerCubit?.state.isPlaying == true) {
+            playerCubit?.pause();
+          }
+        } catch (_) {}
+      }
+
       final player = AudioPlayer();
       _player = player;
       await player.setAudioSource(_SweepSource(wav));
@@ -196,7 +207,14 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
 
       // Tail margin so the last tone's window is fully captured.
       await Future<void>.delayed(const Duration(milliseconds: 250));
-      if (!mounted) return;
+      if (!mounted) {
+        if (_service.isCapturing) {
+          try {
+            await _service.stopCapture();
+          } catch (_) {}
+        }
+        return;
+      }
 
       setState(() => _phase = _RcPhase.analyzing);
       final pcm = await _service.stopCapture();
@@ -226,9 +244,11 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         _phase = _RcPhase.idle;
         _error = e.toString();
       });
-      try {
-        await _service.stopCapture();
-      } catch (_) {}
+      if (_service.isCapturing) {
+        try {
+          await _service.stopCapture();
+        } catch (_) {}
+      }
     }
   }
 

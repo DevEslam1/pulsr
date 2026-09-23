@@ -1,6 +1,7 @@
 // lib/features/folder_detail/presentation/folder_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart' hide State;
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -67,21 +68,35 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 ? context.l10n.browseIncludeInScan
                 : context.l10n.browseExcludeFromScan,
             onPressed: () async {
-              final newExcluded = !_isExcluded;
+              final prevExcluded = _isExcluded;
+              final newExcluded = !prevExcluded;
               setState(() => _isExcluded = newExcluded);
               LibraryCubit? libraryCubit;
               try {
                 libraryCubit = context.read<LibraryCubit>();
               } catch (_) {}
-              // Route through LibraryCubit so the songs stream is re-subscribed
-              // with the new exclusion. Toggling the raw use case only refreshed
-              // the folder list, leaving excluded songs visible in the Library.
-              if (libraryCubit != null) {
-                await libraryCubit.toggleFolderExclusion(folder.path);
-              } else {
-                await _useCase.toggleExcludeFolder(folder.path);
+              
+              Result<void> result;
+              try {
+                if (libraryCubit != null) {
+                  result = await libraryCubit.toggleFolderExclusion(folder.path);
+                } else {
+                  result = await _useCase.toggleExcludeFolder(folder.path);
+                }
+              } catch (e) {
+                result = Left(DatabaseFailure(e.toString()));
               }
+
               if (!context.mounted) return;
+              final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
+              if (failureMessage != null) {
+                setState(() => _isExcluded = prevExcluded);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(failureMessage)),
+                );
+                return;
+              }
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -92,11 +107,15 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   action: SnackBarAction(
                     label: context.l10n.undo,
                     onPressed: () async {
-                      if (mounted) setState(() => _isExcluded = !newExcluded);
-                      if (libraryCubit != null) {
-                        await libraryCubit.toggleFolderExclusion(folder.path);
-                      } else {
-                        await _useCase.toggleExcludeFolder(folder.path);
+                      if (mounted) setState(() => _isExcluded = prevExcluded);
+                      try {
+                        if (libraryCubit != null) {
+                          await libraryCubit.toggleFolderExclusion(folder.path);
+                        } else {
+                          await _useCase.toggleExcludeFolder(folder.path);
+                        }
+                      } catch (_) {
+                        if (mounted) setState(() => _isExcluded = newExcluded);
                       }
                     },
                   ),

@@ -193,10 +193,14 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     packetsPerUrb_ = kPacketsPerUrb;
     bytesPerUrb_ = bytesPerPacket_ * packetsPerUrb_;
 
-    // ~3 URBs of slack in bytes; enough to absorb scheduling jitter.
-    const size_t ringBytes = static_cast<size_t>(bytesPerUrb_) * 3;
-    ring_.assign(ringBytes, 0);
-    ringRead_ = ringWrite_ = ringCount_ = 0;
+    // Power-of-two ring buffer capacity for mask-based indexing (~4 URBs slack).
+    const size_t targetRingBytes = static_cast<size_t>(bytesPerUrb_) * 4;
+    size_t cap = 2048;
+    while (cap < targetRingBytes) cap <<= 1;
+    ring_.assign(cap, 0);
+    ringMask_ = cap - 1;
+    ringRead_.store(0, std::memory_order_relaxed);
+    ringWrite_.store(0, std::memory_order_relaxed);
 
     urbStride_ = sizeof(struct usbdevfs_urb) +
                  static_cast<size_t>(packetsPerUrb_) *
@@ -308,26 +312,27 @@ void UsbAudioSink::workerLoop() {
 
         uint8_t* buf = reinterpret_cast<uint8_t*>(urb->buffer);
         const size_t bytesPerPkt = static_cast<size_t>(bytesPerPacket_);
-        {
-            std::lock_guard<std::mutex> lock(ringMutex_);
-            for (int p = 0; p < packetsPerUrb_; ++p) {
-                uint8_t* dst = buf + static_cast<size_t>(p) * bytesPerPkt;
-                if (ringCount_ >= bytesPerPkt) {
-                    for (size_t i = 0; i < bytesPerPkt; ++i) {
-                        dst[i] = ring_[ringRead_];
-                        ringRead_ = (ringRead_ + 1) % ring_.size();
-                    }
-                    ringCount_ -= bytesPerPkt;
-                } else {
-                    std::memset(dst, 0, bytesPerPkt);
-                    underrunCount_.fetch_add(1, std::memory_order_relaxed);
+        const size_t mask = ringMask_;
+        size_t readPos = ringRead_.load(std::memory_order_relaxed);
+        for (int p = 0; p < packetsPerUrb_; ++p) {
+            uint8_t* dst = buf + static_cast<size_t>(p) * bytesPerPkt;
+            const size_t w = ringWrite_.load(std::memory_order_acquire);
+            const size_t avail = (w >= readPos) ? (w - readPos) : 0;
+            if (avail >= bytesPerPkt) {
+                for (size_t i = 0; i < bytesPerPkt; ++i) {
+                    dst[i] = ring_[(readPos + i) & mask];
                 }
-                urb->iso_frame_desc[p].length =
-                    static_cast<unsigned int>(bytesPerPkt);
-                urb->iso_frame_desc[p].actual_length = 0;
-                urb->iso_frame_desc[p].status = 0;
+                readPos += bytesPerPkt;
+            } else {
+                std::memset(dst, 0, bytesPerPkt);
+                underrunCount_.fetch_add(1, std::memory_order_relaxed);
             }
+            urb->iso_frame_desc[p].length =
+                static_cast<unsigned int>(bytesPerPkt);
+            urb->iso_frame_desc[p].actual_length = 0;
+            urb->iso_frame_desc[p].status = 0;
         }
+        ringRead_.store(readPos, std::memory_order_release);
 
         if (ioctl(fd_, USBDEVFS_SUBMITURB, urb) < 0) {
             lastError_.store(errno, std::memory_order_release);
@@ -348,18 +353,26 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
     }
     const int bps = bytesPerSample_;
     const size_t totalSamples = static_cast<size_t>(frames) * channels;
-    std::lock_guard<std::mutex> lock(ringMutex_);
     const size_t cap = ring_.size();
+    const size_t mask = ringMask_;
+    if (cap == 0) return;
+
+    size_t w = ringWrite_.load(std::memory_order_relaxed);
+    size_t r = ringRead_.load(std::memory_order_acquire);
+    size_t availSpace = (cap > (w - r)) ? (cap - (w - r) - 1) : 0;
+
     size_t s = 0;
-    for (; s < totalSamples && ringCount_ + bps <= cap; ++s) {
+    for (; s < totalSamples && availSpace >= static_cast<size_t>(bps); ++s) {
         uint8_t packed[4];
         packSample(buffer[s], packed, bps);
         for (int b = 0; b < bps; ++b) {
-            ring_[ringWrite_] = packed[b];
-            ringWrite_ = (ringWrite_ + 1) % cap;
+            ring_[(w + b) & mask] = packed[b];
         }
-        ringCount_ += bps;
+        w += bps;
+        availSpace -= bps;
     }
+    ringWrite_.store(w, std::memory_order_release);
+
     if (s < totalSamples) {
         // Track overrun (dropped frames)
         const size_t droppedSamples = totalSamples - s;
@@ -369,11 +382,9 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
 
 double UsbAudioSink::GetBufferedMs() {
     if (!active_.load(std::memory_order_acquire)) return 0.0;
-    size_t count = 0;
-    {
-        std::lock_guard<std::mutex> lock(ringMutex_);
-        count = ringCount_;
-    }
+    const size_t w = ringWrite_.load(std::memory_order_acquire);
+    const size_t r = ringRead_.load(std::memory_order_relaxed);
+    const size_t count = (w >= r) ? (w - r) : 0;
     const int frameBytes = channels_ * bytesPerSample_;
     double ringMs = 0.0;
     if (frameBytes > 0 && sampleRate_ > 0) {
@@ -488,7 +499,66 @@ std::vector<int> UsbAudioSink::QuerySupportedRates(int fd, int interfaceNumber) 
 
     std::vector<int> rates = ParseSupportedRatesFromDescriptors(
         configDesc.data(), configDesc.size(), interfaceNumber);
+
+    // Scan for UAC2 Clock Source entities and query sample rates
+    int acInterface = 0;
+    std::vector<uint8_t> clockIds;
+    size_t dIdx = 0;
+    while (dIdx + 2 <= configDesc.size()) {
+        uint8_t bLength = configDesc[dIdx];
+        if (bLength < 2 || dIdx + bLength > configDesc.size()) break;
+        uint8_t bType = configDesc[dIdx + 1];
+        if (bType == 0x04 && bLength >= 9) { // DESC_INTERFACE
+            if (configDesc[dIdx + 5] == 0x01 && configDesc[dIdx + 6] == 0x01) {
+                acInterface = configDesc[dIdx + 2]; // AudioControl interface
+            }
+        } else if (bType == 0x24 && bLength >= 8) { // CS_INTERFACE
+            if (configDesc[dIdx + 2] == 0x0B) { // CLOCK_SOURCE
+                clockIds.push_back(configDesc[dIdx + 3]); // bClockID
+            }
+        }
+        dIdx += bLength;
+    }
+
+    for (uint8_t clockId : clockIds) {
+        uint8_t rangeBuf[256] = {0};
+        struct usbdevfs_ctrltransfer rangeCtrl {};
+        rangeCtrl.bRequestType = 0xA1; // IN | CLASS | INTERFACE
+        rangeCtrl.bRequest = 0x02;     // UAC2 RANGE
+        rangeCtrl.wValue = 0x0100;     // CS_SAM_FREQ_CONTROL (0x01) << 8
+        rangeCtrl.wIndex = static_cast<uint16_t>((clockId << 8) | acInterface);
+        rangeCtrl.wLength = sizeof(rangeBuf);
+        rangeCtrl.timeout = 1000;
+        rangeCtrl.data = rangeBuf;
+
+        if (ioctl(fd, USBDEVFS_CONTROL, &rangeCtrl) >= 2) {
+            uint16_t numRanges = rangeBuf[0] | (rangeBuf[1] << 8);
+            size_t offset = 2;
+            for (uint16_t r = 0; r < numRanges && offset + 12 <= sizeof(rangeBuf); ++r) {
+                uint32_t dMin = rangeBuf[offset] | (rangeBuf[offset + 1] << 8) |
+                                (rangeBuf[offset + 2] << 16) | (rangeBuf[offset + 3] << 24);
+                uint32_t dMax = rangeBuf[offset + 4] | (rangeBuf[offset + 5] << 8) |
+                                (rangeBuf[offset + 6] << 16) | (rangeBuf[offset + 7] << 24);
+                if (dMin == dMax && dMin > 0) {
+                    rates.push_back(static_cast<int>(dMin));
+                } else if (dMin < dMax) {
+                    constexpr int kStandardRates[] = {
+                        44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000
+                    };
+                    for (int sr : kStandardRates) {
+                        if (static_cast<uint32_t>(sr) >= dMin && static_cast<uint32_t>(sr) <= dMax) {
+                            rates.push_back(sr);
+                        }
+                    }
+                }
+                offset += 12;
+            }
+        }
+    }
+
     if (!rates.empty()) {
+        std::sort(rates.begin(), rates.end());
+        rates.erase(std::unique(rates.begin(), rates.end()), rates.end());
         return rates;
     }
 

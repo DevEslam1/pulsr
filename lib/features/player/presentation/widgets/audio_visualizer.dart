@@ -348,24 +348,32 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     if (!mounted || !_isAppActive || !widget.isPlaying) return;
 
     final now = DateTime.now();
-    final isStale = now.difference(_lastNativeDataTime).inMilliseconds > 250;
+    final staleMs = now.difference(_lastNativeDataTime).inMilliseconds;
+    final isStale = staleMs > 250;
 
     if (isStale && widget.isPlaying && widget.style != VisualizerStyle.off) {
-      final t = now.millisecondsSinceEpoch / 1000.0;
-      final seed = AudioVisualizer.resolveSeed(
-        trackSeed: widget.trackSeed,
-        trackId: widget.trackId,
-        trackPath: widget.trackPath,
-        audioSessionId: widget.audioSessionId,
-      );
-      final seedOffset = (seed.abs() % 100) / 100.0;
-      for (int i = 0; i < _numBands; i++) {
-        final phase = i * 0.25 + seedOffset;
-        final wave1 = math.sin(t * (3.5 + (seed.abs() % 4) * 0.1) + phase);
-        final wave2 =
-            math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
-        final sim = ((wave1 + wave2) / 4.0 + 0.35).clamp(0.05, 0.85);
-        _targetData[i] = sim;
+      if (Platform.isAndroid && _lastNativeDataTime.millisecondsSinceEpoch > 0 && staleMs > 1500) {
+        // Native stream stopped delivering samples; decay to zero to avoid misleading synthetic animation
+        for (int i = 0; i < _numBands; i++) {
+          _targetData[i] = 0.0;
+        }
+      } else {
+        final t = now.millisecondsSinceEpoch / 1000.0;
+        final seed = AudioVisualizer.resolveSeed(
+          trackSeed: widget.trackSeed,
+          trackId: widget.trackId,
+          trackPath: widget.trackPath,
+          audioSessionId: widget.audioSessionId,
+        );
+        final seedOffset = (seed.abs() % 100) / 100.0;
+        for (int i = 0; i < _numBands; i++) {
+          final phase = i * 0.25 + seedOffset;
+          final wave1 = math.sin(t * (3.5 + (seed.abs() % 4) * 0.1) + phase);
+          final wave2 =
+              math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
+          final sim = ((wave1 + wave2) / 4.0 + 0.35).clamp(0.05, 0.85);
+          _targetData[i] = sim;
+        }
       }
     } else if (!widget.isPlaying) {
       for (int i = 0; i < _numBands; i++) {

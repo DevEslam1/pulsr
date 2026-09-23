@@ -3,6 +3,15 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#define PULSR_HAS_SSE 1
+#endif
+
 StereoWidth::StereoWidth() {
     setSampleRate(48000.0);
     configure(1.0);
@@ -67,7 +76,33 @@ void StereoWidth::process(float* L, float* R, int frames) {
         if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(effTarget - 1.0) < 1e-5) return;
 
         const float w = static_cast<float>(smoothedWidth_);
-        for (int i = 0; i < frames; ++i) {
+        int i = 0;
+#if defined(PULSR_HAS_NEON)
+        for (; i + 4 <= frames; i += 4) {
+            float32x4_t vL = vld1q_f32(&L[i]);
+            float32x4_t vR = vld1q_f32(&R[i]);
+            float32x4_t vMid = vmulq_n_f32(vaddq_f32(vL, vR), 0.5f);
+            float32x4_t vSide = vmulq_n_f32(vsubq_f32(vL, vR), 0.5f);
+            float32x4_t vOutL = vfmaq_n_f32(vMid, vSide, w);
+            float32x4_t vOutR = vfmsq_n_f32(vMid, vSide, w);
+            vst1q_f32(&L[i], vOutL);
+            vst1q_f32(&R[i], vOutR);
+        }
+#elif defined(PULSR_HAS_SSE)
+        const __m128 vHalf = _mm_set1_ps(0.5f);
+        const __m128 vW = _mm_set1_ps(w);
+        for (; i + 4 <= frames; i += 4) {
+            __m128 vL = _mm_loadu_ps(&L[i]);
+            __m128 vR = _mm_loadu_ps(&R[i]);
+            __m128 vMid = _mm_mul_ps(_mm_add_ps(vL, vR), vHalf);
+            __m128 vSide = _mm_mul_ps(_mm_sub_ps(vL, vR), vHalf);
+            __m128 vOutL = _mm_add_ps(vMid, _mm_mul_ps(vW, vSide));
+            __m128 vOutR = _mm_sub_ps(vMid, _mm_mul_ps(vW, vSide));
+            _mm_storeu_ps(&L[i], vOutL);
+            _mm_storeu_ps(&R[i], vOutR);
+        }
+#endif
+        for (; i < frames; ++i) {
             const float l = L[i];
             const float r = R[i];
             const float mid = 0.5f * (l + r);
@@ -147,14 +182,54 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
         if (std::abs(smoothedWidth_ - 1.0) < 1e-5 && std::abs(effTarget - 1.0) < 1e-5) return;
 
         const float w = static_cast<float>(smoothedWidth_);
-        for (int i = 0; i < frames; ++i) {
-            for (int ch = 0; ch + 1 < channels; ch += 2) {
-                const float l = buffer[i * channels + ch];
-                const float r = buffer[i * channels + ch + 1];
+        if (channels == 2) {
+            int i = 0;
+#if defined(PULSR_HAS_NEON)
+            for (; i + 4 <= frames; i += 4) {
+                float32x4x2_t vIn = vld2q_f32(buffer + i * 2);
+                float32x4_t vMid = vmulq_n_f32(vaddq_f32(vIn.val[0], vIn.val[1]), 0.5f);
+                float32x4_t vSide = vmulq_n_f32(vsubq_f32(vIn.val[0], vIn.val[1]), 0.5f);
+                float32x4x2_t vOut;
+                vOut.val[0] = vfmaq_n_f32(vMid, vSide, w);
+                vOut.val[1] = vfmsq_n_f32(vMid, vSide, w);
+                vst2q_f32(buffer + i * 2, vOut);
+            }
+#elif defined(PULSR_HAS_SSE)
+            const __m128 vHalf = _mm_set1_ps(0.5f);
+            const __m128 vW = _mm_set1_ps(w);
+            for (; i + 4 <= frames; i += 4) {
+                __m128 v0 = _mm_loadu_ps(buffer + i * 2);     // [L0, R0, L1, R1]
+                __m128 v1 = _mm_loadu_ps(buffer + i * 2 + 4); // [L2, R2, L3, R3]
+                __m128 vL = _mm_shuffle_ps(v0, v1, _MM_SHUFFLE(2, 0, 2, 0)); // [L0, L1, L2, L3]
+                __m128 vR = _mm_shuffle_ps(v0, v1, _MM_SHUFFLE(3, 1, 3, 1)); // [R0, R1, R2, R3]
+                __m128 vMid = _mm_mul_ps(_mm_add_ps(vL, vR), vHalf);
+                __m128 vSide = _mm_mul_ps(_mm_sub_ps(vL, vR), vHalf);
+                __m128 vOutL = _mm_add_ps(vMid, _mm_mul_ps(vW, vSide));
+                __m128 vOutR = _mm_sub_ps(vMid, _mm_mul_ps(vW, vSide));
+                __m128 out0 = _mm_unpacklo_ps(vOutL, vOutR); // [L0, R0, L1, R1]
+                __m128 out1 = _mm_unpackhi_ps(vOutL, vOutR); // [L2, R2, L3, R3]
+                _mm_storeu_ps(buffer + i * 2, out0);
+                _mm_storeu_ps(buffer + i * 2 + 4, out1);
+            }
+#endif
+            for (; i < frames; ++i) {
+                const float l = buffer[i * 2];
+                const float r = buffer[i * 2 + 1];
                 const float mid = 0.5f * (l + r);
                 const float side = 0.5f * (l - r);
-                buffer[i * channels + ch] = mid + w * side;
-                buffer[i * channels + ch + 1] = mid - w * side;
+                buffer[i * 2] = mid + w * side;
+                buffer[i * 2 + 1] = mid - w * side;
+            }
+        } else {
+            for (int i = 0; i < frames; ++i) {
+                for (int ch = 0; ch + 1 < channels; ch += 2) {
+                    const float l = buffer[i * channels + ch];
+                    const float r = buffer[i * channels + ch + 1];
+                    const float mid = 0.5f * (l + r);
+                    const float side = 0.5f * (l - r);
+                    buffer[i * channels + ch] = mid + w * side;
+                    buffer[i * channels + ch + 1] = mid - w * side;
+                }
             }
         }
         return;

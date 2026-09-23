@@ -1,10 +1,12 @@
 // lib/features/settings/presentation/widgets/usb_dac_section.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../domain/services/usb_exclusive_service.dart';
+import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'settings_tiles.dart';
@@ -93,17 +95,26 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     setState(() => _streamingBusy = true);
     try {
       if (enabled) {
+        int sampleRate = 48000;
+        try {
+          final playerCubit = context.read<PlayerCubit>();
+          final trackRate = playerCubit.state.currentSong?.sampleRate;
+          if (trackRate != null && trackRate > 0) {
+            sampleRate = trackRate;
+          }
+        } catch (_) {}
         if (!_status.permitted) {
           final granted = await _service.requestPermission();
           if (!granted) return;
         }
-        final res = await _service.startStreaming(sampleRate: 48000);
+        final res = await _service.startStreaming(sampleRate: sampleRate);
         if (!mounted) return;
         if (!res.isOk) {
           await _refresh();
           if (mounted) {
+            final rateKhz = (sampleRate / 1000).toStringAsFixed(1);
             ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-              content: Text('${context.l10n.usbBpFailed}: ${res.toUserMessage()} (48.0 kHz)'),
+              content: Text('${context.l10n.usbBpFailed}: ${res.toUserMessage()} ($rateKhz kHz)'),
               action: SnackBarAction(
                 label: 'Retry',
                 onPressed: () => _toggleStreaming(true),

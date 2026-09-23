@@ -241,6 +241,40 @@ double DspEngineRegistry::getAppliedSampleRate() {
     return AudioDspEngine::instance().getSampleRate();
 }
 
+void DspEngineRegistry::setPerformanceProfile(DspPerformanceProfile profile) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto* engine : engines_) {
+        if (engine) engine->setPerformanceProfile(profile);
+    }
+    AudioDspEngine::instance().setPerformanceProfile(profile);
+}
+
+void DspEngineRegistry::setThermalLevel(int level) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto* engine : engines_) {
+        if (engine) engine->setThermalLevel(level);
+    }
+    AudioDspEngine::instance().setThermalLevel(level);
+}
+
+void DspEngineRegistry::setReverbThreadingMode(ReverbThreadingMode mode) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto* engine : engines_) {
+        if (engine) engine->setReverbThreadingMode(mode);
+    }
+    AudioDspEngine::instance().setReverbThreadingMode(mode);
+}
+
+void DspEngineRegistry::drainRetireQueues() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine::instance().drainRetireQueue();
+    for (auto* engine : engines_) {
+        if (engine && engine != &AudioDspEngine::instance()) {
+            engine->drainRetireQueue();
+        }
+    }
+}
+
 void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     if (!mutator) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
@@ -530,7 +564,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 5. Convolution Reverb Stage (Stereo channels 0 and 1)
-        if ((stages & STAGE_REVERB) && channels >= 2) {
+        if ((stages & STAGE_REVERB) && (snapshot->reverb.enabled || reverb_.isRamping()) && channels >= 2) {
             reverb_.processInterleaved(buffer, frames, channels);
         }
 
@@ -716,58 +750,93 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
 
             const uint32_t currentDegraded = autoDegradedStages_.load(std::memory_order_relaxed);
 
-            // Sustained high load (RTF > 0.80 over window): degrade ONE stage at a time in cost order
-            // Note: Limiter output protection is NEVER disabled during auto-degrade to prevent clipping.
-            if (avgRtf > 0.80f) {
+            const auto profile = performanceProfile_.load(std::memory_order_relaxed);
+            const int thermal = thermalLevel_.load(std::memory_order_relaxed);
+
+            float degradeThreshold = 0.80f;
+            float recoveryThreshold = 0.50f;
+
+            if (thermal >= 3) {
+                degradeThreshold = 0.45f;
+                recoveryThreshold = 0.30f;
+            } else if (thermal == 2) {
+                degradeThreshold = 0.60f;
+                recoveryThreshold = 0.40f;
+            } else if (thermal == 1 || profile == DspPerformanceProfile::PowerSaver) {
+                degradeThreshold = 0.65f;
+                recoveryThreshold = 0.45f;
+            } else if (profile == DspPerformanceProfile::Audiophile) {
+                degradeThreshold = 0.90f;
+                recoveryThreshold = 0.65f;
+            } else {
+                degradeThreshold = 0.80f;
+                recoveryThreshold = 0.50f;
+            }
+
+            // Sustained high load (RTF > degradeThreshold over window): degrade ONE stage at a time in cost order
+            // Note: Limiter output protection and Headphone Safety are NEVER disabled during auto-degrade to prevent clipping/hearing injury.
+            if (avgRtf > degradeThreshold) {
                 recoveryConsecutiveBlocks_ = 0;
-                // Cost order: REVERB -> MULTIBAND_COMPRESSOR -> DYNAMIC_BASS -> SATURATION -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
-                if ((rawStages & STAGE_REVERB) && !(currentDegraded & STAGE_REVERB)) {
+                // Cost order: REVERB -> LIVE_PROG -> ARBITRARY_EQ -> MULTIBAND_COMPRESSOR -> DYNAMIC_BASS -> SATURATION -> VIPER_DDC -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
+                if ((rawStages & STAGE_REVERB) && snapshot->reverb.enabled && !(currentDegraded & STAGE_REVERB)) {
                     triggerStageAutoDegrade(STAGE_REVERB);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_MULTIBAND_COMPRESSOR) && !(currentDegraded & STAGE_MULTIBAND_COMPRESSOR)) {
+                } else if ((rawStages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled && !(currentDegraded & STAGE_LIVE_PROG)) {
+                    triggerStageAutoDegrade(STAGE_LIVE_PROG);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_ARBITRARY_EQ) && snapshot->arbitraryEq.enabled && !(currentDegraded & STAGE_ARBITRARY_EQ)) {
+                    triggerStageAutoDegrade(STAGE_ARBITRARY_EQ);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled && !(currentDegraded & STAGE_MULTIBAND_COMPRESSOR)) {
                     triggerStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_DYNAMIC_BASS) && !(currentDegraded & STAGE_DYNAMIC_BASS)) {
+                } else if ((rawStages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled && !(currentDegraded & STAGE_DYNAMIC_BASS)) {
                     triggerStageAutoDegrade(STAGE_DYNAMIC_BASS);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_SATURATION) && !(currentDegraded & STAGE_SATURATION)) {
+                } else if ((rawStages & STAGE_SATURATION) && snapshot->saturation.enabled && !(currentDegraded & STAGE_SATURATION)) {
                     triggerStageAutoDegrade(STAGE_SATURATION);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_DYNEQ) && !(currentDegraded & STAGE_DYNEQ)) {
+                } else if ((rawStages & STAGE_VIPER_DDC) && snapshot->viperDdc.enabled && !(currentDegraded & STAGE_VIPER_DDC)) {
+                    triggerStageAutoDegrade(STAGE_VIPER_DDC);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled && !(currentDegraded & STAGE_DYNEQ)) {
                     triggerStageAutoDegrade(STAGE_DYNEQ);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_CROSSOVER) && !(currentDegraded & STAGE_CROSSOVER)) {
+                } else if ((rawStages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled && !(currentDegraded & STAGE_CROSSOVER)) {
                     triggerStageAutoDegrade(STAGE_CROSSOVER);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_WIDTH) && !(currentDegraded & STAGE_WIDTH)) {
+                } else if ((rawStages & STAGE_WIDTH) && snapshot->stereoWidth.enabled && !(currentDegraded & STAGE_WIDTH)) {
                     triggerStageAutoDegrade(STAGE_WIDTH);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_CROSSFEED) && !(currentDegraded & STAGE_CROSSFEED)) {
+                } else if ((rawStages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled && !(currentDegraded & STAGE_CROSSFEED)) {
                     triggerStageAutoDegrade(STAGE_CROSSFEED);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_PANNER) && !(currentDegraded & STAGE_PANNER)) {
+                } else if ((rawStages & STAGE_PANNER) && (snapshot->panner.monoMix || std::abs(snapshot->panner.balance) > 0.001) && !(currentDegraded & STAGE_PANNER)) {
                     triggerStageAutoDegrade(STAGE_PANNER);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if ((rawStages & STAGE_EQ) && !(currentDegraded & STAGE_EQ)) {
+                } else if ((rawStages & STAGE_EQ) && snapshot->eq.enabled && !(currentDegraded & STAGE_EQ)) {
                     triggerStageAutoDegrade(STAGE_EQ);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
                 }
-            } else if (avgRtf < 0.50f && currentDegraded != 0) {
-                // Recovery: sustained low load (RTF < 0.50) over kRtfRecoveryWindowSize blocks
+            } else if (avgRtf < recoveryThreshold && currentDegraded != 0) {
+                // Recovery: sustained low load (RTF < recoveryThreshold) over kRtfRecoveryWindowSize blocks
                 recoveryConsecutiveBlocks_++;
                 if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
                     recoveryConsecutiveBlocks_ = 0;
-                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> REVERB
+                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> VIPER_DDC -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> ARBITRARY_EQ -> LIVE_PROG -> REVERB
                     if (currentDegraded & STAGE_EQ) {
                         eq_.reset();
                         recoverStageAutoDegrade(STAGE_EQ);
@@ -786,6 +855,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     } else if (currentDegraded & STAGE_DYNEQ) {
                         dynamicEq_.reset();
                         recoverStageAutoDegrade(STAGE_DYNEQ);
+                    } else if (currentDegraded & STAGE_VIPER_DDC) {
+                        viperDdc_.reset();
+                        recoverStageAutoDegrade(STAGE_VIPER_DDC);
                     } else if (currentDegraded & STAGE_SATURATION) {
                         saturation_.reset();
                         recoverStageAutoDegrade(STAGE_SATURATION);
@@ -795,6 +867,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     } else if (currentDegraded & STAGE_MULTIBAND_COMPRESSOR) {
                         multibandCompressor_.reset();
                         recoverStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
+                    } else if (currentDegraded & STAGE_ARBITRARY_EQ) {
+                        arbitraryEq_.reset();
+                        recoverStageAutoDegrade(STAGE_ARBITRARY_EQ);
+                    } else if (currentDegraded & STAGE_LIVE_PROG) {
+                        liveProg_.reset();
+                        recoverStageAutoDegrade(STAGE_LIVE_PROG);
                     } else if (currentDegraded & STAGE_REVERB) {
                         reverb_.reset();
                         recoverStageAutoDegrade(STAGE_REVERB);

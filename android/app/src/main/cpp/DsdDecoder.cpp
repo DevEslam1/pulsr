@@ -3,6 +3,15 @@
 #include <cstring>
 #include <cmath>
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#define PULSR_HAS_SSE 1
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -39,6 +48,10 @@ void DsdDecoder::generateFilters() {
         for (int i = 0; i < DECIMATION_TAPS; ++i) {
             decimationCoeffs_[i] *= invSum;
         }
+    }
+
+    for (int i = 0; i < DECIMATION_TAPS; ++i) {
+        reversedDecimationCoeffs_[i] = decimationCoeffs_[DECIMATION_TAPS - 1 - i];
     }
 
     // 5Hz DC blocker pole: R = 1 - 2*pi*5 / targetRate
@@ -152,17 +165,93 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
 
                 // --- STAGE 2: Anti-Aliasing Decimation Filter ---
                 stage2RingL_[stage2WriteIdx_] = cicOutL;
+                stage2RingL_[stage2WriteIdx_ + DECIMATION_TAPS] = cicOutL;
                 stage2RingR_[stage2WriteIdx_] = cicOutR;
+                stage2RingR_[stage2WriteIdx_ + DECIMATION_TAPS] = cicOutR;
+
+                const float* bufL = &stage2RingL_[stage2WriteIdx_ + 1];
+                const float* bufR = &stage2RingR_[stage2WriteIdx_ + 1];
                 stage2WriteIdx_ = (stage2WriteIdx_ + 1) % DECIMATION_TAPS;
 
                 float decimationOutL = 0.0f;
                 float decimationOutR = 0.0f;
 
-                for (int tap = 0; tap < DECIMATION_TAPS; ++tap) {
-                    int rIdx = (stage2WriteIdx_ - 1 - tap + DECIMATION_TAPS) % DECIMATION_TAPS;
-                    decimationOutL += stage2RingL_[rIdx] * decimationCoeffs_[tap];
-                    decimationOutR += stage2RingR_[rIdx] * decimationCoeffs_[tap];
+#if defined(PULSR_HAS_NEON)
+                float32x4_t accL0 = vdupq_n_f32(0.0f);
+                float32x4_t accL1 = vdupq_n_f32(0.0f);
+                float32x4_t accR0 = vdupq_n_f32(0.0f);
+                float32x4_t accR1 = vdupq_n_f32(0.0f);
+                int tap = 0;
+                for (; tap <= DECIMATION_TAPS - 8; tap += 8) {
+                    float32x4_t c0 = vld1q_f32(&reversedDecimationCoeffs_[tap]);
+                    float32x4_t c1 = vld1q_f32(&reversedDecimationCoeffs_[tap + 4]);
+                    float32x4_t l0 = vld1q_f32(&bufL[tap]);
+                    float32x4_t l1 = vld1q_f32(&bufL[tap + 4]);
+                    float32x4_t r0 = vld1q_f32(&bufR[tap]);
+                    float32x4_t r1 = vld1q_f32(&bufR[tap + 4]);
+                    accL0 = vfmaq_f32(accL0, l0, c0);
+                    accL1 = vfmaq_f32(accL1, l1, c1);
+                    accR0 = vfmaq_f32(accR0, r0, c0);
+                    accR1 = vfmaq_f32(accR1, r1, c1);
                 }
+                accL0 = vaddq_f32(accL0, accL1);
+                accR0 = vaddq_f32(accR0, accR1);
+                for (; tap <= DECIMATION_TAPS - 4; tap += 4) {
+                    float32x4_t c = vld1q_f32(&reversedDecimationCoeffs_[tap]);
+                    float32x4_t l = vld1q_f32(&bufL[tap]);
+                    float32x4_t r = vld1q_f32(&bufR[tap]);
+                    accL0 = vfmaq_f32(accL0, l, c);
+                    accR0 = vfmaq_f32(accR0, r, c);
+                }
+                decimationOutL = vaddvq_f32(accL0);
+                decimationOutR = vaddvq_f32(accR0);
+                for (; tap < DECIMATION_TAPS; ++tap) {
+                    decimationOutL += bufL[tap] * reversedDecimationCoeffs_[tap];
+                    decimationOutR += bufR[tap] * reversedDecimationCoeffs_[tap];
+                }
+#elif defined(PULSR_HAS_SSE)
+                __m128 accL0 = _mm_setzero_ps();
+                __m128 accL1 = _mm_setzero_ps();
+                __m128 accR0 = _mm_setzero_ps();
+                __m128 accR1 = _mm_setzero_ps();
+                int tap = 0;
+                for (; tap <= DECIMATION_TAPS - 8; tap += 8) {
+                    __m128 c0 = _mm_loadu_ps(&reversedDecimationCoeffs_[tap]);
+                    __m128 c1 = _mm_loadu_ps(&reversedDecimationCoeffs_[tap + 4]);
+                    __m128 l0 = _mm_loadu_ps(&bufL[tap]);
+                    __m128 l1 = _mm_loadu_ps(&bufL[tap + 4]);
+                    __m128 r0 = _mm_loadu_ps(&bufR[tap]);
+                    __m128 r1 = _mm_loadu_ps(&bufR[tap + 4]);
+                    accL0 = _mm_add_ps(accL0, _mm_mul_ps(l0, c0));
+                    accL1 = _mm_add_ps(accL1, _mm_mul_ps(l1, c1));
+                    accR0 = _mm_add_ps(accR0, _mm_mul_ps(r0, c0));
+                    accR1 = _mm_add_ps(accR1, _mm_mul_ps(r1, c1));
+                }
+                accL0 = _mm_add_ps(accL0, accL1);
+                accR0 = _mm_add_ps(accR0, accR1);
+                for (; tap <= DECIMATION_TAPS - 4; tap += 4) {
+                    __m128 c = _mm_loadu_ps(&reversedDecimationCoeffs_[tap]);
+                    __m128 l = _mm_loadu_ps(&bufL[tap]);
+                    __m128 r = _mm_loadu_ps(&bufR[tap]);
+                    accL0 = _mm_add_ps(accL0, _mm_mul_ps(l, c));
+                    accR0 = _mm_add_ps(accR0, _mm_mul_ps(r, c));
+                }
+                alignas(16) float tmpL[4];
+                alignas(16) float tmpR[4];
+                _mm_store_ps(tmpL, accL0);
+                _mm_store_ps(tmpR, accR0);
+                decimationOutL = tmpL[0] + tmpL[1] + tmpL[2] + tmpL[3];
+                decimationOutR = tmpR[0] + tmpR[1] + tmpR[2] + tmpR[3];
+                for (; tap < DECIMATION_TAPS; ++tap) {
+                    decimationOutL += bufL[tap] * reversedDecimationCoeffs_[tap];
+                    decimationOutR += bufR[tap] * reversedDecimationCoeffs_[tap];
+                }
+#else
+                for (int tap = 0; tap < DECIMATION_TAPS; ++tap) {
+                    decimationOutL += bufL[tap] * reversedDecimationCoeffs_[tap];
+                    decimationOutR += bufR[tap] * reversedDecimationCoeffs_[tap];
+                }
+#endif
 
                 // --- STAGE 3: Fractional Phase Accumulator to target rate ---
                 phaseAcc_ += 8.0; // 8 raw DSD bits processed per CIC output

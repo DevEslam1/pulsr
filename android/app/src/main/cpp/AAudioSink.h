@@ -78,7 +78,7 @@ public:
 
 private:
     bool TryOpen(aaudio_sharing_mode_t sharing, aaudio_performance_mode_t perf);
-    void CloseLocked();
+    void CloseLocked(bool waitForWriters = true);
     static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
     bool RecoverDisconnected();
 
@@ -86,6 +86,7 @@ private:
     std::atomic<AAudioStream*> stream_{nullptr};
     std::mutex streamMutex_;
     mutable std::atomic<int32_t> activeReaders_{0};
+    mutable std::atomic<int32_t> activeWriters_{0};
     std::atomic<bool> releasing_{false};
     std::atomic<bool> disconnected_{false};
     bool exclusive_ = false;

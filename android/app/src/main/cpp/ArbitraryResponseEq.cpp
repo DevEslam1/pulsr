@@ -5,6 +5,15 @@
 #include <cmath>
 #include <cstring>
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#define PULSR_HAS_SSE 1
+#endif
+
 namespace {
 // A GraphicEq/EqualizerAPO string is untrusted input. Clamp the requested gain
 // so a crafted value can never overflow pow() to +inf and poison the FIR taps.
@@ -233,6 +242,96 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     }
 }
 
+namespace {
+inline void convolve512Stereo(
+    const float* h,
+    const float* ptrL,
+    const float* ptrR,
+    float& outL,
+    float& outR)
+{
+#if defined(PULSR_HAS_NEON)
+    float32x4_t accL0 = vdupq_n_f32(0.0f);
+    float32x4_t accR0 = vdupq_n_f32(0.0f);
+    float32x4_t accL1 = vdupq_n_f32(0.0f);
+    float32x4_t accR1 = vdupq_n_f32(0.0f);
+
+    for (int t = 0; t < ArbitraryResponseEq::FIR_TAPS; t += 8) {
+        float32x4_t vH0 = vld1q_f32(&h[t]);
+        float32x4_t vPtrL0 = vld1q_f32(ptrL - t - 3);
+        float32x4_t vPtrR0 = vld1q_f32(ptrR - t - 3);
+
+        float32x4_t vRevL0 = vcombine_f32(vget_high_f32(vrev64q_f32(vPtrL0)), vget_low_f32(vrev64q_f32(vPtrL0)));
+        float32x4_t vRevR0 = vcombine_f32(vget_high_f32(vrev64q_f32(vPtrR0)), vget_low_f32(vrev64q_f32(vPtrR0)));
+
+        accL0 = vfmaq_f32(accL0, vH0, vRevL0);
+        accR0 = vfmaq_f32(accR0, vH0, vRevR0);
+
+        float32x4_t vH1 = vld1q_f32(&h[t + 4]);
+        float32x4_t vPtrL1 = vld1q_f32(ptrL - t - 7);
+        float32x4_t vPtrR1 = vld1q_f32(ptrR - t - 7);
+
+        float32x4_t vRevL1 = vcombine_f32(vget_high_f32(vrev64q_f32(vPtrL1)), vget_low_f32(vrev64q_f32(vPtrL1)));
+        float32x4_t vRevR1 = vcombine_f32(vget_high_f32(vrev64q_f32(vPtrR1)), vget_low_f32(vrev64q_f32(vPtrR1)));
+
+        accL1 = vfmaq_f32(accL1, vH1, vRevL1);
+        accR1 = vfmaq_f32(accR1, vH1, vRevR1);
+    }
+
+    outL = vaddvq_f32(vaddq_f32(accL0, accL1));
+    outR = vaddvq_f32(vaddq_f32(accR0, accR1));
+
+#elif defined(PULSR_HAS_SSE)
+    __m128 accL0 = _mm_setzero_ps();
+    __m128 accR0 = _mm_setzero_ps();
+    __m128 accL1 = _mm_setzero_ps();
+    __m128 accR1 = _mm_setzero_ps();
+
+    for (int t = 0; t < ArbitraryResponseEq::FIR_TAPS; t += 8) {
+        __m128 vH0 = _mm_loadu_ps(&h[t]);
+        __m128 vPtrL0 = _mm_loadu_ps(ptrL - t - 3);
+        __m128 vPtrR0 = _mm_loadu_ps(ptrR - t - 3);
+
+        __m128 vRevL0 = _mm_shuffle_ps(vPtrL0, vPtrL0, _MM_SHUFFLE(0, 1, 2, 3));
+        __m128 vRevR0 = _mm_shuffle_ps(vPtrR0, vPtrR0, _MM_SHUFFLE(0, 1, 2, 3));
+
+        accL0 = _mm_add_ps(accL0, _mm_mul_ps(vH0, vRevL0));
+        accR0 = _mm_add_ps(accR0, _mm_mul_ps(vH0, vRevR0));
+
+        __m128 vH1 = _mm_loadu_ps(&h[t + 4]);
+        __m128 vPtrL1 = _mm_loadu_ps(ptrL - t - 7);
+        __m128 vPtrR1 = _mm_loadu_ps(ptrR - t - 7);
+
+        __m128 vRevL1 = _mm_shuffle_ps(vPtrL1, vPtrL1, _MM_SHUFFLE(0, 1, 2, 3));
+        __m128 vRevR1 = _mm_shuffle_ps(vPtrR1, vPtrR1, _MM_SHUFFLE(0, 1, 2, 3));
+
+        accL1 = _mm_add_ps(accL1, _mm_mul_ps(vH1, vRevL1));
+        accR1 = _mm_add_ps(accR1, _mm_mul_ps(vH1, vRevR1));
+    }
+
+    __m128 sumL = _mm_add_ps(accL0, accL1);
+    __m128 sumR = _mm_add_ps(accR0, accR1);
+
+    alignas(16) float arrL[4], arrR[4];
+    _mm_store_ps(arrL, sumL);
+    _mm_store_ps(arrR, sumR);
+
+    outL = arrL[0] + arrL[1] + arrL[2] + arrL[3];
+    outR = arrR[0] + arrR[1] + arrR[2] + arrR[3];
+
+#else
+    float sumL = 0.0f;
+    float sumR = 0.0f;
+    for (int t = 0; t < ArbitraryResponseEq::FIR_TAPS; ++t) {
+        sumL += h[t] * ptrL[-t];
+        sumR += h[t] * ptrR[-t];
+    }
+    outL = sumL;
+    outR = sumR;
+#endif
+}
+} // namespace
+
 void ArbitraryResponseEq::process(float* L, float* R, int frames) {
     if (!enabled_ || !hasResponse_ || !L || !R || frames <= 0) return;
 
@@ -256,10 +355,7 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
 
         float outL = 0.0f;
         float outR = 0.0f;
-        for (int t = 0; t < taps; ++t) {
-            outL += h[t] * ptrL[-t];
-            outR += h[t] * ptrR[-t];
-        }
+        convolve512Stereo(h, ptrL, ptrR, outL, outR);
 
         historyIdx_ = historyIdx_ + 1;
         if (historyIdx_ >= taps) historyIdx_ = 0;
@@ -292,10 +388,7 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
 
         float outL = 0.0f;
         float outR = 0.0f;
-        for (int t = 0; t < taps; ++t) {
-            outL += h[t] * ptrL[-t];
-            outR += h[t] * ptrR[-t];
-        }
+        convolve512Stereo(h, ptrL, ptrR, outL, outR);
 
         historyIdx_ = historyIdx_ + 1;
         if (historyIdx_ >= taps) historyIdx_ = 0;

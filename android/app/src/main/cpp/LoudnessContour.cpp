@@ -1,6 +1,15 @@
 // android/app/src/main/cpp/LoudnessContour.cpp
 #include "LoudnessContour.h"
 #include <cstring>
+#include <cmath>
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
+#define PULSR_HAS_SSE2 1
+#endif
 
 LoudnessContour::LoudnessContour() {
     setSampleRate(48000.0);
@@ -158,6 +167,131 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         }
         lastComputedBassDb_ = currentBassDb_;
         lastComputedTrebleDb_ = currentTrebleDb_;
+    }
+
+    if (channels == 2) {
+#if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
+        const float64x2_t tb0 = vdupq_n_f64(treble_[0].b0);
+        const float64x2_t tb1 = vdupq_n_f64(treble_[0].b1);
+        const float64x2_t tb2 = vdupq_n_f64(treble_[0].b2);
+        const float64x2_t ta1 = vdupq_n_f64(treble_[0].a1);
+        const float64x2_t ta2 = vdupq_n_f64(treble_[0].a2);
+
+        const float64x2_t bb0 = vdupq_n_f64(bass_[0].b0);
+        const float64x2_t bb1 = vdupq_n_f64(bass_[0].b1);
+        const float64x2_t bb2 = vdupq_n_f64(bass_[0].b2);
+        const float64x2_t ba1 = vdupq_n_f64(bass_[0].a1);
+        const float64x2_t ba2 = vdupq_n_f64(bass_[0].a2);
+
+        float64x2_t tx1 = { treble_[0].x1, treble_[1].x1 };
+        float64x2_t tx2 = { treble_[0].x2, treble_[1].x2 };
+        float64x2_t ty1 = { treble_[0].y1, treble_[1].y1 };
+        float64x2_t ty2 = { treble_[0].y2, treble_[1].y2 };
+
+        float64x2_t bx1 = { bass_[0].x1, bass_[1].x1 };
+        float64x2_t bx2 = { bass_[0].x2, bass_[1].x2 };
+        float64x2_t by1 = { bass_[0].y1, bass_[1].y1 };
+        float64x2_t by2 = { bass_[0].y2, bass_[1].y2 };
+
+        for (int i = 0; i < frames; ++i) {
+            double l = buffer[i * 2];
+            double r = buffer[i * 2 + 1];
+            if (!std::isfinite(l)) l = 0.0;
+            if (!std::isfinite(r)) r = 0.0;
+            float64x2_t vx = { l, r };
+
+            // Treble shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            float64x2_t ty = vsubq_f64(
+                vaddq_f64(vmulq_f64(tb0, vx), vaddq_f64(vmulq_f64(tb1, tx1), vmulq_f64(tb2, tx2))),
+                vaddq_f64(vmulq_f64(ta1, ty1), vmulq_f64(ta2, ty2))
+            );
+            tx2 = tx1; tx1 = vx;
+            ty2 = ty1; ty1 = ty;
+
+            // Bass shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            float64x2_t by = vsubq_f64(
+                vaddq_f64(vmulq_f64(bb0, ty), vaddq_f64(vmulq_f64(bb1, bx1), vmulq_f64(bb2, bx2))),
+                vaddq_f64(vmulq_f64(ba1, by1), vmulq_f64(ba2, by2))
+            );
+            bx2 = bx1; bx1 = ty;
+            by2 = by1; by1 = by;
+
+            buffer[i * 2] = static_cast<float>(vgetq_lane_f64(by, 0));
+            buffer[i * 2 + 1] = static_cast<float>(vgetq_lane_f64(by, 1));
+        }
+
+        treble_[0].x1 = vgetq_lane_f64(tx1, 0); treble_[1].x1 = vgetq_lane_f64(tx1, 1);
+        treble_[0].x2 = vgetq_lane_f64(tx2, 0); treble_[1].x2 = vgetq_lane_f64(tx2, 1);
+        treble_[0].y1 = vgetq_lane_f64(ty1, 0); treble_[1].y1 = vgetq_lane_f64(ty1, 1);
+        treble_[0].y2 = vgetq_lane_f64(ty2, 0); treble_[1].y2 = vgetq_lane_f64(ty2, 1);
+
+        bass_[0].x1 = vgetq_lane_f64(bx1, 0); bass_[1].x1 = vgetq_lane_f64(bx1, 1);
+        bass_[0].x2 = vgetq_lane_f64(bx2, 0); bass_[1].x2 = vgetq_lane_f64(bx2, 1);
+        bass_[0].y1 = vgetq_lane_f64(by1, 0); bass_[1].y1 = vgetq_lane_f64(by1, 1);
+        bass_[0].y2 = vgetq_lane_f64(by2, 0); bass_[1].y2 = vgetq_lane_f64(by2, 1);
+        return;
+#elif defined(PULSR_HAS_SSE2)
+        const __m128d tb0 = _mm_set1_pd(treble_[0].b0);
+        const __m128d tb1 = _mm_set1_pd(treble_[0].b1);
+        const __m128d tb2 = _mm_set1_pd(treble_[0].b2);
+        const __m128d ta1 = _mm_set1_pd(treble_[0].a1);
+        const __m128d ta2 = _mm_set1_pd(treble_[0].a2);
+
+        const __m128d bb0 = _mm_set1_pd(bass_[0].b0);
+        const __m128d bb1 = _mm_set1_pd(bass_[0].b1);
+        const __m128d bb2 = _mm_set1_pd(bass_[0].b2);
+        const __m128d ba1 = _mm_set1_pd(bass_[0].a1);
+        const __m128d ba2 = _mm_set1_pd(bass_[0].a2);
+
+        __m128d tx1 = _mm_set_pd(treble_[1].x1, treble_[0].x1);
+        __m128d tx2 = _mm_set_pd(treble_[1].x2, treble_[0].x2);
+        __m128d ty1 = _mm_set_pd(treble_[1].y1, treble_[0].y1);
+        __m128d ty2 = _mm_set_pd(treble_[1].y2, treble_[0].y2);
+
+        __m128d bx1 = _mm_set_pd(bass_[1].x1, bass_[0].x1);
+        __m128d bx2 = _mm_set_pd(bass_[1].x2, bass_[0].x2);
+        __m128d by1 = _mm_set_pd(bass_[1].y1, bass_[0].y1);
+        __m128d by2 = _mm_set_pd(bass_[1].y2, bass_[0].y2);
+
+        for (int i = 0; i < frames; ++i) {
+            double l = buffer[i * 2];
+            double r = buffer[i * 2 + 1];
+            if (!std::isfinite(l)) l = 0.0;
+            if (!std::isfinite(r)) r = 0.0;
+            __m128d vx = _mm_set_pd(r, l);
+
+            __m128d ty = _mm_sub_pd(
+                _mm_add_pd(_mm_mul_pd(tb0, vx), _mm_add_pd(_mm_mul_pd(tb1, tx1), _mm_mul_pd(tb2, tx2))),
+                _mm_add_pd(_mm_mul_pd(ta1, ty1), _mm_mul_pd(ta2, ty2))
+            );
+            tx2 = tx1; tx1 = vx;
+            ty2 = ty1; ty1 = ty;
+
+            __m128d by = _mm_sub_pd(
+                _mm_add_pd(_mm_mul_pd(bb0, ty), _mm_add_pd(_mm_mul_pd(bb1, bx1), _mm_mul_pd(bb2, bx2))),
+                _mm_add_pd(_mm_mul_pd(ba1, by1), _mm_mul_pd(ba2, by2))
+            );
+            bx2 = bx1; bx1 = ty;
+            by2 = by1; by1 = by;
+
+            alignas(16) double by_arr[2];
+            _mm_store_pd(by_arr, by);
+            buffer[i * 2] = static_cast<float>(by_arr[0]);
+            buffer[i * 2 + 1] = static_cast<float>(by_arr[1]);
+        }
+
+        alignas(16) double t_arr[2], b_arr[2];
+        _mm_store_pd(t_arr, tx1); treble_[0].x1 = t_arr[0]; treble_[1].x1 = t_arr[1];
+        _mm_store_pd(t_arr, tx2); treble_[0].x2 = t_arr[0]; treble_[1].x2 = t_arr[1];
+        _mm_store_pd(t_arr, ty1); treble_[0].y1 = t_arr[0]; treble_[1].y1 = t_arr[1];
+        _mm_store_pd(t_arr, ty2); treble_[0].y2 = t_arr[0]; treble_[1].y2 = t_arr[1];
+
+        _mm_store_pd(b_arr, bx1); bass_[0].x1 = b_arr[0]; bass_[1].x1 = b_arr[1];
+        _mm_store_pd(b_arr, bx2); bass_[0].x2 = b_arr[0]; bass_[1].x2 = b_arr[1];
+        _mm_store_pd(b_arr, by1); bass_[0].y1 = b_arr[0]; bass_[1].y1 = b_arr[1];
+        _mm_store_pd(b_arr, by2); bass_[0].y2 = b_arr[0]; bass_[1].y2 = b_arr[1];
+        return;
+#endif
     }
 
     const int activeChannels = std::min(channels, MAX_CHANNELS);

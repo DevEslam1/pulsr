@@ -52,6 +52,12 @@ enum DspStageMask {
     STAGE_HEADPHONE_SAFETY = 1 << 17,
 };
 
+enum class DspPerformanceProfile {
+    Audiophile = 0,   // High-fidelity target: degradation threshold RTF > 0.90, recovery < 0.65
+    Performance = 1,  // Balanced: degradation threshold RTF > 0.80, recovery < 0.50
+    PowerSaver = 2    // Battery saver / thermal throttle: degradation threshold RTF > 0.65, recovery < 0.40
+};
+
 template<typename T>
 class AtomicSharedPtr {
 public:
@@ -157,6 +163,10 @@ public:
     bool isAutoDegradeMonitorEnabled() const { return autoDegradeMonitorEnabled_.load(); }
     void setSimulatedBlockRtf(double rtf) { simulatedBlockRtf_.store(rtf); }
     double getRollingRtf() const { return rollingRtf_.load(); }
+    void setPerformanceProfile(DspPerformanceProfile profile) { performanceProfile_.store(profile, std::memory_order_relaxed); }
+    DspPerformanceProfile getPerformanceProfile() const { return performanceProfile_.load(std::memory_order_relaxed); }
+    void setThermalLevel(int level) { thermalLevel_.store(std::clamp(level, 0, 3), std::memory_order_relaxed); }
+    int getThermalLevel() const { return thermalLevel_.load(std::memory_order_relaxed); }
     float getLimiterGrDb() const { return limiterGrDb_.load(std::memory_order_relaxed); }
     float getDynEqGrDb(int band) const {
         if (band >= 0 && band < DynamicEqParamSet::MAX_BANDS) {
@@ -170,6 +180,9 @@ public:
         }
         return 0.0f;
     }
+
+    void setReverbThreadingMode(ReverbThreadingMode mode) { reverb_.setThreadingMode(mode); }
+    ReverbThreadingMode getReverbThreadingMode() const { return reverb_.getThreadingMode(); }
 
     // Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
     double getWeeklyDose() const { return weeklyDose_.load(std::memory_order_relaxed); }
@@ -212,6 +225,8 @@ private:
     std::atomic<bool> autoDegradeMonitorEnabled_{true};
     std::atomic<double> simulatedBlockRtf_{-1.0}; // < 0 means measure actual wall-clock
     std::atomic<double> rollingRtf_{0.0};
+    std::atomic<DspPerformanceProfile> performanceProfile_{DspPerformanceProfile::Performance};
+    std::atomic<int> thermalLevel_{0};
     float rtfRingBuffer_[kRtfWindowSize] = {};
     int rtfRingHead_ = 0;
     int rtfCount_ = 0;
@@ -312,6 +327,10 @@ public:
     void resetWeeklyDose();
     bool isSafetyAttenuationActive();
     double getAppliedSampleRate();
+    void setPerformanceProfile(DspPerformanceProfile profile);
+    void setThermalLevel(int level);
+    void setReverbThreadingMode(ReverbThreadingMode mode);
+    void drainRetireQueues();
 
 private:
     std::mutex mutex_;

@@ -303,7 +303,19 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final l10n = AppLocalizations.of(context)!;
     try {
       final db = _db;
-      if (db == null) return;
+      if (db == null) {
+        ErrorLogger.log('Database not available for downloaded song playback',
+            category: 'Downloads');
+        if (context.mounted) {
+          PulsrToast.show(
+            context,
+            message: l10n.libraryReadError,
+            icon: Icons.error_outline_rounded,
+            isError: true,
+          );
+        }
+        return;
+      }
       final song = await (db.select(db.songsTable)
             ..where((t) => t.id.equals(localId)))
           .getSingleOrNull();

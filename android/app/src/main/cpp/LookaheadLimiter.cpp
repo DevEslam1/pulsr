@@ -3,6 +3,15 @@
 #include <cstring>
 #include <cmath>
 
+#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#define PULSR_HAS_SSE 1
+#endif
+
 // 24-tap polyphase sinc coefficients windowed with Blackman-Harris across 4 phases (6 taps per phase)
 const float LookaheadLimiter::polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE] = {
     { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f }, // Phase 0 (identity)
@@ -97,6 +106,42 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
         }
     } else {
         // <= 96kHz: 4x oversampling (evaluate phases 1, 2, 3)
+#if defined(PULSR_HAS_NEON)
+        alignas(16) static const float kPhaseCoeffs[6][4] = {
+            { 0.0063f,  0.0152f,  0.0120f, 0.0f },
+            { -0.0984f, -0.1386f, -0.0682f, 0.0f },
+            { 0.8841f,  0.6234f,  0.2642f, 0.0f },
+            { 0.2642f,  0.6234f,  0.8841f, 0.0f },
+            { -0.0682f, -0.1386f, -0.0984f, 0.0f },
+            { 0.0120f,  0.0152f,  0.0063f, 0.0f }
+        };
+        float32x4_t vAcc = vdupq_n_f32(0.0f);
+        for (int t = 0; t < 6; ++t) {
+            float32x4_t vC = vld1q_f32(kPhaseCoeffs[t]);
+            vAcc = vfmaq_n_f32(vAcc, vC, history[t]);
+        }
+        float32x4_t vAbs = vabsq_f32(vAcc);
+        peak = std::max(peak, vmaxvq_f32(vAbs));
+#elif defined(PULSR_HAS_SSE)
+        alignas(16) static const float kPhaseCoeffs[6][4] = {
+            { 0.0063f,  0.0152f,  0.0120f, 0.0f },
+            { -0.0984f, -0.1386f, -0.0682f, 0.0f },
+            { 0.8841f,  0.6234f,  0.2642f, 0.0f },
+            { 0.2642f,  0.6234f,  0.8841f, 0.0f },
+            { -0.0682f, -0.1386f, -0.0984f, 0.0f },
+            { 0.0120f,  0.0152f,  0.0063f, 0.0f }
+        };
+        __m128 vAcc = _mm_setzero_ps();
+        for (int t = 0; t < 6; ++t) {
+            __m128 vC = _mm_load_ps(kPhaseCoeffs[t]);
+            __m128 vH = _mm_set1_ps(history[t]);
+            vAcc = _mm_add_ps(vAcc, _mm_mul_ps(vH, vC));
+        }
+        __m128 vAbs = _mm_and_ps(vAcc, _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff)));
+        alignas(16) float sub[4];
+        _mm_store_ps(sub, vAbs);
+        peak = std::max(peak, std::max(sub[0], std::max(sub[1], sub[2])));
+#else
         for (int phase = 1; phase < INTERP_PHASES; ++phase) {
             float subSample = 0.0f;
             for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
@@ -104,6 +149,7 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
             }
             peak = std::max(peak, std::abs(subSample));
         }
+#endif
     }
 
     return peak;

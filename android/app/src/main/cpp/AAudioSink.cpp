@@ -179,7 +179,8 @@ void AAudioSink::ErrorCallback(AAudioStream* stream, void* userData, aaudio_resu
 
 bool AAudioSink::RecoverDisconnected() {
     LOGW("Attempting to recover disconnected AAudio stream...");
-    CloseLocked();
+    // Current writer thread is active, so do not wait for writers here
+    CloseLocked(/* waitForWriters = */ false);
     disconnected_.store(false, std::memory_order_release);
     const int64_t prevFramesWritten = framesWritten_;
 
@@ -213,14 +214,20 @@ bool AAudioSink::RecoverDisconnected() {
     return false;
 }
 
-void AAudioSink::CloseLocked() {
+void AAudioSink::CloseLocked(bool waitForWriters) {
     AAudioStream* st = stream_.exchange(nullptr, std::memory_order_acq_rel);
     if (st != nullptr) {
+        // Request stop immediately so any in-flight write unblocks without blocking Close
+        AAudioStream_requestStop(st);
         // Wait for any in-flight lock-free queries to finish before closing
         while (activeReaders_.load(std::memory_order_acquire) > 0) {
             std::this_thread::yield();
         }
-        AAudioStream_requestStop(st);
+        if (waitForWriters) {
+            while (activeWriters_.load(std::memory_order_acquire) > 0) {
+                std::this_thread::yield();
+            }
+        }
         AAudioStream_close(st);
     }
 }
@@ -236,10 +243,19 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     if (bytesPerFrame_ <= 0) return -1;
     if (sizeBytes < 0 || (sizeBytes % bytesPerFrame_) != 0) return -1;
 
-    std::lock_guard<std::mutex> lock(streamMutex_);
     if (releasing_.load(std::memory_order_acquire)) return -1;
 
+    activeWriters_.fetch_add(1, std::memory_order_acquire);
+    struct WriterGuard {
+        std::atomic<int32_t>& ref;
+        ~WriterGuard() { ref.fetch_sub(1, std::memory_order_release); }
+    } guard{activeWriters_};
+
     if (disconnected_.load(std::memory_order_acquire)) {
+        std::unique_lock<std::mutex> lock(streamMutex_, std::try_to_lock);
+        if (!lock.owns_lock() || releasing_.load(std::memory_order_acquire)) {
+            return -1;
+        }
         const auto now = std::chrono::steady_clock::now();
         const auto msSinceLast = std::chrono::duration_cast<std::chrono::milliseconds>(
             now - lastRecoveryAttempt_).count();
@@ -256,7 +272,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     }
 
     AAudioStream* st = stream_.load(std::memory_order_acquire);
-    if (st == nullptr) return -1;
+    if (st == nullptr || releasing_.load(std::memory_order_acquire)) return -1;
 
     const uint8_t* src = data;
     int32_t remaining = sizeBytes;

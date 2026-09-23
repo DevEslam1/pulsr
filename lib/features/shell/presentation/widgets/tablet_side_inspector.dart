@@ -203,7 +203,9 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                         lyricsSlice: state.lyricsSlice,
                       ),
                       builder: (context, lyricsData) => LyricsView(
-                        key: ValueKey('lyrics_${lyricsData.songId}_${lyricsData.remoteId}'),
+                        key: (lyricsData.songId != null || lyricsData.remoteId != null)
+                            ? ValueKey('lyrics_${lyricsData.songId}_${lyricsData.remoteId}')
+                            : const ValueKey('lyrics_empty'),
                         lyrics: lyricsData.lyricsSlice.lyrics,
                         isLoading: lyricsData.lyricsSlice.isLoadingLyrics,
                         activeColor: activeColor,

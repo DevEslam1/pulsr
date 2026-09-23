@@ -6,11 +6,14 @@ import '../../../domain/models/dsp_telemetry.dart';
 
 class DspTelemetryCubit extends Cubit<DspTelemetry> {
   final AudioEffectsChannel _channel;
+  final Duration pollingInterval;
   Timer? _pollingTimer;
   int _listenerCount = 0;
 
-  DspTelemetryCubit({AudioEffectsChannel? channel})
-      : _channel = channel ?? AudioEffectsChannel(),
+  DspTelemetryCubit({
+    AudioEffectsChannel? channel,
+    this.pollingInterval = const Duration(milliseconds: 200),
+  })  : _channel = channel ?? AudioEffectsChannel(),
         super(const DspTelemetry.zero());
 
   /// Increments consumer reference count and starts polling if first subscriber.
@@ -31,7 +34,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
 
   void _startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+    _pollingTimer = Timer.periodic(pollingInterval, (_) {
       _fetchTelemetry();
     });
     _fetchTelemetry();

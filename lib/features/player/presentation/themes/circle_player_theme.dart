@@ -128,7 +128,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 (context.isTwoPane || constraints.maxWidth >= 680);
 
             final double heightRatio =
-                (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+                (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
             final double spacingTrackToSeek =
                 (isTablet ? 10.0 : 6.0) * heightRatio;
             final double spacingSeekToControls =
@@ -143,10 +143,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 (isTablet ? 6.0 : 3.0) * heightRatio;
 
             final double pillBarWidth = math.min(
-              constraints.maxWidth - (isTablet ? 64 : 36),
+              constraints.maxWidth - (isTablet ? 64 : 28),
               isTablet ? 440.0 : 336.0,
             );
-            final double pillBarHeight = isTablet ? 50.0 : 44.0;
+            final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -450,7 +450,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   hasPrevious: state.hasPreviousNeighbour,
                   hasNext: state.hasNextNeighbour,
                   primaryColor: activeColor,
-                  mainButtonSize: isTablet ? 72 : (isLandscape ? 56 : 64),
+                  mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
                   onPlayPause: () => cubit.togglePlayPause(),
                   onNext: () => cubit.next(),
                   onPrevious: () => cubit.previous(),
@@ -663,10 +663,11 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       final double availableHeight =
                           artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
                       final double maxAllowed = isTablet ? 560.0 : 420.0;
-                      final double circleArtSize = math.min(
-                        math.min(availableWidth, availableHeight),
-                        maxAllowed,
-                      ).clamp(180.0, double.infinity);
+                      final double rawSize =
+                          math.min(availableWidth, availableHeight);
+                      final double circleArtSize = rawSize <= 0
+                          ? 0.0
+                          : math.min(rawSize, maxAllowed);
 
                       return Center(
                         child: ConstrainedBox(

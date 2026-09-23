@@ -263,6 +263,12 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
               : YtmFetchStatus.idle,
         );
       }
+    } on FormatException catch (e, st) {
+      ErrorLogger.log('Corrupted JSON in online playlist cache',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
+    } on TypeError catch (e, st) {
+      ErrorLogger.log('Type schema mismatch in online playlist cache',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
     } catch (e, st) {
       ErrorLogger.log('Failed to load online playlist cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
@@ -292,14 +298,17 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
     Future<void> _writeOnlineCache() async {
+      if (_disposed || isClosed) return;
       try {
         final prefs = await SharedPreferences.getInstance();
+        if (_disposed || isClosed) return;
         // Bounded cache: prefs is not a database. Liked tracks capped at 200,
         // custom playlists at the 10 most recent with 50 tracks each — full
         // track lists are re-fetched on open, so the cache only needs enough
         // for instant paint. Previously unbounded (200-track × N playlists).
-        final liked = ytmOnline.value.likedTracks;
-        final customs = ytmOnline.value.customPlaylists;
+        final onlineValue = ytmOnline.value;
+        final liked = onlineValue.likedTracks;
+        final customs = onlineValue.customPlaylists;
         final cappedCustoms = customs.length > 10
             ? customs.sublist(customs.length - 10)
             : customs;
@@ -309,7 +318,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
               .map((t) => t.toJson())
               .toList(),
           'accountPlaylists':
-              ytmOnline.value.accountPlaylists.map((p) => p.toJson()).toList(),
+              onlineValue.accountPlaylists.map((p) => p.toJson()).toList(),
           'customPlaylists': [
             for (final p in cappedCustoms)
               () {

@@ -325,29 +325,41 @@ class SongInfoSheet extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (PlatformCapabilities.hasRingtoneManager) ...[
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r14),
-                              ),
-                              side: BorderSide(color: p.hairline),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.r14),
                             ),
-                            onPressed: () => _showRingtoneOptions(context),
-                            icon: Icon(Icons.ring_volume_rounded,
-                                size: 20, color: p.textPrimary),
-                            label: Text(
-                              context.l10n.ringtone,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: p.textPrimary),
-                            ),
+                            side: BorderSide(color: p.hairline),
+                          ),
+                          onPressed: PlatformCapabilities.hasRingtoneManager
+                              ? () => _showRingtoneOptions(context)
+                              : () {
+                                  ScaffoldMessenger.of(context).clearSnackBars();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Ringtone setting is only supported on Android'),
+                                    ),
+                                  );
+                                },
+                          icon: Icon(Icons.ring_volume_rounded,
+                              size: 20,
+                              color: PlatformCapabilities.hasRingtoneManager
+                                  ? p.textPrimary
+                                  : p.textTertiary),
+                          label: Text(
+                            context.l10n.ringtone,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: PlatformCapabilities.hasRingtoneManager
+                                    ? p.textPrimary
+                                    : p.textTertiary),
                           ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -749,6 +761,19 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
       _headphoneProfiles = const [];
     }
     _currentSliderVol = _volStore.getGainDbForTrack(widget.song.id.toString());
+    Future.wait([
+      _ratingStore.ready,
+      _eqStore.ready,
+      _volStore.ready,
+      _bpmStore.ready,
+    ]).then((_) {
+      if (mounted) {
+        setState(() {
+          _currentSliderVol =
+              _volStore.getGainDbForTrack(widget.song.id.toString());
+        });
+      }
+    });
   }
 
   String? _eqDropdownValue(String? stored) {

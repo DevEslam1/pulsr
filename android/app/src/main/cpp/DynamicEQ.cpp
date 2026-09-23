@@ -1,6 +1,15 @@
 // android/app/src/main/cpp/DynamicEQ.cpp
 #include "DynamicEQ.h"
 #include <cstring>
+#include <cmath>
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#define PULSR_HAS_NEON 1
+#elif defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
+#define PULSR_HAS_SSE2 1
+#endif
 
 DynamicEQ::DynamicEQ() {
     setSampleRate(48000.0);
@@ -356,17 +365,92 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                 computeBandCoeffs(band, band.currentGainDb);
             }
 
-            for (int ch = 0; ch < chCount; ++ch) {
-                const double x = buffer[i * channels + ch];
-                double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
-                    - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
-                if (std::abs(y) < 1e-25) y = 0.0;
-                
-                band.x2[ch] = band.x1[ch];
-                band.x1[ch] = x;
-                band.y2[ch] = band.y1[ch];
-                band.y1[ch] = y;
-                buffer[i * channels + ch] = static_cast<float>(y);
+            if (chCount == 2) {
+#if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
+                float64x2_t vx = { buffer[i * channels], buffer[i * channels + 1] };
+                float64x2_t vx1 = { band.x1[0], band.x1[1] };
+                float64x2_t vx2 = { band.x2[0], band.x2[1] };
+                float64x2_t vy1 = { band.y1[0], band.y1[1] };
+                float64x2_t vy2 = { band.y2[0], band.y2[1] };
+                float64x2_t vb0 = vdupq_n_f64(band.b0);
+                float64x2_t vb1 = vdupq_n_f64(band.b1);
+                float64x2_t vb2 = vdupq_n_f64(band.b2);
+                float64x2_t va1 = vdupq_n_f64(band.a1);
+                float64x2_t va2 = vdupq_n_f64(band.a2);
+
+                float64x2_t vy = vsubq_f64(
+                    vaddq_f64(vmulq_f64(vb0, vx), vaddq_f64(vmulq_f64(vb1, vx1), vmulq_f64(vb2, vx2))),
+                    vaddq_f64(vmulq_f64(va1, vy1), vmulq_f64(va2, vy2))
+                );
+
+                double y0 = vgetq_lane_f64(vy, 0);
+                double y1 = vgetq_lane_f64(vy, 1);
+                if (std::abs(y0) < 1e-25) y0 = 0.0;
+                if (std::abs(y1) < 1e-25) y1 = 0.0;
+
+                band.x2[0] = band.x1[0]; band.x2[1] = band.x1[1];
+                band.x1[0] = buffer[i * channels]; band.x1[1] = buffer[i * channels + 1];
+                band.y2[0] = band.y1[0]; band.y2[1] = band.y1[1];
+                band.y1[0] = y0; band.y1[1] = y1;
+
+                buffer[i * channels] = static_cast<float>(y0);
+                buffer[i * channels + 1] = static_cast<float>(y1);
+#elif defined(PULSR_HAS_SSE2)
+                __m128d vx = _mm_set_pd(buffer[i * channels + 1], buffer[i * channels]);
+                __m128d vx1 = _mm_set_pd(band.x1[1], band.x1[0]);
+                __m128d vx2 = _mm_set_pd(band.x2[1], band.x2[0]);
+                __m128d vy1 = _mm_set_pd(band.y1[1], band.y1[0]);
+                __m128d vy2 = _mm_set_pd(band.y2[1], band.y2[0]);
+                __m128d vb0 = _mm_set1_pd(band.b0);
+                __m128d vb1 = _mm_set1_pd(band.b1);
+                __m128d vb2 = _mm_set1_pd(band.b2);
+                __m128d va1 = _mm_set1_pd(band.a1);
+                __m128d va2 = _mm_set1_pd(band.a2);
+
+                __m128d vy = _mm_sub_pd(
+                    _mm_add_pd(_mm_mul_pd(vb0, vx), _mm_add_pd(_mm_mul_pd(vb1, vx1), _mm_mul_pd(vb2, vx2))),
+                    _mm_add_pd(_mm_mul_pd(va1, vy1), _mm_mul_pd(va2, vy2))
+                );
+
+                alignas(16) double y_arr[2];
+                _mm_store_pd(y_arr, vy);
+                if (std::abs(y_arr[0]) < 1e-25) y_arr[0] = 0.0;
+                if (std::abs(y_arr[1]) < 1e-25) y_arr[1] = 0.0;
+
+                band.x2[0] = band.x1[0]; band.x2[1] = band.x1[1];
+                band.x1[0] = buffer[i * channels]; band.x1[1] = buffer[i * channels + 1];
+                band.y2[0] = band.y1[0]; band.y2[1] = band.y1[1];
+                band.y1[0] = y_arr[0]; band.y1[1] = y_arr[1];
+
+                buffer[i * channels] = static_cast<float>(y_arr[0]);
+                buffer[i * channels + 1] = static_cast<float>(y_arr[1]);
+#else
+                for (int ch = 0; ch < 2; ++ch) {
+                    const double x = buffer[i * channels + ch];
+                    double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
+                        - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
+                    if (std::abs(y) < 1e-25) y = 0.0;
+                    
+                    band.x2[ch] = band.x1[ch];
+                    band.x1[ch] = x;
+                    band.y2[ch] = band.y1[ch];
+                    band.y1[ch] = y;
+                    buffer[i * channels + ch] = static_cast<float>(y);
+                }
+#endif
+            } else {
+                for (int ch = 0; ch < chCount; ++ch) {
+                    const double x = buffer[i * channels + ch];
+                    double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
+                        - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
+                    if (std::abs(y) < 1e-25) y = 0.0;
+                    
+                    band.x2[ch] = band.x1[ch];
+                    band.x1[ch] = x;
+                    band.y2[ch] = band.y1[ch];
+                    band.y1[ch] = y;
+                    buffer[i * channels + ch] = static_cast<float>(y);
+                }
             }
         }
     }

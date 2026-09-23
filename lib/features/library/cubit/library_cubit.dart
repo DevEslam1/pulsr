@@ -196,17 +196,20 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       await store.ready;
     } catch (_) {}
 
-    int ratingOf(SongsTableData s) {
+    final ratings = <int, int>{};
+    for (final s in songs) {
       try {
-        return store.getRating(s.id.toString());
+        ratings[s.id] = store.getRating(s.id.toString());
       } catch (_) {
-        return 0;
+        ratings[s.id] = 0;
       }
     }
 
     final sorted = List<SongsTableData>.from(songs);
     sorted.sort((a, b) {
-      final cmp = ratingOf(a).compareTo(ratingOf(b));
+      final rA = ratings[a.id] ?? 0;
+      final rB = ratings[b.id] ?? 0;
+      final cmp = rA.compareTo(rB);
       if (cmp != 0) return ascending ? cmp : -cmp;
       return a.title.toLowerCase().compareTo(b.title.toLowerCase());
     });
@@ -370,9 +373,6 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _favoriteOpTokens[songId] = opToken;
 
     try {
-      // FIX-A07: Index songs once for O(1) lookup instead of O(n) scans
-      final songsById = <int, SongsTableData>{for (final s in state.songs) s.id: s};
-
       List<SongsTableData> songsWith(bool isFavorite) => state.songs
           .map((s) => s.id == songId ? s.copyWith(isFavorite: isFavorite) : s)
           .toList();
@@ -395,8 +395,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         safeEmit(state.copyWith(favorites: favs, songs: songsWith(false)));
       } else {
         _pendingFavoriteTargets[songId] = true;
-        // FIX-A07: O(1) dictionary lookup
-        var matchingSong = songsById[songId];
+        SongsTableData? matchingSong;
+        for (final s in state.songs) {
+          if (s.id == songId) {
+            matchingSong = s;
+            break;
+          }
+        }
         if (matchingSong == null && _musicRepository != null) {
           try {
             final res = await _musicRepository!.getSongsByIds([songId]);
@@ -468,20 +473,24 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         _pendingFavoriteTargets.remove(songId);
       }
       lock.release();
+      if (!_favoriteOpTokens.containsKey(songId)) {
+        _favoriteLocks.remove(songId);
+      }
     }
   }
 
-  Future<void> toggleFolderExclusion(String folderPath) async {
+  Future<Result<void>> toggleFolderExclusion(String folderPath) async {
     final result = await _folderUseCases.toggleExcludeFolder(folderPath);
-    if (isClosed) return;
+    if (isClosed) return result;
     final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
     if (failureMessage != null) {
       safeEmit(state.copyWith(errorMessage: failureMessage));
-      return;
+      return result;
     }
     await loadFolders();
-    if (isClosed) return;
+    if (isClosed) return result;
     await _subscribeSongs();
+    return result;
   }
 
   // Multi-select actions
@@ -607,6 +616,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _genresSub?.cancel();
     _yearsSub?.cancel();
     _favoritesSub?.cancel();
+    _favoriteLocks.clear();
     return super.close();
   }
 }
