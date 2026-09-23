@@ -309,7 +309,19 @@ struct LiveProgParamSet {
     double slider2 = 0.0;
     double slider3 = 0.0;
     double slider4 = 0.0;
+    double slider5 = 0.0;
+    double slider6 = 0.0;
+    double slider7 = 0.0;
+    double slider8 = 0.0;
     std::shared_ptr<const LiveProgProgram> program;
+};
+
+// Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870)
+struct HeadphoneSafetyParamSet {
+    bool enabled = false;
+    double doseThreshold = 1.0; // 1.0 = 100% weekly dose (80 dBA for 40 hours)
+    double safetyCeilingDb = -6.0; // Clamped output ceiling when dose >= threshold
+    bool attenuationActive = false;
 };
 
 struct DspParamSnapshot {
@@ -337,4 +349,5 @@ struct DspParamSnapshot {
     ViperDdcParamSet viperDdc;
     ArbitraryEqParamSet arbitraryEq;
     LiveProgParamSet liveProg;
+    HeadphoneSafetyParamSet headphoneSafety;
 };

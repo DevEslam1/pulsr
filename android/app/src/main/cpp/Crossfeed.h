@@ -11,7 +11,8 @@
 
 class Crossfeed {
 public:
-    static constexpr int MAX_DELAY_SAMPLES = 2048;
+    static constexpr int MAX_DELAY_SAMPLES = 4096;
+    static_assert(MAX_DELAY_SAMPLES >= 768 * 2, "Crossfeed buffer must accommodate >= 2ms lookahead/delay at 768kHz");
 
     Crossfeed();
     void setSampleRate(double sampleRate);
@@ -26,9 +27,13 @@ public:
     double getFcut() const { return fcut_; }
     double getFeedDb() const { return feedDb_; }
     double getDelayUs() const { return delayUs_; }
+    double getBs2bA0Lo() const { return bs2b_a0_lo_; }
+    double getBs2bB1Lo() const { return bs2b_b1_lo_; }
+    double getBs2bA0Hi() const { return bs2b_a0_hi_; }
+    double getBs2bGain() const { return bs2b_gain_; }
 
     void process(float* L, float* R, int frames);
-    void processInterleaved(float* buffer, int frames);
+    void processInterleaved(float* buffer, int frames, int channels = 2);
 
 private:
     void initBs2b(double fcut, double feedDb);
@@ -47,6 +52,7 @@ private:
     float targetLpCoeff_ = 0.087f;
     float smoothedLpCoeff_ = 0.087f;
     bool enabled_ = false;
+    float smoothedEnabledMix_ = 0.0f;
 
     // Delay-line states (for Custom delay-line mode)
     float delayBufferL_[MAX_DELAY_SAMPLES] = {};

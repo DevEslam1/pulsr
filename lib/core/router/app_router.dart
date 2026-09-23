@@ -161,8 +161,9 @@ Page<dynamic> _buildTabPage({
 Page<dynamic> _resolveById<T>({
   required LocalKey pageKey,
   required String? id,
-  required Stream<Result<List<T>>> Function() watch,
-  required bool Function(T item) match,
+  Future<Result<T?>> Function()? fetchSingle,
+  Stream<Result<List<T>>> Function()? watch,
+  bool Function(T item)? match,
   required Widget Function(BuildContext context, T item) builder,
   required String notFoundMessage,
 }) {
@@ -178,6 +179,7 @@ Page<dynamic> _resolveById<T>({
   return _buildPulsrPageRoute(
     key: pageKey,
     child: EntityByIdLoader<T>(
+      fetchSingle: fetchSingle,
       watch: watch,
       match: match,
       builder: builder,
@@ -186,7 +188,8 @@ Page<dynamic> _resolveById<T>({
   );
 }
 
-GoRouter createRouter(MediaScannerService scannerService) {
+GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? musicRepository]) {
+  final repo = musicRepository ?? getIt<IMusicRepository>();
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     observers: [PulsrModalObserver()],
@@ -355,10 +358,12 @@ GoRouter createRouter(MediaScannerService scannerService) {
             );
           }
           final id = state.uri.queryParameters['id'];
+          final parsedId = int.tryParse(id ?? '');
           return _resolveById<AlbumsTableData>(
             pageKey: state.pageKey,
             id: id,
-            watch: () => getIt<IMusicRepository>().watchAlbums(),
+            fetchSingle: parsedId != null ? () => repo.getAlbumById(parsedId) : null,
+            watch: () => repo.watchAlbums(),
             match: (a) => a.id.toString() == id,
             builder: (context, a) => AlbumDetailScreen(album: a),
             notFoundMessage: context.l10n.albumNotFoundHint,
@@ -375,15 +380,17 @@ GoRouter createRouter(MediaScannerService scannerService) {
               : null;
           if (artist != null) {
             return _buildPulsrPageRoute(
-              key: state.pageKey,
-              child: ArtistDetailScreen(artist: artist),
+               key: state.pageKey,
+               child: ArtistDetailScreen(artist: artist),
             );
           }
           final id = state.uri.queryParameters['id'];
+          final parsedId = int.tryParse(id ?? '');
           return _resolveById<ArtistsTableData>(
             pageKey: state.pageKey,
             id: id,
-            watch: () => getIt<IMusicRepository>().watchArtists(),
+            fetchSingle: parsedId != null ? () => repo.getArtistById(parsedId) : null,
+            watch: () => repo.watchArtists(),
             match: (a) => a.id.toString() == id,
             builder: (context, a) => ArtistDetailScreen(artist: a),
             notFoundMessage: context.l10n.artistNotFoundHint,
@@ -448,10 +455,12 @@ GoRouter createRouter(MediaScannerService scannerService) {
             );
           }
           final id = state.uri.queryParameters['id'];
+          final parsedId = int.tryParse(id ?? '');
           return _resolveById<PlaylistsTableData>(
             pageKey: state.pageKey,
             id: id,
-            watch: () => getIt<IMusicRepository>().watchPlaylists(),
+            fetchSingle: parsedId != null ? () => repo.getPlaylistById(parsedId) : null,
+            watch: () => repo.watchPlaylists(),
             match: (p) => p.id.toString() == id,
             builder: (context, p) => PlaylistDetailScreen(playlist: p),
             notFoundMessage: context.l10n.playlistNotFoundHint,

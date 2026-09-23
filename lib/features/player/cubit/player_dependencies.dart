@@ -14,11 +14,13 @@ import '../../../data/audio/per_song_eq_store.dart';
 import '../../../data/audio/per_song_volume_store.dart';
 import '../../../data/audio/song_rating_store.dart';
 import '../../../data/scanner/media_scanner_service.dart';
+import 'package:injectable/injectable.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
 
 /// FIX-A03: Parameter object bundling auxiliary services for [PlayerCubit].
 /// Keeps the constructor clean while maintaining backwards compatibility.
+@injectable
 class PlayerDependencies {
   final SettingsCubit? settingsCubit;
   final WidgetService? widgetService;

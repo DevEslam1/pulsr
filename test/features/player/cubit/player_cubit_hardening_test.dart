@@ -21,6 +21,7 @@ import 'package:pulsr/features/player/cubit/controllers/player_controllers.dart'
 import 'package:pulsr/features/player/cubit/managers/player_managers.dart';
 import 'package:pulsr/features/player/cubit/player_constants.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/features/player/cubit/player_scrobble_coordinator.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -681,6 +682,122 @@ void main() {
       // Close must complete cleanly without throwing
       await expectLater(cubit.close(), completes);
       expect(cubit.isClosed, isTrue);
+    });
+
+    test('Fix #1 & #4 (Round 2): applyDspEffect rolls back dsp state on audioHandler failure', () async {
+      final mockSettings = MockSettingsCubit();
+      when(() => mockSettings.state).thenReturn(const SettingsState());
+      var state = const PlayerState();
+      final dspController = PlayerDspController(
+        audioHandler: testAudioHandler,
+        settingsCubit: mockSettings,
+        getState: () => state,
+        emit: (s) => state = s,
+        syncAudioEffects: ({bool force = false}) {},
+        isClosed: () => false,
+      );
+
+      expect(state.dsp.isEqEnabled, isFalse);
+
+      await dspController.applyDspEffect(
+        featureName: 'Equalizer',
+        updateDsp: (dsp) => dsp.copyWith(isEqEnabled: true),
+        applyAudioHandler: () async => throw Exception('Native DSP engine failure'),
+      );
+
+      // Must rollback to false and populate errorMessage
+      expect(state.dsp.isEqEnabled, isFalse);
+      expect(state.playback.errorMessage, contains('Native DSP engine failure'));
+    });
+
+    test('Fix #2 & #8 (Round 2): Scrobble coordinator differentiates true restart from backward seek', () {
+      final mockScrobbler = MockScrobblerService();
+      when(() => mockScrobbler.notifyPlaybackState(
+            id: any(named: 'id'),
+            artist: any(named: 'artist'),
+            track: any(named: 'track'),
+            album: any(named: 'album'),
+            durationMs: any(named: 'durationMs'),
+            positionMs: any(named: 'positionMs'),
+            isPlaying: any(named: 'isPlaying'),
+            isQuran: any(named: 'isQuran'),
+          )).thenAnswer((_) async {});
+
+      final coordinator = PlayerScrobbleCoordinator(
+        service: () => mockScrobbler,
+        isQuranMode: () => false,
+        isClosed: () => false,
+        interval: const Duration(seconds: 1),
+      );
+
+      final song = SongsTableData(
+        id: 10,
+        title: 'Song',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 200000,
+        path: '/path/song.mp3',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      // Initial playback at 0s
+      coordinator.debouncedScrobble(song, Duration.zero, true);
+      // Playback advances to 120s
+      coordinator.debouncedScrobble(song, const Duration(seconds: 120), true);
+
+      // User scrubs backward to 90s (backward scrub: >3000ms, not a restart)
+      coordinator.debouncedScrobble(song, const Duration(seconds: 90), true);
+
+      // User seeks to 1s from 90s (true restart: posMs < 3000 && lastPosMs > 10000)
+      coordinator.debouncedScrobble(song, const Duration(seconds: 1), true);
+
+      coordinator.dispose();
+    });
+
+    test('Fix #9 (Round 2): PlayerQueueController.playNext delegates to addToQueue when queue is empty', () async {
+      var state = const PlayerState();
+      final slots = <int, QueueSlotData>{};
+      final controller = PlayerQueueController(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false,
+        queueMutex: Mutex(),
+        slotLookupCache: <int, SongsTableData>{},
+        queueSlots: slots,
+        updateWidgetThrottled: ({bool force = false}) {},
+        loadLyrics: (_) {},
+        bumpQueueVersion: () {},
+        isSameTrack: (a, b) => a?.id == b?.id,
+      );
+
+      final song = SongsTableData(
+        id: 42,
+        title: 'Empty Queue Track',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 180000,
+        path: '/path/empty.mp3',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      expect(state.queue.isEmpty, isTrue);
+      await controller.playNext(song);
+
+      // Track should be cleanly appended to queue via addToQueue
+      expect(state.queue.length, equals(1));
+      expect(state.queue.first.id, equals(42));
     });
   });
 }

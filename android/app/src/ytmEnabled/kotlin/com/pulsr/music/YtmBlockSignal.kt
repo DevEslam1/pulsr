@@ -124,7 +124,11 @@ enum class YtmBlockSignal(val code: String) {
             "invalid argument",
             "client version is no longer supported",
             "upgrade to continue",
-            "unsupported client"
+            "unsupported client",
+            "no longer supported in this application",
+            "no longer supported",
+            "unsupported device",
+            "unsupported application"
         )
 
         /**

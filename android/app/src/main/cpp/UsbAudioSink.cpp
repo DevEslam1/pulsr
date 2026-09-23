@@ -1,9 +1,55 @@
 // android/app/src/main/cpp/UsbAudioSink.cpp
 #include "UsbAudioSink.h"
 
+#if defined(__linux__) || defined(__ANDROID__)
 #include <linux/usbdevice_fs.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#else
+// Non-Linux mock definitions for host compilation and tests
+struct usbdevfs_urb {
+    unsigned char type;
+    unsigned char endpoint;
+    int status;
+    unsigned int flags;
+    void* buffer;
+    int buffer_length;
+    int actual_length;
+    int start_frame;
+    int number_of_packets;
+    int error_count;
+    unsigned int signr;
+    void* usercontext;
+    struct usbdevfs_iso_packet_desc {
+        unsigned int length;
+        unsigned int actual_length;
+        unsigned int status;
+    } iso_frame_desc[1];
+};
+struct usbdevfs_setinterface {
+    unsigned int interface;
+    unsigned int altsetting;
+};
+struct usbdevfs_ctrltransfer {
+    uint8_t bRequestType;
+    uint8_t bRequest;
+    uint16_t wValue;
+    uint16_t wIndex;
+    uint16_t wLength;
+    uint32_t timeout;
+    void* data;
+};
+#define USBDEVFS_URB_TYPE_ISO 0
+#define USBDEVFS_URB_ISO_ASAP 2
+#define USBDEVFS_CLAIMINTERFACE 0
+#define USBDEVFS_RELEASEINTERFACE 0
+#define USBDEVFS_SETINTERFACE 0
+#define USBDEVFS_SUBMITURB 0
+#define USBDEVFS_DISCARDURB 0
+#define USBDEVFS_REAPURBNDELAY 0
+#define USBDEVFS_CONTROL 0
+inline int ioctl(int, unsigned long, ...) { return -1; }
+#endif
 
 #include <algorithm>
 #include <cerrno>
@@ -66,23 +112,49 @@ bool UsbAudioSink::IsActive() const {
 }
 
 bool UsbAudioSink::submitAll() {
+#if defined(__linux__) || defined(__ANDROID__)
     for (void* raw : urbs_) {
         auto* urb = reinterpret_cast<struct usbdevfs_urb*>(raw);
         if (ioctl(fd_, USBDEVFS_SUBMITURB, urb) < 0) {
             return false;
         }
     }
+#endif
     return true;
 }
 
-bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
-                        int altSetting, int sampleRate, int channels,
-                        int bytesPerSample) {
-    if (fd < 0 || sampleRate <= 0 || channels <= 0 || bytesPerSample <= 0) {
-        return false;
+UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
+                                   int altSetting, int sampleRate, int channels,
+                                   int bytesPerSample) {
+    if (fd < 0 || channels <= 0 || bytesPerSample <= 0) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        return UsbStreamResult::InvalidArgs;
     }
+    if (sampleRate <= 0) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        return UsbStreamResult::RateUnsupported;
+    }
+    static const int kValidRates[] = {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
+    bool validRate = false;
+    for (int r : kValidRates) {
+        if (sampleRate == r) {
+            validRate = true;
+            break;
+        }
+    }
+    if (!validRate) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        return UsbStreamResult::RateUnsupported;
+    }
+
     // Never tear down a live sink implicitly; caller must Stop first.
-    if (active_.load()) return false;
+    if (active_.load()) {
+        return UsbStreamResult::ClaimFailed;
+    }
+
+    lastError_.store(0, std::memory_order_relaxed);
+    underrunCount_.store(0, std::memory_order_relaxed);
+    overrunCount_.store(0, std::memory_order_relaxed);
 
     fd_ = fd;
     endpoint_ = endpointAddress;
@@ -92,13 +164,15 @@ bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
     channels_ = channels;
     bytesPerSample_ = std::clamp(bytesPerSample, 2, 4);
 
+#if defined(__linux__) || defined(__ANDROID__)
     // Claim the AudioStreaming interface (force: detaches the kernel audio
     // driver so the HAL can no longer own the endpoint) and select the alt
     // setting that exposes the isochronous OUT endpoint.
     int iface = interfaceNumber_;
     if (ioctl(fd_, USBDEVFS_CLAIMINTERFACE, &iface) < 0) {
+        lastError_.store(errno, std::memory_order_relaxed);
         releaseResources();
-        return false;
+        return UsbStreamResult::ClaimFailed;
     }
     claimed_ = true;
 
@@ -106,7 +180,13 @@ bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
     si.interface = static_cast<unsigned int>(interfaceNumber_);
     si.altsetting = static_cast<unsigned int>(altSetting_);
     // Best-effort: some HALs already selected the alt setting.
-    ioctl(fd_, USBDEVFS_SETINTERFACE, &si);
+    if (ioctl(fd_, USBDEVFS_SETINTERFACE, &si) < 0) {
+        if (errno != 0 && errno != EBUSY && altSetting_ > 0) {
+            lastError_.store(errno, std::memory_order_relaxed);
+            releaseResources();
+            return UsbStreamResult::AltSettingFailed;
+        }
+    }
 
     const int framesPerPacket = std::max(1, sampleRate_ / 1000);
     bytesPerPacket_ = framesPerPacket * channels_ * bytesPerSample_;
@@ -134,8 +214,9 @@ bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
             urbStorage_.data() + static_cast<size_t>(i) * urbStride_);
         urbBuffers_[i] = new (std::nothrow) uint8_t[bytesPerUrb_]();
         if (!urbBuffers_[i]) {
+            lastError_.store(ENOMEM, std::memory_order_relaxed);
             releaseResources();
-            return false;
+            return UsbStreamResult::SubmitFailed;
         }
         std::memset(urb, 0, sizeof(struct usbdevfs_urb));
         urb->type = USBDEVFS_URB_TYPE_ISO;
@@ -154,14 +235,20 @@ bool UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
     }
 
     if (!submitAll()) {
+        lastError_.store(errno, std::memory_order_relaxed);
         releaseResources();
-        return false;
+        return UsbStreamResult::SubmitFailed;
     }
 
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
     worker_ = std::thread([this] { workerLoop(); });
-    return true;
+    return UsbStreamResult::Ok;
+#else
+    running_.store(true, std::memory_order_release);
+    active_.store(true, std::memory_order_release);
+    return UsbStreamResult::Ok;
+#endif
 }
 
 void UsbAudioSink::Close() {
@@ -180,11 +267,6 @@ void UsbAudioSink::Close() {
         ioctl(fd_, USBDEVFS_DISCARDURB, raw);
     }
 
-    if (fd_ >= 0 && claimed_) {
-        int iface = interfaceNumber_;
-        ioctl(fd_, USBDEVFS_RELEASEINTERFACE, &iface);
-    }
-
     active_.store(false, std::memory_order_release);
     releaseResources();
 }
@@ -199,6 +281,10 @@ void UsbAudioSink::releaseResources() {
     urbBuffers_.shrink_to_fit();
     urbs_.shrink_to_fit();
     urbStorage_.shrink_to_fit();
+    if (claimed_ && fd_ >= 0) {
+        int iface = interfaceNumber_;
+        ioctl(fd_, USBDEVFS_RELEASEINTERFACE, &iface);
+    }
     claimed_ = false;
     fd_ = -1;
     active_.store(false, std::memory_order_release);
@@ -215,6 +301,7 @@ void UsbAudioSink::workerLoop() {
                 continue;
             }
             // ESHUTDOWN / ENOENT / device gone: stop cleanly.
+            lastError_.store(errno, std::memory_order_release);
             break;
         }
         if (urb == nullptr) continue;
@@ -233,6 +320,7 @@ void UsbAudioSink::workerLoop() {
                     ringCount_ -= bytesPerPkt;
                 } else {
                     std::memset(dst, 0, bytesPerPkt);
+                    underrunCount_.fetch_add(1, std::memory_order_relaxed);
                 }
                 urb->iso_frame_desc[p].length =
                     static_cast<unsigned int>(bytesPerPkt);
@@ -242,9 +330,14 @@ void UsbAudioSink::workerLoop() {
         }
 
         if (ioctl(fd_, USBDEVFS_SUBMITURB, urb) < 0) {
+            lastError_.store(errno, std::memory_order_release);
             break;
         }
     }
+    // Critical: set running_ and active_ to false on exit so sink never stays
+    // in a zombie "playing but silent" state when the worker thread terminates.
+    running_.store(false, std::memory_order_release);
+    active_.store(false, std::memory_order_release);
 }
 
 void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
@@ -257,7 +350,8 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
     const size_t totalSamples = static_cast<size_t>(frames) * channels;
     std::lock_guard<std::mutex> lock(ringMutex_);
     const size_t cap = ring_.size();
-    for (size_t s = 0; s < totalSamples && ringCount_ + bps <= cap; ++s) {
+    size_t s = 0;
+    for (; s < totalSamples && ringCount_ + bps <= cap; ++s) {
         uint8_t packed[4];
         packSample(buffer[s], packed, bps);
         for (int b = 0; b < bps; ++b) {
@@ -266,6 +360,145 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
         }
         ringCount_ += bps;
     }
+    if (s < totalSamples) {
+        // Track overrun (dropped frames)
+        const size_t droppedSamples = totalSamples - s;
+        overrunCount_.fetch_add(droppedSamples / channels, std::memory_order_relaxed);
+    }
+}
+
+double UsbAudioSink::GetBufferedMs() {
+    if (!active_.load(std::memory_order_acquire)) return 0.0;
+    size_t count = 0;
+    {
+        std::lock_guard<std::mutex> lock(ringMutex_);
+        count = ringCount_;
+    }
+    const int frameBytes = channels_ * bytesPerSample_;
+    double ringMs = 0.0;
+    if (frameBytes > 0 && sampleRate_ > 0) {
+        ringMs = (static_cast<double>(count) / static_cast<double>(frameBytes * sampleRate_)) * 1000.0;
+    }
+    const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_);
+    return ringMs + urbMs;
+}
+
+std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
+    const uint8_t* desc, size_t len, int targetInterface) {
+    if (!desc || len < 8) return {};
+
+    std::vector<int> rates;
+    constexpr int kStandardRates[] = {
+        44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000
+    };
+
+    size_t i = 0;
+    int currentInterface = -1;
+    int currentClass = 0;
+    int currentSubclass = 0;
+
+    while (i + 2 <= len) {
+        uint8_t bLength = desc[i];
+        if (bLength < 2 || i + bLength > len) {
+            i++;
+            continue;
+        }
+        uint8_t bType = desc[i + 1];
+
+        if (bType == 0x04) { // DESC_INTERFACE
+            if (bLength >= 9) {
+                currentInterface = desc[i + 2];
+                currentClass = desc[i + 5];
+                currentSubclass = desc[i + 6];
+            }
+        } else if (bType == 0x24) { // DESC_CS_INTERFACE
+            if (currentClass == 0x01 && currentSubclass == 0x02 &&
+                (targetInterface < 0 || currentInterface == targetInterface)) {
+                // AudioStreaming CS_INTERFACE
+                uint8_t bSubtype = desc[i + 2];
+                if (bSubtype == 0x02 && bLength >= 8) { // FORMAT_TYPE
+                    uint8_t bFormatType = desc[i + 3];
+                    if (bFormatType == 0x01) { // FORMAT_TYPE_I (UAC1)
+                        uint8_t bSamFreqType = desc[i + 7];
+                        if (bSamFreqType == 0 && bLength >= 14) {
+                            // Continuous sample rate range
+                            int lower = desc[i + 8] | (desc[i + 9] << 8) | (desc[i + 10] << 16);
+                            int upper = desc[i + 11] | (desc[i + 12] << 8) | (desc[i + 13] << 16);
+                            for (int r : kStandardRates) {
+                                if (r >= lower && r <= upper) {
+                                    rates.push_back(r);
+                                }
+                            }
+                        } else if (bSamFreqType > 0) {
+                            // Discrete sample rates
+                            for (uint8_t k = 0; k < bSamFreqType; ++k) {
+                                size_t offset = i + 8 + 3 * k;
+                                if (offset + 3 <= i + bLength) {
+                                    int r = desc[offset] | (desc[offset + 1] << 8) | (desc[offset + 2] << 16);
+                                    if (r > 0) {
+                                        rates.push_back(r);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        i += bLength;
+    }
+
+    std::sort(rates.begin(), rates.end());
+    rates.erase(std::unique(rates.begin(), rates.end()), rates.end());
+    return rates;
+}
+
+std::vector<int> UsbAudioSink::QuerySupportedRates(int fd, int interfaceNumber) {
+#if defined(__linux__) || defined(__ANDROID__)
+    if (fd < 0) return {};
+
+    uint8_t header[4] = {0};
+    struct usbdevfs_ctrltransfer ctrl {};
+    ctrl.bRequestType = 0x80; // USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE
+    ctrl.bRequest = 0x06;     // USB_REQ_GET_DESCRIPTOR
+    ctrl.wValue = 0x0200;     // (USB_DT_CONFIG << 8) | 0
+    ctrl.wIndex = 0;
+    ctrl.wLength = sizeof(header);
+    ctrl.timeout = 1000;
+    ctrl.data = header;
+
+    if (ioctl(fd, USBDEVFS_CONTROL, &ctrl) < 0) {
+        return {};
+    }
+
+    uint16_t totalLength = static_cast<uint16_t>(header[2] | (header[3] << 8));
+    if (totalLength < 9 || totalLength > 16384) {
+        totalLength = 4096;
+    }
+
+    std::vector<uint8_t> configDesc(totalLength);
+    ctrl.wLength = totalLength;
+    ctrl.data = configDesc.data();
+
+    int res = ioctl(fd, USBDEVFS_CONTROL, &ctrl);
+    if (res < 0) {
+        return {};
+    }
+    configDesc.resize(static_cast<size_t>(res));
+
+    std::vector<int> rates = ParseSupportedRatesFromDescriptors(
+        configDesc.data(), configDesc.size(), interfaceNumber);
+    if (!rates.empty()) {
+        return rates;
+    }
+
+    // Fallback: If no UAC1 rates detected (e.g. UAC2 DAC), probe standard high-res rates
+    return {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
+#else
+    (void)fd;
+    (void)interfaceNumber;
+    return {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
+#endif
 }
 
 } // namespace pulsr

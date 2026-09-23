@@ -282,8 +282,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       final videoId = song.remoteId;
       if (videoId == null || videoId.isEmpty) continue;
 
-      // Skip tracks that are already local on disk
-      if (song.source == SongSource.local) {
+      // Skip tracks that are already local on disk or already marked downloaded
+      if (song.source == SongSource.local || song.isDownloaded) {
         skippedLocal++;
         continue;
       }

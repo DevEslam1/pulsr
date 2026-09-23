@@ -64,4 +64,8 @@ public final class AaudioNativeBridge {
     public static native boolean nativeIsExclusive(long handle);
 
     public static native void nativeSetVolume(long handle, float volume);
+ 
+    public static native double nativeGetOutputLatencyMs(long handle);
+
+    public static native int nativeGetFramesPerBurst(long handle);
 }

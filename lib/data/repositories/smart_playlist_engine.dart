@@ -15,6 +15,47 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   SmartPlaylistEngine(this._db);
 
+  @override
+  List<SmartRule> validateRules(SmartCriteria criteria) {
+    final invalid = <SmartRule>[];
+    for (final rule in criteria.rules) {
+      if (_isDartRule(rule.field)) {
+        if (rule.field == SmartRuleField.rating) {
+          final r = double.tryParse(rule.value.trim());
+          if (r == null || r < 0 || r > 5) invalid.add(rule);
+        } else if (rule.field == SmartRuleField.bpm) {
+          final b = double.tryParse(rule.value.trim());
+          if (b == null || b <= 0) invalid.add(rule);
+        }
+        continue;
+      }
+      final valStr = rule.value.trim();
+      switch (rule.field) {
+        case SmartRuleField.playCount:
+        case SmartRuleField.decade:
+        case SmartRuleField.year:
+        case SmartRuleField.dateAdded:
+          if (rule.operator == SmartOperator.between) {
+            if (_parseIntBetween(valStr) == null) invalid.add(rule);
+          } else if (int.tryParse(valStr) == null) {
+            invalid.add(rule);
+          }
+          break;
+        case SmartRuleField.artist:
+        case SmartRuleField.album:
+        case SmartRuleField.title:
+        case SmartRuleField.genre:
+          if (valStr.isEmpty) invalid.add(rule);
+          break;
+        case SmartRuleField.isLossless:
+          break;
+        default:
+          break;
+      }
+    }
+    return invalid;
+  }
+
   SimpleSelectStatement<$SongsTableTable, SongsTableData> _buildQuery(
       SmartCriteria criteria) {
     final query = _db.select(_db.songsTable)

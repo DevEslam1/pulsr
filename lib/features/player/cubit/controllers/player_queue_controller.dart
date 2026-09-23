@@ -85,8 +85,7 @@ class PlayerQueueController {
         _queueSlots = queueSlots,
         _updateWidgetThrottled = updateWidgetThrottled,
         _loadLyrics = loadLyrics,
-        _debouncedPersistQueueSlots =
-            debouncedPersistQueueSlots ?? (() {}),
+        _debouncedPersistQueueSlots = debouncedPersistQueueSlots ?? (() {}),
         _bumpQueueVersion = bumpQueueVersion,
         _isSameTrack = isSameTrack,
         _latencyTracker = latencyTracker,
@@ -99,9 +98,7 @@ class PlayerQueueController {
     required Duration position,
     required double speed,
   }) {
-    for (final s in songs) {
-      _slotLookupCache[s.id] = s;
-    }
+    for (final s in songs) { _slotLookupCache[s.id] = s; }
     _queueSlots[slot] = QueueSlotData(
       songIds: songs.map((s) => s.id).toList(),
       currentIndex: currentIndex,
@@ -112,13 +109,9 @@ class PlayerQueueController {
 
   Future<void> playRadioStation(RadioStation station) async {
     final uri = Uri.tryParse(station.url);
-    if (!RadioStation.isHttpUrl(station.url) ||
-        uri == null ||
-        (uri.scheme != 'http' && uri.scheme != 'https')) {
+    if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback
-              .copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
+      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
       return;
     }
     final song = SongsTableData(
@@ -363,13 +356,7 @@ class PlayerQueueController {
     }
 
     if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-      _findNextLocalMatch(
-        song,
-        effectiveQueue,
-        effectiveIndex,
-        capturedSwapGen,
-        capturedGen,
-      );
+      _findNextLocalMatch(song, effectiveQueue, effectiveIndex, capturedSwapGen, capturedGen);
     }
   }
 
@@ -397,8 +384,7 @@ class PlayerQueueController {
         swapReconciledSong(nextTrack.id, match);
       }
     }).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('Find next local match failed',
-          error: e, stackTrace: st, category: 'PlayerQueueController');
+      ErrorLogger.log('Find next local match failed', error: e, stackTrace: st, category: 'PlayerQueueController');
     });
   }
 

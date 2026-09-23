@@ -42,6 +42,7 @@ object UsbAudioControlParser {
         val volumeUnit: FeatureUnitVolume?,
         val streamingInterface: Int?,
         val streamingEndpoint: StreamingEndpoint? = null,
+        val supportedRates: List<Int> = emptyList(),
     ) {
         val hasVolumeControl: Boolean get() = volumeUnit != null
     }
@@ -86,6 +87,8 @@ object UsbAudioControlParser {
         var volumeUnit: FeatureUnitVolume? = null
         var streamingInterface: Int? = null
         var streamingEndpoint: StreamingEndpoint? = null
+        val supportedRates = mutableListOf<Int>()
+        val standardRates = intArrayOf(44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000)
 
         var i = 0
         while (i + 2 <= descriptors.size) {
@@ -196,12 +199,50 @@ object UsbAudioControlParser {
                                 }
                             }
                         }
+                    } else if (currentClass == CLASS_AUDIO &&
+                        currentSubclass == SUBCLASS_AUDIOSTREAMING &&
+                        bLength >= 8
+                    ) {
+                        val subtype = descriptors[i + 2].toInt() and 0xFF
+                        if (subtype == 0x02) { // FORMAT_TYPE
+                            val formatType = descriptors[i + 3].toInt() and 0xFF
+                            if (formatType == 0x01) { // FORMAT_TYPE_I
+                                val samFreqType = descriptors[i + 7].toInt() and 0xFF
+                                if (samFreqType == 0 && bLength >= 14) {
+                                    val lower = (descriptors[i + 8].toInt() and 0xFF) or
+                                        ((descriptors[i + 9].toInt() and 0xFF) shl 8) or
+                                        ((descriptors[i + 10].toInt() and 0xFF) shl 16)
+                                    val upper = (descriptors[i + 11].toInt() and 0xFF) or
+                                        ((descriptors[i + 12].toInt() and 0xFF) shl 8) or
+                                        ((descriptors[i + 13].toInt() and 0xFF) shl 16)
+                                    for (r in standardRates) {
+                                        if (r in lower..upper) supportedRates.add(r)
+                                    }
+                                } else if (samFreqType > 0) {
+                                    for (k in 0 until samFreqType) {
+                                        val offset = i + 8 + 3 * k
+                                        if (offset + 3 <= i + bLength) {
+                                            val r = (descriptors[offset].toInt() and 0xFF) or
+                                                ((descriptors[offset + 1].toInt() and 0xFF) shl 8) or
+                                                ((descriptors[offset + 2].toInt() and 0xFF) shl 16)
+                                            if (r > 0) supportedRates.add(r)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
             i += bLength
         }
 
-        return Result(uacVersion, volumeUnit, streamingInterface, streamingEndpoint)
+        return Result(
+            uacVersion = uacVersion,
+            volumeUnit = volumeUnit,
+            streamingInterface = streamingInterface,
+            streamingEndpoint = streamingEndpoint,
+            supportedRates = supportedRates.distinct().sorted(),
+        )
     }
 }

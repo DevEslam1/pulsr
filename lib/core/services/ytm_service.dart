@@ -12,7 +12,9 @@ import 'package:injectable/injectable.dart';
 import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../di/injection.dart';
+import '../utils/ytm_locale.dart';
 import 'ytm_account_service.dart';
+import 'ytm_browse_service.dart';
 import 'ytm_client_version_resolver.dart';
 import 'ytm_url_cache.dart';
 import '../../domain/models/ytm_track.dart';
@@ -55,6 +57,8 @@ class YtmException implements Exception {
       code == 'YTM_NETWORK' ||
       code == 'YTM_TIMEOUT' ||
       code == 'YTM_OFFLINE';
+
+  bool get isOffline => isNetwork;
 
   /// YouTube has flagged the IP / client as automated and wants attestation.
   ///
@@ -109,6 +113,18 @@ class YtmException implements Exception {
 
   /// The build has no extractor compiled in.
   bool get isDisabled => code == 'YTM_DISABLED' || code == 'YTM_UNSUPPORTED';
+
+  /// HTTP status code representing this error for audio proxy responses (e.g. 404/410 aborts ExoPlayer retries).
+  int get httpStatusCode {
+    return switch (signal) {
+      YtmBlockSignal.videoGone => 410,
+      YtmBlockSignal.botChallenge || YtmBlockSignal.ipBlocked => 403,
+      YtmBlockSignal.signInRequired => 401,
+      YtmBlockSignal.rateLimited => 429,
+      YtmBlockSignal.geoBlocked => 451,
+      _ => 404,
+    };
+  }
 
   @override
   String toString() =>
@@ -438,9 +454,15 @@ class YtmService {
   /// the next resolve re-resolves the edge for the new route.
   Future<void> handleNetworkChange() async {
     debugClearBotCooldown();
+    YtmRateLimiter.shared.resetAfterNetworkChange();
     try {
       if (getIt.isRegistered<YtmUrlCache>()) {
         getIt<YtmUrlCache>().clear();
+      }
+    } catch (_) {}
+    try {
+      if (getIt.isRegistered<YtmBrowseService>()) {
+        getIt<YtmBrowseService>().clearCache();
       }
     } catch (_) {}
     try {
@@ -856,7 +878,9 @@ class YtmService {
     }
     final key = '$videoId:${quality.toLowerCase()}';
     final existing = _inFlightStreamResolves[key];
-    if (existing != null) return existing;
+    if (existing != null) {
+      return existing.timeout(_defaultResolveTimeout + const Duration(seconds: 5));
+    }
     final fut =
         _resolveStreamInner(videoId, quality: quality, forceRefresh: false);
     _inFlightStreamResolves[key] = fut;
@@ -872,7 +896,9 @@ class YtmService {
     // Check Task 2 in-memory URL cache first
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
-    if (!forceRefresh) {
+    if (forceRefresh) {
+      urlCache?.invalidate(videoId, quality: quality);
+    } else {
       final cachedEntry = urlCache?.get(videoId, quality: quality);
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         try {
@@ -882,10 +908,28 @@ class YtmService {
       }
     }
 
-    // Remember the first classified failure so the caller gets an actionable
+    // Remember the most actionable failure so the caller gets an actionable
     // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
-    // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
+    // of a generic timeout or dead end.
     Object? firstError;
+
+    int errorPriority(Object? err) {
+      if (err is! YtmException) return 0;
+      if (err.isBotBlocked) return 6;
+      if (err.isIpBlocked) return 5;
+      if (err.isThrottled) return 4;
+      if (err.isAuth) return 3;
+      if (err.isOffline || err.code == 'YTM_TIMEOUT') return 2;
+      return 1;
+    }
+
+    void recordError(Object? err) {
+      if (err == null) return;
+      if (firstError == null || errorPriority(err) > errorPriority(firstError)) {
+        firstError = err;
+      }
+    }
+
     // FIX-C01: Check per-video cooldown as well as global IP cooldown
     var inBotCooldown = isBotCoolingDown || isVideoCoolingDown(videoId);
     if (inBotCooldown) {
@@ -969,9 +1013,10 @@ class YtmService {
       // (see final rethrow below).
       if (e is YtmException && e.isAuth) {
         debugPrint('[YTM_SERVICE] Direct account stream auth failure, falling back to guest engines: $e');
-        firstError ??= e;
+        recordError(e);
       } else {
         debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
+        recordError(e);
       }
       // If the account tier hit an IP-level block or a bot challenge, activate
       // cooldown so the native tier doesn't burn through 9 more clients for the
@@ -1029,7 +1074,7 @@ class YtmService {
       // Same guest-fallback rule as Tier-1: a native LOGIN_REQUIRED (often
       // caused by stale synced cookies) must still try the remote backend
       // before surfacing auth to the UI.
-      firstError ??= e;
+      recordError(e);
       nativeError = e;
       // The cooldown short-circuit itself must not extend the window, or a
       // retry loop would hold it open forever (fixed window from first hit).
@@ -1106,7 +1151,7 @@ class YtmService {
       }
     } catch (e) {
       debugPrint('[YTM_SERVICE] Dart InnerTube stream resolution failed: $e');
-      firstError ??= e;
+      recordError(e);
     }
 
     // All engines failed: surface the first classified engine error so the
@@ -1124,16 +1169,30 @@ class YtmService {
   Future<YtmStream?> _resolveStreamDart(String videoId,
       {String quality = 'high'}) async {
     String apiKey = YtmClientVersionResolver.fallbackApiKey;
+    String androidVersion = '19.44.38';
+    String androidVrVersion = '1.63.27';
     if (getIt.isRegistered<YtmClientVersionResolver>()) {
-      apiKey = getIt<YtmClientVersionResolver>().apiKey;
+      final resolver = getIt<YtmClientVersionResolver>();
+      apiKey = resolver.apiKey;
+      androidVersion = resolver.androidVersion;
+      androidVrVersion = resolver.androidVrVersion;
     }
+
+    String? guestPoToken;
+    String? guestVisitorData;
+    try {
+      final poState =
+          await getPoTokenState().timeout(const Duration(seconds: 2));
+      guestPoToken = poState?['streamingPoToken'] as String?;
+      guestVisitorData = poState?['visitorData'] as String?;
+    } catch (_) {}
 
     final clients = [
       (
         name: 'ANDROID_VR',
-        version: '1.63.27',
+        version: androidVrVersion,
         clientNameId: '28',
-        ua: 'com.google.android.apps.youtube.vr/1.63.27 (Linux; U; Android 14; en_US) gzip',
+        ua: 'com.google.android.apps.youtube.vr/$androidVrVersion (Linux; U; Android 14; en_US) gzip',
         host: 'https://www.youtube.com',
       ),
       (
@@ -1145,28 +1204,45 @@ class YtmService {
       ),
       (
         name: 'ANDROID',
-        version: '19.44.38',
+        version: androidVersion,
         clientNameId: '3',
-        ua: 'com.google.android.youtube/19.44.38 (Linux; U; Android 14; en_US) gzip',
+        ua: 'com.google.android.youtube/$androidVersion (Linux; U; Android 14; en_US) gzip',
         host: 'https://www.youtube.com',
       ),
     ];
 
     for (final client in clients) {
       try {
-        final body = jsonEncode({
-          'context': {
-            'client': {
-              'clientName': client.name,
-              'clientVersion': client.version,
-              'hl': 'en',
-              'gl': 'US',
-            },
+        final isEmbed = client.name == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
+        final clientContext = <String, dynamic>{
+          'client': {
+            'clientName': client.name,
+            'clientVersion': client.version,
+            'hl': YtmLocale.hl(),
+            'gl': YtmLocale.gl(),
+            if (guestVisitorData != null && guestVisitorData.isNotEmpty)
+              'visitorData': guestVisitorData,
           },
+          if (isEmbed)
+            'thirdParty': {
+              'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
+            },
+        };
+
+        final body = jsonEncode({
+          'context': clientContext,
           'videoId': videoId,
+          'racyCheckOk': true,
+          'contentCheckOk': true,
+          if (isEmbed)
+            'thirdParty': {
+              'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
+            },
           'playbackContext': {
             'contentPlaybackContext': {
               'html5Preference': 'HTML5_PREF_WANTS',
+              if (guestPoToken != null && guestPoToken.isNotEmpty)
+                'poToken': guestPoToken,
             },
           },
         });
@@ -1177,6 +1253,8 @@ class YtmService {
           'X-Goog-Api-Key': apiKey,
           'x-youtube-client-name': client.clientNameId,
           'x-youtube-client-version': client.version,
+          if (guestVisitorData != null && guestVisitorData.isNotEmpty)
+            'X-Goog-Visitor-Id': guestVisitorData,
         };
 
         final response = await _httpClient
@@ -1301,7 +1379,10 @@ class YtmService {
         // already-struggling route/VPN exit and hastens an IP block.
         await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on MissingPluginException {
-        throw const YtmException('YTM_UNSUPPORTED');
+        if (attempt == maxRetries) {
+          throw const YtmException('YTM_UNSUPPORTED');
+        }
+        await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
       } on SocketException catch (e) {
         // Offline/DNS failure — retry with backoff like YTM_TIMEOUT, surface offline
         if (attempt == maxRetries) {

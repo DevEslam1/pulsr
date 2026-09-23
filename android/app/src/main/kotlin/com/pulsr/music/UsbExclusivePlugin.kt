@@ -85,9 +85,14 @@ class UsbExclusivePlugin(
     private external fun nativeUsbStreamStart(
         fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
         sampleRate: Int, channels: Int,
-    ): Boolean
+    ): Int
     private external fun nativeUsbStreamStop()
     private external fun nativeUsbStreamIsActive(): Boolean
+    private external fun nativeUsbStreamGetLastError(): Int
+    private external fun nativeUsbStreamGetUnderrunCount(): Long
+    private external fun nativeUsbStreamGetOverrunCount(): Long
+    private external fun nativeUsbStreamGetBufferedMs(): Double
+    private external fun nativeUsbQuerySupportedRates(fd: Int, interfaceNumber: Int): IntArray
 
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var permissionReceiver: BroadcastReceiver? = null
@@ -168,6 +173,47 @@ class UsbExclusivePlugin(
                             device.getInterface(i).interfaceSubclass == 0x02
                         }
                     result.success(supported)
+                }
+                "getDiagnostics" -> {
+                    val diag = mapOf(
+                        "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
+                        "underrunCount" to if (nativeLoaded) nativeUsbStreamGetUnderrunCount() else 0L,
+                        "overrunCount" to if (nativeLoaded) nativeUsbStreamGetOverrunCount() else 0L,
+                        "isStreamActive" to if (nativeLoaded) nativeUsbStreamIsActive() else false,
+                        "bufferedMs" to if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0
+                    )
+                    result.success(diag)
+                }
+                "getBufferedMs" -> {
+                    result.success(if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0)
+                }
+                "querySupportedRates" -> {
+                    val device = openedDevice ?: findAudioDevice()
+                    if (device == null || usbManager?.hasPermission(device) != true) {
+                        result.success(emptyList<Int>())
+                        return
+                    }
+                    val conn = ensureConnection(device)
+                    if (conn == null) {
+                        result.success(emptyList<Int>())
+                        return
+                    }
+                    val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
+                    val ifaceNum = streamInterfaceNumber ?: 1
+                    val nativeRates = if (nativeLoaded && fd >= 0) {
+                        try {
+                            nativeUsbQuerySupportedRates(fd, ifaceNum).toList()
+                        } catch (e: Throwable) {
+                            Log.w(TAG, "nativeUsbQuerySupportedRates failed: ${e.message}")
+                            emptyList<Int>()
+                        }
+                    } else {
+                        emptyList<Int>()
+                    }
+                    val parsed = parseViaRawDescriptors(conn)
+                    val descriptorRates = parsed?.supportedRates ?: emptyList()
+                    val merged = (nativeRates + descriptorRates).distinct().sorted()
+                    result.success(if (merged.isNotEmpty()) merged else listOf(44100, 48000, 88200, 96000, 176400, 192000))
                 }
                 else -> result.notImplemented()
             }
@@ -276,6 +322,16 @@ class UsbExclusivePlugin(
         } else {
             parseViaInterfaces(device).also { applyParsed(it) }
         }
+        if (streaming && nativeLoaded && !nativeUsbStreamIsActive()) {
+            val lastErr = nativeUsbStreamGetLastError()
+            Log.w(TAG, "USB streaming sink died asynchronously (error: $lastErr); releasing and falling back")
+            streaming = false
+            claimedStreamingInterface?.let {
+                try { connection?.releaseInterface(it) } catch (_: Exception) {}
+            }
+            claimedStreamingInterface = null
+        }
+
         val hasVolume = parsed.volumeUnit != null &&
             (parsed.uacVersion == UsbAudioControlParser.UAC1 ||
                 parsed.uacVersion == UsbAudioControlParser.UAC2)
@@ -296,6 +352,10 @@ class UsbExclusivePlugin(
             "minVolumeDb" to (minRaw?.let { rawToDb(it) }),
             "maxVolumeDb" to (maxRaw?.let { rawToDb(it) }),
             "interfaceNumber" to parsed.streamingInterface,
+            "supportedRates" to parsed.supportedRates,
+            "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
+            "underrunCount" to if (nativeLoaded) nativeUsbStreamGetUnderrunCount() else 0L,
+            "overrunCount" to if (nativeLoaded) nativeUsbStreamGetOverrunCount() else 0L,
         )
     }
 
@@ -320,6 +380,7 @@ class UsbExclusivePlugin(
         "minVolumeDb" to null,
         "maxVolumeDb" to null,
         "interfaceNumber" to null,
+        "supportedRates" to emptyList<Int>(),
     )
 
     private fun deviceLabel(device: UsbDevice): String =
@@ -630,25 +691,33 @@ class UsbExclusivePlugin(
                 try { conn.releaseInterface(iface) } catch (_: Exception) {}
                 return failure("no_fd")
             }
-            val ok = try {
+            val resultCode = try {
                 nativeUsbStreamStart(
                     fd, ep.address, ep.interfaceNumber, ep.altSetting,
                     sampleRate, channels,
                 )
             } catch (e: Throwable) {
                 Log.w(TAG, "nativeUsbStreamStart failed: ${e.message}")
-                false
+                -1
             }
-            if (!ok) {
+            if (resultCode != 0) {
                 mainHandler.removeCallbacks(watchdog)
                 try { conn.releaseInterface(iface) } catch (_: Exception) {}
-                return failure("native_start_failed")
+                val errStr = when (resultCode) {
+                    1 -> "claim_failed"
+                    2 -> "alt_setting_failed"
+                    3 -> "rate_unsupported"
+                    4 -> "submit_failed"
+                    5 -> "invalid_args"
+                    else -> "native_start_failed"
+                }
+                return failure(errStr) + mapOf("resultCode" to resultCode)
             }
             mainHandler.removeCallbacks(watchdog)
             streaming = true
             claimedStreamingInterface = iface
             emitState()
-            return buildStatus() + mapOf("success" to true)
+            return buildStatus() + mapOf("success" to true, "resultCode" to 0)
         } catch (e: Exception) {
             mainHandler.removeCallbacks(watchdog)
             try { conn.releaseInterface(iface) } catch (_: Exception) {}

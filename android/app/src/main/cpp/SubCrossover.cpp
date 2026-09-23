@@ -70,6 +70,7 @@ void SubCrossover::computeCoeffs() {
 
 void SubCrossover::reset() {
     smoothedSubGain_ = targetSubGain_;
+    smoothedEnabledMix_ = enabled_ ? 1.0 : 0.0;
     for (int p = 0; p < MAX_PAIRS; ++p) {
         stage1_[p].z1 = stage1_[p].z2 = 0.0;
         stage2_[p].z1 = stage2_[p].z2 = 0.0;
@@ -79,11 +80,20 @@ void SubCrossover::reset() {
 }
 
 void SubCrossover::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0) return;
+    if (!L || !R || frames <= 0) return;
+    const double targetMix = enabled_ ? 1.0 : 0.0;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4) return;
 
     constexpr double kTau = 0.020;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedSubGain_ += smoothFactor * (targetSubGain_ - smoothedSubGain_);
+
+    const double startMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += smoothFactor * (targetMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetMix) < 5e-4) {
+        smoothedEnabledMix_ = targetMix;
+    }
+    const double mixStep = (frames > 0) ? ((smoothedEnabledMix_ - startMix) / frames) : 0.0;
 
     const float gain = static_cast<float>(smoothedSubGain_);
     // FIX M-6: makeup only attenuates the added sub tap, not the entire mix
@@ -96,7 +106,10 @@ void SubCrossover::process(float* L, float* R, int frames) {
     const bool doBassMono = bassMono_;
     const bool doAntiPop = antiPop_;
 
+    double curMix = startMix;
     for (int i = 0; i < frames; ++i) {
+        curMix += mixStep;
+        const float mixF = static_cast<float>(curMix);
         float l = L[i];
         float r = R[i];
 
@@ -105,8 +118,8 @@ void SubCrossover::process(float* L, float* R, int frames) {
             const float side = 0.5f * (l - r);
             float sideSub = ss1.process(side);
             if (cascade_) sideSub = ss2.process(sideSub);
-            l -= sideSub;
-            r += sideSub;
+            l -= sideSub * mixF;
+            r += sideSub * mixF;
         }
 
         // 2. Low-pass mono sub redirection
@@ -120,23 +133,36 @@ void SubCrossover::process(float* L, float* R, int frames) {
         }
 
         // FIX M-6: apply sub gain + makeup attenuation only to the added sub tap
-        const float subTap = sub * gain * subAttenuation;
+        const float subTap = sub * gain * subAttenuation * mixF;
         L[i] = l + subTap;
         R[i] = r + subTap;
+    }
+
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4) {
+        reset();
     }
 }
 
 void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
     // Guard BEFORE any stride is used: a mono (1-channel) buffer would otherwise
     // be reinterpreted with a stereo stride and write out of bounds.
-    if (!enabled_ || !buffer || frames <= 0 || channels < 2 ||
-        channels > MAX_CHANNELS) {
+    if (!buffer || frames <= 0 || channels < 2 || channels > MAX_CHANNELS) {
         return;
     }
+
+    const double targetMix = enabled_ ? 1.0 : 0.0;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4) return;
 
     constexpr double kTau = 0.020;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedSubGain_ += smoothFactor * (targetSubGain_ - smoothedSubGain_);
+
+    const double startMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += smoothFactor * (targetMix - smoothedEnabledMix_);
+    if (std::abs(smoothedEnabledMix_ - targetMix) < 5e-4) {
+        smoothedEnabledMix_ = targetMix;
+    }
+    const double mixStep = (frames > 0) ? ((smoothedEnabledMix_ - startMix) / frames) : 0.0;
 
     const float gain = static_cast<float>(smoothedSubGain_);
     // FIX M-6: makeup only attenuates the added sub tap, not the entire mix
@@ -144,7 +170,10 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
     const bool doBassMono = bassMono_;
     const bool doAntiPop = antiPop_;
 
+    double curMix = startMix;
     for (int i = 0; i < frames; ++i) {
+        curMix += mixStep;
+        const float mixF = static_cast<float>(curMix);
         for (int ch = 0; ch + 1 < channels; ch += 2) {
             const int iL = i * channels + ch;
             const int iR = i * channels + ch + 1;
@@ -161,8 +190,8 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
                 const float side = 0.5f * (l - r);
                 float sideSub = ss1.process(side);
                 if (cascade_) sideSub = ss2.process(sideSub);
-                l -= sideSub;
-                r += sideSub;
+                l -= sideSub * mixF;
+                r += sideSub * mixF;
             }
 
             const float mono = 0.5f * (l + r);
@@ -174,9 +203,13 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
             }
 
             // FIX M-6: apply sub gain + makeup attenuation only to the added sub tap
-            const float subTap = sub * gain * subAttenuation;
+            const float subTap = sub * gain * subAttenuation * mixF;
             buffer[iL] = l + subTap;
             buffer[iR] = r + subTap;
         }
+    }
+
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4) {
+        reset();
     }
 }

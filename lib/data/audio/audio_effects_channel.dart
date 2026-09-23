@@ -7,6 +7,7 @@ import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/dsp_debug_report.dart';
+import '../../domain/models/dsp_telemetry.dart';
 
 class AudioEffectsChannel {
   /// Test-only observation of the last value pushed to the native
@@ -1471,6 +1472,19 @@ class AudioEffectsChannel {
     }
   }
 
+  Future<double> getAppliedSampleRate() async {
+    if (!_isAndroid) return 48000.0;
+    try {
+      final dynamic rate = await _channel
+          .invokeMethod<dynamic>('getAppliedSampleRate')
+          .timeout(const Duration(seconds: 2));
+      if (rate is num && rate > 0) return rate.toDouble();
+      return 48000.0;
+    } catch (_) {
+      return 48000.0;
+    }
+  }
+
   Future<void> setBandSolo(int index, bool solo) async {
     if (!_isAndroid) return;
     try {
@@ -1701,6 +1715,24 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Queries real-time engine telemetry (Limiter GR, DynEQ GR, Multiband GR, RTF, and auto-degrade).
+  Future<DspTelemetry> getTelemetry() async {
+    if (!_isAndroid) return const DspTelemetry.zero();
+    try {
+      final dynamic res = await _channel
+          .invokeMethod<dynamic>('getTelemetry')
+          .timeout(const Duration(milliseconds: 250));
+      if (res is List) {
+        final telemetry = DspTelemetry.fromNativeList(res);
+        _handleAutoDegradeTransition(telemetry.autoDegradedStages);
+        return telemetry;
+      }
+      return const DspTelemetry.zero();
+    } catch (_) {
+      return const DspTelemetry.zero();
+    }
+  }
+
   final _autoDegradeStreamController = StreamController<int>.broadcast();
   int _lastKnownDegradedStages = 0;
 
@@ -1714,6 +1746,68 @@ class AudioEffectsChannel {
       _autoDegradeStreamController.add(currentStages);
     }
     _lastKnownDegradedStages = currentStages;
+  }
+
+  /// Retrieves the current weekly sound dose (0.0 to >1.0, where 1.0 = 100% weekly sound dose).
+  Future<double> getWeeklyDose() async {
+    if (!_isAndroid) return 0.0;
+    try {
+      final res = await _channel
+          .invokeMethod<double>('getWeeklyDose')
+          .timeout(const Duration(milliseconds: 250));
+      return res ?? 0.0;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  /// Resets the weekly sound dose accumulator to 0.0.
+  Future<bool> resetWeeklyDose() async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _channel
+          .invokeMethod<bool>('resetWeeklyDose')
+          .timeout(const Duration(seconds: 1));
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks if safety limiter attenuation (-6 dBFS ceiling) is actively engaged.
+  Future<bool> isSafetyAttenuationActive() async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _channel
+          .invokeMethod<bool>('isSafetyAttenuationActive')
+          .timeout(const Duration(milliseconds: 250));
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Configures Headphone Safety parameters in the native DSP engine.
+  Future<void> setHeadphoneSafetyParams({
+    required bool enabled,
+    double doseThreshold = 1.0,
+    double safetyCeilingDb = -6.0,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod('setHeadphoneSafetyParams', {
+        'enabled': enabled,
+        'doseThreshold': doseThreshold,
+        'safetyCeilingDb': safetyCeilingDb,
+      }).timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set headphone safety params',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
   }
 
   /// Retrieves internal DSP status for assertions/testing.

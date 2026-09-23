@@ -124,8 +124,18 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             // EncryptedSharedPreferences, which is keystore-backed disk I/O and ran
             // during engine attach.
             appContext?.let { ctx ->
-                plugin.executor.execute { runCatching { PoTokenManager.init(ctx) } }
-                plugin.executor.execute { runCatching { PlayerJavaScript.warmUp() } }
+                plugin.executor.execute {
+                    runCatching {
+                        plugin.ensureExtractorReady()
+                        PoTokenManager.init(ctx)
+                    }
+                }
+                plugin.executor.execute {
+                    runCatching {
+                        plugin.ensureExtractorReady()
+                        PlayerJavaScript.warmUp()
+                    }
+                }
             }
 
             // Proxy rotation changes egress -> re-mint tokens
@@ -322,6 +332,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     }
                     // Non-blocking background warm-up of JavaScript player and PoToken generator
                     runOffMainThread(result, requireExtractorReady = false) {
+                        ensureExtractorReady()
                         ClientCapabilityMatrix.init(ctx)
                         executor.execute { runCatching { PlayerJavaScript.warmUp() } }
                         PoTokenManager.preWarm(ctx)

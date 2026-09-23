@@ -66,6 +66,13 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
     await _rulesService.saveRule(updated);
   }
 
+  Future<void> _delete(String id) async {
+    setState(() {
+      _rules = _rules.where((r) => r.id != id).toList();
+    });
+    await _rulesService.deleteRule(id);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -140,33 +147,50 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
         icon = Icons.battery_charging_full_rounded;
         break;
     }
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.s10),
-      decoration: BoxDecoration(
-        color: p.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
-        border: Border.all(color: p.hairline),
+    return Dismissible(
+      key: ValueKey(rule.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.s10),
+        alignment: AlignmentDirectional.centerEnd,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: p.error.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(AppRadii.r16),
+        ),
+        child: Icon(Icons.delete_outline_rounded, color: p.error),
       ),
-      child: PulsrSwitchListTile(
-        value: rule.enabled && supported,
-        onChanged: supported ? (v) => _toggle(rule, v) : null,
-        leading: Icon(
-          icon,
-          color: supported ? p.accent : p.textTertiary,
+      onDismissed: (_) => _delete(rule.id),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.s10),
+        decoration: BoxDecoration(
+          color: p.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(AppRadii.r16),
+          border: Border.all(color: p.hairline),
         ),
-        title: Text(
-          rule.trigger.label,
-          style: TextStyle(
-            color: p.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: AppFontSize.body,
+        child: PulsrSwitchListTile(
+          value: rule.enabled && supported,
+          onChanged: supported ? (v) => _toggle(rule, v) : null,
+          leading: Icon(
+            icon,
+            color: supported ? p.accent : p.textTertiary,
           ),
-        ),
-        subtitle: Text(
-          supported ? context.l10n.settingsApplyProfileName(profileName) : context.l10n.settingsNotDetectable,
-          style: TextStyle(
-            color: supported ? p.textSecondary : p.error,
-            fontSize: AppFontSize.label,
+          title: Text(
+            rule.trigger.label,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: AppFontSize.body,
+            ),
+          ),
+          subtitle: Text(
+            supported
+                ? context.l10n.settingsApplyProfileName(profileName)
+                : context.l10n.settingsNotDetectable,
+            style: TextStyle(
+              color: supported ? p.textSecondary : p.error,
+              fontSize: AppFontSize.label,
+            ),
           ),
         ),
       ),

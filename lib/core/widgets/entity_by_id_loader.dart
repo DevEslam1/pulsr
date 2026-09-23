@@ -6,24 +6,28 @@ import 'package:flutter/material.dart';
 import '../errors/failures.dart';
 import 'shimmer_skeleton.dart';
 
-/// Resolves a single entity by id from a reactive list stream so an id-based
-/// deep link (e.g. `/album?id=5`) can render without a typed route `extra`.
+/// Resolves a single entity either directly by id via [fetchSingle] (preferred, O(1))
+/// or from a reactive list stream [watch] so an id-based deep link (e.g. `/album?id=5`)
+/// can render without a typed route `extra`.
 ///
 /// Shows a skeleton while the first emission arrives and a plain "not found"
 /// scaffold when the id matches nothing.
 class EntityByIdLoader<T> extends StatefulWidget {
-  final Stream<Result<List<T>>> Function() watch;
-  final bool Function(T item) match;
+  final Future<Result<T?>> Function()? fetchSingle;
+  final Stream<Result<List<T>>> Function()? watch;
+  final bool Function(T item)? match;
   final Widget Function(BuildContext context, T item) builder;
   final String notFoundMessage;
 
   const EntityByIdLoader({
     super.key,
-    required this.watch,
-    required this.match,
+    this.fetchSingle,
+    this.watch,
+    this.match,
     required this.builder,
     required this.notFoundMessage,
-  });
+  }) : assert(fetchSingle != null || (watch != null && match != null),
+            'Must provide either fetchSingle or both watch and match');
 
   @override
   State<EntityByIdLoader<T>> createState() => _EntityByIdLoaderState<T>();
@@ -41,24 +45,39 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
   }
 
   void _subscribe() {
-    _sub = widget.watch().listen(
-      (result) {
-        result.fold((_) {}, (list) {
-          for (final item in list) {
-            if (widget.match(item)) {
-              _entity = item;
-              break;
-            }
-          }
-        });
+    if (widget.fetchSingle != null) {
+      widget.fetchSingle!().then((res) {
         if (!mounted) return;
-        setState(() => _done = true);
-        _sub?.cancel();
-      },
-      onError: (_) {
+        setState(() {
+          _entity = res.fold((_) => null, (item) => item);
+          _done = true;
+        });
+      }).catchError((_) {
         if (mounted) setState(() => _done = true);
-      },
-    );
+      });
+      return;
+    }
+
+    if (widget.watch != null) {
+      _sub = widget.watch!().listen(
+        (result) {
+          result.fold((_) {}, (list) {
+            for (final item in list) {
+              if (widget.match!(item)) {
+                _entity = item;
+                break;
+              }
+            }
+          });
+          if (!mounted) return;
+          setState(() => _done = true);
+          _sub?.cancel();
+        },
+        onError: (_) {
+          if (mounted) setState(() => _done = true);
+        },
+      );
+    }
   }
 
   @override

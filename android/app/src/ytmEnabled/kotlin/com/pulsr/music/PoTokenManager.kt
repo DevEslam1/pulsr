@@ -13,9 +13,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.localization.ContentCountry
+import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.services.youtube.InnertubeClientRequestInfo
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.time.Instant
+import java.util.Locale
 
 /**
  * Phase 3 — Layer 3: Singleton PoToken Lifecycle Manager with Hardened VisitorData Binding
@@ -102,6 +105,21 @@ object PoTokenManager {
         if (appContext == null) {
             val app = context.applicationContext
             appContext = app
+
+            // Defense-in-depth: Ensure NewPipe downloader is initialized so YoutubeParsingHelper never NPEs
+            if (runCatching { NewPipe.getDownloader() }.getOrNull() == null) {
+                try {
+                    val locale = Locale.getDefault()
+                    NewPipe.init(
+                        PulsrDownloader(app),
+                        Localization.fromLocale(locale),
+                        ContentCountry(locale.country.ifBlank { "US" }),
+                    )
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Fallback NewPipe.init in PoTokenManager failed: ${t.message}")
+                }
+            }
+
             val stored = PoTokenStore.loadTokenData(app)
             if (stored.streamingPoToken.isNotEmpty() && stored.visitorData.isNotEmpty()) {
                 visitorData = stored.visitorData
@@ -480,13 +498,21 @@ object PoTokenManager {
             // flagged IPs) fall back to a pinned version so the PoToken chain can still run.
             val resolvedVersion = try {
                 YoutubeParsingHelper.getClientVersion()
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w(TAG, "getClientVersion() failed (${e.message}), using pinned fallback version")
                 "2.20260905.00.00"
             }
             clientRequestInfo.clientInfo.clientVersion = resolvedVersion
 
             newVisitorData = try {
+                if (runCatching { NewPipe.getDownloader() }.getOrNull() == null) {
+                    val locale = Locale.getDefault()
+                    NewPipe.init(
+                        PulsrDownloader(ctx),
+                        Localization.fromLocale(locale),
+                        ContentCountry(locale.country.ifBlank { "US" }),
+                    )
+                }
                 YoutubeParsingHelper.getVisitorDataFromInnertube(
                     clientRequestInfo,
                     NewPipe.getPreferredLocalization(),
@@ -496,7 +522,7 @@ object PoTokenManager {
                     null,
                     false,
                 )
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w(TAG, "getVisitorDataFromInnertube() failed: ${e.message}")
                 if (visitorData.isNotEmpty()) {
                     Log.i(TAG, "Falling back to stale cached visitorData")

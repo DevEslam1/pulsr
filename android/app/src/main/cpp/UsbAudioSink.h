@@ -27,6 +27,15 @@
 
 namespace pulsr {
 
+enum class UsbStreamResult : int32_t {
+    Ok = 0,
+    ClaimFailed = 1,
+    AltSettingFailed = 2,
+    RateUnsupported = 3,
+    SubmitFailed = 4,
+    InvalidArgs = 5
+};
+
 class UsbAudioSink {
 public:
     static UsbAudioSink& instance();
@@ -34,10 +43,20 @@ public:
     // fd: usbfs fd from UsbDeviceConnection.getFileDescriptor().
     // endpointAddress: isochronous OUT endpoint (bit 7 clear).
     // interfaceNumber/altSetting: the claimed AudioStreaming interface.
-    bool Open(int fd, int endpointAddress, int interfaceNumber, int altSetting,
-              int sampleRate, int channels, int bytesPerSample);
+    UsbStreamResult Open(int fd, int endpointAddress, int interfaceNumber, int altSetting,
+                         int sampleRate, int channels, int bytesPerSample);
     void Close();
     bool IsActive() const;
+    int GetLastError() const { return lastError_.load(std::memory_order_acquire); }
+    uint64_t GetUnderrunCount() const { return underrunCount_.load(std::memory_order_relaxed); }
+    uint64_t GetOverrunCount() const { return overrunCount_.load(std::memory_order_relaxed); }
+    double GetBufferedMs();
+
+    // Queries supported sample rates for the AudioStreaming interface using USBDEVFS_CONTROL.
+    static std::vector<int> QuerySupportedRates(int fd, int interfaceNumber);
+
+    // Parses supported sample rates from raw configuration descriptors (UAC1 Format Type I).
+    static std::vector<int> ParseSupportedRatesFromDescriptors(const uint8_t* desc, size_t len, int targetInterface = -1);
 
     // Audio-thread call: converts float [-1,1] to interleaved S16_LE and appends
     // to the ring. Non-blocking; excess data is dropped (never blocks playback).
@@ -58,6 +77,9 @@ private:
 
     std::atomic<bool> active_{false};
     std::atomic<bool> running_{false};
+    std::atomic<int> lastError_{0};
+    std::atomic<uint64_t> underrunCount_{0};
+    std::atomic<uint64_t> overrunCount_{0};
 
     int fd_ = -1;
     int endpoint_ = 0;

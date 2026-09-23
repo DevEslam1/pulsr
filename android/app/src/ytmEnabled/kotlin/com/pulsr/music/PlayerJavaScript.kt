@@ -90,6 +90,8 @@ internal object PlayerJavaScript {
         }
     }
 
+    private const val PINNED_PLAYER_URL = "https://www.youtube.com/s/player/237e19bb/player_ias.vflset/en_US/base.js"
+
     /**
      * Fetches the YouTube player base.js URL by parsing the iframe_api response.
      * YouTube embeds the player script tag with the base.js path in the iframe_api
@@ -101,17 +103,21 @@ internal object PlayerJavaScript {
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
             val iframeHtml = conn.getInputStream().bufferedReader().use { it.readText() }
-            // The iframe_api JS contains: src="/s/player/<hash>/player_ias.vflset/en_US/base.js"
-            // or it redirects to www.youtube.com/s/player/... directly.
-            val srcRegex = Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']""")  
-            val match = srcRegex.find(iframeHtml)
-            if (match != null) {
-                val path = match.groupValues[1]
-                Log.d(TAG, "Player JS path from iframe_api: $path")
-                "https://www.youtube.com$path"
-            } else {
-                fetchPlayerUrlFromWatchPage()
+            val srcPatterns = listOf(
+                Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']"""),
+                Regex("""\"PLAYER_JS_URL\":\s*\"(/s/player/[^\"]+/base\.js)\""""),
+                Regex("""\"jsUrl\":\"(/s/player/[^\"]+/base\.js)\""""),
+                Regex("""(/s/player/[a-zA-Z0-9_-]+/(?:player_ias\.vflset/[^\"'\s/]+|base)\.js)""")
+            )
+            for (pattern in srcPatterns) {
+                val match = pattern.find(iframeHtml)
+                if (match != null) {
+                    val path = match.groupValues[1]
+                    Log.d(TAG, "Player JS path from iframe_api: $path")
+                    return "https://www.youtube.com$path"
+                }
             }
+            fetchPlayerUrlFromWatchPage()
         } catch (t: Throwable) {
             Log.w(TAG, "fetchPlayerUrlFromIframeApi failed: ${t.message}")
             fetchPlayerUrlFromWatchPage()
@@ -130,7 +136,9 @@ internal object PlayerJavaScript {
             val html = conn.getInputStream().bufferedReader().use { it.readText() }
             val patterns = listOf(
                 Regex("""\"jsUrl\":\"(/s/player/[^\"]+/base\.js)\""""),
+                Regex("""\"PLAYER_JS_URL\":\s*\"(/s/player/[^\"]+/base\.js)\""""),
                 Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']"""),
+                Regex("""(/s/player/[a-zA-Z0-9_-]+/(?:player_ias\.vflset/[^\"'\s/]+|base)\.js)"""),
                 Regex("""(/s/player/[a-f0-9]+/player_ias\.vflset/[^/]+/base\.js)""")
             )
             for (regex in patterns) {
@@ -141,10 +149,10 @@ internal object PlayerJavaScript {
                     return "https://www.youtube.com$path"
                 }
             }
-            null
+            PINNED_PLAYER_URL
         } catch (t: Throwable) {
             Log.w(TAG, "fetchPlayerUrlFromWatchPage failed: ${t.message}")
-            null
+            PINNED_PLAYER_URL
         }
     }
 

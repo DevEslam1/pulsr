@@ -1,4 +1,5 @@
 // lib/core/services/artist_bio_service.dart
+import 'dart:collection';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
@@ -25,10 +26,14 @@ class ArtistInfo {
 @singleton
 class ArtistBioService {
   final http.Client _client;
-  final Map<String, ArtistInfo> _cache = {};
+  final LinkedHashMap<String, ArtistInfo> _cache = LinkedHashMap<String, ArtistInfo>();
   static const int _maxCacheSize = 150;
 
   ArtistBioService([http.Client? client]) : _client = client ?? http.Client();
+
+  void dispose() {
+    _client.close();
+  }
 
   /// Fetches artist info and picture from Deezer and Wikipedia APIs.
   /// Returns null immediately when offline-only mode is enabled.
@@ -38,8 +43,11 @@ class ArtistBioService {
       return null;
     }
 
-    if (_cache.containsKey(cleanName.toLowerCase())) {
-      return _cache[cleanName.toLowerCase()];
+    final key = cleanName.toLowerCase();
+    if (_cache.containsKey(key)) {
+      final cached = _cache.remove(key)!;
+      _cache[key] = cached; // LRU refresh
+      return cached;
     }
 
     try {
@@ -52,40 +60,50 @@ class ArtistBioService {
     }
 
     try {
-      // 1. Search Deezer for HD Artist Picture and Top Tracks
-      final uri = Uri.parse(
+      final deezerUri = Uri.parse(
           'https://api.deezer.com/search/artist?q=${Uri.encodeComponent(cleanName)}&limit=1');
-      final res = await _client.get(uri).timeout(const Duration(seconds: 8));
+      final wikiUri = Uri.parse(
+          'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(cleanName)}');
+
+      final deezerFuture = _client.get(deezerUri).timeout(const Duration(seconds: 8)).catchError((e, st) {
+        ErrorLogger.log('Deezer artist lookup failed for $cleanName',
+            error: e, stackTrace: st, category: 'ArtistBio');
+        return http.Response('', 500);
+      });
+
+      final wikiFuture = _client.get(wikiUri).timeout(const Duration(seconds: 6)).catchError((e, st) {
+        ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
+            error: e, stackTrace: st, category: 'ArtistBio');
+        return http.Response('', 500);
+      });
+
+      final results = await Future.wait([deezerFuture, wikiFuture]);
+      final res = results[0];
+      final wikiRes = results[1];
 
       String? pictureUrl;
       int? fanCount;
 
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-        final list = data['data'] as List<dynamic>?;
-        if (list != null && list.isNotEmpty) {
-          final first = list.first;
-          pictureUrl = first['picture_xl'] ??
-              first['picture_big'] ??
-              first['picture_medium'];
-          fanCount = (first['nb_fan'] as num?)?.toInt();
-        }
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        try {
+          final data = json.decode(res.body);
+          final list = data['data'] as List<dynamic>?;
+          if (list != null && list.isNotEmpty) {
+            final first = list.first;
+            pictureUrl = first['picture_xl'] ??
+                first['picture_big'] ??
+                first['picture_medium'];
+            fanCount = (first['nb_fan'] as num?)?.toInt();
+          }
+        } catch (_) {}
       }
 
-      // 2. Fetch artist bio snippet from Wikipedia API
       String? bio;
-      try {
-        final wikiUri = Uri.parse(
-            'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(cleanName)}');
-        final wikiRes =
-            await _client.get(wikiUri).timeout(const Duration(seconds: 6));
-        if (wikiRes.statusCode == 200) {
+      if (wikiRes.statusCode == 200 && wikiRes.body.isNotEmpty) {
+        try {
           final wikiData = json.decode(wikiRes.body);
           bio = wikiData['extract'] as String?;
-        }
-      } catch (e, st) {
-        ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
-            error: e, stackTrace: st, category: 'ArtistBio');
+        } catch (_) {}
       }
 
       final info = ArtistInfo(
@@ -98,7 +116,7 @@ class ArtistBioService {
       if (_cache.length >= _maxCacheSize) {
         _cache.remove(_cache.keys.first);
       }
-      _cache[cleanName.toLowerCase()] = info;
+      _cache[key] = info;
       return info;
     } catch (e, st) {
       ErrorLogger.log('Failed to fetch artist info for $cleanName',

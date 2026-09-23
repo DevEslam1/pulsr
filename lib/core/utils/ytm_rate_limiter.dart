@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:clock/clock.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'error_logger.dart';
 
 /// Simple asynchronous mutex to serialize token acquisitions.
 class AsyncMutex {
@@ -102,7 +103,10 @@ class YtmRateLimiter {
         p
             .setInt(_keyBackoffUntil, _backoffUntil.millisecondsSinceEpoch)
             .catchError((_) => false);
-      }).catchError((_) {});
+      }).catchError((e, st) {
+        ErrorLogger.log('Failed to persist YtmRateLimiter tokens',
+            error: e, stackTrace: st, category: 'YtmRateLimiter');
+      });
     }
   }
 
@@ -138,12 +142,29 @@ class YtmRateLimiter {
     shared._inFlightRequests.clear();
   }
 
+  /// Clears backoffs, restores full token capacity, and cancels in-flight throttling
+  /// when a network route changes (e.g. Wi-Fi -> mobile, VPN toggle).
+  void resetAfterNetworkChange() {
+    _tokens = _maxTokens.toDouble();
+    _lastRefill = clock.now();
+    _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+    _adaptiveMultiplier = 1;
+    _inFlightRequests.clear();
+    _persist();
+  }
+
   /// Acquires a permit before making a native YTM request.
-  Future<void> acquirePermit() => _nativeMutex.run(() async {
+  /// If [fastFail] is true and an active backoff window is longer than 30s,
+  /// throws a [TimeoutException] immediately instead of blocking the async mutex for minutes.
+  Future<void> acquirePermit({bool fastFail = false}) => _nativeMutex.run(() async {
     while (true) {
       final now = clock.now();
       if (now.isBefore(_backoffUntil)) {
-        await Future<void>.delayed(_backoffUntil.difference(now));
+        final waitDuration = _backoffUntil.difference(now);
+        if (fastFail && waitDuration > const Duration(seconds: 30)) {
+          throw TimeoutException('Rate limiter in long backoff (${waitDuration.inSeconds}s remaining)');
+        }
+        await Future<void>.delayed(waitDuration);
       }
 
       _refill();

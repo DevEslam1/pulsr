@@ -854,6 +854,18 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<AlbumsTableData?>> getAlbumById(int albumId) async {
+    try {
+      final album = await (_db.select(_db.albumsTable)
+            ..where((t) => t.id.equals(albumId)))
+          .getSingleOrNull();
+      return Right(album);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch album by id', e));
+    }
+  }
+
+  @override
   Future<Result<List<SongsTableData>>> getAlbumSongs(int albumId) async {
     try {
       final songs = await (_db.select(_db.songsTable)
@@ -938,6 +950,18 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<ArtistsTableData?>> getArtistById(int artistId) async {
+    try {
+      final artist = await (_db.select(_db.artistsTable)
+            ..where((t) => t.id.equals(artistId)))
+          .getSingleOrNull();
+      return Right(artist);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch artist by id', e));
+    }
+  }
+
+  @override
   Future<Result<List<SongsTableData>>> getArtistSongs(int artistId) async {
     try {
       final songs = await (_db.select(_db.songsTable)
@@ -983,6 +1007,18 @@ class MusicRepository implements IMusicRepository {
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch playlists', e)));
+    }
+  }
+
+  @override
+  Future<Result<PlaylistsTableData?>> getPlaylistById(int playlistId) async {
+    try {
+      final query = _db.select(_db.playlistsTable)
+        ..where((t) => t.id.equals(playlistId));
+      final playlist = await query.getSingleOrNull();
+      return Right(playlist);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to get playlist by id', e));
     }
   }
 

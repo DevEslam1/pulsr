@@ -56,6 +56,13 @@ class YtmBrowseService {
 
   YtmBrowseService(this._ytmService);
 
+  /// Clears in-memory browse feed cache upon network/region changes.
+  void clearCache() {
+    _cachedSections = null;
+    _lastFetchTime = null;
+    _pendingFeed = null;
+  }
+
   /// Fetches Home feed sections including Quick Picks, Recommended, and Trending.
   Future<List<YtmBrowseSection>> getHomeFeed() async {
     if (_cachedSections != null && _lastFetchTime != null) {
@@ -108,6 +115,23 @@ class YtmBrowseService {
 
   /// Fetches Top Charts.
   Future<List<YtmBrowseItem>> getTrendingCharts() async {
+    try {
+      final chartTracks = await _ytmService.getCharts(limit: 15);
+      if (chartTracks.isNotEmpty) {
+        return chartTracks
+            .take(8)
+            .map((t) => YtmBrowseItem(
+                  id: t.videoId,
+                  title: t.title,
+                  subtitle: t.artist,
+                  artworkUrl: t.artworkUrl,
+                  type: 'song',
+                  duration: t.duration,
+                ))
+            .toList();
+      }
+    } catch (_) {}
+
     try {
       final trendingTracks = await _ytmService.trending(limit: 15);
       if (trendingTracks.isNotEmpty) {

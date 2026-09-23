@@ -41,13 +41,13 @@ class BatteryOptimizationService {
     }
   }
 
-  static Future<int> getBatteryLevel() async {
-    if (kIsWeb || !Platform.isAndroid) return 100;
+  static Future<int?> getBatteryLevel() async {
+    if (kIsWeb || !Platform.isAndroid) return null;
     try {
       final level = await _channel.invokeMethod<int>('getBatteryLevel');
-      return level ?? 100;
+      return level;
     } catch (_) {
-      return 100;
+      return null;
     }
   }
 

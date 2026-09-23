@@ -7,11 +7,14 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/error_logger.dart';
+import '../utils/ytm_rate_limiter.dart' show AsyncMutex;
 
 @singleton
 class YtmCacheManager {
   static const String keyMaxCacheSizeMb = 'setting_stream_cache_max_mb';
   static const int defaultMaxCacheSizeMb = 1024; // 1 GB default
+
+  final AsyncMutex _fileMutex = AsyncMutex();
 
   Future<Directory> getCacheDirectory() async {
     final base = await getApplicationSupportDirectory();
@@ -61,33 +64,37 @@ class YtmCacheManager {
   /// Returns the cached audio file for [videoId] at [quality] if it exists on
   /// disk and is non-empty (>100KB).
   Future<File?> getCachedAudioFile(String videoId,
-      {String quality = 'high'}) async {
-    try {
-      final dir = await getCacheDirectory();
-      final hash = getHashForVideoId(videoId);
-      for (final ext in cacheExtensions) {
-        final f = File(p.join(dir.path, cacheFileName(hash, quality, ext)));
-        if (await f.exists()) {
-          final len = await f.length();
-          if (len > 100 * 1024) {
-            // Minimum 100KB for valid audio stream
-            // Update last modified time for LRU
-            try {
-              await f.setLastModified(DateTime.now());
-            } catch (e, st) {
-              ErrorLogger.log('Failed to refresh cache mtime for $videoId',
-                  error: e, stackTrace: st, category: 'YtmCacheManager');
+      {String quality = 'high'}) =>
+      _fileMutex.run(() async {
+        try {
+          final dir = await getCacheDirectory();
+          final hash = getHashForVideoId(videoId);
+          for (final ext in cacheExtensions) {
+            final f = File(p.join(dir.path, cacheFileName(hash, quality, ext)));
+            if (await f.exists()) {
+              final len = await f.length();
+              if (len > 100 * 1024) {
+                // Minimum 100KB for valid audio stream
+                // Update last modified time for LRU
+                try {
+                  await f.setLastModified(DateTime.now());
+                } catch (e, st) {
+                  ErrorLogger.log('Failed to refresh cache mtime for $videoId',
+                      error: e, stackTrace: st, category: 'YtmCacheManager');
+                }
+                return f;
+              }
             }
-            return f;
           }
+        } on FileSystemException catch (e, st) {
+          ErrorLogger.log('FileSystemException checking cached audio for $videoId',
+              error: e, stackTrace: st, category: 'YtmCacheManager');
+        } catch (e, st) {
+          ErrorLogger.log('Error checking cached audio for $videoId',
+              error: e, stackTrace: st, category: 'YtmCacheManager');
         }
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Error checking cached audio for $videoId',
-          error: e, stackTrace: st, category: 'YtmCacheManager');
-    }
-    return null;
-  }
+        return null;
+      });
 
   /// Returns total disk space used by stream cache in bytes.
   Future<int> getCacheSizeBytes() async {
@@ -108,66 +115,69 @@ class YtmCacheManager {
   }
 
   /// Clears all cached stream files from disk.
-  Future<void> clearCache() async {
-    try {
-      final dir = await getCacheDirectory();
-      if (await dir.exists()) {
-        final entities = await dir.list().toList();
-        for (final entity in entities) {
-          if (entity is File) {
+  Future<void> clearCache() => _fileMutex.run(() async {
+        try {
+          final dir = await getCacheDirectory();
+          if (await dir.exists()) {
+            final entities = await dir.list().toList();
+            for (final entity in entities) {
+              if (entity is File) {
+                try {
+                  await entity.delete();
+                } catch (e, st) {
+                  ErrorLogger.log('Failed to delete cached stream file',
+                      error: e, stackTrace: st, category: 'YtmCacheManager');
+                }
+              }
+            }
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Error clearing stream cache',
+              error: e, stackTrace: st, category: 'YtmCacheManager');
+        }
+      });
+
+  /// Prunes oldest accessed files if total cache exceeds user's configured limit.
+  Future<void> pruneIfExceedsLimit() => _fileMutex.run(() async {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final maxMb = prefs.getInt(keyMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
+          final maxBytes = maxMb * 1024 * 1024;
+
+          final dir = await getCacheDirectory();
+          if (!await dir.exists()) return;
+
+          final entities = (await dir.list().toList()).whereType<File>().toList();
+          int totalSize = 0;
+          final fileList = <({File file, int size, DateTime modified})>[];
+          for (final f in entities) {
+            final size = await f.length();
+            final modified = await f.lastModified();
+            totalSize += size;
+            fileList.add((file: f, size: size, modified: modified));
+          }
+
+          if (totalSize <= maxBytes) return;
+
+          // Sort oldest modified first
+          fileList.sort((a, b) => a.modified.compareTo(b.modified));
+
+          for (final item in fileList) {
+            if (totalSize <= maxBytes * 0.85) break; // Reduce to 85% of limit
             try {
-              await entity.delete();
+              await item.file.delete();
+              totalSize -= item.size;
             } catch (e, st) {
-              ErrorLogger.log('Failed to delete cached stream file',
+              ErrorLogger.log('Failed to prune cached stream file',
                   error: e, stackTrace: st, category: 'YtmCacheManager');
             }
           }
-        }
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Error clearing stream cache',
-          error: e, stackTrace: st, category: 'YtmCacheManager');
-    }
-  }
-
-  /// Prunes oldest accessed files if total cache exceeds user's configured limit.
-  Future<void> pruneIfExceedsLimit() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final maxMb = prefs.getInt(keyMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
-      final maxBytes = maxMb * 1024 * 1024;
-
-      final dir = await getCacheDirectory();
-      if (!await dir.exists()) return;
-
-      final entities = (await dir.list().toList()).whereType<File>().toList();
-      int totalSize = 0;
-      final fileList = <({File file, int size, DateTime modified})>[];
-      for (final f in entities) {
-        final size = await f.length();
-        final modified = await f.lastModified();
-        totalSize += size;
-        fileList.add((file: f, size: size, modified: modified));
-      }
-
-      if (totalSize <= maxBytes) return;
-
-      // Sort oldest modified first
-      fileList.sort((a, b) => a.modified.compareTo(b.modified));
-
-      for (final item in fileList) {
-        if (totalSize <= maxBytes * 0.85) break; // Reduce to 85% of limit
-        try {
-          await item.file.delete();
-          totalSize -= item.size;
+        } on FileSystemException catch (e, st) {
+          ErrorLogger.log('FileSystemException pruning stream cache',
+              error: e, stackTrace: st, category: 'YtmCacheManager');
         } catch (e, st) {
-          ErrorLogger.log('Failed to prune cached stream file',
+          ErrorLogger.log('Error pruning stream cache',
               error: e, stackTrace: st, category: 'YtmCacheManager');
         }
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Error pruning stream cache',
-          error: e, stackTrace: st, category: 'YtmCacheManager');
-    }
-  }
+      });
 }

@@ -64,12 +64,16 @@ void LookaheadLimiter::applyParams(const LimiterParamSet& params) {
 void LookaheadLimiter::reset() {
     std::memset(delayBuf_, 0, sizeof(delayBuf_));
     std::fill(std::begin(gainBuf_), std::end(gainBuf_), 1.0f);
+    std::memset(deque_, 0, sizeof(deque_));
     writeIdx_ = 0;
     envelope_ = 1.0f;
     minGain_ = 1.0f;
-    minGainAge_ = 0;
+    dequeHead_ = 0;
+    dequeTail_ = 0;
+    sampleCount_ = 0;
     avgEnergy_ = 0.0f;
     transientWeight_ = 0.0f;
+    gainReductionDb_.store(0.0f, std::memory_order_relaxed);
 }
 
 float LookaheadLimiter::estimateTruePeak(const float* history) {
@@ -144,24 +148,8 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         gainBuf_[writeIdx_] = requiredGain;
 
-        minGainAge_++;
-        if (requiredGain <= minGain_) {
-            minGain_ = requiredGain;
-            minGainAge_ = 0;
-        } else if (minGainAge_ >= lookaheadSamples_) {
-            minGain_ = requiredGain;
-            minGainAge_ = 0;
-            const int lookaheadN = std::min(lookaheadSamples_, MAX_LOOKAHEAD_SAMPLES - 1);
-            for (int k = 1; k <= lookaheadN; ++k) {
-                int prevIdx = (writeIdx_ - k) & kMask;
-                if (gainBuf_[prevIdx] <= minGain_) {
-                    minGain_ = gainBuf_[prevIdx];
-                    minGainAge_ = k;
-                }
-            }
-        }
-
-        float targetGain = minGain_;
+        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_);
+        float targetGain = getMinGain();
 
         // Dynamic transient tracking for program-dependent release
         const float energyCoeff = 0.001f;
@@ -199,6 +187,8 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
     }
+    const float gr = (envelope_ < 1.0f && envelope_ > 0.0f) ? (20.0f * std::log10(envelope_)) : 0.0f;
+    gainReductionDb_.store(gr, std::memory_order_relaxed);
 }
 
 void LookaheadLimiter::processMono(float* inOut, int frames) {
@@ -231,24 +221,8 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 
         gainBuf_[writeIdx_] = requiredGain;
 
-        minGainAge_++;
-        if (requiredGain <= minGain_) {
-            minGain_ = requiredGain;
-            minGainAge_ = 0;
-        } else if (minGainAge_ >= lookaheadSamples_) {
-            minGain_ = requiredGain;
-            minGainAge_ = 0;
-            const int lookaheadN = std::min(lookaheadSamples_, MAX_LOOKAHEAD_SAMPLES - 1);
-            for (int k = 1; k <= lookaheadN; ++k) {
-                int prevIdx = (writeIdx_ - k) & kMask;
-                if (gainBuf_[prevIdx] <= minGain_) {
-                    minGain_ = gainBuf_[prevIdx];
-                    minGainAge_ = k;
-                }
-            }
-        }
-
-        float targetGain = minGain_;
+        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_);
+        float targetGain = getMinGain();
 
         const float energyCoeff = 0.001f;
         avgEnergy_ += energyCoeff * (peak - avgEnergy_);
@@ -281,6 +255,8 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
     }
+    const float gr = (envelope_ < 1.0f && envelope_ > 0.0f) ? (20.0f * std::log10(envelope_)) : 0.0f;
+    gainReductionDb_.store(gr, std::memory_order_relaxed);
 }
 
 void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channels) {
@@ -319,24 +295,8 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
 
         gainBuf_[writeIdx_] = requiredGain;
 
-        minGainAge_++;
-        if (requiredGain <= minGain_) {
-            minGain_ = requiredGain;
-            minGainAge_ = 0;
-        } else if (minGainAge_ >= lookaheadSamples_) {
-            minGain_ = requiredGain;
-            minGainAge_ = 0;
-            const int lookaheadN = std::min(lookaheadSamples_, MAX_LOOKAHEAD_SAMPLES - 1);
-            for (int k = 1; k <= lookaheadN; ++k) {
-                int prevIdx = (writeIdx_ - k) & kMask;
-                if (gainBuf_[prevIdx] <= minGain_) {
-                    minGain_ = gainBuf_[prevIdx];
-                    minGainAge_ = k;
-                }
-            }
-        }
-
-        float targetGain = minGain_;
+        pushGainDeque(requiredGain, sampleCount_++, lookaheadSamples_);
+        float targetGain = getMinGain();
 
         const float energyCoeff = 0.001f;
         avgEnergy_ += energyCoeff * (frameMaxPeak - avgEnergy_);
@@ -373,5 +333,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
     }
+    const float gr = (envelope_ < 1.0f && envelope_ > 0.0f) ? (20.0f * std::log10(envelope_)) : 0.0f;
+    gainReductionDb_.store(gr, std::memory_order_relaxed);
 }
 

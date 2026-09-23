@@ -208,7 +208,13 @@ class YtmOAuthService {
     bool Function()? isCancelled,
   }) async {
     var interval = code.intervalSeconds.clamp(1, 60);
-    while (!code.isExpired) {
+    var pollCount = 0;
+    const maxPolls = 60;
+    final deadline = DateTime.now().add(const Duration(minutes: 15));
+    while (!code.isExpired &&
+        pollCount < maxPolls &&
+        DateTime.now().isBefore(deadline)) {
+      pollCount++;
       if (isCancelled?.call() ?? false) return false;
       await Future.delayed(Duration(seconds: interval));
       if (isCancelled?.call() ?? false) return false;
@@ -315,6 +321,20 @@ class YtmOAuthService {
   Future<void> signOut() async {
     // Invalidate any in-flight persist/refresh before clearing memory/storage.
     _authGeneration++;
+    final tokenToRevoke = _refreshToken ?? _accessToken;
+    if (tokenToRevoke != null && tokenToRevoke.isNotEmpty) {
+      try {
+        await _client
+            .post(
+              Uri.parse('https://oauth2.googleapis.com/revoke'),
+              headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: 'token=${Uri.encodeQueryComponent(tokenToRevoke)}',
+            )
+            .timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('[YtmOAuth] token revocation blip (ignored): $e');
+      }
+    }
     await _clearTokens();
   }
 

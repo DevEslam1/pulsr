@@ -47,6 +47,7 @@ private:
     double sampleRate_ = 48000.0;
     bool enabled_ = false;
     double strength_ = 1.0;     // 1.0 to 8.0 (or normalized 0.0 - 1.0)
+    double smoothedStrength_ = 0.0;
     int xLow_ = 100;
     int xHigh_ = 5600;
     int yLow_ = 40;

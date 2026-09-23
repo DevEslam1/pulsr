@@ -43,6 +43,18 @@ class CloudSyncService {
   static const String _keyLastSync = 'cloud_sync_last_timestamp';
   static const String _keySyncFavorites = 'cloud_sync_favorites_enabled';
   static const String _keySyncPlaylists = 'cloud_sync_playlists_enabled';
+  static const String _keyDeviceId = 'cloud_sync_device_id';
+
+  Future<String> getDeviceId() async {
+    final prefs = await _getPrefs();
+    var id = prefs.getString(_keyDeviceId);
+    if (id == null || id.isEmpty) {
+      final seed = '${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}';
+      id = sha256.convert(utf8.encode(seed)).toString().substring(0, 16);
+      await prefs.setString(_keyDeviceId, id);
+    }
+    return id;
+  }
 
   Future<SharedPreferences> _getPrefs() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -234,6 +246,7 @@ class CloudSyncService {
     required bool syncPlaylists,
   }) async {
     final firestore = FirebaseFirestore.instance;
+    final deviceId = await getDeviceId();
     WriteBatch currentBatch = firestore.batch();
     // Hashes for the docs currently staged in `currentBatch`. They are merged
     // into `_syncedDocHashes` only after a commit succeeds, so a permanent
@@ -297,6 +310,8 @@ class CloudSyncService {
               'contentHash': hash,
               'localVersion': FieldValue.increment(1),
               'modifiedAt': FieldValue.serverTimestamp(),
+              'lastModifiedBy': deviceId,
+              'deviceTimestamp': DateTime.now().millisecondsSinceEpoch,
             },
             SetOptions(merge: true));
         pendingHashes[docId] = hash;
@@ -331,6 +346,8 @@ class CloudSyncService {
                 'contentHash': plHash,
                 'localVersion': FieldValue.increment(1),
                 'modifiedAt': FieldValue.serverTimestamp(),
+                'lastModifiedBy': deviceId,
+                'deviceTimestamp': DateTime.now().millisecondsSinceEpoch,
               },
               SetOptions(merge: true));
           pendingHashes[plDocId] = plHash;
@@ -365,6 +382,8 @@ class CloudSyncService {
                   'contentHash': sHash,
                   'localVersion': FieldValue.increment(1),
                   'modifiedAt': FieldValue.serverTimestamp(),
+                  'lastModifiedBy': deviceId,
+                  'deviceTimestamp': DateTime.now().millisecondsSinceEpoch,
                 },
                 SetOptions(merge: true));
             pendingHashes[fullKey] = sHash;
@@ -478,12 +497,21 @@ class CloudSyncService {
       final existingPlaylists =
           existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
       final prefs = await _getPrefs();
+      final deviceId = await getDeviceId();
 
       if (plSnapshot.docs.isNotEmpty) {
         for (final plDoc in plSnapshot.docs) {
           final plData = plDoc.data();
           final name = (plData['name'] as String?) ?? '';
           if (name.isEmpty) continue;
+
+          final remoteModifiedBy = plData['lastModifiedBy'] as String?;
+          if (remoteModifiedBy != null && remoteModifiedBy != deviceId) {
+            ErrorLogger.log(
+              'CloudSync: Remote playlist change for "$name" was modified by another device ($remoteModifiedBy)',
+              category: 'CloudSyncService',
+            );
+          }
 
           final cloudSyncId = (plData['syncId'] as String?) ?? plDoc.id;
           final mappedLocalId = prefs.getInt('sync_cloud_pl_$cloudSyncId');

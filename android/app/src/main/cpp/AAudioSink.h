@@ -19,6 +19,7 @@
 #include <aaudio/AAudio.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -65,8 +66,12 @@ public:
     int64_t FramesRead() const;      // device-consumed frames since flush base
     int64_t FramesWritten() const;   // app-written frames since flush base
     int32_t XRunCount() const;
+    int32_t XRunDelta() const;
     bool IsExclusive() const { return exclusive_; }
     int32_t BufferCapacityFrames() const;
+    int32_t FramesPerBurst() const;
+    int64_t GetTimestampLatencyFrames() const;
+    double GetOutputLatencyMs() const;
     int32_t SampleRate() const { return config_.sampleRate; }
     int32_t ChannelCount() const { return config_.channelCount; }
     bool HasPendingData() const;
@@ -74,20 +79,27 @@ public:
 private:
     bool TryOpen(aaudio_sharing_mode_t sharing, aaudio_performance_mode_t perf);
     void CloseLocked();
+    static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
+    bool RecoverDisconnected();
 
     Config config_{};
-    AAudioStream* stream_ = nullptr;
+    std::atomic<AAudioStream*> stream_{nullptr};
     std::mutex streamMutex_;
+    mutable std::atomic<int32_t> activeReaders_{0};
     std::atomic<bool> releasing_{false};
+    std::atomic<bool> disconnected_{false};
     bool exclusive_ = false;
     bool bitPerfect_ = false;           // true for I24Packed (no volume)
     int32_t bytesPerFrame_ = 0;
     int64_t framesWrittenBase_ = 0;     // written-frame counter at last flush
-    int64_t framesWritten_ = 0;         // total written since open
+    std::atomic<int64_t> framesWritten_{0}; // total written since open
     int64_t readBase_ = 0;              // device read counter at last flush
-    float volume_ = 1.0f;
+    mutable std::atomic<int32_t> lastXRunCount_{0};
+    std::atomic<float> volume_{1.0f};
     std::string lastError_;
     std::vector<uint8_t> volumeScratch_;
+    std::chrono::steady_clock::time_point lastRecoveryAttempt_{};
+    int recoveryAttempts_ = 0;
 };
 
 }  // namespace pulsr

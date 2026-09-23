@@ -30,8 +30,8 @@ void main() {
       expect(state.isEqEnabled, equals(state.dsp.isEqEnabled));
       expect(state.lyrics, equals(state.lyricsSlice.lyrics));
 
-      // differsFromBeyondPosition compares playback + queue without triggering on DSP/lyrics changes
-      final modifiedDsp = state.copyWith(dsp: state.dsp.copyWith(isVirtualizerEnabled: true));
+      // differsFromBeyondPosition compares playback + queue without triggering on internal DSP parameter changes
+      final modifiedDsp = state.copyWith(dsp: state.dsp.copyWith(saturationDrive: 0.8));
       expect(state.differsFromBeyondPosition(modifiedDsp), isFalse);
 
       final modifiedQueue = state.copyWith(queueSlice: state.queueSlice.copyWith(currentIndex: 2));

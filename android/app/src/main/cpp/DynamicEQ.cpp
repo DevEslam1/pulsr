@@ -149,12 +149,23 @@ void DynamicEQ::computeBandCoeffs(BandState& band, double gainDb) {
 }
 
 void DynamicEQ::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0) return;
+    if (!L || !R || frames <= 0) return;
     const int n = bandCount_;
+
+    if (!enabled_) {
+        bool hasActiveGain = false;
+        for (int b = 0; b < n; ++b) {
+            if (std::abs(bands_[b].currentGainDb) > 1e-4) {
+                hasActiveGain = true;
+                break;
+            }
+        }
+        if (!hasActiveGain) return;
+    }
 
     for (int b = 0; b < n; ++b) {
         BandState& band = bands_[b];
-        if (!band.enabled) {
+        if (!band.enabled || !enabled_) {
             if (std::abs(band.currentGainDb) > 1e-4) {
                 const double rampStep = band.currentGainDb / frames;
                 for (int i = 0; i < frames; ++i) {
@@ -163,7 +174,8 @@ void DynamicEQ::process(float* L, float* R, int frames) {
                     if (!std::isfinite(l)) l = 0.0;
                     if (!std::isfinite(r)) r = 0.0;
                     band.currentGainDb -= rampStep;
-                    if (std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
+                    if (((i & 15) == 0 || i == frames - 1) &&
+                        std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                         computeBandCoeffs(band, band.currentGainDb);
                     }
                     L[i] = static_cast<float>(band.b0 * l + band.b1 * band.x1[0] + band.b2 * band.x2[0]
@@ -233,7 +245,8 @@ void DynamicEQ::process(float* L, float* R, int frames) {
             band.currentGainDb += ballisticsCoeff * (targetGainDb - band.currentGainDb);
 
             // Application
-            if (std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
+            if (((i & 15) == 0 || i == frames - 1) &&
+                std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                 computeBandCoeffs(band, band.currentGainDb);
             }
             double yL = band.b0 * l + band.b1 * band.x1[0] + band.b2 * band.x2[0]
@@ -254,18 +267,30 @@ void DynamicEQ::process(float* L, float* R, int frames) {
 }
 
 void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
-    if (!enabled_ || !buffer || frames <= 0 || channels <= 0) return;
+    if (!buffer || frames <= 0 || channels <= 0) return;
     const int n = bandCount_;
     const int chCount = std::min(channels, MAX_CHANNELS);
 
+    if (!enabled_) {
+        bool hasActiveGain = false;
+        for (int b = 0; b < n; ++b) {
+            if (std::abs(bands_[b].currentGainDb) > 1e-4) {
+                hasActiveGain = true;
+                break;
+            }
+        }
+        if (!hasActiveGain) return;
+    }
+
     for (int b = 0; b < n; ++b) {
         BandState& band = bands_[b];
-        if (!band.enabled) {
+        if (!band.enabled || !enabled_) {
             if (std::abs(band.currentGainDb) > 1e-4) {
                 const double rampStep = band.currentGainDb / frames;
                 for (int i = 0; i < frames; ++i) {
                     band.currentGainDb -= rampStep;
-                    if (std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
+                    if (((i & 15) == 0 || i == frames - 1) &&
+                        std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                         computeBandCoeffs(band, band.currentGainDb);
                     }
                     for (int ch = 0; ch < chCount; ++ch) {
@@ -326,7 +351,8 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
             const double ballisticsCoeff = (std::abs(targetGainDb) > std::abs(band.currentGainDb)) ? attackCoeff : releaseCoeff;
             band.currentGainDb += ballisticsCoeff * (targetGainDb - band.currentGainDb);
 
-            if (std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
+            if (((i & 15) == 0 || i == frames - 1) &&
+                std::abs(band.currentGainDb - band.lastCoeffGainDb) > 0.05) {
                 computeBandCoeffs(band, band.currentGainDb);
             }
 

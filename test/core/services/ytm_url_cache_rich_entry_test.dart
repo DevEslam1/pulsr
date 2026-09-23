@@ -60,7 +60,7 @@ void main() {
       expect(after.mimeType, equals('audio/webm'));
     });
 
-    test('a plain put() for a different url does not inherit the old stream',
+    test('a plain put() for a different url inherits the rich metadata with updated url',
         () {
       cache.putStream(_stream(), quality: 'high');
       cache.put('vidRich', _url2, quality: 'high');
@@ -68,9 +68,11 @@ void main() {
       final entry = cache.get('vidRich');
       expect(entry, isNotNull);
       expect(entry!.url, equals(_url2));
-      expect(entry.stream, isNull,
-          reason: 'a different url means different bytes');
-      expect(cache.getStream('vidRich')!.duration, equals(Duration.zero));
+      expect(entry.stream, isNotNull);
+      expect(entry.stream!.url, equals(_url2));
+      expect(entry.stream!.duration, equals(const Duration(minutes: 4, seconds: 33)));
+      expect(entry.stream!.container, equals('webm'));
+      expect(cache.getStream('vidRich')!.duration, equals(const Duration(minutes: 4, seconds: 33)));
     });
 
     test('the rich stream survives an LRU touch and a re-put', () {

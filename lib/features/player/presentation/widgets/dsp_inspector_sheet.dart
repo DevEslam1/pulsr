@@ -18,6 +18,8 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import 'engine_telemetry_panel.dart';
+import 'sync_diagnostics_sheet.dart';
 
 class DspInspectorSheet extends StatefulWidget {
   const DspInspectorSheet({super.key});
@@ -216,6 +218,11 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         onPressed: () => _shareReport(context),
                       ),
                       IconButton(
+                        tooltip: 'Latency & Sync Diagnostics',
+                        icon: Icon(Icons.sync_rounded, color: p.accent, size: 20),
+                        onPressed: () => SyncDiagnosticsSheet.show(context),
+                      ),
+                      IconButton(
                         tooltip: context.l10n.dspRefreshStatus,
                         icon: Icon(Icons.refresh_rounded, color: p.accent, size: 20),
                         onPressed: () => _refreshReport(),
@@ -243,6 +250,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                                 audioSessionId: audioSessionId,
                                 currentOutputDevice: currentOutputDevice,
                               ),
+                              const SizedBox(height: AppSpacing.sm),
+                              const EngineTelemetryPanel(initialExpanded: true),
                               const SizedBox(height: AppSpacing.md),
 
                               // Active Effects Summary Header

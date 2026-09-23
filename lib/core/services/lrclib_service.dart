@@ -245,7 +245,7 @@ class LrclibService {
   /// anchored to the requested song by artist name overlap or duration
   /// tolerance. Missing metadata on either side means "no evidence", which
   /// keeps previously-working lookups (legacy behavior) intact.
-  static const int _durationToleranceSec = 5;
+  static const int _durationToleranceSec = 15;
 
   bool _namesOverlap(String? a, String? b) {
     if (a == null || b == null) return false;

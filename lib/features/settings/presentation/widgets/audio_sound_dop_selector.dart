@@ -65,13 +65,13 @@ class _DopContainerSelectorState extends State<_DopContainerSelector> {
           segments: const [
             ButtonSegment(
               value: 24,
-              label: Text('24-bit',
+              label: Text("24-bit",
                   style:
                       TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
             ),
             ButtonSegment(
               value: 32,
-              label: Text('32-bit',
+              label: Text("32-bit",
                   style:
                       TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
             ),

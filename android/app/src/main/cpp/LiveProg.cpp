@@ -48,6 +48,13 @@ class Lexer {
 public:
     explicit Lexer(const std::string& src) : src_(src), pos_(0) {}
 
+    Token peek() {
+        size_t savePos = pos_;
+        Token t = next();
+        pos_ = savePos;
+        return t;
+    }
+
     Token next() {
         skipWhitespace();
         if (pos_ >= src_.size()) return {TokenType::End, 0.0, ""};
@@ -245,6 +252,10 @@ void LiveProg::applyParams(const LiveProgParamSet& params) {
     setSlider(2, params.slider2);
     setSlider(3, params.slider3);
     setSlider(4, params.slider4);
+    setSlider(5, params.slider5);
+    setSlider(6, params.slider6);
+    setSlider(7, params.slider7);
+    setSlider(8, params.slider8);
     // Preferred path: the script was compiled off the audio thread and packaged
     // into the snapshot. Applying it only copies bytecode (pre-reserved) and
     // resizes pre-reserved memory, so the audio callback never compiles/allocates.
@@ -365,6 +376,7 @@ bool LiveProg::compileScript(const std::string& code) {
 
         // Recursive descent expression compiler
         std::function<bool()> parseExpr;
+        std::function<bool()> parseTernary;
         std::function<bool()> parseComparison;
         std::function<bool()> parseAddSub;
         std::function<bool()> parseMulDiv;
@@ -409,6 +421,10 @@ bool LiveProg::compileScript(const std::string& code) {
                     return true;
                 }
                 int varIdx = getOrRegisterVar(name);
+                if (varIdx < 0) {
+                    lastError_ = "Too many variables: max " + std::to_string(MAX_MEMORY);
+                    return false;
+                }
                 outProgram.push_back({OpCode::LoadVar, 0.0, varIdx});
                 return true;
             }
@@ -472,8 +488,27 @@ bool LiveProg::compileScript(const std::string& code) {
             return true;
         };
 
+        parseTernary = [&]() -> bool {
+            if (!parseComparison()) return false;
+            if (match(TokenType::Question)) {
+                int jmpFalseIdx = static_cast<int>(outProgram.size());
+                outProgram.push_back({OpCode::JumpIfFalse, 0.0, -1, -1});
+                if (!parseExpr()) return false;
+                if (!match(TokenType::Colon)) {
+                    lastError_ = "Expected ':' in ternary expression";
+                    return false;
+                }
+                int jmpEndIdx = static_cast<int>(outProgram.size());
+                outProgram.push_back({OpCode::Jump, 0.0, -1, -1});
+                outProgram[jmpFalseIdx].targetPc = static_cast<int>(outProgram.size());
+                if (!parseExpr()) return false;
+                outProgram[jmpEndIdx].targetPc = static_cast<int>(outProgram.size());
+            }
+            return true;
+        };
+
         parseExpr = [&]() -> bool {
-            return parseComparison();
+            return parseTernary();
         };
 
         // A single statement. Shared by the top-level loop and `if` bodies so
@@ -502,38 +537,45 @@ bool LiveProg::compileScript(const std::string& code) {
                     // Single-statement body without braces: consume exactly one.
                     if (!parseStatement()) return false;
                 }
-                outProgram[jmpFalseIdx].targetPc = static_cast<int>(outProgram.size());
+
+                if (cur.type == TokenType::Else) {
+                    cur = lexer.next();
+                    int jmpEndIdx = static_cast<int>(outProgram.size());
+                    outProgram.push_back({OpCode::Jump, 0.0, -1, -1});
+
+                    outProgram[jmpFalseIdx].targetPc = static_cast<int>(outProgram.size());
+
+                    if (match(TokenType::LBrace)) {
+                        while (cur.type != TokenType::RBrace && cur.type != TokenType::End) {
+                            if (!parseStatement()) return false;
+                        }
+                        if (!match(TokenType::RBrace)) { lastError_ = "Expected '}'"; return false; }
+                    } else {
+                        if (!parseStatement()) return false;
+                    }
+                    outProgram[jmpEndIdx].targetPc = static_cast<int>(outProgram.size());
+                } else {
+                    outProgram[jmpFalseIdx].targetPc = static_cast<int>(outProgram.size());
+                }
                 return true;
             }
 
             if (cur.type == TokenType::Ident) {
-                std::string targetVar = cur.strVal;
-                Token peek = lexer.next();
+                Token peek = lexer.peek();
                 if (peek.type == TokenType::Assign) {
+                    std::string targetVar = cur.strVal;
                     int varIdx = getOrRegisterVar(targetVar);
-                    cur = lexer.next();
+                    if (varIdx < 0) {
+                        lastError_ = "Too many variables: max " + std::to_string(MAX_MEMORY);
+                        return false;
+                    }
+                    lexer.next(); // consume '='
+                    cur = lexer.next(); // start of RHS expr
                     if (!parseExpr()) return false;
                     outProgram.push_back({OpCode::StoreVar, 0.0, varIdx});
                     match(TokenType::Semi);
                     return true;
                 }
-                // Expression starting with an identifier
-                cur = peek;
-                int varIdx = getOrRegisterVar(targetVar);
-                outProgram.push_back({OpCode::LoadVar, 0.0, varIdx});
-                if (cur.type == TokenType::Plus || cur.type == TokenType::Minus ||
-                    cur.type == TokenType::Mul || cur.type == TokenType::Div) {
-                    TokenType op = cur.type;
-                    cur = lexer.next();
-                    if (!parsePrimary()) return false;
-                    if (op == TokenType::Plus) outProgram.push_back({OpCode::Add});
-                    else if (op == TokenType::Minus) outProgram.push_back({OpCode::Sub});
-                    else if (op == TokenType::Mul) outProgram.push_back({OpCode::Mul});
-                    else if (op == TokenType::Div) outProgram.push_back({OpCode::Div});
-                }
-                outProgram.push_back({OpCode::Pop});
-                match(TokenType::Semi);
-                return true;
             }
 
             if (!parseExpr()) return false;

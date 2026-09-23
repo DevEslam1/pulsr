@@ -15,7 +15,7 @@ public:
     static constexpr int MAX_NODES = 1024;
 
     ArbitraryResponseEq();
-    void setSampleRate(double sampleRate);
+    void setSampleRate(double sampleRate, bool resynthesize = true);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
     void applyParams(const ArbitraryEqParamSet& params);
@@ -34,6 +34,7 @@ public:
 
     int getNodeCount() const { return static_cast<int>(nodes_.size()); }
     const std::string& getLoadedString() const { return loadedString_; }
+    const std::vector<float>& getFirFilter() const { return firFilter_; }
 
     /// Parses a "GraphicEq: f g; f g; ..." string into sorted, clamped nodes.
     /// Performed on the control thread so the audio thread never allocates.
@@ -56,12 +57,13 @@ private:
     // Reusable FFT scratch so synthesis never allocates on the audio thread.
     std::vector<FftUtil::Complex> spectrumScratch_;
 
-    // Overlap-add convolution state (circular buffer)
-    float historyL_[FIR_TAPS] = {};
-    float historyR_[FIR_TAPS] = {};
+    // Doubled convolution state for contiguous reads without modulo
+    float historyL_[FIR_TAPS * 2] = {};
+    float historyR_[FIR_TAPS * 2] = {};
     int historyIdx_ = 0;  // Circular buffer write position
 
     std::shared_ptr<const std::vector<std::pair<double, double>>> preparedNodesRef_;
+    double firSynthesizedRate_ = 0.0;
 
     void synthesizeFir();
 };

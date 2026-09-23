@@ -128,28 +128,36 @@ class YtmUrlCache {
         if (item is! Map) continue;
         final videoId = item['videoId'] as String?;
         final url = item['url'] as String?;
-        final quality = item['quality'] as String? ?? 'high';
+        final quality = item['quality']?.toString() ?? 'high';
         final expiryRaw = item['expiresAt'];
-        if (videoId == null || url == null || expiryRaw is! int) continue;
-        final expiresAt = DateTime.fromMillisecondsSinceEpoch(expiryRaw);
+        final int? expiryMs = expiryRaw is int
+            ? expiryRaw
+            : int.tryParse(expiryRaw?.toString() ?? '');
+        if (videoId == null || url == null || expiryMs == null) continue;
+        final expiresAt = DateTime.fromMillisecondsSinceEpoch(expiryMs);
         if (expiresAt.difference(now) < _restoreMinTtl) continue;
-        final userAgent = item['userAgent'] as String?;
+        final userAgent = item['userAgent']?.toString();
         // Rebuild the rich stream from persisted metadata when present, so a
         // restored entry isn't served with Duration.zero and a guessed
         // container/bitrate.
         YtmStream? rebuilt;
-        final mimeType = item['mimeType'] as String?;
-        if (mimeType != null) {
+        final mimeType = item['mimeType']?.toString();
+        if (mimeType != null && mimeType.isNotEmpty) {
+          final bitrate = (item['bitrateKbps'] is num)
+              ? (item['bitrateKbps'] as num).toInt()
+              : (int.tryParse(item['bitrateKbps']?.toString() ?? '') ?? 0);
+          final durationMs = (item['durationMs'] is num)
+              ? (item['durationMs'] as num).toInt()
+              : (int.tryParse(item['durationMs']?.toString() ?? '') ?? 0);
           rebuilt = YtmStream(
             videoId: videoId,
             url: url,
             mimeType: mimeType,
-            container: item['container'] as String? ?? 'm4a',
-            bitrateKbps: (item['bitrateKbps'] as num?)?.toInt() ?? 0,
-            duration:
-                Duration(milliseconds: (item['durationMs'] as num?)?.toInt() ?? 0),
-            title: item['title'] as String? ?? 'YouTube Track',
-            artist: item['artist'] as String? ?? 'YouTube Music',
+            container: item['container']?.toString() ?? 'm4a',
+            bitrateKbps: bitrate,
+            duration: Duration(milliseconds: durationMs),
+            title: item['title']?.toString() ?? 'YouTube Track',
+            artist: item['artist']?.toString() ?? 'YouTube Music',
             userAgent: userAgent,
             expiresAt: expiresAt.millisecondsSinceEpoch,
           );
@@ -300,10 +308,20 @@ class YtmUrlCache {
     // richer fields are carried forward.
     final previous = _cache[key];
     final sameUrl = previous != null && previous.url == url;
-    final effectiveStream = stream ?? (sameUrl ? previous.stream : null);
+    final effectiveStream = stream ??
+        (sameUrl
+            ? previous.stream
+            : (previous?.stream != null
+                ? previous!.stream!.copyWith(
+                    url: url,
+                    userAgent: userAgent ?? previous.userAgent,
+                    cookies: cookies ?? previous.cookies,
+                  )
+                : null));
     final effectiveUserAgent =
-        userAgent ?? (sameUrl ? previous.userAgent : null);
-    final effectiveCookies = cookies ?? (sameUrl ? previous.cookies : null);
+        userAgent ?? previous?.userAgent;
+    final effectiveCookies =
+        cookies ?? previous?.cookies;
 
     final entry = YtmUrlCacheEntry(
       videoId: videoId,

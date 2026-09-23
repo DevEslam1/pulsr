@@ -110,6 +110,7 @@ void Crossfeed::reset() {
     smoothedFeedLevel_ = targetFeedLevel_;
     smoothedDelaySamples_ = targetDelaySamples_;
     smoothedLpCoeff_ = targetLpCoeff_;
+    smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
 
     bs2b_lo_[0] = 0.0; bs2b_lo_[1] = 0.0;
     bs2b_hi_[0] = 0.0; bs2b_hi_[1] = 0.0;
@@ -117,7 +118,16 @@ void Crossfeed::reset() {
 }
 
 void Crossfeed::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0) return;
+    const float targetMix = enabled_ ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!L || !R || frames <= 0) return;
+
+    constexpr double kTau = 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetMix - smoothedEnabledMix_);
+    const float mixStep = (smoothedEnabledMix_ - startMix) / static_cast<float>(frames);
+    float currentMix = startMix;
 
     if (mode_ != CrossfeedMode::Custom) {
         for (int i = 0; i < frames; ++i) {
@@ -139,15 +149,17 @@ void Crossfeed::process(float* L, float* R, int frames) {
             if (std::abs(bs2b_hi_[0]) < 1e-30) bs2b_hi_[0] = 0.0;
             if (std::abs(bs2b_hi_[1]) < 1e-30) bs2b_hi_[1] = 0.0;
 
-            L[i] = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
-            R[i] = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);
+            float outL = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
+            float outR = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);
+
+            L[i] = (1.0f - currentMix) * static_cast<float>(inL) + currentMix * outL;
+            R[i] = (1.0f - currentMix) * static_cast<float>(inR) + currentMix * outR;
+            currentMix += mixStep;
         }
         return;
     }
 
     // Custom Delay-Line Crossfeed mode
-    constexpr double kTau = 0.015;
-    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedFeedLevel_ += static_cast<float>(smoothFactor) * (targetFeedLevel_ - smoothedFeedLevel_);
     smoothedLpCoeff_ += static_cast<float>(smoothFactor) * (targetLpCoeff_ - smoothedLpCoeff_);
 
@@ -188,18 +200,32 @@ void Crossfeed::process(float* L, float* R, int frames) {
         delayBufferR_[writeIdx_] = lpR_;
         writeIdx_ = (writeIdx_ + 1) % MAX_DELAY_SAMPLES;
 
-        L[i] = (l + delayedR * feedLevel) * makeup;
-        R[i] = (r + delayedL * feedLevel) * makeup;
+        float outL = (l + delayedR * feedLevel) * makeup;
+        float outR = (r + delayedL * feedLevel) * makeup;
+
+        L[i] = (1.0f - currentMix) * l + currentMix * outL;
+        R[i] = (1.0f - currentMix) * r + currentMix * outR;
+        currentMix += mixStep;
     }
 }
 
-void Crossfeed::processInterleaved(float* buffer, int frames) {
-    if (!enabled_ || !buffer || frames <= 0) return;
+void Crossfeed::processInterleaved(float* buffer, int frames, int channels) {
+    const float targetMix = enabled_ ? 1.0f : 0.0f;
+    if (!enabled_ && smoothedEnabledMix_ < 1e-4f) return;
+    if (!buffer || frames <= 0 || channels < 2) return;
+
+    constexpr double kTau = 0.015;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const float startMix = smoothedEnabledMix_;
+    smoothedEnabledMix_ += static_cast<float>(smoothFactor) * (targetMix - smoothedEnabledMix_);
+    const float mixStep = (smoothedEnabledMix_ - startMix) / static_cast<float>(frames);
+    float currentMix = startMix;
 
     if (mode_ != CrossfeedMode::Custom) {
         for (int i = 0; i < frames; ++i) {
-            double inL = buffer[i * 2];
-            double inR = buffer[i * 2 + 1];
+            const int idx = i * channels;
+            double inL = buffer[idx];
+            double inR = buffer[idx + 1];
             if (!std::isfinite(inL)) inL = 0.0;
             if (!std::isfinite(inR)) inR = 0.0;
 
@@ -216,15 +242,17 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
             if (std::abs(bs2b_hi_[0]) < 1e-30) bs2b_hi_[0] = 0.0;
             if (std::abs(bs2b_hi_[1]) < 1e-30) bs2b_hi_[1] = 0.0;
 
-            buffer[i * 2] = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
-            buffer[i * 2 + 1] = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);
+            float outL = static_cast<float>((bs2b_hi_[0] + bs2b_lo_[1]) * bs2b_gain_);
+            float outR = static_cast<float>((bs2b_hi_[1] + bs2b_lo_[0]) * bs2b_gain_);
+
+            buffer[idx] = (1.0f - currentMix) * static_cast<float>(inL) + currentMix * outL;
+            buffer[idx + 1] = (1.0f - currentMix) * static_cast<float>(inR) + currentMix * outR;
+            currentMix += mixStep;
         }
         return;
     }
 
     // Custom Delay-Line Crossfeed mode
-    constexpr double kTau = 0.015;
-    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
     smoothedFeedLevel_ += static_cast<float>(smoothFactor) * (targetFeedLevel_ - smoothedFeedLevel_);
     smoothedLpCoeff_ += static_cast<float>(smoothFactor) * (targetLpCoeff_ - smoothedLpCoeff_);
 
@@ -238,8 +266,9 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
     const float makeup = 1.0f / (1.0f + feedLevel);
 
     for (int i = 0; i < frames; ++i) {
-        float l = buffer[i * 2];
-        float r = buffer[i * 2 + 1];
+        const int idx = i * channels;
+        float l = buffer[idx];
+        float r = buffer[idx + 1];
         if (!std::isfinite(l)) l = 0.0f;
         if (!std::isfinite(r)) r = 0.0f;
 
@@ -265,8 +294,12 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
         delayBufferR_[writeIdx_] = lpR_;
         writeIdx_ = (writeIdx_ + 1) % MAX_DELAY_SAMPLES;
 
-        buffer[i * 2] = (l + delayedR * feedLevel) * makeup;
-        buffer[i * 2 + 1] = (r + delayedL * feedLevel) * makeup;
+        float outL = (l + delayedR * feedLevel) * makeup;
+        float outR = (r + delayedL * feedLevel) * makeup;
+
+        buffer[idx] = (1.0f - currentMix) * l + currentMix * outL;
+        buffer[idx + 1] = (1.0f - currentMix) * r + currentMix * outR;
+        currentMix += mixStep;
     }
 }
 

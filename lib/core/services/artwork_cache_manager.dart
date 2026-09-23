@@ -1,4 +1,5 @@
 // lib/core/services/artwork_cache_manager.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -102,7 +103,10 @@ class ArtworkCacheManager {
         await file.writeAsBytes(bytes, flush: false);
         _putCount++;
         if (_putCount % _enforceEvery == 0) {
-          _enforceDiskLimit();
+          unawaited(_enforceDiskLimit().catchError((e, st) {
+            ErrorLogger.log('Failed to enforce disk limit in ArtworkCacheManager',
+                error: e, stackTrace: st, category: 'ArtworkCacheManager');
+          }));
         }
       }
     } catch (e) {

@@ -95,6 +95,10 @@ abstract class IMusicRepository {
   Stream<Result<List<AlbumsTableData>>> watchAlbums();
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId);
   Future<Result<List<AlbumsTableData>>> getAlbums();
+  Future<Result<AlbumsTableData?>> getAlbumById(int albumId) async {
+    final res = await getAlbums();
+    return res.map((list) => list.where((a) => a.id == albumId).firstOrNull);
+  }
   Future<Result<List<SongsTableData>>> getAlbumSongs(int albumId);
   Future<Result<void>> updateAlbumArtwork(int albumId, String artworkUrl);
 
@@ -102,11 +106,19 @@ abstract class IMusicRepository {
   Stream<Result<List<ArtistsTableData>>> watchArtists();
   Stream<Result<List<SongsTableData>>> watchArtistSongs(int artistId);
   Future<Result<List<ArtistsTableData>>> getArtists();
+  Future<Result<ArtistsTableData?>> getArtistById(int artistId) async {
+    final res = await getArtists();
+    return res.map((list) => list.where((a) => a.id == artistId).firstOrNull);
+  }
   Future<Result<List<SongsTableData>>> getArtistSongs(int artistId);
   Stream<Result<List<AlbumsTableData>>> watchArtistAlbums(int artistId);
 
   // --- PLAYLISTS ---
   Stream<Result<List<PlaylistsTableData>>> watchPlaylists();
+  Future<Result<PlaylistsTableData?>> getPlaylistById(int playlistId) async {
+    final res = await getPlaylists();
+    return res.map((list) => list.where((p) => p.id == playlistId).firstOrNull);
+  }
   Future<Result<int>> createPlaylist(String name,
       {bool isSmart = false, String? smartCriteria});
   Future<Result<void>> renamePlaylist(int playlistId, String newName);

@@ -9,8 +9,10 @@ import 'package:path/path.dart' as p;
 import '../config/app_config.dart';
 import '../constants/audio_formats.dart';
 import '../di/injection.dart';
+import '../errors/failures.dart';
 import '../router/app_router.dart';
 import '../utils/error_logger.dart';
+import 'package:fpdart/fpdart.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
@@ -158,8 +160,13 @@ class FileIntentHandler {
     final q = query.trim();
     if (q.isEmpty) return;
     try {
-      final res =
-          await _repository.watchAllSongs(searchQuery: q, limit: 1).first;
+      final res = await _repository
+          .watchAllSongs(searchQuery: q, limit: 1)
+          .first
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => const Left(DatabaseFailure('Voice search query timeout')),
+          );
       final match =
           res.fold((_) => null, (songs) => songs.isEmpty ? null : songs.first);
       if (match != null) {

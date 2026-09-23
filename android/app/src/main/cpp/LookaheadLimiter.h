@@ -9,10 +9,16 @@
 #include <cmath>
 #include <algorithm>
 #include <cassert>
+#include <atomic>
 
 class LookaheadLimiter {
 public:
-    static constexpr int MAX_LOOKAHEAD_SAMPLES = 8192;
+    static constexpr int MAX_LOOKAHEAD_SAMPLES = 16384;
+    static_assert((MAX_LOOKAHEAD_SAMPLES & (MAX_LOOKAHEAD_SAMPLES - 1)) == 0,
+                  "MAX_LOOKAHEAD_SAMPLES must be a power of two");
+    static_assert(MAX_LOOKAHEAD_SAMPLES >= 768 * 20,
+                  "MAX_LOOKAHEAD_SAMPLES must accommodate at least 20ms @ 768kHz");
+
     static constexpr int INTERP_TAPS = 24;
     static constexpr int INTERP_PHASES = 4;
     static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 6
@@ -26,6 +32,7 @@ public:
     void reset();
 
     int getLatencyFrames() const { return lookaheadSamples_; }
+    float getCurrentGainReductionDb() const { return gainReductionDb_.load(std::memory_order_relaxed); }
 
     void process(float* L, float* R, int frames);
     void processMono(float* inOut, int frames);
@@ -52,13 +59,40 @@ private:
     float avgEnergy_ = 0.0f;
     float transientWeight_ = 0.0f;
     float envelope_ = 1.0f;
+    std::atomic<float> gainReductionDb_{0.0f};
 
     static constexpr int MAX_CHANNELS = 8;
     float delayBuf_[MAX_CHANNELS][MAX_LOOKAHEAD_SAMPLES] = {};
     float gainBuf_[MAX_LOOKAHEAD_SAMPLES] = {};
     int writeIdx_ = 0;
     float minGain_ = 1.0f;
-    int minGainAge_ = 0;
+
+    // Sliding-window monotonic deque for O(1) minimum tracking
+    struct DequeNode {
+        float gain;
+        int64_t idx;
+    };
+    DequeNode deque_[MAX_LOOKAHEAD_SAMPLES] = {};
+    int64_t dequeHead_ = 0;
+    int64_t dequeTail_ = 0;
+    int64_t sampleCount_ = 0;
+
+    inline void pushGainDeque(float gain, int64_t idx, int windowSize) {
+        constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
+        while (dequeTail_ > dequeHead_ && deque_[(dequeTail_ - 1) & kMask].gain >= gain) {
+            dequeTail_--;
+        }
+        deque_[dequeTail_ & kMask] = { gain, idx };
+        dequeTail_++;
+        while (dequeHead_ < dequeTail_ && deque_[dequeHead_ & kMask].idx <= idx - windowSize) {
+            dequeHead_++;
+        }
+    }
+
+    inline float getMinGain() const {
+        constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
+        return (dequeTail_ > dequeHead_) ? deque_[dequeHead_ & kMask].gain : 1.0f;
+    }
 
     // 4x and 8x oversampling polyphase interpolation tables for true peak detection
     static const float polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE];

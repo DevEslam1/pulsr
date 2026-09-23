@@ -292,6 +292,25 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i902.ResumeDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i19.RetryDownloadUseCase>(
         () => _i19.RetryDownloadUseCase(gh<_i783.IDownloadRepository>()));
+    gh.factory<_i1046.PlayerDependencies>(() => _i1046.PlayerDependencies(
+          settingsCubit: gh<_i41.SettingsCubit>(),
+          widgetService: gh<_i42.WidgetService>(),
+          scrobblerService: gh<_i629.ScrobblerService>(),
+          settingsProfilesService: gh<_i461.SettingsProfilesService>(),
+          deviceProfileService: gh<_i971.DeviceProfileService>(),
+          hiResAudioService: gh<_i722.HiResAudioService>(),
+          smartAudioService: gh<_i197.SmartAudioService>(),
+          latencyTracker: gh<_i626.PlaybackLatencyTracker>(),
+          perSongEqStore: gh<_i1054.PerSongEqStore>(),
+          perSongVolumeStore: gh<_i866.PerSongVolumeStore>(),
+          songRatingStore: gh<_i227.SongRatingStore>(),
+          sponsorBlockService: gh<_i912.SponsorBlockService>(),
+          quranModeService: gh<_i322.QuranModeService>(),
+          earbudOptimizationService: gh<_i260.EarbudOptimizationService>(),
+          lrclibService: gh<_i622.LrclibService>(),
+          ytmAccountService: gh<_i631.YtmAccountService>(),
+          mediaScannerService: gh<_i483.MediaScannerService>(),
+        ));
     gh.lazySingletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
           audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
           repository: gh<_i320.IMusicRepository>(),
