@@ -297,8 +297,8 @@ class ClassicPlayerTheme extends StatelessWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isLandscape = context.isLandscape &&
-                        (context.isTwoPane || constraints.maxWidth >= 680);
+                    final isLandscape = context.isLandscape ||
+                        (context.isTwoPane || constraints.maxWidth >= 600);
 
                     // Dynamic vertical spacing ratio for balanced, centered content distribution
                     final double heightRatio =
@@ -317,7 +317,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                         (isTablet ? 10.0 : 6.0) * heightRatio;
 
                     final double landscapeArtSize =
-                        (constraints.maxHeight - 36).clamp(240.0, 520.0);
+                        (constraints.maxHeight - 36).clamp(160.0, 520.0);
 
                     // Symmetrical twin pill capsule dimensions for top (view switcher) & bottom (eq dock)
                     final double pillBarWidth = math.min(

@@ -97,6 +97,8 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   bool _isAppActive = true;
   bool _permissionAsked = false;
   bool _permissionDenied = false;
+  bool _permanentlyDenied = false;
+  bool _toastShown = false;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
@@ -114,7 +116,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     _dataNotifier = ValueNotifier<List<double>>(List.from(_currentData));
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 16),
+      duration: const Duration(milliseconds: 33),
     )..addListener(_onTick);
 
     if (widget.style == VisualizerStyle.milkdrop) {
@@ -213,6 +215,10 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isAppActive = true;
+      _permissionAsked = false;
+      if (_permissionDenied && !_permanentlyDenied && widget.isPlaying && widget.style != VisualizerStyle.off) {
+        _initVisualizer();
+      }
       if (widget.isPlaying && widget.style != VisualizerStyle.off) {
         _startAnimation();
         _restartNativeStream();
@@ -267,12 +273,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
     try {
       var status = await Permission.microphone.status;
-      if (status.isDenied && !_permissionAsked) {
-        _permissionAsked = true;
-        status = await Permission.microphone.request();
-      }
-      if (!mounted) return;
       if (status.isGranted) {
+        _permanentlyDenied = false;
+        _toastShown = false;
         if (_permissionDenied && mounted) {
           setState(() => _permissionDenied = false);
         }
@@ -281,20 +284,36 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         if (!_permissionDenied) {
           widget.onPermissionDenied?.call();
         }
-        if (mounted) setState(() => _permissionDenied = true);
         if (status.isPermanentlyDenied) {
-          ErrorLogger.log(
-              'Microphone permission permanently denied for visualizer',
-              category: 'Visualizer');
-          if (mounted) {
-            PulsrToast.show(
-              context,
-              message: context.l10n.rcMicNeeded,
-              actionLabel: 'Settings',
-              onActionPressed: () => openAppSettings(),
-            );
+          _permanentlyDenied = true;
+          if (!_toastShown) {
+            _toastShown = true;
+            ErrorLogger.log(
+                'Microphone permission permanently denied for visualizer',
+                category: 'Visualizer');
+            if (mounted) {
+              PulsrToast.show(
+                context,
+                message: context.l10n.rcMicNeeded,
+                actionLabel: 'Settings',
+                onActionPressed: () => openAppSettings(),
+              );
+            }
+          }
+        } else if (!_permissionAsked) {
+          _permissionAsked = true;
+          status = await Permission.microphone.request();
+          if (status.isGranted) {
+            _permanentlyDenied = false;
+            _toastShown = false;
+            if (_permissionDenied && mounted) {
+              setState(() => _permissionDenied = false);
+            }
+            _subscribeToStream();
+            return;
           }
         }
+        if (mounted) setState(() => _permissionDenied = true);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to init visualizer',
@@ -345,7 +364,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   }
 
   void _onTick() {
-    if (!mounted || !_isAppActive || !widget.isPlaying) return;
+    if (!mounted || !context.motionEnabled || !TickerMode.valuesOf(context).enabled || !_isAppActive || !widget.isPlaying) return;
 
     final now = DateTime.now();
     final staleMs = now.difference(_lastNativeDataTime).inMilliseconds;
@@ -508,18 +527,60 @@ class _AudioVisualizerState extends State<AudioVisualizer>
               ),
             ),
           if (_permissionDenied && Platform.isAndroid)
-            Center(
-              child: ActionChip(
-                avatar: const Icon(Icons.mic_none_rounded, size: 16),
-                label: Text(context.l10n.rcMicNeeded),
-                onPressed: () async {
-                  final status = await Permission.microphone.request();
-                  if (status.isGranted) {
-                    _initVisualizer();
-                  } else {
-                    await openAppSettings();
-                  }
-                },
+            PositionedDirectional(
+              top: 12,
+              start: 16,
+              end: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainerHigh.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  border: Border.all(color: p.accent.withValues(alpha: 0.4)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.mic_none_rounded, size: 20, color: p.accent),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        context.l10n.rcMicNeeded,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: p.accent,
+                      ),
+                      onPressed: () async {
+                        final status = await Permission.microphone.request();
+                        if (status.isGranted) {
+                          _initVisualizer();
+                        } else {
+                          await openAppSettings();
+                        }
+                      },
+                      child: Text(
+                        context.l10n.gotIt.isNotEmpty ? 'Grant' : '',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],

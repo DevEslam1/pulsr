@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../../domain/models/genre_item.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -15,7 +16,8 @@ class GenreCategory {
   final List<String> keywords;
 
   // B-28: LinkedHashMap guarantees deterministic insertion-order eviction for keys.first
-  static final LinkedHashMap<String, RegExp> _regexCache = LinkedHashMap<String, RegExp>();
+  static final LinkedHashMap<String, RegExp> _regexCache =
+      LinkedHashMap<String, RegExp>();
   static const int _maxCacheSize = 100;
 
   static RegExp _keywordRegex(String kw) {
@@ -54,113 +56,216 @@ class GenreHierarchyView extends StatefulWidget {
 }
 
 class _GenreHierarchyViewState extends State<GenreHierarchyView> {
-  static int _instanceCount = 0;
+  static final Set<_GenreHierarchyViewState> _activeInstances = <_GenreHierarchyViewState>{};
+  static bool _cacheClearScheduled = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _instanceCount++;
+    _activeInstances.add(this);
   }
 
   @override
   void dispose() {
-    _instanceCount--;
-    if (_instanceCount <= 0) {
-      _instanceCount = 0;
-      GenreCategory.clearCache();
+    _searchController.dispose();
+    _activeInstances.remove(this);
+    if (_activeInstances.isEmpty && !_cacheClearScheduled) {
+      _cacheClearScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Double frame check: ensure route replacement/transition didn't mount a new instance
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _cacheClearScheduled = false;
+          if (_activeInstances.isEmpty) {
+            GenreCategory.clearCache();
+          }
+        });
+      });
     }
     super.dispose();
   }
 
   List<GenreCategory> _categories(BuildContext context) => [
-    GenreCategory(context.l10n.browseGenreRockMetal, Icons.electric_bolt_rounded,
-        ['rock', 'metal', 'grunge', 'punk', 'alternative', 'روك', 'ميتال']),
-    GenreCategory(context.l10n.browseGenreElectronicDance, Icons.album_rounded, [
-      'electronic',
-      'techno',
-      'house',
-      'edm',
-      'ambient',
-      'trance',
-      'synth',
-      'إلكترونك',
-      'هاوس',
-      'تكنو'
-    ]),
-    GenreCategory(context.l10n.browseGenreHipHopRnb, Icons.mic_external_on_rounded, [
-      'hip hop',
-      'hip-hop',
-      'rap',
-      'r&b',
-      'trap',
-      'soul',
-      'راب',
-      'هيب هوب',
-      'تراب',
-      'مهرجانات'
-    ]),
-    GenreCategory(context.l10n.browseGenreJazzBlues, Icons.music_note_rounded,
-        ['jazz', 'blues', 'swing', 'bebop', 'جاز', 'بلوز']),
-    GenreCategory(context.l10n.browseGenreClassicalInstrumental, Icons.piano_rounded, [
-      'classical',
-      'instrumental',
-      'soundtrack',
-      'orchestral',
-      'score',
-      'كلاسيك',
-      'موسيقى كلاسيكية',
-      'أوركسترا',
-      'موسيقى تصويرية'
-    ]),
-    GenreCategory(context.l10n.browseGenrePopAcoustic, Icons.star_rounded, [
-      'pop',
-      'acoustic',
-      'indie',
-      'folk',
-      'vocal',
-      'بوب',
-      'شعبي',
-      'أكوستيك',
-      'فولك'
-    ]),
-    GenreCategory(context.l10n.browseGenreArabicRegional, Icons.queue_music_rounded, [
-      'طرب',
-      'عربي',
-      'خليجي',
-      'مغربي',
-      'شامي',
-      'مصري',
-      'أندلسي',
-      'موشحات',
-      'arabic',
-      'tarab',
-      'khaleeji',
-      'oriental',
-      'middle eastern'
-    ]),
-  ];
+        GenreCategory(
+            context.l10n.browseGenreRockMetal,
+            Icons.electric_bolt_rounded,
+            ['rock', 'metal', 'grunge', 'punk', 'alternative', 'روك', 'ميتال']),
+        GenreCategory(
+            context.l10n.browseGenreElectronicDance, Icons.album_rounded, [
+          'electronic',
+          'techno',
+          'house',
+          'edm',
+          'ambient',
+          'trance',
+          'synth',
+          'إلكترونك',
+          'هاوس',
+          'تكنو'
+        ]),
+        GenreCategory(
+            context.l10n.browseGenreHipHopRnb, Icons.mic_external_on_rounded, [
+          'hip hop',
+          'hip-hop',
+          'rap',
+          'r&b',
+          'trap',
+          'soul',
+          'راب',
+          'هيب هوب',
+          'تراب',
+          'مهرجانات'
+        ]),
+        GenreCategory(
+            context.l10n.browseGenreJazzBlues,
+            Icons.music_note_rounded,
+            ['jazz', 'blues', 'swing', 'bebop', 'جاز', 'بلوز']),
+        GenreCategory(context.l10n.browseGenreClassicalInstrumental,
+            Icons.piano_rounded, [
+          'classical',
+          'instrumental',
+          'soundtrack',
+          'orchestral',
+          'score',
+          'كلاسيك',
+          'موسيقى كلاسيكية',
+          'أوركسترا',
+          'موسيقى تصويرية'
+        ]),
+        GenreCategory(context.l10n.browseGenrePopAcoustic, Icons.star_rounded, [
+          'pop',
+          'acoustic',
+          'indie',
+          'folk',
+          'vocal',
+          'بوب',
+          'شعبي',
+          'أكوستيك',
+          'فولك'
+        ]),
+        GenreCategory(
+            context.l10n.browseGenreArabicRegional, Icons.queue_music_rounded, [
+          'طرب',
+          'عربي',
+          'خليجي',
+          'مغربي',
+          'شامي',
+          'مصري',
+          'أندلسي',
+          'موشحات',
+          'arabic',
+          'tarab',
+          'khaleeji',
+          'oriental',
+          'middle eastern'
+        ]),
+      ];
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final categories = _categories(context);
+    final effectiveGenres = _searchQuery.isEmpty
+        ? widget.genres
+        : widget.genres
+            .where((g) => g.name.toLowerCase().contains(_searchQuery))
+            .toList();
 
     return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
       children: [
-        for (final category in categories) ...[
-          _buildCategoryGroup(context, category, p),
-          const SizedBox(height: AppSpacing.sm),
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (val) =>
+                setState(() => _searchQuery = val.trim().toLowerCase()),
+            style: TextStyle(
+                color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+            decoration: InputDecoration(
+              hintText: context.l10n.searchPlaceholder,
+              hintStyle: TextStyle(
+                  color: p.textTertiary, fontSize: AppFontSize.bodySmall),
+              prefixIcon:
+                  Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      color: p.textSecondary,
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: p.surfaceCard,
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderSide: BorderSide(color: p.hairline),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderSide: BorderSide(color: p.hairline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderSide: BorderSide(color: p.primary, width: 1.5),
+              ),
+            ),
+          ),
+        ),
+        if (widget.genres.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
+            child: Center(
+              child: EmptyStateWidget(
+                icon: Icons.category_outlined,
+                title: context.l10n.browseNoGenresFound,
+                subtitle: context.l10n.browseScanForGenres,
+              ),
+            ),
+          )
+        else if (effectiveGenres.isEmpty && _searchQuery.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
+            child: Center(
+              child: EmptyStateWidget(
+                icon: Icons.search_off_rounded,
+                title: context.l10n.noResultsFound,
+                subtitle: '"$_searchQuery"',
+                primaryActionLabel: context.l10n.clear,
+                primaryActionIcon: Icons.clear_rounded,
+                onPrimaryAction: () {
+                  _searchController.clear();
+                  setState(() => _searchQuery = '');
+                },
+              ),
+            ),
+          )
+        else ...[
+          for (final category in categories) ...[
+            _buildCategoryGroup(context, category, effectiveGenres, p),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          // Remaining uncategorized genres
+          _buildUncategorizedGroup(context, categories, effectiveGenres, p),
         ],
-        // Remaining uncategorized genres
-        _buildUncategorizedGroup(context, categories, p),
       ],
     );
   }
 
-  Widget _buildCategoryGroup(
-      BuildContext context, GenreCategory cat, PulsrPalette p) {
-    final matching = widget.genres.where((g) => cat.matches(g.name)).toList();
+  Widget _buildCategoryGroup(BuildContext context, GenreCategory cat,
+      List<GenreItem> genres, PulsrPalette p) {
+    final matching = genres.where((g) => cat.matches(g.name)).toList();
 
     if (matching.isEmpty) return const SizedBox.shrink();
 
@@ -195,7 +300,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
         ),
         children: [
           Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -216,8 +322,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600),
                     ),
-                    onPressed: () =>
-                        context.push('/genre', extra: g),
+                    onPressed: () => context.push('/genre', extra: g),
                   ),
                 );
               }).toList(),
@@ -228,8 +333,9 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
     );
   }
 
-  Widget _buildUncategorizedGroup(BuildContext context, List<GenreCategory> categories, PulsrPalette p) {
-    final uncategorized = widget.genres.where((g) {
+  Widget _buildUncategorizedGroup(BuildContext context,
+      List<GenreCategory> categories, List<GenreItem> genres, PulsrPalette p) {
+    final uncategorized = genres.where((g) {
       final name = g.name;
       return !categories.any((cat) => cat.matches(name));
     }).toList();
@@ -252,7 +358,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
           ),
           child: Icon(Icons.category_rounded, color: p.accent, size: 20),
         ),
-        title: Text(context.l10n.otherGenres,
+        title: Text(
+          context.l10n.otherGenres,
           style: TextStyle(
             color: p.textPrimary,
             fontSize: AppFontSize.callout,
@@ -265,7 +372,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
         ),
         children: [
           Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.sm, 0, AppSpacing.sm, AppSpacing.sm),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -286,8 +394,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                           color: p.textPrimary,
                           fontWeight: FontWeight.w600),
                     ),
-                    onPressed: () =>
-                        context.push('/genre', extra: g),
+                    onPressed: () => context.push('/genre', extra: g),
                   ),
                 );
               }).toList(),

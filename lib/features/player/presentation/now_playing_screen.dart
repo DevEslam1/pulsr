@@ -40,6 +40,25 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     super.dispose();
   }
 
+  void _safePop(BuildContext context) {
+    if (_isPopping) return;
+    _isPopping = true;
+    try {
+      final router = GoRouter.of(context);
+      if (router.canPop()) {
+        router.pop();
+      } else {
+        router.go('/');
+      }
+    } catch (_) {
+      try {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Narrow subscriptions: only the fields this screen actually renders.
@@ -98,28 +117,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         return PopScope(
           canPop: false,
           onPopInvokedWithResult: (didPop, result) {
-            if (didPop || _isPopping) return;
-            _isPopping = true;
-            final router = GoRouter.of(context);
-            if (router.canPop()) {
-              router.pop();
-            } else {
-              router.go('/');
-            }
+            if (didPop) return;
+            _safePop(context);
           },
           child: Scaffold(
             backgroundColor: bgColor,
             body: _SwipeDownToDismiss(
-              onDismiss: () {
-                if (_isPopping) return;
-                _isPopping = true;
-                final router = GoRouter.of(context);
-                if (router.canPop()) {
-                  router.pop();
-                } else {
-                  router.go('/');
-                }
-              },
+              onDismiss: () => _safePop(context),
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -130,9 +134,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   child: Stack(
                     children: [
                       AnimatedSwitcher(
-                        duration: context.motionMs(250),
-                        switchInCurve: context.motionCurve(Curves.easeInOut),
-                        switchOutCurve: context.motionCurve(Curves.easeInOut),
+                        duration: context.motionMs(350),
+                        switchInCurve:
+                            context.motionCurve(Curves.easeInOutCubic),
+                        switchOutCurve:
+                            context.motionCurve(Curves.easeInOutCubic),
+                        transitionBuilder: (child, animation) =>
+                            FadeTransition(opacity: animation, child: child),
                         child: KeyedSubtree(
                           key: ValueKey(settingsConfig.playerThemeMode),
                           child: themeWidget,
@@ -241,6 +249,15 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     }
   }
 
+  void _onVerticalDragCancel() {
+    _activePointers = 0;
+    if (_dragOffset > 0) {
+      _tween.begin = _dragOffset;
+      _tween.end = 0.0;
+      _animController.forward(from: 0.0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -261,16 +278,17 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       child: Listener(
         onPointerDown: (_) => _activePointers++,
         onPointerUp: (_) {
-          if (_activePointers > 0) _activePointers--;
+          _activePointers = (_activePointers - 1).clamp(0, 99);
         },
         onPointerCancel: (_) {
-          if (_activePointers > 0) _activePointers--;
+          _activePointers = (_activePointers - 1).clamp(0, 99);
         },
         child: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onVerticalDragStart: _onVerticalDragStart,
           onVerticalDragUpdate: _onVerticalDragUpdate,
           onVerticalDragEnd: _onVerticalDragEnd,
+          onVerticalDragCancel: _onVerticalDragCancel,
           child: AnimatedBuilder(
             animation: _animController,
             child: boundChild,

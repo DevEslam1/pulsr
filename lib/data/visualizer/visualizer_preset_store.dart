@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/visualizer_preset.dart';
 
 /// Persists a user-authored Custom (JSON) visualizer preset.
@@ -36,17 +37,21 @@ class VisualizerPresetStore {
   /// parsed preset, or null when cancelled or the file is not a valid preset.
   Future<VisualizerPreset?> importFromFile() async {
     try {
-      final result = await FilePicker.pickFile(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: const ['json'],
       );
-      final path = result?.path;
-      if (path == null) return null;
-      final content = await File(path).readAsString();
+      if (file == null) return null;
+      final path = file.path;
+      if (path == null || path.isEmpty) return null;
+      final ioFile = File(path);
+      if (!await ioFile.exists()) return null;
+      final content = await ioFile.readAsString();
       final preset = VisualizerPreset.fromJsonString(content);
       await save(preset);
       return preset;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('VisualizerPresetStore importFromFile failed', error: e, stackTrace: st, category: 'VisualizerPresetStore');
       return null;
     }
   }

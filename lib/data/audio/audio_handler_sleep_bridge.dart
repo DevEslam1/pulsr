@@ -60,9 +60,16 @@ mixin PulsrAudioSleepBridge on BaseAudioHandler {
   }
 
   void startAfterNTracksTimer(int trackCount, {bool fadeOut = true}) {
+    final durations = <Duration>[];
+    if (_songs.isNotEmpty && _currentIndex >= 0) {
+      for (int i = _currentIndex; i < _songs.length && durations.length < trackCount; i++) {
+        durations.add(Duration(milliseconds: _songs[i].durationMs));
+      }
+    }
     _sleepTimerManager.startAfterNTracksTimer(
       trackCount,
       fadeOut: fadeOut,
+      trackDurations: durations.isNotEmpty ? durations : null,
       onTimerExpired: () async => pause(),
       getActivePlayer: () => _activePlayer,
     );
@@ -101,6 +108,8 @@ mixin PulsrAudioSleepBridge on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   AudioPlayer get _activePlayer;
+  List<SongsTableData> get _songs;
+  int get _currentIndex;
 
   // Requires: provided by the composing class (same library).
   DateTime? get _lastSleepTrackCompletedAt;

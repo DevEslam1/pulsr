@@ -5,6 +5,7 @@ import '../../../core/services/radio_station_store.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/empty_state_widget.dart';
@@ -67,8 +68,15 @@ class _RadioScreenState extends State<RadioScreen> {
     return ['All', ...list];
   }
 
+  String? _cachedFilterKey;
+  List<RadioStation>? _cachedFilteredStations;
+
   List<RadioStation> get _filteredStations {
-    return _stations.where((s) {
+    final key = '$_selectedGenre|$_searchQuery|${_stations.length}|${identityHashCode(_stations)}';
+    if (_cachedFilterKey == key && _cachedFilteredStations != null) {
+      return _cachedFilteredStations!;
+    }
+    final filtered = _stations.where((s) {
       if (_selectedGenre != 'All') {
         if (s.genre?.toLowerCase() != _selectedGenre.toLowerCase()) {
           return false;
@@ -83,6 +91,9 @@ class _RadioScreenState extends State<RadioScreen> {
       }
       return true;
     }).toList();
+    _cachedFilterKey = key;
+    _cachedFilteredStations = filtered;
+    return filtered;
   }
 
   String _nameForUrl(String url) {
@@ -98,9 +109,8 @@ class _RadioScreenState extends State<RadioScreen> {
     );
 
     if (station != null && mounted) {
-      // A changed stream URL produces a new derived id; drop the old entry so
-      // edit replaces rather than duplicates.
-      if (initial != null && initial.url != station.url) {
+      // When editing, remove the previous station by ID to guarantee clean replacement.
+      if (initial != null) {
         await _store.remove(initial.id);
       }
       await _store.add(station);
@@ -197,7 +207,8 @@ class _RadioScreenState extends State<RadioScreen> {
     final availableGenres = _availableGenres;
     final filtered = _filteredStations;
 
-    return Scaffold(
+    return PulsrPagePopScope(
+      child: Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
         backgroundColor: p.surface,
@@ -540,7 +551,7 @@ class _RadioScreenState extends State<RadioScreen> {
                 ),
               ],
             ),
-    );
+    ));
   }
 }
 

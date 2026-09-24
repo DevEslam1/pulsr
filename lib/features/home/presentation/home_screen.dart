@@ -42,14 +42,17 @@ import 'package:pulsr/core/constants/app_colors.dart';
 /// Scales a fixed two-line card title box (34px at the default text size) with
 /// the user's Dynamic Type setting so large text never clips. Pixel-identical
 /// at the 1.0x scale.
-double _scaledTitleBoxHeight(BuildContext context) =>
-    MediaQuery.textScalerOf(context).scale(34.0).clamp(34.0, 78.0);
+double _scaledTitleBoxHeight(BuildContext context) {
+  final base = Adaptive.isTablet(context) ? 38.0 : 34.0;
+  return MediaQuery.textScalerOf(context).scale(base).clamp(base, 78.0);
+}
 
 /// Grows a fixed-height horizontal card carousel just enough to fit scaled
 /// two-line titles. Pixel-identical at the 1.0x scale.
 double _scaledCarouselHeight(BuildContext context, bool isTablet) {
+  final base = isTablet ? 38.0 : 34.0;
   final delta =
-      (MediaQuery.textScalerOf(context).scale(34.0) - 34.0).clamp(0.0, 44.0);
+      (MediaQuery.textScalerOf(context).scale(base) - base).clamp(0.0, 44.0);
   return (isTablet ? 232.0 : 212.0) + delta;
 }
 
@@ -109,22 +112,22 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   late final HomeCubit _homeCubit;
 
-  // FIX-M12: Use monotonic Stopwatch for 60-second TTL cache for 200 songs shared by Daily Drive and Focus Flow
-  List<SongsTableData>? _cachedSongs200;
-  Stopwatch? _cachedSongs200Stopwatch;
+  // Shared cache for quick action songs (Daily Drive & Focus Flow) with a 60-second TTL
+  List<SongsTableData>? _cachedQuickSongs;
+  Stopwatch? _cachedQuickSongsStopwatch;
   StreamSubscription? _librarySub;
 
   Future<List<SongsTableData>> _getQuickActionSongs(GetSongsUseCase useCase) async {
-    if (_cachedSongs200 != null &&
-        _cachedSongs200Stopwatch != null &&
-        _cachedSongs200Stopwatch!.isRunning &&
-        _cachedSongs200Stopwatch!.elapsed < const Duration(seconds: 60)) {
-      return _cachedSongs200!;
+    if (_cachedQuickSongs != null &&
+        _cachedQuickSongsStopwatch != null &&
+        _cachedQuickSongsStopwatch!.isRunning &&
+        _cachedQuickSongsStopwatch!.elapsed < const Duration(seconds: 60)) {
+      return _cachedQuickSongs!;
     }
     final res = await useCase.getAllSongs(limit: 50);
     final list = res.fold((_) => <SongsTableData>[], (r) => r);
-    _cachedSongs200 = list;
-    _cachedSongs200Stopwatch = Stopwatch()..start();
+    _cachedQuickSongs = list;
+    _cachedQuickSongsStopwatch = Stopwatch()..start();
     return list;
   }
 
@@ -142,21 +145,31 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     _checkNotificationDenied();
     final libraryCubit = context.read<LibraryCubit?>();
     if (libraryCubit != null) {
-      _librarySub = libraryCubit.stream.listen((_) {
-        // H-06: A library emission can land while this screen is being disposed.
+      List<SongsTableData> lastSongs = libraryCubit.state.songs;
+      _librarySub = libraryCubit.stream.listen((state) {
         if (!mounted) return;
-        _cachedSongs200 = null;
-        _cachedSongs200Stopwatch = null;
+        if (!identical(state.songs, lastSongs) || state.songs.length != lastSongs.length) {
+          lastSongs = state.songs;
+          _cachedQuickSongs = null;
+          _cachedQuickSongsStopwatch?.stop();
+          _cachedQuickSongsStopwatch = null;
+        }
       });
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkNotificationDenied();
   }
 
   Future<void> _checkNotificationDenied() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final denied = prefs.getBool('notification_permission_denied') ?? false;
-      if (denied && mounted) {
-        setState(() => _notificationDenied = true);
+      if (mounted && _notificationDenied != denied) {
+        setState(() => _notificationDenied = denied);
       }
     } catch (_) {}
   }
@@ -174,8 +187,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   @override
   void dispose() {
     _librarySub?.cancel();
-    // H-06: Stop the TTL stopwatch so it doesn't keep running after disposal.
-    _cachedSongs200Stopwatch?.stop();
+    _cachedQuickSongsStopwatch?.stop();
+    _cachedQuickSongsStopwatch = null;
+    _cachedQuickSongs = null;
     _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
     super.dispose();
   }
@@ -260,6 +274,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 }
               },
               child: ListView(
+                key: const PageStorageKey('home_screen_scroll'),
                 physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics()),
                 padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
@@ -292,6 +307,26 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             ],
                           ),
                         ),
+                        if (offlineOnly)
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                                end: AppSpacing.sm),
+                            child: Chip(
+                              avatar: Icon(Icons.wifi_off_rounded,
+                                  size: 14, color: p.accent),
+                              label: Text(
+                                context.l10n.offlineOnlyMode,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.accent,
+                                ),
+                              ),
+                              backgroundColor: p.accentContainer,
+                              side: BorderSide(color: p.hairline),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
                         Container(
                           padding: const EdgeInsets.all(AppSpacing.s10),
                           decoration: BoxDecoration(
@@ -467,11 +502,21 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   const SizedBox(height: AppSpacing.md),
 
                   // ---------- Content (Local vs Online) ----------
-                  if (currentTab == 0)
-                    _buildLocalView(
-                        context, p, getSongsUseCase, playerCubit, isTablet)
-                  else if (showOnlineTab)
-                    _buildOnlineView(context, p, playerCubit, isTablet),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: KeyedSubtree(
+                      key: ValueKey('home_tab_$currentTab'),
+                      child: currentTab == 0
+                          ? _buildLocalView(
+                              context, p, getSongsUseCase, playerCubit, isTablet)
+                          : (showOnlineTab
+                              ? _buildOnlineView(
+                                  context, p, playerCubit, isTablet)
+                              : const SizedBox.shrink()),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -568,6 +613,37 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     );
   }
 
+  Widget _buildQuickActionsRow(BuildContext context, List<Widget> cards) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 360;
+    if (isNarrow && cards.length == 3) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              cards[0],
+              const SizedBox(width: AppSpacing.s10),
+              cards[1],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          Row(
+            children: [
+              cards[2],
+            ],
+          ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        for (int i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.s10),
+          cards[i],
+        ],
+      ],
+    );
+  }
+
   Widget _buildLocalView(
     BuildContext context,
     PulsrPalette p,
@@ -582,8 +658,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         Padding(
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 0,
               Adaptive.pagePadding(context), AppSpacing.md),
-          child: Row(
-            children: [
+          child: _buildQuickActionsRow(
+            context,
+            [
               _QuickCard(
                 title: context.l10n.favorites,
                 subtitle: context.l10n.likedTracks,
@@ -591,7 +668,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 color: p.favorite,
                 onTap: () => context.push('/favorites'),
               ),
-              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.dailyDrive,
                 subtitle: context.l10n.autoMix,
@@ -605,7 +681,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   }
                 },
               ),
-              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.focusFlow,
                 subtitle: context.l10n.topPlayedTracks,
@@ -727,8 +802,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         Padding(
           padding: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context)),
-          child: Row(
-            children: [
+          child: _buildQuickActionsRow(
+            context,
+            [
               _QuickCard(
                 title: _ytmAccountService.isLoggedIn
                     ? context.l10n.browseForYou
@@ -747,7 +823,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         ? 'Recommended For You'
                         : 'Global Top Hits'),
               ),
-              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.newReleases,
                 subtitle: context.l10n.browseTrending,
@@ -756,7 +831,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 onTap: () =>
                     setState(() => _selectedOnlineCategory = 'New Releases'),
               ),
-              const SizedBox(width: AppSpacing.s10),
               _QuickCard(
                 title: context.l10n.browseChillLofi,
                 subtitle: context.l10n.browseRelaxing,
@@ -823,26 +897,31 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         const SizedBox(height: AppSpacing.md),
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
-        _OnlineCategorySection(
-          key: ValueKey(_selectedOnlineCategory),
-          title: _selectedOnlineCategory == 'Recommended For You'
-              ? context.l10n.browseRecommendedYtmTitle
-              : (_selectedOnlineCategory == 'Trending Egypt'
-                  ? context.l10n.browseTrendingInEgypt
-                  : '${context.l10n.browsePopular}: ${_categoryLabel(context, _selectedOnlineCategory)}'),
-          future: context.read<HomeCubit>().categoryFuture(_selectedOnlineCategory),
-          playerCubit: playerCubit,
-          onRetry: () {
-            context.read<HomeCubit>().retryCategory(_selectedOnlineCategory);
-            setState(() {});
-          },
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: _OnlineCategorySection(
+            key: PageStorageKey('online_cat_$_selectedOnlineCategory'),
+            title: _selectedOnlineCategory == 'Recommended For You'
+                ? context.l10n.browseRecommendedYtmTitle
+                : (_selectedOnlineCategory == 'Trending Egypt'
+                    ? context.l10n.browseTrendingInEgypt
+                    : '${context.l10n.browsePopular}: ${_categoryLabel(context, _selectedOnlineCategory)}'),
+            future: context.read<HomeCubit>().categoryFuture(_selectedOnlineCategory),
+            playerCubit: playerCubit,
+            onRetry: () {
+              context.read<HomeCubit>().retryCategory(_selectedOnlineCategory);
+              setState(() {});
+            },
+          ),
         ),
       ],
     );
   }
 }
 
-class _OnlineCategorySection extends StatelessWidget {
+class _OnlineCategorySection extends StatefulWidget {
   final String title;
   final Future<List<YtmTrack>> future;
   final PlayerCubit playerCubit;
@@ -857,19 +936,29 @@ class _OnlineCategorySection extends StatelessWidget {
   });
 
   @override
+  State<_OnlineCategorySection> createState() => _OnlineCategorySectionState();
+}
+
+class _OnlineCategorySectionState extends State<_OnlineCategorySection>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final p = context.palette;
     final isTablet = Adaptive.isTablet(context);
     final size = isTablet ? 158.0 : 138.0;
 
     return FutureBuilder<List<YtmTrack>>(
-      future: future,
+      future: widget.future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SectionHeader(title: title),
+              SectionHeader(title: widget.title),
               SizedBox(
                 height: _scaledCarouselHeight(context, isTablet),
                 child: ListView.builder(
@@ -912,12 +1001,12 @@ class _OnlineCategorySection extends StatelessWidget {
                       color: p.textTertiary, size: 38),
                   const SizedBox(height: AppSpacing.s10),
                   Text(
-                    context.l10n.loadSongsFailed(title),
+                    context.l10n.loadSongsFailed(widget.title),
                     style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   TextButton.icon(
-                    onPressed: onRetry,
+                    onPressed: widget.onRetry,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: Text(context.l10n.retry),
                   ),
@@ -935,84 +1024,84 @@ class _OnlineCategorySection extends StatelessWidget {
         final content = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SectionHeader(title: title),
-              SizedBox(
-                height: _scaledCarouselHeight(context, isTablet),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  itemCount: songs.length,
-                  itemBuilder: (context, index) {
-                    final song = songs[index];
-                    return StaggeredReveal(
-                      index: index,
-                      horizontal: true,
-                      groupKey: songs.isEmpty
-                          ? ''
-                          : '${songs.first.id}-${songs.length}',
-                      child: _TrendingCard(
-                        song: song,
-                        onTap: () => playerCubit.playSong(song, queue: songs),
-                      ),
-                    );
-                  },
-                ),
+            SectionHeader(title: widget.title),
+            SizedBox(
+              height: _scaledCarouselHeight(context, isTablet),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                itemCount: songs.length,
+                itemBuilder: (context, index) {
+                  final song = songs[index];
+                  return StaggeredReveal(
+                    index: index,
+                    horizontal: true,
+                    groupKey: songs.isEmpty
+                        ? ''
+                        : '${songs.first.id}-${songs.length}',
+                    child: _TrendingCard(
+                      song: song,
+                      onTap: () => widget.playerCubit.playSong(song, queue: songs),
+                    ),
+                  );
+                },
               ),
-              const SizedBox(height: AppSpacing.md),
-              SectionHeader(
-                  title:
-                      '${context.l10n.browseTopChartsSongs} (${songs.length})'),
-              if (context.trackGridColumns > 1)
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: context.trackGridColumns,
-                    mainAxisExtent: 72,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 4,
-                  ),
-                  itemCount: songs.length,
-                  itemBuilder: (context, i) => StaggeredReveal(
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SectionHeader(
+                title:
+                    '${context.l10n.browseTopChartsSongs} (${songs.length})'),
+            if (context.trackGridColumns > 1)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: context.trackGridColumns,
+                  mainAxisExtent: 72,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 4,
+                ),
+                itemCount: songs.length,
+                itemBuilder: (context, i) => StaggeredReveal(
+                  index: i,
+                  groupKey: songs.isEmpty
+                      ? ''
+                      : '${songs.first.id}-${songs.length}',
+                  child: SongTile(
+                    song: songs[i],
                     index: i,
-                    groupKey: songs.isEmpty
-                        ? ''
-                        : '${songs.first.id}-${songs.length}',
-                    child: SongTile(
-                      song: songs[i],
-                      index: i,
-                      onTap: () => playerCubit.playSong(songs[i], queue: songs),
-                      trailing: YtmDownloadButton(song: songs[i]),
-                      onMorePressed: () =>
-                          SongInfoSheet.show(context, song: songs[i]),
-                    ),
+                    onTap: () => widget.playerCubit.playSong(songs[i], queue: songs),
+                    trailing: YtmDownloadButton(song: songs[i]),
+                    onMorePressed: () =>
+                        SongInfoSheet.show(context, song: songs[i]),
                   ),
-                )
-              else
-                for (int i = 0; i < songs.length; i++)
-                  StaggeredReveal(
+                ),
+              )
+            else
+              for (int i = 0; i < songs.length; i++)
+                StaggeredReveal(
+                  index: i,
+                  groupKey: songs.isEmpty
+                      ? ''
+                      : '${songs.first.id}-${songs.length}',
+                  child: SongTile(
+                    song: songs[i],
                     index: i,
-                    groupKey: songs.isEmpty
-                        ? ''
-                        : '${songs.first.id}-${songs.length}',
-                    child: SongTile(
-                      song: songs[i],
-                      index: i,
-                      onTap: () => playerCubit.playSong(songs[i], queue: songs),
-                      trailing: YtmDownloadButton(song: songs[i]),
-                      onMorePressed: () =>
-                          SongInfoSheet.show(context, song: songs[i]),
-                    ),
+                    onTap: () => widget.playerCubit.playSong(songs[i], queue: songs),
+                    trailing: YtmDownloadButton(song: songs[i]),
+                    onMorePressed: () =>
+                        SongInfoSheet.show(context, song: songs[i]),
                   ),
-            ],
-          );
+                ),
+          ],
+        );
         if (ytmCubit != null) {
           return BlocProvider<YtmDownloadCubit>.value(
             value: ytmCubit,
@@ -1459,18 +1548,26 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
   static const int _pageSize = 50;
   int _currentLimit = _pageSize;
   bool _isLoadingMore = false;
+  Timer? _loadMoreTimeoutTimer;
 
   void _loadMore() {
     if (_isLoadingMore) return;
+    _loadMoreTimeoutTimer?.cancel();
     setState(() {
       _isLoadingMore = true;
       _currentLimit += _pageSize;
     });
-    Future.delayed(const Duration(seconds: 5), () {
+    _loadMoreTimeoutTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && _isLoadingMore) {
         setState(() => _isLoadingMore = false);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _loadMoreTimeoutTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -1484,6 +1581,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           if (_isLoadingMore) {
+            _loadMoreTimeoutTimer?.cancel();
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && _isLoadingMore) {
                 setState(() => _isLoadingMore = false);
@@ -1497,6 +1595,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
 
         if (songs.isEmpty) {
           if (_isLoadingMore) {
+            _loadMoreTimeoutTimer?.cancel();
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && _isLoadingMore) {
                 setState(() => _isLoadingMore = false);
@@ -1510,6 +1609,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
         // As soon as the active stream emits, clear the guard so "Load more"
         // does not remain stuck when reaching the end of the collection.
         if (_isLoadingMore && snapshot.connectionState != ConnectionState.waiting) {
+          _loadMoreTimeoutTimer?.cancel();
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && _isLoadingMore) {
               setState(() => _isLoadingMore = false);
@@ -1749,6 +1849,26 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
   }
 
   Future<void> _requestPermission() async {
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(context.l10n.homePermissionNeeded),
+        content: Text(context.l10n.homePermissionSubtitle),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(context.l10n.homeGrantPermission),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldProceed != true) return;
+
     try {
       final scanner = _getScanner();
       if (scanner == null) return;

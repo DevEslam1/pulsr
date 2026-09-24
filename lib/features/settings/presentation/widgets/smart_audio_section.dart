@@ -28,14 +28,16 @@ class SmartAudioSection extends StatefulWidget {
 }
 
 class _SmartAudioSectionState extends State<SmartAudioSection> {
-  late final SmartAudioService _service = getIt.isRegistered<SmartAudioService>()
-      ? getIt<SmartAudioService>()
-      : SmartAudioService();
+  late final SmartAudioService _service =
+      getIt.isRegistered<SmartAudioService>()
+          ? getIt<SmartAudioService>()
+          : SmartAudioService();
 
   SmartAudioMode _mode = SmartAudioMode.auto;
   String? _deviceName;
   String? _matchedProfileName;
   String? _deviceDetectionError;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
   }
 
   Future<void> _reload() async {
+    setState(() => _isLoading = true);
     try {
       final mode = await _service.getMode();
       String? deviceName;
@@ -78,6 +81,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
     } catch (e, st) {
       ErrorLogger.log('Error reloading SmartAudioSection',
           error: e, stackTrace: st, category: 'SmartAudio');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -152,7 +157,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
         if (_deviceDetectionError != null) ...[
           const SizedBox(height: AppSpacing.xs),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -177,10 +183,33 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
             ),
           ),
         ],
-        if (_deviceName != null) ...[
+        if (_isLoading) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                '${context.l10n.settingsAudioOutputDevice}...',
+                style: TextStyle(
+                  fontSize: AppFontSize.label,
+                  color: p.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ] else if (_deviceName != null) ...[
           const SizedBox(height: AppSpacing.xs),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh.withValues(alpha: 0.45),
               borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -212,7 +241,6 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: (isAuto ? p.accent : p.textTertiary)
@@ -236,8 +264,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                   child: Text(
                     isAuto
                         ? (_matchedProfileName != null
-                            ? l10n.smartAudioMatchedProfile(
-                                _matchedProfileName!)
+                            ? l10n
+                                .smartAudioMatchedProfile(_matchedProfileName!)
                             : l10n.smartAudioNoMatch)
                         : l10n.dspEqCurvesBypassed,
                     key: ValueKey<String>(
@@ -251,6 +279,36 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: AppSpacing.xs),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: p.surfaceContainerHigh.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(AppRadii.r10),
+              border: Border.all(color: p.hairline),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.headphones_outlined,
+                  size: 15,
+                  color: p.textTertiary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    context.l10n.noDevicesSeen,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      color: p.textTertiary,
+                    ),
                   ),
                 ),
               ],

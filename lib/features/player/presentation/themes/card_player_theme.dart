@@ -114,8 +114,8 @@ class CardPlayerTheme extends StatelessWidget {
         SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isLandscape = context.isLandscape &&
-                  (context.isTwoPane || constraints.maxWidth >= 680);
+              final isLandscape = context.isLandscape ||
+                  (context.isTwoPane || constraints.maxWidth >= 600);
 
               final double heightRatio =
                   (constraints.maxHeight / 720.0).clamp(0.55, 1.25);

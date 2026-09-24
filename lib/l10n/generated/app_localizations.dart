@@ -11957,17 +11957,287 @@ abstract class AppLocalizations {
   /// **'SIDE A • TYPE II (CrO2)'**
   String get cassetteSideA;
 
-  /// No description provided for @cassettePulsrTape.
-  ///
-  /// In en, this message translates to:
-  /// **'PULSR TAPE'**
-  String get cassettePulsrTape;
-
   /// No description provided for @vinylSpeedRpm.
   ///
   /// In en, this message translates to:
   /// **'33⅓ RPM'**
   String get vinylSpeedRpm;
+
+  /// No description provided for @exclusiveUsbActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive USB Active'**
+  String get exclusiveUsbActive;
+
+  /// No description provided for @underrunsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} underruns'**
+  String underrunsCount(int count);
+
+  /// No description provided for @dspEngineTelemetry.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Engine Telemetry'**
+  String get dspEngineTelemetry;
+
+  /// No description provided for @rtfPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'RTF: {pct}%'**
+  String rtfPercent(String pct);
+
+  /// No description provided for @limiterReduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Limiter Reduction'**
+  String get limiterReduction;
+
+  /// No description provided for @multibandCompReduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiband Comp Reduction'**
+  String get multibandCompReduction;
+
+  /// No description provided for @dynamicEqAdjustments.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic EQ Adjustments'**
+  String get dynamicEqAdjustments;
+
+  /// No description provided for @resetWeeklyDoseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Weekly Sound Dose?'**
+  String get resetWeeklyDoseTitle;
+
+  /// No description provided for @resetWeeklyDoseDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'This will reset your accumulated acoustic exposure counter to 0% and lift safety attenuation. Only reset if starting a new monitoring week or switching listening environments.'**
+  String get resetWeeklyDoseDesc;
+
+  /// No description provided for @resetDoseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Dose'**
+  String get resetDoseAction;
+
+  /// No description provided for @weeklyDoseResetSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly sound dose has been reset to 0.0%'**
+  String get weeklyDoseResetSnackbar;
+
+  /// No description provided for @headphoneSafetyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Headphone Safety & Dose'**
+  String get headphoneSafetyTitle;
+
+  /// No description provided for @headphoneSafetyStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'WHO-ITU H.870 / EN 62368-1 Acoustic Standard'**
+  String get headphoneSafetyStandard;
+
+  /// No description provided for @weeklySoundAllowance.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Sound Allowance'**
+  String get weeklySoundAllowance;
+
+  /// No description provided for @safetyLimiterActiveDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Safety Limiter Active (-6 dBFS ceiling engaged to prevent hearing damage)'**
+  String get safetyLimiterActiveDesc;
+
+  /// No description provided for @highSoundDoseWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'High sound dose: Consider reducing volume to protect hearing'**
+  String get highSoundDoseWarning;
+
+  /// No description provided for @optimalExposureDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Optimal exposure: Safe listening levels within 40-hour allowance'**
+  String get optimalExposureDesc;
+
+  /// No description provided for @latencySyncDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Latency & Sync Diagnostics'**
+  String get latencySyncDiagnostics;
+
+  /// No description provided for @latencySyncDiagnosticsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time output and processing delay metrics reported directly from native hardware sinks.'**
+  String get latencySyncDiagnosticsDesc;
+
+  /// No description provided for @dspPipelineDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Pipeline Delay'**
+  String get dspPipelineDelay;
+
+  /// No description provided for @dspPipelineDelayDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Lookahead Limiter + Resampler group delay + Reverb partitioned delay'**
+  String get dspPipelineDelayDesc;
+
+  /// No description provided for @usbBufferedDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'USB Hardware Buffered Delay'**
+  String get usbBufferedDelay;
+
+  /// No description provided for @usbBufferedDelayDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ring buffer occupancy + URB kernel queue slack'**
+  String get usbBufferedDelayDesc;
+
+  /// No description provided for @totalMonitoredLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Monitored Latency'**
+  String get totalMonitoredLatency;
+
+  /// No description provided for @totalMonitoredLatencyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sum of active digital processing & hardware buffering'**
+  String get totalMonitoredLatencyDesc;
+
+  /// No description provided for @directUsbExclusivePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct USB Exclusive Path'**
+  String get directUsbExclusivePath;
+
+  /// No description provided for @lowLatencyDirectOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Low-Latency Direct Output'**
+  String get lowLatencyDirectOutput;
+
+  /// No description provided for @dacRateSwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'DAC Sample Rate Switch'**
+  String get dacRateSwitchTitle;
+
+  /// No description provided for @dacRateSwitchBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your DAC supports {supported} kHz, but the current track is {track} kHz.'**
+  String dacRateSwitchBody(String supported, String track);
+
+  /// No description provided for @dacRateSwitchResample.
+  ///
+  /// In en, this message translates to:
+  /// **'Resample to {target} kHz for bit-perfect output?'**
+  String dacRateSwitchResample(String target);
+
+  /// No description provided for @dacRateSwitchRemember.
+  ///
+  /// In en, this message translates to:
+  /// **'Always auto-switch in the future'**
+  String get dacRateSwitchRemember;
+
+  /// No description provided for @dacRateSwitchConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch ({target} k)'**
+  String dacRateSwitchConfirm(String target);
+
+  /// No description provided for @miniPlayerSwipeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe left/right to skip'**
+  String get miniPlayerSwipeHint;
+
+  /// No description provided for @phoneSpeaker.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Speaker'**
+  String get phoneSpeaker;
+
+  /// No description provided for @usbDacNoneAttached.
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC: None attached'**
+  String get usbDacNoneAttached;
+
+  /// No description provided for @directPlaybackNotReported.
+  ///
+  /// In en, this message translates to:
+  /// **'DIRECT PLAYBACK: Not reported'**
+  String get directPlaybackNotReported;
+
+  /// No description provided for @directPlaybackUpTo.
+  ///
+  /// In en, this message translates to:
+  /// **'DIRECT PLAYBACK: Up to {rate} Hz / {bits}'**
+  String directPlaybackUpTo(String rate, String bits);
+
+  /// No description provided for @activeSystemOutputDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Active system output device • Up to {rate} kHz / {bits}-bit'**
+  String activeSystemOutputDesc(String rate, String bits);
+
+  /// No description provided for @deviceOutputSpecsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'{typeName} • Up to {rate} kHz / {bits}-bit'**
+  String deviceOutputSpecsDesc(String typeName, String rate, String bits);
+
+  /// No description provided for @bpDirectActiveUsb.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware direct pass-through active on USB DAC'**
+  String get bpDirectActiveUsb;
+
+  /// No description provided for @bpDirectActiveWired.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware direct pass-through active (wired direct)'**
+  String get bpDirectActiveWired;
+
+  /// No description provided for @bpPassThroughArmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Pass-through armed • Engages automatically when capable DAC is connected'**
+  String get bpPassThroughArmed;
+
+  /// No description provided for @bpBypassesAndroidMixer.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)'**
+  String get bpBypassesAndroidMixer;
+
+  /// No description provided for @settingsResultsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 setting found} other{{count} settings found}}'**
+  String settingsResultsCount(int count);
+
+  /// No description provided for @cassettePulsrTape.
+  ///
+  /// In en, this message translates to:
+  /// **'PULSR C-90'**
+  String get cassettePulsrTape;
+
+  /// No description provided for @statusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get statusCancelled;
 }
 
 class _AppLocalizationsDelegate

@@ -6,6 +6,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
@@ -13,8 +14,18 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
-class FolderBrowserTab extends StatelessWidget {
+enum _FolderSort { name, count }
+
+class FolderBrowserTab extends StatefulWidget {
   const FolderBrowserTab({super.key});
+
+  @override
+  State<FolderBrowserTab> createState() => _FolderBrowserTabState();
+}
+
+class _FolderBrowserTabState extends State<FolderBrowserTab> {
+  _FolderSort _sort = _FolderSort.name;
+  bool _ascending = true;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +72,17 @@ class FolderBrowserTab extends StatelessWidget {
           );
         }
 
+        final sortedFolders = List<FolderItem>.from(folders);
+        if (_sort == _FolderSort.name) {
+          sortedFolders.sort((a, b) => _ascending
+              ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
+              : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        } else {
+          sortedFolders.sort((a, b) => _ascending
+              ? a.songCount.compareTo(b.songCount)
+              : b.songCount.compareTo(a.songCount));
+        }
+
         return Center(
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
@@ -78,9 +100,77 @@ class FolderBrowserTab extends StatelessWidget {
                   start: Adaptive.pagePadding(context),
                   end: Adaptive.pagePadding(context),
                 ),
-                itemCount: folders.length,
+                itemCount: sortedFolders.length + 1,
                 itemBuilder: (context, index) {
-                  final folder = folders[index];
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.xs, horizontal: AppSpacing.xxs),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${sortedFolders.length} ${context.l10n.folders.toLowerCase()}',
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              color: p.textTertiary,
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ActionChip(
+                                visualDensity: VisualDensity.compact,
+                                avatar: Icon(
+                                  _sort == _FolderSort.name
+                                      ? Icons.sort_by_alpha_rounded
+                                      : Icons.numbers_rounded,
+                                  size: 16,
+                                  color: p.accent,
+                                ),
+                                label: Text(
+                                  _sort == _FolderSort.name
+                                      ? context.l10n.title
+                                      : context.l10n.songs,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.textPrimary,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _sort = _sort == _FolderSort.name
+                                        ? _FolderSort.count
+                                        : _FolderSort.name;
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                              IconButton(
+                                icon: Icon(
+                                  _ascending
+                                      ? Icons.arrow_upward_rounded
+                                      : Icons.arrow_downward_rounded,
+                                  size: 18,
+                                  color: p.textSecondary,
+                                ),
+                                tooltip:
+                                    _ascending ? 'Ascending' : 'Descending',
+                                constraints: const BoxConstraints(
+                                    minWidth: AppSpacing.minTouchTarget,
+                                    minHeight: AppSpacing.minTouchTarget),
+                                onPressed: () =>
+                                    setState(() => _ascending = !_ascending),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final folder = sortedFolders[index - 1];
                   final isDownloads =
                       folder.name.toLowerCase().contains('pulsr') ||
                           folder.path.toLowerCase().contains('ytdl') ||
@@ -88,7 +178,8 @@ class FolderBrowserTab extends StatelessWidget {
                           folder.name.toLowerCase() == 'downloads';
 
                   return Container(
-                    margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                    margin:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                     child: Material(
                       color: p.surfaceContainer,
                       shape: RoundedRectangleBorder(
@@ -150,11 +241,12 @@ class FolderBrowserTab extends StatelessWidget {
                               const SizedBox(width: AppSpacing.s6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-
-                                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                                    horizontal: AppSpacing.s6,
+                                    vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(AppRadii.r6),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r6),
                                 ),
                                 child: Text(
                                   context.l10n.downloadsLabel,
@@ -173,8 +265,9 @@ class FolderBrowserTab extends StatelessWidget {
                           '${folder.songCount} ${context.l10n.browseAudioTracks} • ${folder.path}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                          style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label),
                         ),
                         trailing: IconButton(
                           icon: Icon(

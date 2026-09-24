@@ -37,13 +37,9 @@ class PlaybackAnalytics {
     _addEvent(PlaybackHealthEvent.bufferUnderrun);
     _bufferUnderrunCount++;
 
-    if (_bufferUnderrunCount == 3) {
+    if (_bufferUnderrunCount >= 3) {
       _bufferUnderrunCount = 0;
       _underrunEpoch++;
-      onIncreaseBufferSizeRequested?.call();
-    } else if (_bufferUnderrunCount >= 3) {
-      // Defensive: counter should have reset above; heal conservatively.
-      _bufferUnderrunCount = 0;
       onIncreaseBufferSizeRequested?.call();
     }
     if (_underrunEpoch >= 2) {

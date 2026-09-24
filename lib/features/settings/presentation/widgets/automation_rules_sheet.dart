@@ -66,11 +66,34 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
     await _rulesService.saveRule(updated);
   }
 
-  Future<void> _delete(String id) async {
+  Future<void> _delete(AutomationRule rule, int index) async {
     setState(() {
-      _rules = _rules.where((r) => r.id != id).toList();
+      _rules = _rules.where((r) => r.id != rule.id).toList();
     });
-    await _rulesService.deleteRule(id);
+    await _rulesService.deleteRule(rule.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(rule.trigger.label),
+        action: SnackBarAction(
+          label: context.l10n.undo,
+          onPressed: () async {
+            await _rulesService.saveRule(rule);
+            if (mounted) {
+              setState(() {
+                final list = List<AutomationRule>.from(_rules);
+                if (index <= list.length) {
+                  list.insert(index, rule);
+                } else {
+                  list.add(rule);
+                }
+                _rules = list;
+              });
+            }
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -160,7 +183,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
         ),
         child: Icon(Icons.delete_outline_rounded, color: p.error),
       ),
-      onDismissed: (_) => _delete(rule.id),
+      onDismissed: (_) => _delete(rule, _rules.indexOf(rule)),
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.s10),
         decoration: BoxDecoration(

@@ -10,6 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/channels.dart';
 import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
+import '../../core/utils/error_logger.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/utils/platform_capabilities.dart';
@@ -338,10 +339,11 @@ class SongInfoSheet extends StatelessWidget {
                           onPressed: PlatformCapabilities.hasRingtoneManager
                               ? () => _showRingtoneOptions(context)
                               : () {
+                                  const ringtoneWarning = 'Ringtone setting is only supported on Android';
                                   ScaffoldMessenger.of(context).clearSnackBars();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Ringtone setting is only supported on Android'),
+                                      content: Text(ringtoneWarning),
                                     ),
                                   );
                                 },
@@ -401,7 +403,10 @@ class SongInfoSheet extends StatelessWidget {
     PlayerCubit? playerCubit;
     try {
       playerCubit = context.read<PlayerCubit>();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('SongInfoSheet reading PlayerCubit failed',
+          error: e, stackTrace: st, category: 'SongInfoSheet');
+    }
     if (playerCubit == null) return const SizedBox.shrink();
     final cubit = playerCubit;
 
@@ -837,7 +842,10 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
     PlayerCubit? playerCubit;
     try {
       playerCubit = context.read<PlayerCubit>();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('SongInfoSheet reading PlayerCubit for rating failed',
+          error: e, stackTrace: st, category: 'SongInfoSheet');
+    }
 
     final currentRating = _ratingStore.getRating(trackKey);
     final currentEq = _eqStore.getPresetForTrack(trackKey);

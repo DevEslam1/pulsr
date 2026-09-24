@@ -565,8 +565,10 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                       tooltip: context.l10n.dspResetToDefault,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 24, minHeight: 24),
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
                       onPressed:
                           isDefault || !enabled ? null : () => onChanged(defaultValue),
                     ),

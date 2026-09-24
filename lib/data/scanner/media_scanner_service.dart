@@ -133,18 +133,33 @@ class MediaScannerService {
 
   static bool isSystemIgnoredPath(String filePath) {
     final lower = filePath.toLowerCase().replaceAll('\\', '/');
+    final segments = lower.split('/');
     for (final pattern in systemIgnoredPathPatterns) {
-      if (lower.contains(pattern)) return true;
+      final patternSegments =
+          pattern.toLowerCase().split('/').where((s) => s.isNotEmpty).toList();
+      if (patternSegments.isNotEmpty) {
+        for (var i = 0; i <= segments.length - patternSegments.length; i++) {
+          var match = true;
+          for (var j = 0; j < patternSegments.length; j++) {
+            if (segments[i + j] != patternSegments[j]) {
+              match = false;
+              break;
+            }
+          }
+          if (match) return true;
+        }
+      }
     }
-    final fileName = lower.split('/').lastOrNull ?? '';
+    final fileName = segments.lastOrNull ?? '';
     if (fileName.startsWith('ptt-') ||
         (fileName.startsWith('aud-') && fileName.length > 20)) {
-      if (lower.contains('whatsapp') || lower.contains('opus')) return true;
+      if (segments.any((s) => s.contains('whatsapp') || s.contains('opus'))) {
+        return true;
+      }
     }
     // Ignore only known system dot folders — user dot folders like .my_collection are now allowed
-    final parts = lower.split('/');
     const knownSystemDotFolders = {'.thumbnails', '.trash', '.cache'};
-    if (parts.any((p) => knownSystemDotFolders.contains(p))) {
+    if (segments.any((p) => knownSystemDotFolders.contains(p))) {
       return true;
     }
     return false;
@@ -611,9 +626,11 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         path: Value(path),
         uri: Value(uri),
         trackNumber: Value(track),
-        dateAdded: Value(dateAdded),
+        dateAdded: Value(dateAdded != null
+            ? (dateAdded < 10000000000 ? dateAdded * 1000 : dateAdded)
+            : null),
         fileSize: Value(size),
-        artworkUri: Value(id.toString()),
+        artworkUri: const Value(null),
         genre: Value(genre),
         year: Value(year),
       ),
@@ -628,7 +645,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
           title: Value(album),
           artist: Value(artist),
           artistId: Value(artistId),
-          artworkUri: Value(albumId.toString()),
+          artworkUri: const Value(null),
         );
       }
     }
@@ -640,7 +657,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         artistMap[artistId] = ArtistsTableCompanion(
           id: Value(artistId),
           name: Value(artist),
-          artworkUri: Value(artistId.toString()),
+          artworkUri: const Value(null),
         );
       }
     }

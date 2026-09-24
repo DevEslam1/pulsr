@@ -66,12 +66,9 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<void> _maybeAdaptiveStepDown() async {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    final current = prefs.getString('setting_streaming_quality') ?? 'high';
-    // Only re-sync the policy when the persisted quality actually changed;
-    // resetting on every tick cleared the underrun counter before it could ever
-    // reach the threshold, so a step-down never fired.
-    if (current != adaptiveQualityManager.currentQuality) {
-      adaptiveQualityManager.setQuality(current);
+    final ceiling = prefs.getString('setting_streaming_quality') ?? 'high';
+    if (qualityRank(adaptiveQualityManager.currentQuality) > qualityRank(ceiling)) {
+      adaptiveQualityManager.setQuality(ceiling);
     }
     final next = await adaptiveQualityManager.reportUnderrun();
     if (next != null) await _applyAdaptiveQuality(next);
@@ -80,31 +77,31 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<void> _maybeAdaptiveStepUp() async {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    final current = prefs.getString('setting_streaming_quality') ?? 'high';
-    // `current` is the user's ceiling. Snap down only if the manager believes a
-    // higher quality is playing than the ceiling allows; never reset it upward.
-    if (qualityRank(adaptiveQualityManager.currentQuality) > qualityRank(current)) {
-      adaptiveQualityManager.setQuality(current);
+    final ceiling = prefs.getString('setting_streaming_quality') ?? 'high';
+    if (qualityRank(adaptiveQualityManager.currentQuality) > qualityRank(ceiling)) {
+      adaptiveQualityManager.setQuality(ceiling);
     }
     final next = await adaptiveQualityManager.reportHealthy();
-    if (next != null && qualityRank(next) <= qualityRank(current)) {
+    if (next != null && qualityRank(next) <= qualityRank(ceiling)) {
       await _applyAdaptiveQuality(next);
     }
   }
 
   Future<void> _applyAdaptiveQuality(String newQuality) async {
-    // A quality step-down landing mid-crossfade/gapless load would clobber the
-    // player that is already transitioning; skip this cycle and let the next
-    // health tick retry.
+    // A quality step-down landing mid-crossfade or during gapless playback
+    // must not clobber the player or destroy the ConcatenatingAudioSource.
     if (_crossfadeManager.isCrossfading) return;
+    if (_gaplessMode && _gaplessLoaded) return;
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+    final previousQuality = prefs.getString('adaptive_runtime_quality') ??
+        prefs.getString('setting_streaming_quality') ?? 'high';
     try {
-      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      await prefs.setString('setting_streaming_quality', newQuality);
+      await prefs.setString('adaptive_runtime_quality', newQuality);
       final song = currentSong;
       if (song != null &&
           song.source == SongSource.youtube &&
           (song.remoteId?.isNotEmpty ?? false)) {
-        _streamCache.removeWhere((k, _) => k.startsWith(song.remoteId!));
+        _streamCache.removeWhere((k, _) => k.startsWith('${song.remoteId!}:'));
         _streamResolutionPipeline.invalidateCache(song.remoteId!);
         // Hot-swap mid-track: re-resolve at new quality, keep position.
         final pos = _activePlayer.position;
@@ -112,19 +109,31 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         final generation = ++_playGeneration;
         try {
           final resolved = await _resolveStreamUrl(song, forceRefresh: true);
-          // Bail if the track/queue changed while we re-resolved.
+          // Bail if the track/queue changed while we re-resolved or if in gapless mode.
           if (generation != _playGeneration ||
               currentSong?.id != song.id ||
-              _crossfadeManager.isCrossfading) {
+              _crossfadeManager.isCrossfading ||
+              (_gaplessMode && _gaplessLoaded)) {
             return;
           }
           final tag = PulsrAudioHandler._songToMediaItem(song);
           final src = AudioSource.uri(Uri.parse(resolved.url), tag: tag);
           await _activePlayer.setAudioSource(src, initialPosition: pos);
           if (wasPlaying) unawaited(_activePlayer.play());
-        } catch (_) {}
+        } catch (_) {
+          await prefs.setString('adaptive_runtime_quality', previousQuality);
+        }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply adaptive quality',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      try {
+        await prefs.setString('adaptive_runtime_quality', previousQuality);
+      } catch (e2, st2) {
+        ErrorLogger.log('Failed to roll back runtime quality pref',
+            error: e2, stackTrace: st2, category: 'AudioHandler');
+      }
+    }
   }
 
   // F6: gapless trim lookup for a song.
@@ -396,4 +405,8 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   TrackDelayManager get trackDelayManager;
+
+  // Requires: provided by the composing class (same library).
+  bool get _gaplessMode;
+  bool get _gaplessLoaded;
 }

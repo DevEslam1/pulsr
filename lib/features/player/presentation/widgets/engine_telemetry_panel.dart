@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/models/dsp_telemetry.dart';
 import '../../cubit/dsp_telemetry_cubit.dart';
 
@@ -132,7 +133,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
             ),
             const SizedBox(width: AppSpacing.sm),
             Text(
-              "DSP Engine Telemetry",
+              context.l10n.dspEngineTelemetry,
               style: TextStyle(
                 fontSize: 13,
                 color: p.textPrimary,
@@ -150,7 +151,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                   border: Border.all(color: p.error, width: 0.8),
                 ),
                 child: Text(
-                  "DEGRADED",
+                  context.l10n.dspStatusDegraded,
                   style: TextStyle(
                     color: p.error,
                     fontSize: 9,
@@ -159,7 +160,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                 ),
               ),
             Text(
-              'RTF: ${rtfPct.toStringAsFixed(1)}%',
+              context.l10n.rtfPercent(rtfPct.toStringAsFixed(1)),
               style: TextStyle(
                 fontSize: 12,
                 color: rtfColor,
@@ -191,18 +192,18 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(height: 12, color: p.hairline),
-          _buildLimiterMeter(p, telemetry.limiterGrDb),
+          _buildLimiterMeter(context, p, telemetry.limiterGrDb),
           const SizedBox(height: AppSpacing.sm),
-          _buildMultibandMeter(p, telemetry.multibandGrDb),
+          _buildMultibandMeter(context, p, telemetry.multibandGrDb),
           const SizedBox(height: AppSpacing.sm),
-          _buildDynEqMeter(p, telemetry.dynEqGrDb),
+          _buildDynEqMeter(context, p, telemetry.dynEqGrDb),
           const SizedBox(height: AppSpacing.xs),
         ],
       ),
     );
   }
 
-  Widget _buildLimiterMeter(PulsrPalette p, double limiterGrDb) {
+  Widget _buildLimiterMeter(BuildContext context, PulsrPalette p, double limiterGrDb) {
     final clampedGr = limiterGrDb.clamp(-24.0, 0.0);
     final ratio = (-clampedGr / 24.0).clamp(0.0, 1.0);
 
@@ -213,7 +214,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              "Limiter Reduction",
+              context.l10n.limiterReduction,
               style: TextStyle(
                 color: p.textSecondary,
                 fontSize: 11,
@@ -246,14 +247,14 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildMultibandMeter(PulsrPalette p, List<double> mbGr) {
+  Widget _buildMultibandMeter(BuildContext context, PulsrPalette p, List<double> mbGr) {
     final bandLabels = ['Low', 'Lo-Mid', 'Hi-Mid', 'High'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Multiband Comp Reduction",
+          context.l10n.multibandCompReduction,
           style: TextStyle(
             color: p.textSecondary,
             fontSize: 11,
@@ -296,12 +297,12 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildDynEqMeter(PulsrPalette p, List<double> dynEqGr) {
+  Widget _buildDynEqMeter(BuildContext context, PulsrPalette p, List<double> dynEqGr) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Dynamic EQ Adjustments",
+          context.l10n.dynamicEqAdjustments,
           style: TextStyle(
             color: p.textSecondary,
             fontSize: 11,

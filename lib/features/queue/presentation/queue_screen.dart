@@ -195,6 +195,15 @@ class QueueScreen extends StatelessWidget {
             );
           }
 
+          final slotKeys = <Key>[];
+          final occurrences = <String, int>{};
+          for (final s in queue) {
+            final id = 'queue_${s.id}_${s.remoteId ?? s.path}';
+            final count = (occurrences[id] ?? 0) + 1;
+            occurrences[id] = count;
+            slotKeys.add(ValueKey('${id}_#$count'));
+          }
+
           return Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
@@ -206,9 +215,7 @@ class QueueScreen extends StatelessWidget {
                   vertical: AppSpacing.xs,
                 ).copyWith(bottom: AppSpacing.scrollBottom),
                 itemCount: queue.length,
-                // ignore: deprecated_member_use — onReorderItem is 3.41+; keep onReorder for stable channel compat
-                onReorder: (oldIdx, newIdx) {
-                  if (newIdx > oldIdx) newIdx -= 1;
+                onReorderItem: (oldIdx, newIdx) {
                   if (oldIdx == newIdx) return;
                   context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx);
                   ScaffoldMessenger.of(context).clearSnackBars();
@@ -230,7 +237,7 @@ class QueueScreen extends StatelessWidget {
                   final isCurrent = song.id == currentSong?.id;
 
                   return Container(
-                    key: ValueKey('queue_${song.id}_${song.remoteId ?? song.path}_$index'),
+                    key: slotKeys[index],
                     margin: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                     decoration: BoxDecoration(
                       borderRadius: AppRadii.cardRadius,
@@ -256,12 +263,34 @@ class QueueScreen extends StatelessWidget {
                         button: true,
                         label: '${song.title} by ${song.artist}',
                         child: ListTile(
-                          leading: CachedArtwork(
-                            id: song.id,
-                            remoteUrl: song.remoteArtworkUrl,
-                            type: ArtworkType.AUDIO,
-                            size: 44,
-                            borderRadius: 10,
+                          leading: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              CachedArtwork(
+                                id: song.id,
+                                remoteUrl: song.remoteArtworkUrl,
+                                type: ArtworkType.AUDIO,
+                                size: 44,
+                                borderRadius: 10,
+                              ),
+                              if (song.remoteId != null &&
+                                  song.remoteId!.isNotEmpty)
+                                PositionedDirectional(
+                                  end: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: p.surface,
+                                      shape: BoxShape.circle,
+                                      border:
+                                          Border.all(color: p.accent, width: 1),
+                                    ),
+                                    child: Icon(Icons.cloud_rounded,
+                                        size: 10, color: p.accent),
+                                  ),
+                                ),
+                            ],
                           ),
                           title: Text(
                             song.title,
@@ -274,12 +303,28 @@ class QueueScreen extends StatelessWidget {
                               fontSize: AppFontSize.body,
                             ),
                           ),
-                          subtitle: Text(
-                            '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                          subtitle: Row(
+                            children: [
+                              if (song.remoteId != null && song.remoteId!.isNotEmpty) ...[
+                                Icon(
+                                  Icons.cloud_outlined,
+                                  size: 13,
+                                  color: p.accent.withValues(alpha: 0.8),
+                                ),
+                                const SizedBox(width: AppSpacing.xxs),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -295,14 +340,33 @@ class QueueScreen extends StatelessWidget {
                               IconButton(
                                 icon: Icon(Icons.close_rounded, color: p.textTertiary, size: 20),
                                 tooltip: context.l10n.delete,
+                                constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget,
+                                ),
                                 onPressed: () {
                                   HapticFeedback.heavyImpact();
                                   context.read<PlayerCubit>().removeQueueItem(index);
                                 },
                               ),
-                              Semantics(
-                                label: 'Reorder ${song.title}',
-                                child: Icon(Icons.drag_handle_rounded, color: p.textTertiary.withValues(alpha: 0.5), size: 20),
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Semantics(
+                                  label: 'Reorder ${song.title}',
+                                  child: Container(
+                                    padding: const EdgeInsets.all(AppSpacing.xs),
+                                    constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      Icons.drag_handle_rounded,
+                                      color: p.textTertiary.withValues(alpha: 0.5),
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
                           ),

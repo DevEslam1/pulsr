@@ -7,7 +7,7 @@
 #include <map>
 #include <list>
 #include <tuple>
-#if defined(__ARM_NEON) || defined(__ARM_NEON__)
+#if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
 #define PULSR_HAS_NEON 1
 #elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)

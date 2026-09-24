@@ -107,11 +107,11 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isLandscape = context.isLandscape &&
-            (context.isTwoPane || constraints.maxWidth >= 680);
+        final isLandscape = context.isLandscape ||
+            (context.isTwoPane || constraints.maxWidth >= 600);
 
         final double heightRatio =
-            (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+            (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
         final double spacingTrackToSeek =
             (isTablet ? 10.0 : 6.0) * heightRatio;
         final double spacingSeekToControls =
@@ -126,10 +126,10 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             (isTablet ? 6.0 : 3.0) * heightRatio;
 
         final double pillBarWidth = math.min(
-          constraints.maxWidth - (isTablet ? 64 : 36),
+          constraints.maxWidth - (isTablet ? 64 : 28),
           isTablet ? 440.0 : 336.0,
         );
-        final double pillBarHeight = isTablet ? 50.0 : 44.0;
+        final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
         final viewSwitcher = PlayerViewSwitcher(
           state: state,
@@ -467,7 +467,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               hasPrevious: state.hasPreviousNeighbour,
               hasNext: state.hasNextNeighbour,
               primaryColor: activeColor,
-              mainButtonSize: isTablet ? 72 : (isLandscape ? 56 : 64),
+              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
               onPlayPause: () => cubit.togglePlayPause(),
               onNext: () => cubit.next(),
               onPrevious: () => cubit.previous(),
@@ -684,10 +684,10 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                         artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
                     final double maxW = isTablet ? 560.0 : 440.0;
                     final double maxH = isTablet ? 360.0 : 300.0;
-                    final double cassetteW =
-                        math.min(availableWidth, maxW).clamp(240.0, double.infinity);
-                    final double cassetteH =
-                        math.min(availableHeight, maxH).clamp(160.0, double.infinity);
+                    final double rawW = math.min(availableWidth, maxW);
+                    final double rawH = math.min(availableHeight, maxH);
+                    final double cassetteW = rawW <= 0 ? 0.0 : rawW;
+                    final double cassetteH = rawH <= 0 ? 0.0 : rawH;
 
                     return Center(
                       child: ConstrainedBox(

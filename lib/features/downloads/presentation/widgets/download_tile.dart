@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../cubit/downloads_cubit.dart';
@@ -126,17 +127,33 @@ class DownloadTile extends StatelessWidget {
                     icon: Icon(Icons.close_rounded,
                         color: p.textSecondary, size: 20),
                     tooltip: l10n.cancel,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    onPressed: () => cubit.cancelDownload(task.videoId),
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    onPressed: () {
+                      final title = task.title.isNotEmpty ? task.title : task.videoId;
+                      cubit.cancelDownload(task.videoId);
+                      PulsrToast.show(
+                        context,
+                        message: '$title ${l10n.statusCancelled.toLowerCase()}',
+                        icon: Icons.cancel_outlined,
+                        actionLabel: l10n.retry,
+                        onActionPressed: () => cubit.retryDownload(task.videoId),
+                      );
+                    },
                   ),
                 Semantics(
                   label: '${l10n.browseDownloadActionsFor} ${task.title}',
                   button: true,
-                  child: PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert_rounded,
-                        color: p.textSecondary, size: 20),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    child: PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert_rounded,
+                          color: p.textSecondary, size: 20),
                     color: p.surfaceContainerHigh,
                     onSelected: (action) {
                       switch (action) {
@@ -151,6 +168,13 @@ class DownloadTile extends StatelessWidget {
                           break;
                         case 'delete':
                           cubit.deleteDownload(task.videoId);
+                          PulsrToast.show(
+                            context,
+                            message: '${task.title.isNotEmpty ? task.title : task.videoId} ${l10n.delete.toLowerCase()}',
+                            icon: Icons.delete_outline_rounded,
+                            actionLabel: l10n.undo,
+                            onActionPressed: () => cubit.queueDownload(task),
+                          );
                           break;
                       }
                     },
@@ -205,20 +229,31 @@ class DownloadTile extends StatelessWidget {
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
             if (task.status == DownloadStatus.downloading ||
                 task.status == DownloadStatus.tagging) ...[
               const SizedBox(height: AppSpacing.sm),
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadii.r4),
-                child: LinearProgressIndicator(
-                  value: task.status == DownloadStatus.tagging
-                      ? null
-                      : (task.progress > 0 ? task.progress : null),
-                  backgroundColor: p.surfaceContainerHigh,
-                  valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                  minHeight: 6,
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  tween: Tween<double>(
+                    begin: 0.0,
+                    end: task.progress.clamp(0.0, 1.0),
+                  ),
+                  builder: (context, animatedProgress, _) {
+                    return LinearProgressIndicator(
+                      value: task.status == DownloadStatus.tagging
+                          ? null
+                          : (animatedProgress > 0 ? animatedProgress : null),
+                      backgroundColor: p.surfaceContainerHigh,
+                      valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                      minHeight: 6,
+                    );
+                  },
                 ),
               ),
               if (task.status == DownloadStatus.downloading) ...[

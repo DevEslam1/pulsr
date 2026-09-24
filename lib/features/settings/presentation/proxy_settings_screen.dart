@@ -124,29 +124,43 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   }
 
   void _syncControllersWithState(SettingsState state) {
-    if (!_hostFocusNode.hasFocus && _hostController.text != state.proxyHost) {
-      _hostController.text = state.proxyHost;
+    final anyFieldFocused = _hostFocusNode.hasFocus ||
+        _portFocusNode.hasFocus ||
+        _usernameFocusNode.hasFocus ||
+        _passwordFocusNode.hasFocus ||
+        _bypassFocusNode.hasFocus;
+    if (anyFieldFocused) {
+      _enabled = state.proxyEnabled;
+      _type = state.proxyType;
+      return;
     }
-    if (!_portFocusNode.hasFocus && _portController.text != state.proxyPort.toString()) {
-      _portController.text = state.proxyPort.toString();
-    }
-    if (!_usernameFocusNode.hasFocus && _usernameController.text != state.proxyUsername) {
-      _usernameController.text = state.proxyUsername;
-    }
-    if (!_bypassFocusNode.hasFocus && _bypassController.text != state.proxyBypassHosts) {
-      _bypassController.text = state.proxyBypassHosts;
-    }
-    // Password lives in secure storage (not in SettingsState) — rehydrate it
-    // so switching pool entries never leaves a stale password behind.
-    if (!_passwordFocusNode.hasFocus) {
-      context.read<SettingsCubit>().getProxyPassword().then((pw) {
-        if (mounted && !_passwordFocusNode.hasFocus && _passwordController.text != pw) {
-          _passwordController.text = pw;
-        }
-      });
-    }
-    _enabled = state.proxyEnabled;
-    _type = state.proxyType;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_hostFocusNode.hasFocus && _hostController.text != state.proxyHost) {
+        _hostController.text = state.proxyHost;
+      }
+      if (!_portFocusNode.hasFocus && _portController.text != state.proxyPort.toString()) {
+        _portController.text = state.proxyPort.toString();
+      }
+      if (!_usernameFocusNode.hasFocus && _usernameController.text != state.proxyUsername) {
+        _usernameController.text = state.proxyUsername;
+      }
+      if (!_bypassFocusNode.hasFocus && _bypassController.text != state.proxyBypassHosts) {
+        _bypassController.text = state.proxyBypassHosts;
+      }
+      // Password lives in secure storage (not in SettingsState) — rehydrate it
+      // so switching pool entries never leaves a stale password behind.
+      if (!_passwordFocusNode.hasFocus) {
+        context.read<SettingsCubit>().getProxyPassword().then((pw) {
+          if (mounted && !_passwordFocusNode.hasFocus && _passwordController.text != pw) {
+            _passwordController.text = pw;
+          }
+        });
+      }
+      _enabled = state.proxyEnabled;
+      _type = state.proxyType;
+    });
   }
 
   Future<void> _saveSettings() async {
@@ -551,9 +565,11 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
               constraints: const BoxConstraints(maxWidth: 720),
               child: Form(
                 key: _formKey,
-                child: ListView(
-                  padding:
-                      EdgeInsetsDirectional.fromSTEB(horizontalPad, AppSpacing.xs, horizontalPad, AppSpacing.xxl),
+                child: FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: ListView(
+                    padding:
+                        EdgeInsetsDirectional.fromSTEB(horizontalPad, AppSpacing.xs, horizontalPad, AppSpacing.xxl),
                   children: [
                     // Master Switch Card
                     _buildMasterToggle(p),
@@ -617,10 +633,11 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
             ),
           ),
         ),
-      );
-    },
+      ),
     );
-  }
+  },
+  );
+}
 
   Widget _buildMasterToggle(PulsrPalette p) {
     return Container(
@@ -639,8 +656,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: AppSpacing.minTouchTarget,
+                height: AppSpacing.minTouchTarget,
                 decoration: BoxDecoration(
                   color: _enabled ? p.accentContainer : p.surface,
                   borderRadius: BorderRadius.circular(AppRadii.r12),

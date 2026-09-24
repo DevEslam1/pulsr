@@ -470,16 +470,35 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                       song.remoteId!.isNotEmpty)
                                     YtmDownloadButton(song: song),
                                   if (!playlist.isSmart)
-                                      IconButton(
-                                        icon: Icon(
-                                            Icons.remove_circle_outline_rounded,
-                                            size: 20,
-                                            color: p.textTertiary),
-                                        tooltip: context.l10n.remove,
-                                      onPressed: () {
-                                        playlistUseCases
-                                            .removeSongFromPlaylist(
-                                                playlist.id, song.id);
+                                    IconButton(
+                                      icon: Icon(
+                                          Icons.remove_circle_outline_rounded,
+                                          size: 20,
+                                          color: p.textTertiary),
+                                      tooltip: context.l10n.remove,
+                                      constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget,
+                                      ),
+                                      onPressed: () async {
+                                        await playlistUseCases.removeSongFromPlaylist(
+                                            playlist.id, song.id);
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).clearSnackBars();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  '${song.title} removed from ${playlist.name}'),
+                                              action: SnackBarAction(
+                                                label: context.l10n.undo,
+                                                onPressed: () {
+                                                  playlistUseCases.addSongsToPlaylist(
+                                                      playlist.id, [song.id]);
+                                                },
+                                              ),
+                                            ),
+                                          );
+                                        }
                                       },
                                     ),
                                 ],

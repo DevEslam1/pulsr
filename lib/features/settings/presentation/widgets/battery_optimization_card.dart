@@ -23,6 +23,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
   bool _isDismissed = false;
   bool _isIgnoring = true;
   String _manufacturer = '';
+  bool _isChecking = false;
 
   @override
   void initState() {
@@ -45,17 +46,22 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
   }
 
   Future<void> _checkStatus() async {
-    if (!PlatformCapabilities.isAndroid) return;
-    final dismissed = await BatteryOptimizationService.isCardDismissed();
-    final ignoring =
-        await BatteryOptimizationService.isIgnoringBatteryOptimizations();
-    final m = await BatteryOptimizationService.getDeviceManufacturer();
-    if (mounted) {
-      setState(() {
-        _isDismissed = dismissed;
-        _isIgnoring = ignoring;
-        _manufacturer = m;
-      });
+    if (!PlatformCapabilities.isAndroid || _isChecking) return;
+    _isChecking = true;
+    try {
+      final dismissed = await BatteryOptimizationService.isCardDismissed();
+      final ignoring =
+          await BatteryOptimizationService.isIgnoringBatteryOptimizations();
+      final m = await BatteryOptimizationService.getDeviceManufacturer();
+      if (mounted) {
+        setState(() {
+          _isDismissed = dismissed;
+          _isIgnoring = ignoring;
+          _manufacturer = m;
+        });
+      }
+    } finally {
+      _isChecking = false;
     }
   }
 

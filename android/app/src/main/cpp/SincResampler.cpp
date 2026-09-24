@@ -7,7 +7,7 @@
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
-#if defined(__ARM_NEON)
+#if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
 #endif
 

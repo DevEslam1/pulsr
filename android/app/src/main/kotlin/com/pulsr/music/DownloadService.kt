@@ -273,7 +273,7 @@ class DownloadService : Service() {
         val title = if (single) {
             downloadTitles[vid] ?: getString(R.string.download_notification_downloads)
         } else {
-            getString(R.string.download_notification_count, activeDownloads.size)
+            resources.getQuantityString(R.plurals.download_notification_count, activeDownloads.size, activeDownloads.size)
         }
         // A single job reports its own progress; several report their average.
         val progress = if (single) {

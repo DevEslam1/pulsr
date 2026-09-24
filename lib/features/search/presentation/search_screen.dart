@@ -78,7 +78,7 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  bool _initialQueryApplied = false;
+  String? _lastAppliedQueryParam;
 
   @override
   void didChangeDependencies() {
@@ -86,16 +86,22 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!AppConfig.ytmEnabled && _selectedTab != 0) {
       _selectedTab = 0;
     }
-    if (_initialQueryApplied) return;
-    _initialQueryApplied = true;
     // Assistant / deep-link entry: prefill and run the search when the route
     // carries a `?q=` query (e.g. `go('/search?q=...')` from voice search).
     final q = GoRouterState.of(context).uri.queryParameters['q'];
-    if (q == null || q.trim().isEmpty) return;
-    _searchController.text = q;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _onQueryChanged(context, q, immediate: true);
-    });
+    if (q != null && q.trim().isNotEmpty && q != _lastAppliedQueryParam) {
+      _lastAppliedQueryParam = q;
+      _searchController.text = q;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onQueryChanged(context, q, immediate: true);
+      });
+    }
+  }
+
+  @override
+  void deactivate() {
+    _suggestTimer?.cancel();
+    super.deactivate();
   }
 
   @override
@@ -139,7 +145,11 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController.selection = TextSelection.collapsed(
         offset: suggestion.length);
     setState(() => _suggestions = const []);
-    _onQueryChanged(context, suggestion, immediate: true);
+    if (_isOnlineTab) {
+      context.read<YtmSearchCubit>().onQueryChanged(suggestion);
+    } else {
+      context.read<SearchCubit>().useHistoryQuery(suggestion);
+    }
   }
 
   void _clear(BuildContext context) {
@@ -151,18 +161,26 @@ class _SearchScreenState extends State<SearchScreen> {
     } else {
       context.read<SearchCubit>().clearQuery();
     }
+    _searchFocus.requestFocus();
   }
 
   bool get _isOnlineTab => AppConfig.ytmEnabled && _selectedTab == 1;
 
   void _onTabChanged(int index) {
     if (_selectedTab == index) return;
-    setState(() => _selectedTab = index);
+    _suggestTimer?.cancel();
+    setState(() {
+      _selectedTab = index;
+      _suggestions = const [];
+    });
     final query = _searchController.text;
     if (index == 1 && AppConfig.ytmEnabled) {
       context.read<YtmSearchCubit>().onQueryChanged(query);
     } else {
       context.read<SearchCubit>().onQueryChanged(query);
+      if (query.trim().isNotEmpty) {
+        _scheduleSuggestions(context, query);
+      }
     }
   }
 
@@ -266,40 +284,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
 
-                    // ---------- C-02: Autocomplete Suggestions ----------
-                    if (currentTab == 0 && _suggestions.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: Adaptive.pagePadding(context)),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          child: Row(
-                            children: [
-                              for (final suggestion in _suggestions)
-                                Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                      end: AppSpacing.xs),
-                                  child: ActionChip(
-                                    avatar: Icon(Icons.search_rounded,
-                                        size: 16, color: p.textTertiary),
-                                    label: Text(suggestion),
-                                    backgroundColor: p.surfaceContainer,
-                                    side: BorderSide(color: p.hairline),
-                                    labelStyle: TextStyle(
-                                        color: p.textPrimary,
-                                        fontSize: AppFontSize.label,
-                                        fontWeight: FontWeight.w600),
-                                    onPressed: () =>
-                                        _applySuggestion(context, suggestion),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+
 
                     // ---------- Filter Chips (Local Tab Only) ----------
                     if (currentTab == 0) ...[
@@ -395,8 +380,42 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Widget _buildSuggestionsList(BuildContext context, PulsrPalette p) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const ClampingScrollPhysics(),
+      padding: EdgeInsets.symmetric(
+        horizontal: Adaptive.pagePadding(context),
+        vertical: AppSpacing.xs,
+      ),
+      itemCount: _suggestions.length,
+      separatorBuilder: (_, __) => Divider(color: p.hairline, height: 1),
+      itemBuilder: (context, index) {
+        final suggestion = _suggestions[index];
+        return ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          leading: Icon(Icons.search_rounded, color: p.textTertiary, size: 20),
+          title: Text(
+            suggestion,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontSize: AppFontSize.body,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          trailing: const Icon(Icons.north_west_rounded, size: 16),
+          onTap: () => _applySuggestion(context, suggestion),
+        );
+      },
+    );
+  }
+
   Widget _buildLocalBody(BuildContext context, SearchState state,
       PlayerCubit playerCubit, PulsrPalette p) {
+    if (_suggestions.isNotEmpty && _searchController.text.trim().isNotEmpty) {
+      return _buildSuggestionsList(context, p);
+    }
     if (state.isLoading) {
       return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
     }
@@ -428,7 +447,25 @@ class _SearchScreenState extends State<SearchScreen> {
                 ValueListenableBuilder<List<String>>(
                   valueListenable: context.read<SearchCubit>().savedSearches,
                   builder: (context, saved, _) {
-                    if (saved.isEmpty) return const SizedBox.shrink();
+                    if (saved.isEmpty) {
+                      if (state.history.length > 3) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.bookmark_add_outlined, size: 14, color: p.textTertiary),
+                              const SizedBox(width: AppSpacing.xxs),
+                              Text(
+                                '${context.l10n.search}: Tap "Save search" after searching to bookmark it',
+                                style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -743,6 +780,16 @@ class _OnlineResults extends StatelessWidget {
 
     return BlocBuilder<YtmSearchCubit, YtmSearchState>(
       builder: (context, state) {
+        final isOffline =
+            context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+        if (isOffline) {
+          return EmptyStateWidget(
+            icon: Icons.wifi_off_rounded,
+            title: context.l10n.offlineOnlyMode,
+            subtitle: context.l10n.browseYtmSearchScreenDesc,
+          );
+        }
+
         if (state.isLoading) {
           return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
         }

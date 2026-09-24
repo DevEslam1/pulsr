@@ -52,7 +52,24 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: const PulsrBackButton(),
-          title: Text(genreItem.name),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${context.l10n.genres} > ${genreItem.name}',
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  color: p.textTertiary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                genreItem.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
         ),
       body: StreamBuilder<Result<List<SongsTableData>>>(
         stream: _useCase.watchGenreSongs(genreItem.name).distinct(),

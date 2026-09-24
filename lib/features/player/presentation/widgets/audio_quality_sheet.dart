@@ -279,7 +279,7 @@ class AudioQualitySheet extends StatelessWidget {
                           Text(
                             outputDevice?.isUsbDac == true
                                 ? 'USB DAC: ${outputDevice?.usbDacLabel ?? "-"} ($uacLabel)'
-                                : 'USB DAC: none attached',
+                                : context.l10n.usbDacNoneAttached,
                             style: TextStyle(
                               fontSize: AppFontSize.label,
                               color: p.textPrimary,
@@ -289,8 +289,8 @@ class AudioQualitySheet extends StatelessWidget {
                           const SizedBox(height: AppSpacing.s2),
                           Text(
                             maxRate == null
-                                ? 'DIRECT PLAYBACK: not reported'
-                                : 'DIRECT PLAYBACK: up to $maxRate Hz / $bitsLabel',
+                                ? context.l10n.directPlaybackNotReported
+                                : context.l10n.directPlaybackUpTo(maxRate.toString(), bitsLabel),
                             style: TextStyle(
                               fontSize: AppFontSize.label,
                               color: p.textPrimary,
@@ -527,7 +527,7 @@ class AudioQualitySheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    outputDevice?.deviceName ?? 'Phone Speaker',
+                    outputDevice?.deviceName ?? context.l10n.phoneSpeaker,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -535,7 +535,10 @@ class AudioQualitySheet extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Active system output device • Up to ${outputDevice != null ? (outputDevice.sampleRate ~/ 1000) : 48} kHz / ${outputDevice?.bitDepth ?? 16}-bit',
+                    context.l10n.activeSystemOutputDesc(
+                      (outputDevice != null ? (outputDevice.sampleRate ~/ 1000) : 48).toString(),
+                      (outputDevice?.bitDepth ?? 16).toString(),
+                    ),
                     style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
                   ),
                 ],
@@ -622,7 +625,11 @@ class AudioQualitySheet extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                '${dev.typeName} • Up to ${dev.sampleRates.isEmpty ? "48" : (dev.sampleRates.reduce((a, b) => a > b ? a : b) ~/ 1000)} kHz / ${dev.maxBitDepth}-bit',
+                                context.l10n.deviceOutputSpecsDesc(
+                                  dev.typeName,
+                                  (dev.sampleRates.isEmpty ? 48 : (dev.sampleRates.reduce((a, b) => a > b ? a : b) ~/ 1000)).toString(),
+                                  dev.maxBitDepth.toString(),
+                                ),
                                 style: TextStyle(
                                   color: p.textSecondary,
                                   fontSize: AppFontSize.caption,
@@ -1033,9 +1040,11 @@ class AudioQualitySheet extends StatelessWidget {
                                 ? blockedReason
                                 : (isBitPerfectEnabled
                                     ? (isBitPerfectActive
-                                        ? 'Hardware direct pass-through active${isUsbDac ? " on USB DAC" : " (wired direct)"}'
-                                        : 'Pass-through armed • Engages automatically when capable DAC is connected')
-                                    : 'Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)'),
+                                        ? (isUsbDac
+                                            ? context.l10n.bpDirectActiveUsb
+                                            : context.l10n.bpDirectActiveWired)
+                                        : context.l10n.bpPassThroughArmed)
+                                    : context.l10n.bpBypassesAndroidMixer),
                             style: TextStyle(
                               color:
                                   blockedReason != null && !isBitPerfectEnabled
@@ -1282,7 +1291,7 @@ class AudioQualitySheet extends StatelessWidget {
               ),
             ),
           ],
-          _buildSignalChainNode(
+          _SignalChainNode(
             step: 1,
             title: context.l10n.dspSourceFile,
             detail: sourceLabel,
@@ -1290,8 +1299,8 @@ class AudioQualitySheet extends StatelessWidget {
             color: info.badgeColor,
             p: p,
           ),
-          _buildSignalChainConnector(p),
-          _buildSignalChainNode(
+          _SignalChainConnector(p: p),
+          _SignalChainNode(
             step: 2,
             title: context.l10n.dspDspProcessing,
             detail: dspLabel,
@@ -1302,8 +1311,8 @@ class AudioQualitySheet extends StatelessWidget {
             p: p,
             isDimmed: isBitPerfect,
           ),
-          _buildSignalChainConnector(p),
-          _buildSignalChainNode(
+          _SignalChainConnector(p: p),
+          _SignalChainNode(
             step: 3,
             title: context.l10n.dspResamplingEngine,
             detail: resamplerLabel,
@@ -1312,8 +1321,8 @@ class AudioQualitySheet extends StatelessWidget {
             p: p,
             isDimmed: isBitPerfect,
           ),
-          _buildSignalChainConnector(p),
-          _buildSignalChainNode(
+          _SignalChainConnector(p: p),
+          _SignalChainNode(
             step: 4,
             title: context.l10n.dspOutputDriver,
             detail: driverLabel,
@@ -1321,8 +1330,8 @@ class AudioQualitySheet extends StatelessWidget {
             color: isBitPerfect ? AppColors.dacGold : p.warning,
             p: p,
           ),
-          _buildSignalChainConnector(p),
-          _buildSignalChainNode(
+          _SignalChainConnector(p: p),
+          _SignalChainNode(
             step: 5,
             title: context.l10n.dspHardwareEndpoint,
             detail:
@@ -1341,16 +1350,31 @@ class AudioQualitySheet extends StatelessWidget {
     );
   }
 
-  Widget _buildSignalChainNode({
-    required int step,
-    required String title,
-    required String detail,
-    required IconData icon,
-    required Color color,
-    required PulsrPalette p,
-    bool isDimmed = false,
-    bool isLast = false,
-  }) {
+}
+
+class _SignalChainNode extends StatelessWidget {
+  final int step;
+  final String title;
+  final String detail;
+  final IconData icon;
+  final Color color;
+  final PulsrPalette p;
+  final bool isDimmed;
+  final bool isLast;
+
+  const _SignalChainNode({
+    required this.step,
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.color,
+    required this.p,
+    this.isDimmed = false,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -1403,10 +1427,21 @@ class AudioQualitySheet extends StatelessWidget {
       ],
     );
   }
+}
 
-  Widget _buildSignalChainConnector(PulsrPalette p) {
+class _SignalChainConnector extends StatelessWidget {
+  final PulsrPalette p;
+
+  const _SignalChainConnector({required this.p});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 13, top: AppSpacing.s2, bottom: AppSpacing.s2),
+      padding: const EdgeInsetsDirectional.only(
+        start: 13,
+        top: AppSpacing.s2,
+        bottom: AppSpacing.s2,
+      ),
       child: Container(width: 2, height: 12, color: p.hairline),
     );
   }

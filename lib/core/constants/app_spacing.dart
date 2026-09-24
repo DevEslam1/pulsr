@@ -30,6 +30,9 @@ abstract class AppSpacing {
   static const double s40 = 40;
   static const double s64 = 64;
 
+  /// Canonical minimum interactive touch target dimension per Material & WCAG guidelines.
+  static const double minTouchTarget = 48;
+
   /// Bottom padding so content clears the mini-player + nav dock.
   static const double scrollBottom = 160;
 }

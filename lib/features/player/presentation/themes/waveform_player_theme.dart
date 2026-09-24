@@ -125,11 +125,11 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isLandscape = context.isLandscape &&
-                (context.isTwoPane || constraints.maxWidth >= 680);
+            final isLandscape = context.isLandscape ||
+                (context.isTwoPane || constraints.maxWidth >= 600);
 
             final double heightRatio =
-                (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+                (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
             final double spacingTrackToSeek =
                 (isTablet ? 10.0 : 6.0) * heightRatio;
             final double spacingSeekToControls =
@@ -144,10 +144,10 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                 (isTablet ? 6.0 : 3.0) * heightRatio;
 
             final double pillBarWidth = math.min(
-              constraints.maxWidth - (isTablet ? 64 : 36),
+              constraints.maxWidth - (isTablet ? 64 : 28),
               isTablet ? 440.0 : 336.0,
             );
-            final double pillBarHeight = isTablet ? 50.0 : 44.0;
+            final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -406,7 +406,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   hasPrevious: state.hasPreviousNeighbour,
                   hasNext: state.hasNextNeighbour,
                   primaryColor: activeColor,
-                  mainButtonSize: isTablet ? 72 : (isLandscape ? 56 : 64),
+                  mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
                   onPlayPause: () => cubit.togglePlayPause(),
                   onNext: () => cubit.next(),
                   onPrevious: () => cubit.previous(),
@@ -671,12 +671,11 @@ class _WaveformHeroStage extends StatelessWidget {
         final availableH = constraints.maxHeight - (isTablet ? 24.0 : 8.0);
         final maxDimension = math.min(availableW, availableH);
 
+        final double rawSize = maxDimension;
+        final double maxAllowed = isTablet ? 560.0 : 420.0;
         final double artSize = isLandscape
             ? (constraints.maxHeight * 0.82).clamp(160.0, 320.0)
-            : math.min(
-                maxDimension,
-                isTablet ? 560.0 : 420.0,
-              ).clamp(180.0, double.infinity);
+            : (rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed));
 
         final double waveBaselineY =
             (constraints.maxHeight / 2) + (artSize * 0.28);

@@ -21,24 +21,41 @@ class KaraokeModeScreen extends StatefulWidget {
   State<KaraokeModeScreen> createState() => _KaraokeModeScreenState();
 }
 
-class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
+class _KaraokeModeScreenState extends State<KaraokeModeScreen>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // Immersive, distraction-free singing: hide the system status/nav bars.
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Maintain immersiveSticky across orientation and dependency changes
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  }
+
+  @override
   void dispose() {
-    // Restore the app's edge-to-edge chrome cleanly without double-call flickering
+    WidgetsBinding.instance.removeObserver(this);
+    // Restore the app's edge-to-edge chrome cleanly when leaving karaoke mode
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final p = context.palette;
+    try {
+      final p = context.palette;
     final audibleOffset = context.select<SettingsCubit, Duration>(
       (c) => c.state.audibleLatencyOffset,
     );
@@ -100,6 +117,10 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
               leading: IconButton(
                 icon: Icon(Icons.close_rounded, color: p.textPrimary),
                 tooltip: context.l10n.close,
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
               title: Text(
@@ -275,5 +296,9 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen> {
         );
       },
     );
+    } catch (e) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      rethrow;
+    }
   }
 }

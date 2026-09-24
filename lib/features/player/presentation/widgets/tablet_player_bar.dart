@@ -89,10 +89,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   @override
   void dispose() {
     PulsrModalTracker.isModalOpen.removeListener(_onModalChanged);
+    _dragVolumeNotifier.value = null;
+    _dragSeekNotifier.value = null;
     _dragVolumeNotifier.dispose();
     _dragSeekNotifier.dispose();
     // Reset synchronously: the deferred post-frame callback in _maybeUpdateDock
     // is skipped once the widget is unmounted, leaving a stale dock reservation.
+    _lastDockHeight = null;
+    _lastMiniPlayer = null;
     PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
     super.dispose();
   }
@@ -510,6 +514,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                   width: 80,
                                   child: Semantics(
                                     label: l10n.volume,
+                                    value: '${(effectiveVolume * 100).round()}%',
                                     child: PulsrSlider(
                                       min: 0.0,
                                       max: 1.0,

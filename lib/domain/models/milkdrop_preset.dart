@@ -21,6 +21,7 @@ class MilkdropPreset {
   final double waveG;
   final double waveB;
   final int waveMode;
+  @Deprecated('Parsed from legacy Milkdrop .milk files but unused by renderer')
   final double fRating;
   final Map<String, String> raw;
 

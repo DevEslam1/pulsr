@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -264,6 +265,10 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
                   onTap: () {
                     cubit.setDspPreference(opt.$1);
                     Navigator.pop(sheetContext);
+                    PulsrToast.show(
+                      context,
+                      message: '${opt.$2}: ${opt.$3}',
+                    );
                   },
                 );
               }),

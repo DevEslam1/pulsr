@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical">
+
+    <!-- Top Track Info & Core Controls Row -->
+    <LinearLayout
+        android:id="@+id/widget_main_row"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Album Artwork (44dp rounded) -->
+        <ImageView
+            android:id="@+id/widget_artwork"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:scaleType="centerCrop"
+            android:src="@mipmap/launcher_icon"
+            android:contentDescription="@string/widget_album_artwork" />
+
+        <!-- Track Title & Artist -->
+        <LinearLayout
+            android:id="@+id/widget_info_area"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="6dp">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/app_name"
+                android:textColor="#FFFFFF"
+                android:textSize="13.5sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="@string/widget_nothing_playing"
+                android:textColor="#A7B0C0"
+                android:textSize="11.5sp"
+                android:fontFamily="sans-serif"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Minimal playback buttons: prev, play/pause, next -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageButton
+                android:id="@+id/btn_prev"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:padding="8dp"
+                android:background="@drawable/widget_secondary_button_background"
+                android:src="@drawable/ic_widget_skip_prev"
+                android:contentDescription="@string/widget_previous" />
+
+            <ImageButton
+                android:id="@+id/btn_play_pause"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp"
+                android:padding="11dp"
+                android:background="@drawable/widget_play_button_background"
+                android:src="@drawable/ic_widget_play"
+                android:contentDescription="@string/widget_play_pause" />
+
+            <ImageButton
+                android:id="@+id/btn_next"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:padding="8dp"
+                android:background="@drawable/widget_secondary_button_background"
+                android:src="@drawable/ic_widget_skip_next"
+                android:contentDescription="@string/widget_next" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Slim Progress Bar -->
+    <FrameLayout
+        android:id="@+id/widget_progress_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp">
+
+        <ProgressBar
+            android:id="@+id/widget_progress"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_gravity="center_vertical"
+            android:max="1000"
+            android:progress="0"
+            android:progressDrawable="@drawable/widget_progress_bar" />
+    </FrameLayout>
+
+    <!-- Hidden elements for complete view ID compatibility -->
+    <LinearLayout
+        android:id="@+id/widget_times_row"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone">
+
+        <TextView android:id="@+id/widget_elapsed" android:layout_width="0dp" android:layout_height="0dp" />
+        <TextView android:id="@+id/widget_duration" android:layout_width="0dp" android:layout_height="0dp" />
+        <ImageButton android:id="@+id/widget_favorite" android:layout_width="0dp" android:layout_height="0dp" />
+        <ImageButton android:id="@+id/widget_shuffle" android:layout_width="0dp" android:layout_height="0dp" />
+        <ImageButton android:id="@+id/widget_repeat" android:layout_width="0dp" android:layout_height="0dp" />
+        <ImageButton android:id="@+id/btn_rewind" android:layout_width="0dp" android:layout_height="0dp" />
+        <ImageButton android:id="@+id/btn_forward" android:layout_width="0dp" android:layout_height="0dp" />
+    </LinearLayout>
+</LinearLayout>

@@ -84,16 +84,30 @@ class AbLoopManager {
     }
   }
 
+  Map<String, dynamic>? _memoryCache;
+
+  Future<void> _ensureCacheLoaded() async {
+    if (_memoryCache != null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(prefsKey);
+      if (raw != null && raw.isNotEmpty) {
+        _memoryCache = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      } else {
+        _memoryCache = <String, dynamic>{};
+      }
+    } catch (_) {
+      _memoryCache = <String, dynamic>{};
+    }
+  }
+
   /// Restores the persisted loop for [songId], if any. Called after
   /// [onSongChanged] when a new track starts.
   Future<void> restoreForSong(int? songId) async {
     if (songId == null) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(prefsKey);
-      if (raw == null || raw.isEmpty) return;
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      final entry = decoded[songId.toString()];
+      await _ensureCacheLoaded();
+      final entry = _memoryCache![songId.toString()];
       if (entry is! Map<String, dynamic>) return;
       final aMs = (entry['a'] as num?)?.toInt();
       final bMs = (entry['b'] as num?)?.toInt();
@@ -110,27 +124,21 @@ class AbLoopManager {
   Future<void> persist() async {
     final songId = _scopeSongId;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final Map<String, dynamic> all;
-      final raw = prefs.getString(prefsKey);
-      if (raw == null || raw.isEmpty) {
-        all = <String, dynamic>{};
-      } else {
-        all = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      }
+      await _ensureCacheLoaded();
       if (songId == null || _a == null || _b == null) {
-        if (songId != null) all.remove(songId.toString());
+        if (songId != null) _memoryCache!.remove(songId.toString());
       } else {
-        all[songId.toString()] = {
+        _memoryCache![songId.toString()] = {
           'a': _a!.inMilliseconds,
           'b': _b!.inMilliseconds,
           'enabled': _enabled,
         };
-        while (all.length > maxEntries) {
-          all.remove(all.keys.first);
+        while (_memoryCache!.length > maxEntries) {
+          _memoryCache!.remove(_memoryCache!.keys.first);
         }
       }
-      await prefs.setString(prefsKey, jsonEncode(all));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(prefsKey, jsonEncode(_memoryCache!));
     } catch (_) {}
   }
 
@@ -140,12 +148,10 @@ class AbLoopManager {
     final id = songId ?? _scopeSongId;
     if (id == null) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(prefsKey);
-      if (raw == null || raw.isEmpty) return;
-      final all = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      if (all.remove(id.toString()) != null) {
-        await prefs.setString(prefsKey, jsonEncode(all));
+      await _ensureCacheLoaded();
+      if (_memoryCache!.remove(id.toString()) != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(prefsKey, jsonEncode(_memoryCache!));
       }
     } catch (_) {}
   }

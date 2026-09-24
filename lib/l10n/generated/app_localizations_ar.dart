@@ -3434,7 +3434,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String proxyPresetApplied(Object name, Object host, Object port) {
-    return 'تم تطبيق: $name';
+    return 'تم تطبيق الإعداد المسبق: $name ($host:$port)';
   }
 
   @override
@@ -6573,8 +6573,182 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cassetteSideA => 'الوجه أ • النوع الثاني (CrO2)';
 
   @override
-  String get cassettePulsrTape => 'شريط بولسر';
+  String get vinylSpeedRpm => '33⅓ دورة/د';
 
   @override
-  String get vinylSpeedRpm => '33⅓ دورة/د';
+  String get exclusiveUsbActive => 'USB حصري نشط';
+
+  @override
+  String underrunsCount(int count) {
+    return '$count نقص في التخزين';
+  }
+
+  @override
+  String get dspEngineTelemetry => 'قياس محرك DSP عن بُعد';
+
+  @override
+  String rtfPercent(String pct) {
+    return 'RTF: $pct%';
+  }
+
+  @override
+  String get limiterReduction => 'تقليل المحدد';
+
+  @override
+  String get multibandCompReduction => 'تقليل الضاغط متعدد النطاقات';
+
+  @override
+  String get dynamicEqAdjustments => 'تعديلات الموازن الديناميكي';
+
+  @override
+  String get resetWeeklyDoseTitle => 'إعادة ضبط جرعة الصوت الأسبوعية؟';
+
+  @override
+  String get resetWeeklyDoseDesc =>
+      'سيؤدي هذا إلى إعادة ضبط عداد التعرض الصوتي المتراكم إلى 0% وإلغاء تخفيف الأمان. أعد الضبط فقط عند بدء أسبوع مراقبة جديد أو تغيير بيئة الاستماع.';
+
+  @override
+  String get resetDoseAction => 'إعادة ضبط الجرعة';
+
+  @override
+  String get weeklyDoseResetSnackbar =>
+      'تمت إعادة ضبط جرعة الصوت الأسبوعية إلى 0.0%';
+
+  @override
+  String get headphoneSafetyTitle => 'أمان وجرعة سماعات الرأس';
+
+  @override
+  String get headphoneSafetyStandard =>
+      'المعيار الصوتي WHO-ITU H.870 / EN 62368-1';
+
+  @override
+  String get weeklySoundAllowance => 'الحصة الصوتية الأسبوعية';
+
+  @override
+  String get safetyLimiterActiveDesc =>
+      'محدد الأمان نشط (سقف -6 dBFS مفعل لمنع تلف السمع)';
+
+  @override
+  String get highSoundDoseWarning =>
+      'جرعة صوتية عالية: يُرجى تقليل مستوى الصوت لحماية السمع';
+
+  @override
+  String get optimalExposureDesc =>
+      'تعرض مثالي: مستويات استماع آمنة ضمن بدل الـ 40 ساعة';
+
+  @override
+  String get latencySyncDiagnostics => 'تشخيصات التأخير والمزامنة';
+
+  @override
+  String get latencySyncDiagnosticsDesc =>
+      'مقاييس تأخير المعالجة والإخراج المباشرة من أجهزة الصوت الأصلية.';
+
+  @override
+  String get dspPipelineDelay => 'تأخير معالجة مسار DSP';
+
+  @override
+  String get dspPipelineDelayDesc =>
+      'محدد الاستباق + تأخير مجموعة إعادة التشكيل + تأخير الصدى المقسم';
+
+  @override
+  String get usbBufferedDelay => 'تأخير التخزين المؤقت لجهاز USB';
+
+  @override
+  String get usbBufferedDelayDesc => 'شغل المخزن الدائري + ركود طابور نواة URB';
+
+  @override
+  String get totalMonitoredLatency => 'إجمالي التأخير المراقب';
+
+  @override
+  String get totalMonitoredLatencyDesc =>
+      'مجموع المعالجة الرقمية النشطة والتخزين المؤقت للأجهزة';
+
+  @override
+  String get directUsbExclusivePath => 'مسار USB حصري مباشر';
+
+  @override
+  String get lowLatencyDirectOutput => 'إخراج مباشر منخفض التأخير';
+
+  @override
+  String get dacRateSwitchTitle => 'تبديل معدل عينات DAC';
+
+  @override
+  String dacRateSwitchBody(String supported, String track) {
+    return 'يدعم محول DAC الخاص بك $supported كيلوهرتز، ولكن المسار الحالي $track كيلوهرتز.';
+  }
+
+  @override
+  String dacRateSwitchResample(String target) {
+    return 'إعادة تشكيل إلى $target كيلوهرتز للحصول على إخراج دقيق؟';
+  }
+
+  @override
+  String get dacRateSwitchRemember => 'التبديل التلقائي دائماً في المستقبل';
+
+  @override
+  String dacRateSwitchConfirm(String target) {
+    return 'تبديل ($target ك)';
+  }
+
+  @override
+  String get miniPlayerSwipeHint => 'اسحب لليسار/اليمين للتخطي';
+
+  @override
+  String get phoneSpeaker => 'مكبر صوت الهاتف';
+
+  @override
+  String get usbDacNoneAttached => 'محول USB DAC: لا يوجد جهاز متصل';
+
+  @override
+  String get directPlaybackNotReported => 'التشغيل المباشر: غير مُبلّغ عنه';
+
+  @override
+  String directPlaybackUpTo(String rate, String bits) {
+    return 'التشغيل المباشر: حتى $rate هرتز / $bits';
+  }
+
+  @override
+  String activeSystemOutputDesc(String rate, String bits) {
+    return 'جهاز إخراج النظام النشط • حتى $rate كيلوهرتز / $bits بت';
+  }
+
+  @override
+  String deviceOutputSpecsDesc(String typeName, String rate, String bits) {
+    return '$typeName • حتى $rate كيلوهرتز / $bits بت';
+  }
+
+  @override
+  String get bpDirectActiveUsb =>
+      'التمرير المباشر للأجهزة نشط على محول USB DAC';
+
+  @override
+  String get bpDirectActiveWired => 'التمرير المباشر للأجهزة نشط (سلكي مباشر)';
+
+  @override
+  String get bpPassThroughArmed =>
+      'التمرير جاهز • يعمل تلقائياً عند توصيل محول DAC متوافق';
+
+  @override
+  String get bpBypassesAndroidMixer =>
+      'يتجاوز مازج أندرويد ومعالجة DSP لإخراج صوتي مطابق (يتطلب USB أندرويد 14+، والسلكي يتطلب مساراً مباشراً)';
+
+  @override
+  String settingsResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم العثور على $count إعداد',
+      many: 'تم العثور على $count إعداداً',
+      few: 'تم العثور على $count إعدادات',
+      two: 'تم العثور على إعدادين',
+      one: 'تم العثور على إعداد واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cassettePulsrTape => 'PULSR C-90';
+
+  @override
+  String get statusCancelled => 'تم الإلغاء';
 }

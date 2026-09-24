@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
 
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../player/presentation/widgets/quran_mode_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
@@ -14,18 +15,20 @@ class QuranModeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Scaffold(
-      backgroundColor: p.bg,
-      appBar: AppBar(
+    return PulsrPagePopScope(
+      child: Scaffold(
         backgroundColor: p.bg,
-        foregroundColor: p.textPrimary,
-        elevation: 0,
-        title: Text(context.l10n.quranMode,
-            style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
-      body: const SingleChildScrollView(
-        padding: EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),
-        child: QuranModePanel(),
+        appBar: AppBar(
+          backgroundColor: p.bg,
+          foregroundColor: p.textPrimary,
+          elevation: 0,
+          title: Text(context.l10n.quranMode,
+              style: TextStyle(fontWeight: FontWeight.w800)),
+        ),
+        body: const SingleChildScrollView(
+          padding: EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),
+          child: QuranModePanel(),
+        ),
       ),
     );
   }

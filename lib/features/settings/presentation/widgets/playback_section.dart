@@ -22,6 +22,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -102,6 +103,20 @@ class PlaybackSection extends StatelessWidget {
           defaultValue: 0.0,
           formatValue: (v) => '${v.toStringAsFixed(1)}s',
           onChanged: cubit.setCrossfade,
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
+          child: Text(
+            state.crossfadeSeconds > 0.01
+                ? 'Songs will blend over ${state.crossfadeSeconds.toStringAsFixed(1)} seconds'
+                : 'Crossfade disabled (songs end naturally)',
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         if (state.gaplessPlayback)
           SettingsConflictCard(
@@ -203,6 +218,20 @@ class PlaybackSection extends StatelessWidget {
                       state.gaplessPlayback)
                   : null),
           onChanged: cubit.setCrossfade,
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
+          child: Text(
+            state.crossfadeSeconds > 0.01
+                ? 'Songs will blend over ${state.crossfadeSeconds.toStringAsFixed(1)} seconds'
+                : 'Crossfade disabled (songs end naturally)',
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         if (state.gaplessPlayback)
           SettingsConflictCard(
@@ -642,6 +671,13 @@ class _PlaybackPresetsTile extends StatelessWidget {
       } catch (e, st) {
         ErrorLogger.log('Failed to apply preset $label',
             error: e, stackTrace: st, category: 'PlaybackPresets');
+        if (context.mounted) {
+          PulsrToast.show(
+            context,
+            message: 'Failed to apply $label',
+            isError: true,
+          );
+        }
       }
     }
 

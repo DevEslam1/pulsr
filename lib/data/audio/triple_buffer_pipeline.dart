@@ -36,6 +36,16 @@ class TripleBufferPipeline {
   PlayerClaim _inactiveClaim = PlayerClaim.none;
   PlayerClaim get inactiveClaim => _inactiveClaim;
 
+  int? _preloadedSongId;
+  int? get preloadedSongId => _preloadedSongId;
+  AudioSource? _preloadedSource;
+  AudioSource? get preloadedSource => _preloadedSource;
+
+  void clearPreload() {
+    _preloadedSongId = null;
+    _preloadedSource = null;
+  }
+
   Future<bool> claimInactive(PlayerClaim claim) async {
     return _claimMutex.protect(() async {
       if (_inactiveClaim != PlayerClaim.none && _inactiveClaim != claim) {
@@ -87,7 +97,10 @@ class TripleBufferPipeline {
         return;
       }
       await inactivePlayer.setAudioSource(source, preload: true);
+      _preloadedSongId = nextSong.id;
+      _preloadedSource = source;
     } catch (e) {
+      clearPreload();
       ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');
     } finally {
       releaseInactive(PlayerClaim.prefetch);

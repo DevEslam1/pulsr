@@ -6,6 +6,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../domain/services/usb_exclusive_service.dart';
@@ -116,7 +117,7 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
                       Icon(Icons.sync_rounded, color: p.accent, size: 22),
                       const SizedBox(width: AppSpacing.sm),
                       Text(
-                        "Latency & Sync Diagnostics",
+                        context.l10n.latencySyncDiagnostics,
                         style: TextStyle(
                           fontSize: AppFontSize.bodyLarge,
                           fontWeight: FontWeight.bold,
@@ -127,7 +128,7 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    "Real-time output and processing delay metrics reported directly from native hardware sinks.",
+                    context.l10n.latencySyncDiagnosticsDesc,
                     style: TextStyle(
                       fontSize: AppFontSize.bodySmall,
                       color: p.textSecondary,
@@ -137,8 +138,8 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
                   _buildMetricTile(
                     p: p,
                     icon: Icons.tune_rounded,
-                    title: 'DSP Pipeline Delay',
-                    subtitle: 'Lookahead Limiter + Resampler group delay + Reverb partitioned delay',
+                    title: context.l10n.dspPipelineDelay,
+                    subtitle: context.l10n.dspPipelineDelayDesc,
                     value: '${dspMs.toStringAsFixed(2)} ms',
                     detail: '$_pipelineLatencyFrames frames @ ${(sr / 1000.0).toStringAsFixed(1)} kHz',
                   ),
@@ -147,8 +148,8 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
                     _buildMetricTile(
                       p: p,
                       icon: Icons.usb_rounded,
-                      title: 'USB Hardware Buffered Delay',
-                      subtitle: 'Ring buffer occupancy + URB kernel queue slack',
+                      title: context.l10n.usbBufferedDelay,
+                      subtitle: context.l10n.usbBufferedDelayDesc,
                       value: '${_usbBufferedMs.toStringAsFixed(1)} ms',
                       detail: 'Underruns: ${_usbDiagnostics['underrunCount'] ?? 0} | Overruns: ${_usbDiagnostics['overrunCount'] ?? 0}',
                     ),
@@ -157,10 +158,10 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
                   _buildMetricTile(
                     p: p,
                     icon: Icons.speed_rounded,
-                    title: 'Total Monitored Latency',
-                    subtitle: 'Sum of active digital processing & hardware buffering',
+                    title: context.l10n.totalMonitoredLatency,
+                    subtitle: context.l10n.totalMonitoredLatencyDesc,
                     value: '${(dspMs + (isUsbStreaming ? _usbBufferedMs : 0.0)).toStringAsFixed(2)} ms',
-                    detail: isUsbStreaming ? 'Direct USB Exclusive Path' : 'Low-Latency Direct Output',
+                    detail: isUsbStreaming ? context.l10n.directUsbExclusivePath : context.l10n.lowLatencyDirectOutput,
                   ),
                 ],
               ),

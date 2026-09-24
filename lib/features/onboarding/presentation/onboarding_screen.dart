@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
@@ -122,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             );
         }
       }
-    } else if (allow == false) {
+    } else {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('notification_permission_denied', true);
     }
@@ -200,6 +201,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isLandscape = context.isLandscape;
 
     return Scaffold(
       backgroundColor: p.background,
@@ -208,7 +210,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           children: [
             // Top Bar with Skip Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: isLandscape ? AppSpacing.xs : AppSpacing.sm,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -232,7 +237,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     )
                   else
-                    const SizedBox(height: AppSpacing.s40),
+                    SizedBox(height: isLandscape ? AppSpacing.lg : AppSpacing.s40),
                 ],
               ),
             ),
@@ -256,7 +261,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
             // Bottom Navigation & Page Indicators
             Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s28, 0, AppSpacing.s28, AppSpacing.lg),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.s28,
+                0,
+                AppSpacing.s28,
+                isLandscape ? AppSpacing.sm : AppSpacing.lg,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -268,8 +278,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       return AnimatedContainer(
                         duration: context.motionMs(300),
                         margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-                        height: 8,
-                        width: isActive ? 24 : 8,
+                        height: isLandscape ? 6 : 8,
+                        width: isActive ? (isLandscape ? 18 : 24) : (isLandscape ? 6 : 8),
                         decoration: BoxDecoration(
                           color: isActive ? p.accent : p.hairline,
                           borderRadius: BorderRadius.circular(AppRadii.r4),
@@ -277,12 +287,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       );
                     }),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
 
                   // Navigation Button
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: isLandscape ? 44 : 52,
                     child: _currentPage == 2
                         ? FilledButton(
                             style: FilledButton.styleFrom(
@@ -354,80 +364,95 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Page 1: "Your Music, Your Privacy"
   Widget _buildPage1(BuildContext context) {
     final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          Container(
-            width: 104,
-            height: 104,
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r28),
-              border: Border.all(color: p.hairline, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: p.accent.withValues(alpha: 0.25),
-                  blurRadius: 36,
-                  spreadRadius: 6,
-                ),
-              ],
-            ),
-            child: Center(
-              child: PulsrLogo(
-                size: 64,
-                color: p.accent,
-                glowColor: p.glow,
-                animate: true,
-              ),
-            ),
-          ).animate().scale(
-              duration: context.motionMs(600),
-              curve: context.motionCurve(Curves.easeOutBack)),
-          const SizedBox(height: AppSpacing.s40),
-          Text(context.l10n.onboardingHeading,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: AppTracking.heading,
-                ),
-          ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: AppSpacing.md),
-          Text(context.l10n.onboardingPrivacyDesc,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: p.textSecondary,
-                  height: 1.5,
-                ),
-          ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: AppSpacing.xl),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: AppRadii.cardRadius,
-              border: Border.all(color: p.hairline),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.lock_rounded, color: p.accent, size: 22),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(context.l10n.privacyGuarantee,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontSize: AppFontSize.bodySmall,
-                      fontWeight: FontWeight.w600,
+    final isLandscape = context.isLandscape;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.s28,
+            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+              Container(
+                width: isLandscape ? 68 : 104,
+                height: isLandscape ? 68 : 104,
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: BorderRadius.circular(
+                      isLandscape ? AppRadii.r20 : AppRadii.r28),
+                  border: Border.all(color: p.hairline, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: p.accent.withValues(alpha: 0.25),
+                      blurRadius: 36,
+                      spreadRadius: 6,
                     ),
+                  ],
+                ),
+                child: Center(
+                  child: PulsrLogo(
+                    size: isLandscape ? 40 : 64,
+                    color: p.accent,
+                    glowColor: p.glow,
+                    animate: true,
                   ),
                 ),
-              ],
-            ),
-          ).animate().fadeIn(delay: context.motionMs(500)),
-          const Spacer(),
-        ],
+              ).animate().scale(
+                  duration: context.motionMs(600),
+                  curve: context.motionCurve(Curves.easeOutBack)),
+              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s40),
+              Text(
+                context.l10n.onboardingHeading,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.heading,
+                    ),
+              ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                context.l10n.onboardingPrivacyDesc,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: p.textSecondary,
+                      height: 1.5,
+                    ),
+              ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.xl),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.s14),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_rounded, color: p.accent, size: 22),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        context.l10n.privacyGuarantee,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: AppFontSize.bodySmall,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ).animate().fadeIn(delay: context.motionMs(500)),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -435,74 +460,89 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Page 2: "Powerful Playback"
   Widget _buildPage2(BuildContext context) {
     final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          // Graphic container representing EQ & Audio Controls
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r24),
-              border: Border.all(
-                  color: p.accent.withValues(alpha: 0.3), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: p.accent.withValues(alpha: 0.15),
-                  blurRadius: 32,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildPlaybackFeatureIcon(Icons.equalizer_rounded,
-                    context.l10n.browseTenBandGraphicEq, p.accent),
-                _buildPlaybackFeatureIcon(
-                    Icons.tune_rounded, context.l10n.browseCrossfade, p.accent),
-                _buildPlaybackFeatureIcon(
-                    Icons.timer_rounded, context.l10n.sleepTimer, p.accent),
-              ],
-            ),
-          )
-              .animate()
-              .fadeIn(duration: context.motionMs(500))
-              .scale(begin: const Offset(0.9, 0.9)),
-          const SizedBox(height: AppSpacing.s40),
-          Text(context.l10n.onboardingPowerful,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: AppTracking.heading,
-                ),
-          ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: AppSpacing.md),
-          Text(context.l10n.onboardingPowerfulDesc,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: p.textSecondary,
-                  height: 1.5,
-                ),
-          ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
+    final isLandscape = context.isLandscape;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.s28,
+            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _FeatureBadge(label: context.l10n.browseTenBandGraphicEq),
-              _FeatureBadge(label: context.l10n.browseSmoothCrossfade),
-              _FeatureBadge(label: context.l10n.sleepTimer),
-              _FeatureBadge(label: context.l10n.gaplessPlayback),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+              // Graphic container representing EQ & Audio Controls
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(
+                    vertical: isLandscape ? AppSpacing.sm : AppSpacing.lg,
+                    horizontal: AppSpacing.s20),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: BorderRadius.circular(
+                      isLandscape ? AppRadii.r18 : AppRadii.r24),
+                  border: Border.all(
+                      color: p.accent.withValues(alpha: 0.3), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: p.accent.withValues(alpha: 0.15),
+                      blurRadius: 32,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildPlaybackFeatureIcon(Icons.equalizer_rounded,
+                        context.l10n.browseTenBandGraphicEq, p.accent),
+                    _buildPlaybackFeatureIcon(
+                        Icons.tune_rounded, context.l10n.browseCrossfade, p.accent),
+                    _buildPlaybackFeatureIcon(
+                        Icons.timer_rounded, context.l10n.sleepTimer, p.accent),
+                  ],
+                ),
+              )
+                  .animate()
+                  .fadeIn(duration: context.motionMs(500))
+                  .scale(begin: const Offset(0.9, 0.9)),
+              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s40),
+              Text(
+                context.l10n.onboardingPowerful,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.heading,
+                    ),
+              ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                context.l10n.onboardingPowerfulDesc,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: p.textSecondary,
+                      height: 1.5,
+                    ),
+              ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.lg),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  _FeatureBadge(label: context.l10n.browseTenBandGraphicEq),
+                  _FeatureBadge(label: context.l10n.browseSmoothCrossfade),
+                  _FeatureBadge(label: context.l10n.sleepTimer),
+                  _FeatureBadge(label: context.l10n.gaplessPlayback),
+                ],
+              ).animate().fadeIn(delay: context.motionMs(500)),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],
-          ).animate().fadeIn(delay: context.motionMs(500)),
-          const Spacer(),
-        ],
+          ),
+        ),
       ),
     );
   }
@@ -510,82 +550,97 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Page 3: "Beautiful & Personal"
   Widget _buildPage3(BuildContext context) {
     final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s28),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          // Theme swatches visual container
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.s20),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r24),
-              border: Border.all(color: p.hairline, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: p.accent.withValues(alpha: 0.2),
-                  blurRadius: 36,
-                  spreadRadius: 4,
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.palette_rounded, color: p.accent, size: 24),
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(context.l10n.onboardingThemes,
-                      style: TextStyle(
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: AppTracking.wide,
-                        color: p.textPrimary,
-                      ),
+    final isLandscape = context.isLandscape;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.s28,
+            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+              // Theme swatches visual container
+              Container(
+                padding: EdgeInsets.all(
+                    isLandscape ? AppSpacing.sm : AppSpacing.s20),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: BorderRadius.circular(
+                      isLandscape ? AppRadii.r18 : AppRadii.r24),
+                  border: Border.all(color: p.hairline, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: p.accent.withValues(alpha: 0.2),
+                      blurRadius: 36,
+                      spreadRadius: 4,
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                child: Column(
                   children: [
-                    _buildThemeSwatch('Pulsr Modern',
-                        const [Color(0xFF9B9EF5), Color(0xFF6C70DC)]),
-                    _buildThemeSwatch('Glassmorphism',
-                        const [Color(0xFF00E676), Color(0xFF1DE9B6)]),
-                    _buildThemeSwatch('Dynamic Palette',
-                        const [Color(0xFFFF9100), Color(0xFFFF4081)]),
-                    _buildThemeSwatch('Cyberpunk Aura',
-                        const [Color(0xFFD500F9), AppColors.skyBlue]),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.palette_rounded, color: p.accent, size: 24),
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          context.l10n.onboardingThemes,
+                          style: TextStyle(
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: AppTracking.wide,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildThemeSwatch('Pulsr Modern',
+                            const [Color(0xFF9B9EF5), Color(0xFF6C70DC)]),
+                        _buildThemeSwatch('Glassmorphism',
+                            const [Color(0xFF00E676), Color(0xFF1DE9B6)]),
+                        _buildThemeSwatch('Dynamic Palette',
+                            const [Color(0xFFFF9100), Color(0xFFFF4081)]),
+                        _buildThemeSwatch('Cyberpunk Aura',
+                            const [Color(0xFFD500F9), AppColors.skyBlue]),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          )
-              .animate()
-              .fadeIn(duration: context.motionMs(500))
-              .scale(begin: const Offset(0.9, 0.9)),
-          const SizedBox(height: AppSpacing.s40),
-          Text(context.l10n.onboardingBeautiful,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: AppTracking.heading,
-                ),
-          ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
-          const SizedBox(height: AppSpacing.md),
-          Text(context.l10n.onboardingBeautifulDesc,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: p.textSecondary,
-                  height: 1.5,
-                ),
-          ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
-          const Spacer(),
-        ],
+              )
+                  .animate()
+                  .fadeIn(duration: context.motionMs(500))
+                  .scale(begin: const Offset(0.9, 0.9)),
+              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s40),
+              Text(
+                context.l10n.onboardingBeautiful,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.heading,
+                    ),
+              ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                context.l10n.onboardingBeautifulDesc,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: p.textSecondary,
+                      height: 1.5,
+                    ),
+              ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+            ],
+          ),
+        ),
       ),
     );
   }

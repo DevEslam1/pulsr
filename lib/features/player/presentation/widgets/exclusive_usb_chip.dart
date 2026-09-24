@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/services/usb_exclusive_service.dart';
 import 'sync_diagnostics_sheet.dart';
 
@@ -123,7 +124,7 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
               ),
               const SizedBox(width: AppSpacing.xxs),
               Text(
-                "Exclusive USB Active",
+                context.l10n.exclusiveUsbActive,
                 style: TextStyle(
                   color: AppColors.dacGold,
                   fontSize: widget.compact ? AppFontSize.tiny : AppFontSize.caption,
@@ -142,7 +143,7 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
               ),
               const SizedBox(width: AppSpacing.s6),
               Text(
-                '$_underruns underruns',
+                context.l10n.underrunsCount(_underruns),
                 style: TextStyle(
                   color: _underruns > 0 ? AppColors.warning : AppColors.dacGold.withValues(alpha: 0.8),
                   fontSize: widget.compact ? AppFontSize.tiny : AppFontSize.caption,

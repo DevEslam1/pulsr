@@ -41,6 +41,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   bool _sdk = false;
   bool _busy = false;
   bool _scanning = false;
+  Timer? _scanTimeoutTimer;
 
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
@@ -92,7 +93,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       if (supported) await _service.startDiscovery();
     }
 
-    Future.delayed(const Duration(seconds: 8), () {
+    _scanTimeoutTimer?.cancel();
+    _scanTimeoutTimer = Timer(const Duration(seconds: 8), () {
       if (mounted && _scanning) {
         setState(() => _scanning = false);
       }
@@ -110,7 +112,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       await _service.stopDiscovery();
       await _service.startDiscovery();
     }
-    Future.delayed(const Duration(seconds: 8), () {
+    _scanTimeoutTimer?.cancel();
+    _scanTimeoutTimer = Timer(const Duration(seconds: 8), () {
       if (mounted && _scanning) {
         setState(() => _scanning = false);
       }
@@ -119,6 +122,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   @override
   void dispose() {
+    _scanTimeoutTimer?.cancel();
     _deviceSub?.cancel();
     _routeSub?.cancel();
     _sessionSub?.cancel();

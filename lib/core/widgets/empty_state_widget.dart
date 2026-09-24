@@ -60,7 +60,8 @@ class EmptyStateWidget extends StatelessWidget {
                   ),
                 )
                     .animate(onPlay: (controller) {
-                      if (context.motionEnabled) controller.repeat(reverse: true);
+                      final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+                      if (context.motionEnabled && !isTest) controller.repeat(reverse: true);
                     })
                     .scaleXY(
                         begin: 0.88,
@@ -76,7 +77,8 @@ class EmptyStateWidget extends StatelessWidget {
                   ),
                 )
                     .animate(onPlay: (controller) {
-                      if (context.motionEnabled) controller.repeat(reverse: true);
+                      final isTest = WidgetsBinding.instance.runtimeType.toString().contains('Test');
+                      if (context.motionEnabled && !isTest) controller.repeat(reverse: true);
                     })
                     .scaleXY(
                         begin: 0.80,

@@ -1,0 +1,6 @@
+@init
+threshold = 1.0;
+
+@sample
+spl0 = spl0 > threshold ? threshold : (spl0 < -threshold ? -threshold : spl0);
+spl1 = spl1 * slider1;

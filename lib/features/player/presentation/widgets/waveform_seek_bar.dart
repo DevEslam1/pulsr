@@ -1,4 +1,5 @@
 // lib/features/player/presentation/widgets/waveform_seek_bar.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -54,9 +55,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     // the visible window always matches the samples being painted.
     if (!identical(oldWidget.samples, widget.samples) ||
         oldWidget.duration != widget.duration) {
-      if (_dragValue == null) {
-        _zoomScale = 1.0;
-      } else if (widget.duration.inMilliseconds > 0) {
+      _zoomScale = 1.0;
+      if (_dragValue != null && widget.duration.inMilliseconds > 0) {
         _dragValue =
             _dragValue!.clamp(0.0, widget.duration.inMilliseconds.toDouble());
       }
@@ -85,8 +85,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   /// Maps a local X coordinate to a global 0..1 ratio through the visible
   /// window, so zoomed scrubbing is accurate.
   double _ratioForDx(double dx, double trackWidth, int totalCount) {
-    // FIX-M8: Guard totalCount <= 1
-    if (trackWidth <= 0 || totalCount <= 1) return 0.0;
+    if (trackWidth <= 0 || totalCount <= 0) return 0.0;
     final window = _visibleWindow(totalCount);
     if (window.visibleCount <= 0) return 0.0;
     final double ratioInWindow = (dx / trackWidth).clamp(0.0, 1.0);
@@ -115,8 +114,11 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final currentDuration = _dragValue != null
         ? Duration(milliseconds: _dragValue!.round())
         : widget.position;
-    final valueLabel =
+    final durationStr =
         '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
+    final valueLabel = _zoomScale > 1.05
+        ? '$durationStr (${_zoomScale.toStringAsFixed(1)}x zoom)'
+        : durationStr;
 
     Duration clampDuration(Duration d) {
       if (d < Duration.zero) return Duration.zero;
@@ -181,7 +183,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         final ratio =
                             _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
                         setState(() {
-                          _dragValue = ratio * maxDuration;
+                          _dragValue = (ratio * maxDuration).clamp(0.0, maxDuration);
                         });
                       }
                     },
@@ -190,7 +192,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         final ratio =
                             _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
                         setState(() {
-                          _dragValue = ratio * maxDuration;
+                          _dragValue = (ratio * maxDuration).clamp(0.0, maxDuration);
                         });
                       }
                     },
@@ -199,6 +201,13 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         HapticFeedback.lightImpact();
                         widget.onSeek(
                             Duration(milliseconds: _dragValue!.round()));
+                        setState(() {
+                          _dragValue = null;
+                        });
+                      }
+                    },
+                    onHorizontalDragCancel: () {
+                      if (_dragValue != null) {
                         setState(() {
                           _dragValue = null;
                         });
@@ -296,6 +305,47 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (_zoomScale > 1.05)
+                    Semantics(
+                      button: true,
+                      label: 'Reset waveform zoom',
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _zoomScale = 1.0);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                          decoration: BoxDecoration(
+                            color: context.palette.accent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                            border: Border.all(
+                              color: context.palette.accent.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_zoomScale.toStringAsFixed(1)}x',
+                                style: TextStyle(
+                                  color: context.palette.accent,
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.s2),
+                              Icon(
+                                Icons.close_rounded,
+                                size: 12,
+                                color: context.palette.accent,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   Text(
                     Formatters.formatDuration(widget.duration),
                     style: TextStyle(
@@ -460,14 +510,34 @@ class _WaveformPainter extends CustomPainter {
                 .clamp(0.0, 1.0));
       }
 
-      // Shade the looping region so the A-B span reads at a glance.
-      if (xA != null && xB != null) {
-        final left = xA < xB ? xA : xB;
-        final right = xA < xB ? xB : xA;
-        canvas.drawRect(
-          Rect.fromLTRB(left, 0, right, size.height),
-          Paint()..color = activeColor.withValues(alpha: 0.12),
-        );
+      // Shade the looping region so the A-B span reads clearly at any zoom scale.
+      if (loopPointA != null && loopPointB != null) {
+        final double ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds)
+            .clamp(0.0, 1.0);
+        final double ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds)
+            .clamp(0.0, 1.0);
+        final double globalMin = math.min(ratioA, ratioB);
+        final double globalMax = math.max(ratioA, ratioB);
+
+        final double minVisibleRatio = startIndex / totalCount;
+        final double maxVisibleRatio = endIndex / totalCount;
+
+        final double overlapMin = math.max(globalMin, minVisibleRatio);
+        final double overlapMax = math.min(globalMax, maxVisibleRatio);
+
+        if (overlapMin < overlapMax) {
+          final double leftX =
+              ((overlapMin * totalCount - startIndex) / visible) * size.width;
+          final double rightX =
+              ((overlapMax * totalCount - startIndex) / visible) * size.width;
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTRB(leftX, 0, rightX, size.height),
+              const Radius.circular(AppRadii.r4),
+            ),
+            Paint()..color = activeColor.withValues(alpha: 0.22),
+          );
+        }
       }
 
       if (xA != null) {

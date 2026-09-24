@@ -6,6 +6,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_state.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 
@@ -134,13 +135,15 @@ class PlayerControls extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Color.lerp(primaryColor, Colors.white, 0.18) ?? primaryColor,
+                        Color.lerp(primaryColor, Colors.white, 0.18) ??
+                            primaryColor,
                         primaryColor,
                       ],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: primaryColor.withValues(alpha: isPlaying ? 0.45 : 0.25),
+                        color: primaryColor.withValues(
+                            alpha: isPlaying ? 0.45 : 0.25),
                         blurRadius: isPlaying ? 24 : 16,
                         spreadRadius: isPlaying ? 2 : 0,
                         offset: const Offset(0, 6),
@@ -166,7 +169,9 @@ class PlayerControls extends StatelessWidget {
                         child: child,
                       ),
                       child: Icon(
-                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                         key: ValueKey(isPlaying),
                         color: onPrimaryColor,
                         size: mainButtonSize * 0.52,
@@ -223,6 +228,27 @@ class PlayerControls extends StatelessWidget {
                 onPressed: () {
                   HapticFeedback.selectionClick();
                   onToggleRepeat();
+                  final nextMode = switch (repeatMode) {
+                    PlayerRepeatMode.off => PlayerRepeatMode.all,
+                    PlayerRepeatMode.all => PlayerRepeatMode.one,
+                    PlayerRepeatMode.one => PlayerRepeatMode.off,
+                  };
+                  final nextLabel = switch (nextMode) {
+                    PlayerRepeatMode.one => l10n.repeatOne,
+                    PlayerRepeatMode.all => l10n.repeatAll,
+                    PlayerRepeatMode.off => l10n.repeatOff,
+                  };
+                  final nextIcon = switch (nextMode) {
+                    PlayerRepeatMode.one => Icons.repeat_one_rounded,
+                    PlayerRepeatMode.all => Icons.repeat_rounded,
+                    PlayerRepeatMode.off => Icons.repeat_rounded,
+                  };
+                  PulsrToast.show(
+                    context,
+                    message: nextLabel,
+                    icon: nextIcon,
+                    duration: const Duration(milliseconds: 1200),
+                  );
                 },
                 icon: repeatMode == PlayerRepeatMode.one
                     ? Icons.repeat_one_rounded
@@ -266,7 +292,8 @@ class _ControlButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppRadii.r20),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

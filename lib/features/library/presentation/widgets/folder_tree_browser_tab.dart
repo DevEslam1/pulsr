@@ -22,6 +22,26 @@ class FolderTreeBrowserTab extends StatefulWidget {
 
 class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
   String? _currentPath;
+  final ScrollController _breadcrumbController = ScrollController();
+
+  void _navigateTo(String path) {
+    setState(() => _currentPath = path);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_breadcrumbController.hasClients) {
+        _breadcrumbController.animateTo(
+          _breadcrumbController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _breadcrumbController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,11 +76,16 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           _currentPath = null;
         }
 
-        // Initialize root to the shortest (top-most) folder, not an
-        // arbitrary set order.
+        // Initialize root to the top-most common parent folder (least depth),
+        // rather than arbitrary string length.
         if (_currentPath == null && folders.isNotEmpty) {
           final sorted = folders.toList()
-            ..sort((a, b) => a.length.compareTo(b.length));
+            ..sort((a, b) {
+              final depthA = a.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).length;
+              final depthB = b.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).length;
+              if (depthA != depthB) return depthA.compareTo(depthB);
+              return a.length.compareTo(b.length);
+            });
           _currentPath = sorted.first;
         }
 
@@ -101,6 +126,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
               color: p.surfaceContainer.withValues(alpha: 0.4),
               child: ListView.separated(
+                controller: _breadcrumbController,
                 scrollDirection: Axis.horizontal,
                 itemCount: breadcrumbs.length,
                 separatorBuilder: (_, __) => Icon(Icons.chevron_right_rounded,
@@ -114,7 +140,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     child: InkWell(
                       onTap: isLast
                           ? null
-                          : () => setState(() => _currentPath = crumbPath),
+                          : () => _navigateTo(crumbPath),
                       borderRadius: BorderRadius.circular(AppRadii.r8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
@@ -151,9 +177,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                               color: p.textPrimary,
                               fontWeight: FontWeight.w600)),
                       onTap: () {
-                        setState(() {
-                          _currentPath = p_path.posix.dirname(currentDir);
-                        });
+                        _navigateTo(p_path.posix.dirname(currentDir));
                       },
                     ),
                     Divider(color: p.hairline),
@@ -176,6 +200,10 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                               icon: Icon(Icons.open_in_new_rounded,
                                   color: p.textSecondary, size: 18),
                               tooltip: context.l10n.browseOpenFolderDetails,
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
+                              ),
                               onPressed: () {
                                 final item = folderItemFor(sub);
                                 if (item != null) {
@@ -187,7 +215,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                               color: p.textSecondary),
                         ],
                       ),
-                      onTap: () => setState(() => _currentPath = sub),
+                      onTap: () => _navigateTo(sub),
                     ),
                   ],
 

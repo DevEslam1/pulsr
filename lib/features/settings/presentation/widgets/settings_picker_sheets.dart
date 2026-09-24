@@ -145,8 +145,8 @@ Widget _ytmWebOptionTile(
     child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs, vertical: AppSpacing.s2),
       leading: Container(
-        width: 38,
-        height: 38,
+        width: AppSpacing.s40,
+        height: AppSpacing.s40,
         decoration: BoxDecoration(
           color: p.surface,
           borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -341,6 +341,151 @@ void showAboutSheet(BuildContext context) {
               ),
             ),
             const SizedBox(height: AppSpacing.s20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      showWhatsNewSheet(context);
+                    },
+                    child: const Text("What's New"),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: p.accent,
+                      foregroundColor: p.onAccent,
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(context.l10n.close),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void showWhatsNewSheet(BuildContext context) {
+  final p = context.palette;
+  final highlights = const [
+    (
+      Icons.speed_rounded,
+      'Bit-Perfect & Hi-Res Output',
+      'Direct USB DAC streaming, hardware volume control, and native DSD/DoP playback.'
+    ),
+    (
+      Icons.tune_rounded,
+      'Pro Studio DSP Suite',
+      'Arbitrary response parametric EQ, multiband compressor, lookahead limiter, and binaural crossfeed.'
+    ),
+    (
+      Icons.palette_rounded,
+      'Adaptive Player Themes',
+      '8 handcrafted player themes with full phone landscape, tablet two-pane, and AMOLED optimization.'
+    ),
+    (
+      Icons.accessibility_new_rounded,
+      'Accessibility & Fluid Gestures',
+      'WCAG 2.1 AA contrast compliance, dynamic type 2.0x support, and full screen-reader semantics.'
+    ),
+  ];
+
+  PulsrSheetHelper.showPulsrSheet(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: p.accentContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.new_releases_rounded, color: p.accent, size: 24),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "What's New in Pulsr",
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: AppFontSize.title,
+                        ),
+                      ),
+                      Text(
+                        'Version ${AppConfig.appVersion}',
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.caption,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (final h in highlights) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                      ),
+                      child: Icon(h.$1, size: 16, color: p.accent),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            h.$2,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppFontSize.bodySmall,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            h.$3,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
               child: FilledButton(

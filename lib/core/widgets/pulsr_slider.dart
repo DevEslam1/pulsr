@@ -22,6 +22,7 @@ class PulsrSlider extends StatefulWidget {
   final ValueChanged<double> onChanged;
   final ValueChanged<double>? onChangeStart;
   final ValueChanged<double>? onChangeEnd;
+  final VoidCallback? onChangeCancel;
   final String? semanticLabel;
   final double height;
   final Color? activeColor;
@@ -38,6 +39,7 @@ class PulsrSlider extends StatefulWidget {
     required this.onChanged,
     this.onChangeStart,
     this.onChangeEnd,
+    this.onChangeCancel,
     this.divisions,
     this.semanticLabel,
     this.height = 32,
@@ -201,6 +203,7 @@ class _PulsrSliderState extends State<PulsrSlider>
                 _tapSeekPending = false;
                 setState(() => _isDragging = false);
                 _expandController.reverse();
+                widget.onChangeCancel?.call();
               },
               child: RepaintBoundary(
                 child: AnimatedBuilder(

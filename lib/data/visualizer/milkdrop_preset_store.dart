@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/milkdrop_preset.dart';
 
 /// Persists a user-imported Milkdrop preset (raw .milk text) for the visualizer.
@@ -41,20 +42,25 @@ class MilkdropPresetStore {
   /// parsed preset, or null when the user cancels or the file cannot be read.
   Future<MilkdropPreset?> importFromFile() async {
     try {
-      final result = await FilePicker.pickFile(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: const ['milk'],
       );
-      final path = result?.path;
-      if (path == null) return null;
-      final content = await File(path).readAsString();
+      if (file == null) return null;
+      final path = file.path;
+      if (path == null || path.isEmpty) return null;
+      final ioFile = File(path);
+      if (!await ioFile.exists()) return null;
+      final content = await ioFile.readAsString();
+      final cleanName = file.name.replaceAll(RegExp(r'\.milk$', caseSensitive: false), '');
       final preset = MilkdropPreset.fromMilk(
         content,
-        fallbackName: result?.name.replaceAll(RegExp(r'\.milk$'), ''),
+        fallbackName: cleanName.isNotEmpty ? cleanName : 'Imported Preset',
       );
       await save(preset, content);
       return preset;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('MilkdropPresetStore importFromFile failed', error: e, stackTrace: st, category: 'MilkdropPresetStore');
       return null;
     }
   }

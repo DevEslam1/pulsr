@@ -161,7 +161,11 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen>
-    with TickerProviderStateMixin, LibrarySongsTab, LibraryCollectionsTabs, LibraryFavoritesTab {
+    with
+        TickerProviderStateMixin,
+        LibrarySongsTab,
+        LibraryCollectionsTabs,
+        LibraryFavoritesTab {
   @override
   late TabController _tabController;
   @override
@@ -196,9 +200,21 @@ class _LibraryScreenState extends State<LibraryScreen>
     _loadLayoutPreferences();
   }
 
+  Timer? _persistTabTimer;
+
   /// Remember the user's last library surface so reopening Library resumes
   /// where they left off (e.g. Albums) instead of always snapping to Songs.
-  void _onTabChanged() => unawaited(_persistSelectedTab());
+  void _onTabChanged() {
+    if (!mounted) return;
+    if (_tabController.indexIsChanging) return;
+    final index = _tabController.index;
+    if (index == _lastPersistedTab) return;
+    _persistTabTimer?.cancel();
+    _persistTabTimer = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      unawaited(_persistSelectedTab());
+    });
+  }
 
   Future<void> _persistSelectedTab() async {
     if (_tabController.indexIsChanging) return;
@@ -218,8 +234,8 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   void _rebuildTabController({int initialIndex = 0}) {
-    final oldController = _tabController;
-    oldController.removeListener(_onTabChanged);
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
     final safeIndex = initialIndex.clamp(0, _activeTabs.length - 1);
     _tabController = TabController(
       length: _activeTabs.length,
@@ -228,11 +244,11 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
     _lastPersistedTab = safeIndex;
     _tabController.addListener(_onTabChanged);
-    oldController.dispose();
   }
 
   @override
   void dispose() {
+    _persistTabTimer?.cancel();
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     _songsScrollController.removeListener(_onSongsScrollNearBottom);
@@ -302,10 +318,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   void _toggleTab(LibraryTabItem tab) {
-    final currentTabItem = (_tabController.index >= 0 &&
-            _tabController.index < _activeTabs.length)
-        ? _activeTabs[_tabController.index]
-        : null;
+    final currentTabItem =
+        (_tabController.index >= 0 && _tabController.index < _activeTabs.length)
+            ? _activeTabs[_tabController.index]
+            : null;
 
     final isPresent = _activeTabs.contains(tab);
     if (isPresent) {
@@ -353,16 +369,14 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   void _onReorderTabs(int oldIndex, int newIndex) {
+    if (oldIndex == newIndex) return;
     HapticFeedback.selectionClick();
-    final currentTabItem = (_tabController.index >= 0 &&
-            _tabController.index < _activeTabs.length)
-        ? _activeTabs[_tabController.index]
-        : null;
+    final currentTabItem =
+        (_tabController.index >= 0 && _tabController.index < _activeTabs.length)
+            ? _activeTabs[_tabController.index]
+            : null;
 
     setState(() {
-      if (newIndex > oldIndex) {
-        newIndex -= 1;
-      }
       final item = _activeTabs.removeAt(oldIndex);
       _activeTabs.insert(newIndex, item);
 
@@ -486,7 +500,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   leading: IconButton(
                       icon: const Icon(Icons.close_rounded),
                       onPressed: cubit.clearSelection),
-                  title: Text(context.l10n.selectedCount(state.selectedSongIds.length)),
+                  title: Text(
+                      context.l10n.selectedCount(state.selectedSongIds.length)),
                   actions: [
                     IconButton(
                         icon: const Icon(Icons.select_all_rounded),
@@ -537,8 +552,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                         }
                         cubit.clearSelection();
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(context.l10n
-                                .addedToQueue(selected.length))));
+                            content: Text(
+                                context.l10n.addedToQueue(selected.length))));
                       },
                     ),
                   ],
@@ -591,8 +606,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                     'library_tab_view_${_activeTabs.map((t) => t.name).join('_')}'),
                 controller: _tabController,
                 children: _activeTabs
-                    .map((tab) => _buildTabView(
-                        context, tab, state, cubit, playerCubit))
+                    .map((tab) =>
+                        _buildTabView(context, tab, state, cubit, playerCubit))
                     .toList(),
               ),
             ),
@@ -687,24 +702,23 @@ class _LibraryScreenState extends State<LibraryScreen>
     LibraryCubit cubit,
     PlayerCubit playerCubit,
   ) {
-    switch (tab) {
-      case LibraryTabItem.songs:
-        return _buildSongsTab(context, state, cubit, playerCubit);
-      case LibraryTabItem.downloaded:
-        return _buildDownloadedTab(context, state, cubit, playerCubit);
-      case LibraryTabItem.albums:
-        return _buildAlbumsTab(context, state);
-      case LibraryTabItem.artists:
-        return _buildArtistsTab(context, state);
-      case LibraryTabItem.favorites:
-        return _buildFavoritesTab(context, state, playerCubit);
-      case LibraryTabItem.folders:
-        return _buildFoldersTab(context);
-      case LibraryTabItem.genres:
-        return _buildGenresTab(context, state);
-      case LibraryTabItem.years:
-        return _buildYearsTab(context, state);
-    }
+    final Widget tabContent = switch (tab) {
+      LibraryTabItem.songs =>
+        _buildSongsTab(context, state, cubit, playerCubit),
+      LibraryTabItem.downloaded =>
+        _buildDownloadedTab(context, state, cubit, playerCubit),
+      LibraryTabItem.albums => _buildAlbumsTab(context, state),
+      LibraryTabItem.artists => _buildArtistsTab(context, state),
+      LibraryTabItem.favorites =>
+        _buildFavoritesTab(context, state, playerCubit),
+      LibraryTabItem.folders => _buildFoldersTab(context),
+      LibraryTabItem.genres => _buildGenresTab(context, state),
+      LibraryTabItem.years => _buildYearsTab(context, state),
+    };
+    return KeyedSubtree(
+      key: PageStorageKey('library_tab_${tab.name}'),
+      child: tabContent,
+    );
   }
 
   void _showManageTabsSheet(
@@ -995,8 +1009,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ],
                 ),
               ),
-        // ignore: deprecated_member_use
-        onReorder: (oldIndex, newIndex) {
+        onReorderItem: (oldIndex, newIndex) {
           _onReorderTabs(oldIndex, newIndex);
           setSheetState(() {});
         },
@@ -1348,8 +1361,6 @@ class _LibraryScreenState extends State<LibraryScreen>
       ),
     );
   }
-
-
 }
 
 class _LayoutToggleButton extends StatelessWidget {
@@ -1375,7 +1386,8 @@ class _LayoutToggleButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.r12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

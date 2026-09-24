@@ -67,31 +67,31 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <ImageView
+            <ImageButton
                 android:id="@+id/widget_favorite"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:padding="7.5dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:padding="8.5dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_heart"
                 android:contentDescription="@string/widget_toggle_favorite" />
 
             <ImageButton
                 android:id="@+id/btn_prev"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
                 android:layout_marginStart="5dp"
-                android:padding="7.5dp"
+                android:padding="8.5dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_skip_prev"
                 android:contentDescription="@string/widget_previous" />
 
             <ImageButton
                 android:id="@+id/btn_play_pause"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="6dp"
-                android:layout_marginEnd="6dp"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp"
                 android:padding="12dp"
                 android:background="@drawable/widget_play_button_background"
                 android:src="@drawable/ic_widget_play"
@@ -99,9 +99,9 @@
 
             <ImageButton
                 android:id="@+id/btn_next"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:padding="7.5dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:padding="8.5dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_skip_next"
                 android:contentDescription="@string/widget_next" />
@@ -128,19 +128,19 @@
         <!-- 10 Granular Tap Zones (10% steps) for seek placement -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="22dp"
+            android:layout_height="24dp"
             android:orientation="horizontal">
 
-            <LinearLayout android:id="@+id/btn_seek_01" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_02" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_03" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_04" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_05" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_06" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_07" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
+            <LinearLayout android:id="@+id/btn_seek_01" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_02" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_03" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_04" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_05" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_06" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_07" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
         </LinearLayout>
     </FrameLayout>
 
@@ -156,9 +156,9 @@
         <!-- Quick Rewind 10s button -->
         <ImageButton
             android:id="@+id/btn_rewind"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:padding="4.5dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_rewind"
             android:contentDescription="@string/widget_rewind_10s" />
@@ -169,32 +169,37 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
             android:text="0:00"
-            android:textColor="#848D9C"
-            android:textSize="10.5sp"
+            android:textColor="#A7B0C0"
+            android:textSize="11.5sp"
             android:fontFamily="sans-serif-medium" />
 
         <ImageView
             android:id="@+id/widget_shuffle"
-            android:layout_width="14dp"
-            android:layout_height="14dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_marginStart="8dp"
             android:visibility="gone"
-            android:src="@drawable/ic_widget_shuffle"
-            android:contentDescription="@string/widget_shuffle" />
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_widget_shuffle" />
 
         <ImageView
             android:id="@+id/widget_repeat"
-            android:layout_width="14dp"
-            android:layout_height="14dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_marginStart="6dp"
             android:visibility="gone"
-            android:src="@drawable/ic_widget_repeat"
-            android:contentDescription="@string/widget_repeat" />
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_widget_repeat" />
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:importantForAccessibility="no" />
 
         <TextView
             android:id="@+id/widget_duration"
@@ -202,16 +207,16 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="6dp"
             android:text="0:00"
-            android:textColor="#848D9C"
-            android:textSize="10.5sp"
+            android:textColor="#A7B0C0"
+            android:textSize="11.5sp"
             android:fontFamily="sans-serif-medium" />
 
         <!-- Quick Fast-Forward 10s button -->
         <ImageButton
             android:id="@+id/btn_forward"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:padding="4.5dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_forward"
             android:contentDescription="@string/widget_forward_10s" />

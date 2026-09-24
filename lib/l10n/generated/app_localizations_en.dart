@@ -6630,8 +6630,181 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cassetteSideA => 'SIDE A • TYPE II (CrO2)';
 
   @override
-  String get cassettePulsrTape => 'PULSR TAPE';
+  String get vinylSpeedRpm => '33⅓ RPM';
 
   @override
-  String get vinylSpeedRpm => '33⅓ RPM';
+  String get exclusiveUsbActive => 'Exclusive USB Active';
+
+  @override
+  String underrunsCount(int count) {
+    return '$count underruns';
+  }
+
+  @override
+  String get dspEngineTelemetry => 'DSP Engine Telemetry';
+
+  @override
+  String rtfPercent(String pct) {
+    return 'RTF: $pct%';
+  }
+
+  @override
+  String get limiterReduction => 'Limiter Reduction';
+
+  @override
+  String get multibandCompReduction => 'Multiband Comp Reduction';
+
+  @override
+  String get dynamicEqAdjustments => 'Dynamic EQ Adjustments';
+
+  @override
+  String get resetWeeklyDoseTitle => 'Reset Weekly Sound Dose?';
+
+  @override
+  String get resetWeeklyDoseDesc =>
+      'This will reset your accumulated acoustic exposure counter to 0% and lift safety attenuation. Only reset if starting a new monitoring week or switching listening environments.';
+
+  @override
+  String get resetDoseAction => 'Reset Dose';
+
+  @override
+  String get weeklyDoseResetSnackbar =>
+      'Weekly sound dose has been reset to 0.0%';
+
+  @override
+  String get headphoneSafetyTitle => 'Headphone Safety & Dose';
+
+  @override
+  String get headphoneSafetyStandard =>
+      'WHO-ITU H.870 / EN 62368-1 Acoustic Standard';
+
+  @override
+  String get weeklySoundAllowance => 'Weekly Sound Allowance';
+
+  @override
+  String get safetyLimiterActiveDesc =>
+      'Safety Limiter Active (-6 dBFS ceiling engaged to prevent hearing damage)';
+
+  @override
+  String get highSoundDoseWarning =>
+      'High sound dose: Consider reducing volume to protect hearing';
+
+  @override
+  String get optimalExposureDesc =>
+      'Optimal exposure: Safe listening levels within 40-hour allowance';
+
+  @override
+  String get latencySyncDiagnostics => 'Latency & Sync Diagnostics';
+
+  @override
+  String get latencySyncDiagnosticsDesc =>
+      'Real-time output and processing delay metrics reported directly from native hardware sinks.';
+
+  @override
+  String get dspPipelineDelay => 'DSP Pipeline Delay';
+
+  @override
+  String get dspPipelineDelayDesc =>
+      'Lookahead Limiter + Resampler group delay + Reverb partitioned delay';
+
+  @override
+  String get usbBufferedDelay => 'USB Hardware Buffered Delay';
+
+  @override
+  String get usbBufferedDelayDesc =>
+      'Ring buffer occupancy + URB kernel queue slack';
+
+  @override
+  String get totalMonitoredLatency => 'Total Monitored Latency';
+
+  @override
+  String get totalMonitoredLatencyDesc =>
+      'Sum of active digital processing & hardware buffering';
+
+  @override
+  String get directUsbExclusivePath => 'Direct USB Exclusive Path';
+
+  @override
+  String get lowLatencyDirectOutput => 'Low-Latency Direct Output';
+
+  @override
+  String get dacRateSwitchTitle => 'DAC Sample Rate Switch';
+
+  @override
+  String dacRateSwitchBody(String supported, String track) {
+    return 'Your DAC supports $supported kHz, but the current track is $track kHz.';
+  }
+
+  @override
+  String dacRateSwitchResample(String target) {
+    return 'Resample to $target kHz for bit-perfect output?';
+  }
+
+  @override
+  String get dacRateSwitchRemember => 'Always auto-switch in the future';
+
+  @override
+  String dacRateSwitchConfirm(String target) {
+    return 'Switch ($target k)';
+  }
+
+  @override
+  String get miniPlayerSwipeHint => 'Swipe left/right to skip';
+
+  @override
+  String get phoneSpeaker => 'Phone Speaker';
+
+  @override
+  String get usbDacNoneAttached => 'USB DAC: None attached';
+
+  @override
+  String get directPlaybackNotReported => 'DIRECT PLAYBACK: Not reported';
+
+  @override
+  String directPlaybackUpTo(String rate, String bits) {
+    return 'DIRECT PLAYBACK: Up to $rate Hz / $bits';
+  }
+
+  @override
+  String activeSystemOutputDesc(String rate, String bits) {
+    return 'Active system output device • Up to $rate kHz / $bits-bit';
+  }
+
+  @override
+  String deviceOutputSpecsDesc(String typeName, String rate, String bits) {
+    return '$typeName • Up to $rate kHz / $bits-bit';
+  }
+
+  @override
+  String get bpDirectActiveUsb =>
+      'Hardware direct pass-through active on USB DAC';
+
+  @override
+  String get bpDirectActiveWired =>
+      'Hardware direct pass-through active (wired direct)';
+
+  @override
+  String get bpPassThroughArmed =>
+      'Pass-through armed • Engages automatically when capable DAC is connected';
+
+  @override
+  String get bpBypassesAndroidMixer =>
+      'Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)';
+
+  @override
+  String settingsResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count settings found',
+      one: '1 setting found',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cassettePulsrTape => 'PULSR C-90';
+
+  @override
+  String get statusCancelled => 'Cancelled';
 }

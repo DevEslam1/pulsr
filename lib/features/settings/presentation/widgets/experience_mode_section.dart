@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -60,7 +61,18 @@ class ExperienceModeSection extends StatelessWidget {
             ],
             selected: {mode},
             onSelectionChanged: (selection) {
-              if (selection.isNotEmpty) cubit.setExperienceMode(selection.first);
+              if (selection.isNotEmpty) {
+                final newMode = selection.first;
+                cubit.setExperienceMode(newMode);
+                if (newMode == ExperienceMode.professional) {
+                  PulsrToast.show(
+                    context,
+                    title: 'Professional Mode',
+                    message: 'Advanced DSP, bit-perfect streaming, and pro audio controls unlocked.',
+                    icon: Icons.tune_rounded,
+                  );
+                }
+              }
             },
           ),
         ),

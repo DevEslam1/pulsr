@@ -36,21 +36,16 @@ class _RecentsScreenState extends State<RecentsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   Timer? _searchDebounce;
-  // FIX-M3: Static default history limit
   static const int _persistedHistoryLimit = 100;
+  static const int _maxHistoryLimit = 500;
   int _historyLimit = _persistedHistoryLimit;
+  bool _hasMore = true;
   late final GetSongsUseCase _getSongsUseCase;
 
   @override
   void initState() {
     super.initState();
     _getSongsUseCase = getIt<GetSongsUseCase>();
-  }
-
-  @override
-  void deactivate() {
-    _searchDebounce?.cancel();
-    super.deactivate();
   }
 
   @override
@@ -280,6 +275,16 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     icon: Icons.search_off_rounded,
                     title: context.l10n.noSongsFound,
                     subtitle: context.l10n.noResultsFor(_searchQuery),
+                    primaryActionLabel:
+                        _searchQuery.isNotEmpty ? context.l10n.clear : null,
+                    primaryActionIcon:
+                        _searchQuery.isNotEmpty ? Icons.clear_rounded : null,
+                    onPrimaryAction: _searchQuery.isNotEmpty
+                        ? () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          }
+                        : null,
                   ),
                 )
               else
@@ -389,7 +394,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     ),
                   ),
                 ),
-              if (allRecents.length >= _historyLimit && _searchQuery.isEmpty)
+              if (_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -398,8 +403,12 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         icon: const Icon(Icons.expand_more_rounded),
                         label: Text(context.l10n.loadMoreHistory),
                         onPressed: () {
+                          if (allRecents.length < _historyLimit) {
+                            setState(() => _hasMore = false);
+                            return;
+                          }
                           setState(() {
-                            _historyLimit += 100;
+                            _historyLimit = (_historyLimit + 100).clamp(_persistedHistoryLimit, _maxHistoryLimit);
                           });
                         },
                       ),

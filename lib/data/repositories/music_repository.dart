@@ -64,11 +64,8 @@ class MusicRepository implements IMusicRepository {
         // Fallback when FTS tokenization yields no tokens: use indexed prefix search when possible
         final trimmed = searchQuery.trim();
         final escaped = _likeEscape(trimmed);
-        final prefixPattern = '$escaped%';
         final containsPattern = '%$escaped%';
         query.where((t) =>
-            t.title.like(prefixPattern, escapeChar: r'\') |
-            t.artist.like(prefixPattern, escapeChar: r'\') |
             t.title.like(containsPattern, escapeChar: r'\') |
             t.artist.like(containsPattern, escapeChar: r'\') |
             t.album.like(containsPattern, escapeChar: r'\'));
@@ -1415,10 +1412,10 @@ class MusicRepository implements IMusicRepository {
           ..where((t) => t.source.equals(SongSource.local)))
         .get();
     if (existing.isEmpty) return songs;
-    final byKey = <String, int>{};
+    final byKey = <(String, int), int>{};
     for (final s in existing) {
       if (s.path.isEmpty) continue;
-      byKey['${s.path.toLowerCase()}\u0000${s.cueStartMs ?? -1}'] = s.id;
+      byKey[(s.path.toLowerCase(), s.cueStartMs ?? -1)] = s.id;
     }
     if (byKey.isEmpty) return songs;
     var changed = false;
@@ -1427,8 +1424,10 @@ class MusicRepository implements IMusicRepository {
       final path = c.path.present ? c.path.value : null;
       final id = c.id.present ? c.id.value : null;
       if (path != null && path.isNotEmpty && id != null) {
-        final key =
-            '${path.toLowerCase()}\u0000${c.cueStartMs.present ? (c.cueStartMs.value ?? -1) : -1}';
+        final key = (
+          path.toLowerCase(),
+          c.cueStartMs.present ? (c.cueStartMs.value ?? -1) : -1
+        );
         final existingId = byKey[key];
         if (existingId != null && existingId != id) {
           out.add(c.copyWith(id: Value(existingId)));
@@ -1962,8 +1961,13 @@ class MusicRepository implements IMusicRepository {
       await _db.transaction(() async {
         if (newRow == null) {
           if (fileExists) {
-            final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+            final nowMs = DateTime.now().millisecondsSinceEpoch;
             if (oldRow != null) {
+              final resolvedDateAdded = (oldRow.dateAdded ?? 0) > 0
+                  ? (oldRow.dateAdded! < 10000000000
+                      ? oldRow.dateAdded! * 1000
+                      : oldRow.dateAdded!)
+                  : nowMs;
               await (_db.update(_db.songsTable)
                     ..where((t) => t.id.equals(oldId)))
                   .write(
@@ -1972,8 +1976,7 @@ class MusicRepository implements IMusicRepository {
                   source: const Value(SongSource.local),
                   isMissing: const Value(false),
                   isDownloaded: const Value(true),
-                  dateAdded: Value(
-                      (oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
+                  dateAdded: Value(resolvedDateAdded),
                   pendingDownloadPath: const Value(null),
                 ),
               );
@@ -2007,7 +2010,7 @@ class MusicRepository implements IMusicRepository {
                       isDownloaded: const Value(true),
                       remoteId: Value(fallbackSong.remoteId),
                       remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
-                      dateAdded: Value(nowSec),
+                      dateAdded: Value(nowMs),
                     ),
                     mode: InsertMode.insertOrReplace,
                   );

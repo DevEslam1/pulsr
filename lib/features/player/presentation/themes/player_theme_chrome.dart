@@ -376,7 +376,10 @@ class PlayerDockIconButton extends StatelessWidget {
       label: tooltip,
       excludeSemantics: true,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        constraints: const BoxConstraints(
+          minWidth: 48,
+          minHeight: 48,
+        ),
         child: body,
       ),
     );
@@ -691,12 +694,18 @@ class PlayerBottomActionDock extends StatelessWidget {
                   Expanded(
                     child: PlayerDockIconButton(
                       icon: Icons.timer_outlined,
-                      tooltip: l10n.sleepTimer,
+                      tooltip: isEndQ
+                          ? 'Sleep Timer: End of Queue'
+                          : (remainingTracks != null
+                              ? 'Sleep Timer: $remainingTracks tracks remaining'
+                              : (props.state.sleepTimerRemaining != null
+                                  ? 'Sleep Timer: ${props.state.sleepTimerRemaining!.inMinutes}m remaining'
+                                  : l10n.sleepTimer)),
                       badgeText: hasTimer
                           ? (remainingTracks != null
                               ? '$remainingTracks tr'
                               : (isEndQ
-                                  ? 'End Q'
+                                  ? 'End'
                                   : (props.state.sleepTimerRemaining != null
                                       ? '${props.state.sleepTimerRemaining!.inMinutes}m'
                                       : '')))

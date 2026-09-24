@@ -13,7 +13,6 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
-
 // ============================================================================
 // Title formatters
 // ============================================================================
@@ -86,7 +85,8 @@ String getLanguageTitle(String code, AppLocalizations l10n) {
   }
 }
 
-String getMiniPlayerSwipeTitle(MiniPlayerSwipeAction action, AppLocalizations l10n) {
+String getMiniPlayerSwipeTitle(
+    MiniPlayerSwipeAction action, AppLocalizations l10n) {
   switch (action) {
     case MiniPlayerSwipeAction.next:
       return l10n.settingsSwipeNextTrack;
@@ -99,7 +99,8 @@ String getMiniPlayerSwipeTitle(MiniPlayerSwipeAction action, AppLocalizations l1
   }
 }
 
-String getNowPlayingDoubleTapTitle(NowPlayingDoubleTapAction action, AppLocalizations l10n) {
+String getNowPlayingDoubleTapTitle(
+    NowPlayingDoubleTapAction action, AppLocalizations l10n) {
   switch (action) {
     case NowPlayingDoubleTapAction.toggleFavorite:
       return l10n.settingsDoubleTapToggleFavorite;
@@ -110,7 +111,8 @@ String getNowPlayingDoubleTapTitle(NowPlayingDoubleTapAction action, AppLocaliza
   }
 }
 
-String getNowPlayingArtworkSwipeTitle(NowPlayingArtworkSwipeAction action, AppLocalizations l10n) {
+String getNowPlayingArtworkSwipeTitle(
+    NowPlayingArtworkSwipeAction action, AppLocalizations l10n) {
   switch (action) {
     case NowPlayingArtworkSwipeAction.nextPrev:
       return l10n.settingsArtworkSwipeNextPrev;
@@ -133,6 +135,68 @@ String getQualityTitle(YtmAudioQuality quality, AppLocalizations l10n) {
 // ============================================================================
 // Picker Modal Sheets
 // ============================================================================
+
+class _ThemePreviewThumbnail extends StatelessWidget {
+  final PlayerThemeMode mode;
+  final bool isSelected;
+  final Color primaryColor;
+
+  const _ThemePreviewThumbnail({
+    required this.mode,
+    required this.isSelected,
+    required this.primaryColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = isSelected
+        ? primaryColor
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7);
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: isSelected
+            ? primaryColor.withValues(alpha: 0.15)
+            : Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AppRadii.r10),
+        border: Border.all(
+          color: isSelected
+              ? primaryColor.withValues(alpha: 0.4)
+              : Colors.transparent,
+          width: 1,
+        ),
+      ),
+      child: Center(
+        child: _buildPreviewIcon(tint),
+      ),
+    );
+  }
+
+  Widget _buildPreviewIcon(Color tint) {
+    switch (mode) {
+      case PlayerThemeMode.classic:
+        return Icon(Icons.crop_square_rounded, size: 22, color: tint);
+      case PlayerThemeMode.card:
+        return Icon(Icons.layers_rounded, size: 22, color: tint);
+      case PlayerThemeMode.circle:
+        return Icon(Icons.album_rounded, size: 22, color: tint);
+      case PlayerThemeMode.minimal:
+        return Icon(Icons.graphic_eq_rounded, size: 22, color: tint);
+      case PlayerThemeMode.vinyl:
+        return Icon(Icons.radio_button_checked_rounded, size: 22, color: tint);
+      case PlayerThemeMode.cassette:
+        return Icon(Icons.developer_board_rounded, size: 22, color: tint);
+      case PlayerThemeMode.waveform:
+        return Icon(Icons.waves_rounded, size: 22, color: tint);
+      case PlayerThemeMode.lyricsFocus:
+        return Icon(Icons.mic_external_on_rounded, size: 22, color: tint);
+    }
+  }
+}
 
 void showThemePickerSheet(
   BuildContext context,
@@ -223,8 +287,10 @@ void showThemePickerSheet(
             ),
             const SizedBox(height: AppSpacing.sm),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.xxs),
-              child: Text(context.l10n.selectPlayerTheme,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s20, vertical: AppSpacing.xxs),
+              child: Text(
+                context.l10n.selectPlayerTheme,
                 style: TextStyle(
                   fontSize: AppFontSize.title,
                   fontWeight: FontWeight.w900,
@@ -258,9 +324,10 @@ void showThemePickerSheet(
                         ),
                       ),
                       child: ListTile(
-                        leading: Icon(
-                          t.icon,
-                          color: isSelected ? primaryColor : textSecondary,
+                        leading: _ThemePreviewThumbnail(
+                          mode: t.mode,
+                          isSelected: isSelected,
+                          primaryColor: primaryColor,
                         ),
                         title: Text(
                           t.title,
@@ -271,7 +338,9 @@ void showThemePickerSheet(
                         ),
                         subtitle: Text(
                           t.subtitle,
-                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: textSecondary),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check_circle_rounded,
@@ -345,13 +414,15 @@ void showLanguagePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   context.l10n.appLanguage,
                   style: const TextStyle(
@@ -390,10 +461,12 @@ void showLanguagePickerSheet(
                       ),
                       subtitle: Text(
                         lang.nativeName,
-                        style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
+                        style: TextStyle(
+                            fontSize: AppFontSize.label, color: textSecondary),
                       ),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         cubit.setLanguage(lang.code);
@@ -455,14 +528,17 @@ void showColorSourcePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(context.l10n.appColorSource,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Text(
+                  context.l10n.appColorSource,
                   style: TextStyle(
                     fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w900,
@@ -499,10 +575,12 @@ void showColorSourcePickerSheet(
                       ),
                       subtitle: Text(
                         s.subtitle,
-                        style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
+                        style: TextStyle(
+                            fontSize: AppFontSize.label, color: textSecondary),
                       ),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         cubit.setThemeColorSource(s.source);
@@ -600,14 +678,17 @@ void showVisualizerStylePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(context.l10n.visualizerStyleLabel,
+                padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Text(
+                  context.l10n.visualizerStyleLabel,
                   style: TextStyle(
                     fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w900,
@@ -644,10 +725,12 @@ void showVisualizerStylePickerSheet(
                       ),
                       subtitle: Text(
                         s.subtitle,
-                        style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
+                        style: TextStyle(
+                            fontSize: AppFontSize.label, color: textSecondary),
                       ),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         cubit.setVisualizerStyle(s.style);
@@ -666,25 +749,29 @@ void showVisualizerStylePickerSheet(
                     side: BorderSide(color: outlineColor),
                   ),
                   child: ListTile(
-                    leading: Icon(Icons.file_open_rounded, color: textSecondary),
-                    title: Text(context.l10n.importMilk,
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                    leading:
+                        Icon(Icons.file_open_rounded, color: textSecondary),
+                    title: Text(
+                      context.l10n.importMilk,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: textPrimary),
                     ),
-                    subtitle: Text(context.l10n.loadMilkDesc,
-                      style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
+                    subtitle: Text(
+                      context.l10n.loadMilkDesc,
+                      style: TextStyle(
+                          fontSize: AppFontSize.label, color: textSecondary),
                     ),
                     onTap: () async {
-                      final preset = await MilkdropPresetStore().importFromFile();
+                      final preset =
+                          await MilkdropPresetStore().importFromFile();
                       if (!context.mounted) return;
                       Navigator.pop(ctx);
                       cubit.setVisualizerStyle(VisualizerStyle.milkdrop);
                       if (preset != null) {
                         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                           SnackBar(
-                            content:
-                                Text(context.l10n.importedPresetTpl(
-                                    'Milkdrop', preset.name)),
+                            content: Text(context.l10n
+                                .importedPresetTpl('Milkdrop', preset.name)),
                           ),
                         );
                       }
@@ -701,25 +788,29 @@ void showVisualizerStylePickerSheet(
                     side: BorderSide(color: outlineColor),
                   ),
                   child: ListTile(
-                    leading: Icon(Icons.data_object_rounded, color: textSecondary),
-                    title: Text(context.l10n.importJsonViz,
-                      style:
-                          TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                    leading:
+                        Icon(Icons.data_object_rounded, color: textSecondary),
+                    title: Text(
+                      context.l10n.importJsonViz,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, color: textPrimary),
                     ),
-                    subtitle: Text(context.l10n.loadJsonVizDesc,
-                      style: TextStyle(fontSize: AppFontSize.label, color: textSecondary),
+                    subtitle: Text(
+                      context.l10n.loadJsonVizDesc,
+                      style: TextStyle(
+                          fontSize: AppFontSize.label, color: textSecondary),
                     ),
                     onTap: () async {
-                      final preset = await VisualizerPresetStore().importFromFile();
+                      final preset =
+                          await VisualizerPresetStore().importFromFile();
                       if (!context.mounted) return;
                       Navigator.pop(ctx);
                       cubit.setVisualizerStyle(VisualizerStyle.custom);
                       if (preset != null) {
                         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                           SnackBar(
-                            content:
-                                Text(context.l10n.importedPresetTpl(
-                                    'JSON', preset.name)),
+                            content: Text(context.l10n
+                                .importedPresetTpl('JSON', preset.name)),
                           ),
                         );
                       }
@@ -734,4 +825,3 @@ void showVisualizerStylePickerSheet(
     ),
   );
 }
-

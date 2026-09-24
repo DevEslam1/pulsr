@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <cache-path name="widget_cache" path="." />
-    <external-cache-path name="external_widget_cache" path="." />
-    <files-path name="widget_files" path="." />
+    <cache-path
+        name="widget_artwork"
+        path="widget_artwork/" />
+
+    <files-path
+        name="widget_shared"
+        path="widget_shared/" />
+
+    <external-cache-path
+        name="widget_external_artwork"
+        path="widget_artwork/" />
 </paths>

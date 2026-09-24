@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -61,30 +60,14 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   String? _lastFilePath;
   Future<List<double>>? _cachedWaveformFuture;
 
-  static final List<double> _loadingWaveformSamples = List.generate(
-    100,
-    (i) => 0.2 + 0.15 * math.sin(i * 0.15),
-  );
-
   @override
   void didUpdateWidget(PlayerSeekBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.songId != widget.songId ||
-        oldWidget.filePath != widget.filePath ||
-        oldWidget.duration != widget.duration) {
+        oldWidget.filePath != widget.filePath) {
       _dragValue = null;
       _tapSeekPending = false;
       _tapSeekRatio = null;
-    } else if (_dragValue != null && widget.position != null && oldWidget.position != null) {
-      // FIX-H13: Reset _dragValue if position jumped by more than 1s externally
-      final delta = (widget.position! - oldWidget.position!).abs();
-      if (delta > const Duration(seconds: 1)) {
-        setState(() {
-          _dragValue = null;
-          _tapSeekPending = false;
-          _tapSeekRatio = null;
-        });
-      }
     }
   }
 
@@ -133,19 +116,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     loopPointB: widget.loopPointB,
                   ));
             }
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              // Keep themed WaveformSeekBar mounted with loading state
-              return _withPosition((position) => WaveformSeekBar(
-                    position: position,
-                    duration: widget.duration,
-                    onSeek: widget.onSeek,
-                    samples: _loadingWaveformSamples,
-                    activeColor: widget.activeColor.withValues(alpha: 0.45),
-                    semanticLabel: widget.semanticLabel,
-                    loopPointA: widget.loopPointA,
-                    loopPointB: widget.loopPointB,
-                  ));
-            }
             if (snapshot.hasError) {
               ErrorLogger.log(
                 'Waveform calculation failed for song $effectiveSongId',
@@ -154,7 +124,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 category: 'WaveformSeekBar',
               );
             }
-            // Hard failure fallback to standard seek bar
+            // Accurate fallback while waveform is computing or on failure
             return _buildStandardSeekBar(context);
           },
         ),
@@ -296,18 +266,28 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   animateWave: isPlaying,
                   onChangeStart: (val) {
                     _tapSeekPending = true;
-                    _tapSeekRatio = val;
-                    setState(() => _dragValue = val);
+                    _tapSeekRatio = val.clamp(0.0, maxDuration.toDouble());
+                    setState(() => _dragValue = _tapSeekRatio);
                   },
                   onChanged: (val) {
-                    if (_tapSeekRatio != null && (val - _tapSeekRatio!).abs() > 200) {
+                    final clampedVal = val.clamp(0.0, maxDuration.toDouble());
+                    if (_tapSeekRatio != null && (clampedVal - _tapSeekRatio!).abs() > 200) {
                       _tapSeekPending = false;
                     }
-                    setState(() => _dragValue = val);
+                    setState(() => _dragValue = clampedVal);
                   },
                   onChangeEnd: (val) {
-                    final target = (_tapSeekPending && _tapSeekRatio != null) ? _tapSeekRatio! : val;
+                    final target = (_tapSeekPending && _tapSeekRatio != null)
+                        ? _tapSeekRatio!.clamp(0.0, maxDuration.toDouble())
+                        : val.clamp(0.0, maxDuration.toDouble());
                     widget.onSeek(Duration(milliseconds: target.round()));
+                    setState(() {
+                      _dragValue = null;
+                      _tapSeekPending = false;
+                      _tapSeekRatio = null;
+                    });
+                  },
+                  onChangeCancel: () {
                     setState(() {
                       _dragValue = null;
                       _tapSeekPending = false;

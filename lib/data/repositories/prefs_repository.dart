@@ -23,11 +23,15 @@ class PrefsRepository {
   /// Get value with in-memory fallback.
   T? get<T>(String key) {
     if (_memoryCache.containsKey(key)) {
-      return _memoryCache[key] as T?;
+      final v = _memoryCache[key];
+      return v is T ? v : null;
     }
-    final val = _prefs.get(key) as T?;
-    if (val != null) _memoryCache[key] = val;
-    return val;
+    final val = _prefs.get(key);
+    if (val is T) {
+      _memoryCache[key] = val;
+      return val;
+    }
+    return null;
   }
 
   bool? getBool(String key) => get<bool>(key);

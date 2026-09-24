@@ -981,18 +981,19 @@ class EqualizerManager {
         PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
       };
 
-      // Atomic commit: all-or-nothing write pattern
-      for (final entry in batch.entries) {
+      // Atomic commit: concurrent write pattern
+      await Future.wait(batch.entries.map((entry) {
         if (entry.value is bool) {
-          await prefs.setBool(entry.key, entry.value as bool);
+          return prefs.setBool(entry.key, entry.value as bool);
         } else if (entry.value is double) {
-          await prefs.setDouble(entry.key, entry.value as double);
+          return prefs.setDouble(entry.key, entry.value as double);
         } else if (entry.value is int) {
-          await prefs.setInt(entry.key, entry.value as int);
+          return prefs.setInt(entry.key, entry.value as int);
         } else if (entry.value is String) {
-          await prefs.setString(entry.key, entry.value as String);
+          return prefs.setString(entry.key, entry.value as String);
         }
-      }
+        return Future.value(true);
+      }));
       // Single atomic pass — batch loop above already persisted everything.
       if (selectedHeadphoneProfile != null) {
         await prefs.setString(
@@ -1654,11 +1655,11 @@ class EqualizerManager {
       return false;
     }
     if (!PlatformCapabilities.isAndroid) {
-      isReverbEnabled = true;
-      reverbPreset = ReverbPreset.custom.wireValue;
-      _debouncedSavePreferences();
-      _syncPipeline();
-      return true;
+      ErrorLogger.log(
+        'Custom impulse response convolution reverb is only supported on Android',
+        category: 'EqualizerManager',
+      );
+      return false;
     }
     final loaded = await _effectsChannel.loadImpulseResponse(irSamples);
     if (!loaded) {

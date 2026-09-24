@@ -80,6 +80,7 @@ class _OnlinePlaylistDetailScreenState
         widget.args.initialTracks!.isNotEmpty) {
       _tracks = List<YtmTrack>.from(widget.args.initialTracks!);
       _artworkUrl ??= _tracks.firstOrNull?.artworkUrl;
+      _fetchTracks(isBackgroundRefresh: true);
     } else {
       _fetchTracks();
     }
@@ -94,12 +95,14 @@ class _OnlinePlaylistDetailScreenState
     super.dispose();
   }
 
-  Future<void> _fetchTracks() async {
+  Future<void> _fetchTracks({bool isBackgroundRefresh = false}) async {
     if (_disposed || !mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (!isBackgroundRefresh) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final accountService = getIt.isRegistered<YtmAccountService>()
@@ -147,12 +150,14 @@ class _OnlinePlaylistDetailScreenState
       if (_disposed || !mounted) return;
 
       if (fetchedTracks.isEmpty) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = isTimeout
-              ? 'Connection timed out. Check your network and try again.'
-              : context.l10n.browseCouldNotLoadTracks;
-        });
+        if (!isBackgroundRefresh) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = isTimeout
+                ? 'Connection timed out. Check your network and try again.'
+                : context.l10n.browseCouldNotLoadTracks;
+          });
+        }
         return;
       }
 
@@ -176,17 +181,13 @@ class _OnlinePlaylistDetailScreenState
           _artworkUrl ??= fetchedTracks.firstOrNull?.artworkUrl;
         }
       });
-    } on TimeoutException {
-      if (_disposed || !mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Connection timed out. Check your network and try again.';
-      });
     } catch (e) {
       if (_disposed || !mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = '${context.l10n.playlistLoadFailed} $e';
+        _errorMessage = e is TimeoutException
+            ? 'Connection timed out. Check your network and try again.'
+            : '${context.l10n.playlistLoadFailed} $e';
       });
     }
   }

@@ -40,10 +40,24 @@ class SleepTimerManager {
   AudioPlayer Function()? _lastPlayerGetter;
   Future<void> Function()? _onTimerExpiredCallback;
 
+  bool countDownWhilePaused = false;
+  List<Duration> _queuedDurations = [];
+
   bool get isArmed => _isArmed;
   SleepTimerMode get mode => _mode;
   Duration get remainingDuration => _remainingDuration;
   int get remainingTracks => _remainingTracks;
+
+  Duration _calculateRemainingTracksDuration() {
+    if (_queuedDurations.isNotEmpty) {
+      final total = _queuedDurations.take(_remainingTracks).fold<Duration>(
+            Duration.zero,
+            (prev, d) => prev + d,
+          );
+      if (total > Duration.zero) return total;
+    }
+    return Duration(minutes: _remainingTracks * 3);
+  }
 
   /// Starts or replaces a duration-based monotonic sleep timer.
   void startSleepTimer(
@@ -86,9 +100,7 @@ class SleepTimerManager {
       return;
     }
 
-    final targetEndTime = DateTime.now().add(duration);
-
-    // 1-second wall-clock countdown ticker resilient to Doze mode drift
+    // 1-second countdown ticker evaluated against active playback
     _countdownTicker =
         Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!_isArmed || _sleepFadeToken != currentToken) {
@@ -97,16 +109,22 @@ class SleepTimerManager {
       }
 
       final player = _lastPlayerGetter?.call();
-      final now = DateTime.now();
-      final diff = targetEndTime.difference(now);
+      final isPlaying = player?.playing ?? true;
+      if (!countDownWhilePaused && !isPlaying) {
+        // Paused: countdown suspended while playback is paused
+        return;
+      }
 
-      if (diff > Duration.zero) {
-        _remainingDuration = diff;
+      if (_remainingDuration > const Duration(seconds: 1)) {
+        _remainingDuration -= const Duration(seconds: 1);
         if (!_sleepTimerRemainingSubject.isClosed) {
           _sleepTimerRemainingSubject.add(_remainingDuration);
         }
+        if (!countDownWhilePaused && _remainingDuration.inSeconds % 5 == 0) {
+          _persistTimerState(_remainingDuration);
+        }
 
-        // Trigger smooth fade-out during the final 15 seconds (or remaining duration if smaller)
+        // Trigger smooth fade-out during the final 15 seconds
         if (_isFadeOutEnabled &&
             _remainingDuration <= const Duration(seconds: 15)) {
           _applyFadeOut(player, _remainingDuration.inSeconds);
@@ -152,6 +170,7 @@ class SleepTimerManager {
     bool fadeOut = true,
     required Future<void> Function() onTimerExpired,
     required AudioPlayer Function() getActivePlayer,
+    List<Duration>? trackDurations,
   }) {
     cancelSleepTimer();
     if (trackCount <= 0) return;
@@ -159,12 +178,16 @@ class SleepTimerManager {
     _isArmed = true;
     _mode = SleepTimerMode.afterNTracks;
     _remainingTracks = trackCount;
+    _queuedDurations = trackDurations != null ? List.from(trackDurations) : [];
     _isFadeOutEnabled = fadeOut;
     _onTimerExpiredCallback = onTimerExpired;
     _lastPlayerGetter = getActivePlayer;
     _sleepFadeToken++;
+
+    final remainingDur = _calculateRemainingTracksDuration();
+    _remainingDuration = remainingDur;
     if (!_sleepTimerRemainingSubject.isClosed) {
-      _sleepTimerRemainingSubject.add(Duration(minutes: trackCount * 3));
+      _sleepTimerRemainingSubject.add(remainingDur);
     }
     if (!_sleepTimerRemainingTracksSubject.isClosed) {
       _sleepTimerRemainingTracksSubject.add(trackCount);
@@ -213,12 +236,17 @@ class SleepTimerManager {
       await _executeExpiration(token);
     } else if (_mode == SleepTimerMode.afterNTracks) {
       _remainingTracks--;
+      if (_queuedDurations.isNotEmpty) {
+        _queuedDurations.removeAt(0);
+      }
       if (_remainingTracks <= 0) {
         final token = _sleepFadeToken;
         await _executeExpiration(token);
       } else {
+        final rem = _calculateRemainingTracksDuration();
+        _remainingDuration = rem;
         if (!_sleepTimerRemainingSubject.isClosed) {
-          _sleepTimerRemainingSubject.add(Duration(minutes: _remainingTracks * 3));
+          _sleepTimerRemainingSubject.add(rem);
         }
         if (!_sleepTimerRemainingTracksSubject.isClosed) {
           _sleepTimerRemainingTracksSubject.add(_remainingTracks);

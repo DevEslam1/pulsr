@@ -55,6 +55,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   _PlaylistTabMode _selectedTab = _PlaylistTabMode.local;
   PlaylistsTableData? _selectedPlaylist;
   List<PlaylistSuggestion> _suggestions = const [];
+  bool _isCreatingPlaylist = false;
 
   @override
   void initState() {
@@ -132,6 +133,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _showCreateDialog(BuildContext context, PlaylistCubit cubit) async {
+    if (_isCreatingPlaylist) return;
     final name = await PulsrDialogHelper.showInputDialog(
       context,
       title: context.l10n.createPlaylist,
@@ -140,8 +142,15 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       confirmLabel: context.l10n.save,
       cancelLabel: context.l10n.cancel,
     );
-    if (name != null && name.isNotEmpty) {
-      await cubit.createPlaylist(name);
+    if (name != null && name.trim().isNotEmpty && mounted) {
+      setState(() => _isCreatingPlaylist = true);
+      try {
+        await cubit.createPlaylist(name.trim());
+      } finally {
+        if (mounted) {
+          setState(() => _isCreatingPlaylist = false);
+        }
+      }
     }
   }
 
@@ -419,12 +428,24 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         final columns = Adaptive.gridColumns(context, minItemWidth: 170);
         final isTwoPane = context.isTwoPanePlaylist;
 
-        if (isTwoPane && _selectedPlaylist == null) {
-          if (userPlaylists.isNotEmpty) {
-            _selectedPlaylist = userPlaylists.first;
-          } else if (smartPlaylists.isNotEmpty) {
-            _selectedPlaylist = smartPlaylists.first;
+        if (isTwoPane) {
+          if (_selectedPlaylist == null) {
+            if (userPlaylists.isNotEmpty) {
+              _selectedPlaylist = userPlaylists.first;
+            } else if (smartPlaylists.isNotEmpty) {
+              _selectedPlaylist = smartPlaylists.first;
+            }
+          } else {
+            final exists = userPlaylists.any((x) => x.id == _selectedPlaylist!.id) ||
+                smartPlaylists.any((x) => x.id == _selectedPlaylist!.id);
+            if (!exists) {
+              _selectedPlaylist = userPlaylists.isNotEmpty
+                  ? userPlaylists.first
+                  : (smartPlaylists.isNotEmpty ? smartPlaylists.first : null);
+            }
           }
+        } else if (_selectedPlaylist != null) {
+          _selectedPlaylist = null;
         }
 
         final playlistListWidget = _buildPlaylistListContent(
@@ -462,9 +483,17 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   onPressed: () => _importPlaylist(context),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add_rounded),
+                  icon: _isCreatingPlaylist
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_rounded),
                   tooltip: context.l10n.createPlaylist,
-                  onPressed: () => _showCreateDialog(context, cubit),
+                  onPressed: _isCreatingPlaylist
+                      ? null
+                      : () => _showCreateDialog(context, cubit),
                 ),
               ],
             ],
@@ -620,7 +649,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 ),
                 if (smartPlaylists.isEmpty)
                   InkWell(
-                    onTap: () => context.push('/smart-playlist-builder'),
+                    onTap: () async {
+                      await context.push('/smart-playlist-builder');
+                    },
                     borderRadius: BorderRadius.circular(AppRadii.r8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -676,9 +707,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     subtitle:
                         '${context.l10n.tracksCount(count)} • ${context.l10n.browseSmart}',
                     icon: Icons.auto_awesome_rounded,
+                    isSmart: true,
                     gradient: [
-                      p.accent.withValues(alpha: 0.65),
-                      p.accent.withValues(alpha: 0.25)
+                      p.accent,
+                      AppColors.ldacViolet,
                     ],
                     isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
                     onTap: () => _onSelectPlaylist(pl),
@@ -1872,12 +1904,14 @@ class _SuggestionCard extends StatelessWidget {
 }
 
 class _PlaylistCard extends StatelessWidget {
+  static const _smartBadgeText = 'SMART';
   final String name;
   final String subtitle;
   final IconData icon;
   final List<Color> gradient;
   final bool muted;
   final bool isSelected;
+  final bool isSmart;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final List<PopupMenuEntry<String>> Function(BuildContext)? menuItems;
@@ -1891,6 +1925,7 @@ class _PlaylistCard extends StatelessWidget {
     required this.onTap,
     this.muted = false,
     this.isSelected = false,
+    this.isSmart = false,
     this.onLongPress,
     this.menuItems,
     this.onMenuSelected,
@@ -1955,9 +1990,52 @@ class _PlaylistCard extends StatelessWidget {
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
                 ),
-                child: Center(
-                  child: Icon(icon,
-                      color: muted ? p.textSecondary : Colors.white, size: 40),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Icon(icon,
+                          color: muted ? p.textSecondary : Colors.white, size: 40),
+                    ),
+                    if (isSmart)
+                      PositionedDirectional(
+                        top: AppSpacing.xs,
+                        end: AppSpacing.xs,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s6,
+                            vertical: AppSpacing.s2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 10,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                              Text(
+                                _smartBadgeText,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppFontSize.micro,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: AppTracking.wide,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),

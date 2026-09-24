@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 
 /// Item stored in preloaded stream head cache.
@@ -27,11 +28,14 @@ class AudioMemoryManager {
   }
 
   static int computeAdaptiveBudget() {
-    // dart:io exposes no cross-platform total-RAM value; the previous
-    // (CPU cores * 512 MB) heuristic was arbitrary and could mis-size the
-    // cache by an order of magnitude. Stay at the conservative default until a
-    // real platform memory channel exists.
-    return 32 * 1024 * 1024;
+    try {
+      final cores = Platform.numberOfProcessors;
+      if (cores <= 4) return 16 * 1024 * 1024; // 16MB
+      if (cores <= 6) return 24 * 1024 * 1024; // 24MB
+      return 32 * 1024 * 1024; // 32MB
+    } catch (_) {
+      return 32 * 1024 * 1024;
+    }
   }
 
   final LinkedHashMap<String, PreloadedHead> _headCache = LinkedHashMap();

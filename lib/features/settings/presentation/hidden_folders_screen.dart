@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
@@ -43,8 +44,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
   }
 
   Future<void> _loadMinFileSize() async {
-    final kb = await context.read<SettingsCubit>().getMinFileSizeKb();
-    if (mounted) setState(() => _minFileSizeKb = kb);
+    try {
+      final kb = await context.read<SettingsCubit>().getMinFileSizeKb();
+      if (mounted) setState(() => _minFileSizeKb = kb);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load min file size filter',
+          error: e, stackTrace: st, category: 'HiddenFoldersScreen');
+      if (mounted) setState(() => _minFileSizeKb = 0);
+    }
   }
 
   @override
