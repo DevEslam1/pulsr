@@ -43,9 +43,9 @@
     <!-- Download foreground-service notification (C-6) -->
     <string name="download_channel_name">Downloads</string>
     <string name="download_channel_description">Shows progress for YouTube downloads</string>
+    <string name="download_channel_id" translatable="false">downloads</string>
     <string name="download_notification_default_title">Downloading</string>
     <string name="download_notification_downloads">Downloads</string>
-    <string name="download_notification_count">%1$d downloads</string>
     <plurals name="download_notification_count">
         <item quantity="one">%1$d download</item>
         <item quantity="other">%1$d downloads</item>

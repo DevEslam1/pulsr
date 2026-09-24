@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Pulsr Music</string>
+    <string name="widget_description">التحكم في تشغيل Pulsr — تخطي المقاطع، المفضلة ومتابعة التقدم</string>
+
     <!-- Now-playing home-screen widget (C-6) -->
     <string name="widget_album_artwork">غلاف الألبوم</string>
     <string name="widget_nothing_playing">لا شيء قيد التشغيل</string>
@@ -41,7 +44,6 @@
     <string name="download_channel_description">يعرض تقدم تنزيلات YouTube</string>
     <string name="download_notification_default_title">جارٍ التنزيل</string>
     <string name="download_notification_downloads">التنزيلات</string>
-    <string name="download_notification_count">%1$d تنزيلات</string>
     <plurals name="download_notification_count">
         <item quantity="zero">لا توجد تنزيلات</item>
         <item quantity="one">تنزيل واحد</item>

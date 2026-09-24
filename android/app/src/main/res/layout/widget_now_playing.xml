@@ -131,16 +131,16 @@
             android:layout_height="24dp"
             android:orientation="horizontal">
 
-            <LinearLayout android:id="@+id/btn_seek_01" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_02" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_03" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_04" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_05" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_06" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_07" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
-            <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@string/widget_seek_to" />
+            <LinearLayout android:id="@+id/btn_seek_01" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_02" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_03" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_04" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_05" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_06" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_07" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
+            <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" android:contentDescription="@null" />
         </LinearLayout>
     </FrameLayout>
 
@@ -156,9 +156,9 @@
         <!-- Quick Rewind 10s button -->
         <ImageButton
             android:id="@+id/btn_rewind"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="7dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_rewind"
             android:contentDescription="@string/widget_rewind_10s" />
@@ -179,10 +179,10 @@
             android:layout_height="22dp"
             android:layout_marginStart="8dp"
             android:visibility="gone"
-            android:clickable="true"
-            android:focusable="true"
-            android:src="@drawable/ic_widget_shuffle"
-            android:contentDescription="@string/widget_shuffle" />
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_widget_shuffle" />
 
         <ImageView
             android:id="@+id/widget_repeat"
@@ -190,10 +190,10 @@
             android:layout_height="22dp"
             android:layout_marginStart="6dp"
             android:visibility="gone"
-            android:clickable="true"
-            android:focusable="true"
-            android:src="@drawable/ic_widget_repeat"
-            android:contentDescription="@string/widget_repeat" />
+            android:clickable="false"
+            android:focusable="false"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_widget_repeat" />
 
         <TextView
             android:layout_width="0dp"
@@ -214,9 +214,9 @@
         <!-- Quick Fast-Forward 10s button -->
         <ImageButton
             android:id="@+id/btn_forward"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="7dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
             android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_forward"
             android:contentDescription="@string/widget_forward_10s" />
