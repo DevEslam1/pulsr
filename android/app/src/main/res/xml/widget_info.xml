@@ -10,6 +10,7 @@
     android:maxResizeHeight="600dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_now_playing"
+    android:previewLayout="@layout/widget_now_playing_medium"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/widget_description">

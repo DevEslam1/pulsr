@@ -133,9 +133,11 @@ class _AuthSheetState extends State<AuthSheet> {
               child: SingleChildScrollView(
                 child: Form(
                   key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Drag handle
                       Center(
@@ -262,79 +264,107 @@ class _AuthSheetState extends State<AuthSheet> {
                       ),
                       const SizedBox(height: AppSpacing.s18),
 
-                      // Email Field
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: TextStyle(color: p.textPrimary),
-                        decoration: InputDecoration(
-                          hintText: context.l10n.browseEmailAddress,
-                          hintStyle: TextStyle(color: p.textTertiary),
-                          prefixIcon: Icon(Icons.email_outlined,
-                              color: p.textTertiary, size: 20),
-                          filled: true,
-                          fillColor: p.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r14),
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r14),
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                        ),
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return context.l10n.browsePleaseEnterEmail;
-                          }
-                          if (!val.contains('@')) {
-                            return context.l10n.browseInvalidEmail;
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
+                      Builder(
+                        builder: (context) {
+                          final isLandscape =
+                              MediaQuery.of(context).orientation == Orientation.landscape;
 
-                      // Password Field
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        style: TextStyle(color: p.textPrimary),
-                        decoration: InputDecoration(
-                          hintText: context.l10n.browsePassword,
-                          hintStyle: TextStyle(color: p.textTertiary),
-                          prefixIcon: Icon(Icons.lock_outline_rounded,
-                              color: p.textTertiary, size: 20),
-                            suffixIcon: IconButton(
-                              tooltip: _obscurePassword
-                                  ? context.l10n.showPassword
-                                  : context.l10n.hidePassword,
-                              icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              color: p.textTertiary,
-                              size: 20,
+                          final emailField = TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            style: TextStyle(color: p.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.browseEmailAddress,
+                              hintStyle: TextStyle(color: p.textTertiary),
+                              prefixIcon: Icon(Icons.email_outlined,
+                                  color: p.textTertiary, size: 20),
+                              filled: true,
+                              fillColor: p.surface,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                                borderSide: BorderSide(color: p.hairline),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                                borderSide: BorderSide(color: p.hairline),
+                              ),
                             ),
-                            onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
-                          ),
-                          filled: true,
-                          fillColor: p.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r14),
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r14),
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                        ),
-                        validator: (val) {
-                          if (val == null || val.length < 6) {
-                            return context.l10n.browsePasswordMinChars;
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return context.l10n.browsePleaseEnterEmail;
+                              }
+                              if (!val.contains('@')) {
+                                return context.l10n.browseInvalidEmail;
+                              }
+                              return null;
+                            },
+                          );
+
+                          final passwordField = TextFormField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            style: TextStyle(color: p.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: context.l10n.browsePassword,
+                              hintStyle: TextStyle(color: p.textTertiary),
+                              prefixIcon: Icon(Icons.lock_outline_rounded,
+                                  color: p.textTertiary, size: 20),
+                              suffixIcon: IconButton(
+                                tooltip: _obscurePassword
+                                    ? context.l10n.showPassword
+                                    : context.l10n.hidePassword,
+                                constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget,
+                                ),
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: p.textTertiary,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword),
+                              ),
+                              filled: true,
+                              fillColor: p.surface,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                                borderSide: BorderSide(color: p.hairline),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                                borderSide: BorderSide(color: p.hairline),
+                              ),
+                            ),
+                            validator: (val) {
+                              if (val == null || val.length < 6) {
+                                return context.l10n.browsePasswordMinChars;
+                              }
+                              return null;
+                            },
+                          );
+
+                          if (isLandscape) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: emailField),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(child: passwordField),
+                              ],
+                            );
                           }
-                          return null;
+
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              emailField,
+                              const SizedBox(height: AppSpacing.sm),
+                              passwordField,
+                            ],
+                          );
                         },
                       ),
 
@@ -410,7 +440,10 @@ class _AuthSheetState extends State<AuthSheet> {
 
                       // Toggle Sign Up / Sign In
                       TextButton(
-                        onPressed: () => setState(() => _isSignUp = !_isSignUp),
+                        onPressed: () {
+                          _passwordController.clear();
+                          setState(() => _isSignUp = !_isSignUp);
+                        },
                         child: Text(
                           _isSignUp
                               ? context.l10n.browseAlreadyHaveAccount
@@ -525,6 +558,7 @@ class _AuthSheetState extends State<AuthSheet> {
                   ),
                 ),
               ),
+            ),
             ),
           ),
         );

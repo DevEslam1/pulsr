@@ -170,7 +170,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           SizedBox(
-                            height: 210,
+                            height: Adaptive.isTablet(context) ? 260 : 210,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
                               padding:
@@ -203,8 +203,11 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
   Widget _buildBrowseCard(BuildContext context, YtmBrowseItem item,
       List<SongsTableData> queueSongs, PulsrPalette p) {
     final song = item.toYtmTrack().toSongData();
+    final cardWidth = Adaptive.isTablet(context) ? 180.0 : 140.0;
+    final imgHeight = (cardWidth * 0.92).roundToDouble();
+
     return Container(
-      width: 140,
+      width: cardWidth,
       decoration: BoxDecoration(
         color: p.surfaceCard,
         borderRadius: BorderRadius.circular(AppRadii.r16),
@@ -222,16 +225,16 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                 item.artworkUrl != null
                     ? Image.network(
                         item.artworkUrl!,
-                        width: 140,
-                        height: 130,
+                        width: cardWidth,
+                        height: imgHeight,
                         fit: BoxFit.cover,
-                        cacheWidth: 280,
-                        cacheHeight: 260,
+                        cacheWidth: (cardWidth * 2).round(),
+                        cacheHeight: (imgHeight * 2).round(),
                         loadingBuilder: (context, child, progress) => progress == null
                             ? child
                             : Container(
-                                width: 140,
-                                height: 130,
+                                width: cardWidth,
+                                height: imgHeight,
                                 color: p.surfaceContainer,
                                 child: Center(
                                   child: SizedBox(
@@ -245,16 +248,16 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                                 ),
                               ),
                         errorBuilder: (_, __, ___) => Container(
-                          width: 140,
-                          height: 130,
+                          width: cardWidth,
+                          height: imgHeight,
                           color: p.surfaceContainer,
                           child: Icon(Icons.music_note_rounded,
                               color: p.primary, size: 36),
                         ),
                       )
                     : Container(
-                        width: 140,
-                        height: 130,
+                        width: cardWidth,
+                        height: imgHeight,
                         color: p.surfaceContainer,
                         child: Icon(Icons.music_note_rounded,
                             color: p.primary, size: 36),

@@ -6,6 +6,7 @@ import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../../domain/services/usb_exclusive_service.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'audio_quality_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -130,7 +131,7 @@ class AudioQualityBadge extends StatelessWidget {
                   const SizedBox(width: AppSpacing.s6),
                   Text(
                     isUsbStreaming
-                        ? 'Exclusive USB Active'
+                        ? context.l10n.exclusiveUsbActive
                         : (isBitPerfect
                             ? '$deviceShortName • Direct'
                             : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b'),

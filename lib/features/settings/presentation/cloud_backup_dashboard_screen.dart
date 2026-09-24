@@ -22,7 +22,7 @@ class CloudBackupDashboardScreen extends StatefulWidget {
 
 class _CloudBackupDashboardScreenState
     extends State<CloudBackupDashboardScreen> {
-  late final CloudSyncService _syncService;
+  CloudSyncService? _syncService;
   bool _isSyncing = false;
   bool _syncFavorites = true;
   bool _syncPlaylists = true;
@@ -30,14 +30,23 @@ class _CloudBackupDashboardScreenState
   @override
   void initState() {
     super.initState();
-    _syncService = widget.syncService ?? getIt<CloudSyncService>();
+    try {
+      _syncService = widget.syncService ??
+          (getIt.isRegistered<CloudSyncService>()
+              ? getIt<CloudSyncService>()
+              : null);
+    } catch (_) {
+      _syncService = null;
+    }
     _loadSyncScopes();
   }
 
   Future<void> _loadSyncScopes() async {
+    final service = _syncService;
+    if (service == null) return;
     try {
-      final fav = await _syncService.isFavoritesSyncEnabled;
-      final pl = await _syncService.isPlaylistsSyncEnabled;
+      final fav = await service.isFavoritesSyncEnabled;
+      final pl = await service.isPlaylistsSyncEnabled;
       if (!mounted) return;
       setState(() {
         _syncFavorites = fav;
@@ -50,9 +59,21 @@ class _CloudBackupDashboardScreenState
   }
 
   Future<void> _performSync() async {
+    final service = _syncService;
+    if (service == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.settingsCloudSyncFailed),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
     setState(() => _isSyncing = true);
     try {
-      final success = await _syncService.syncAll();
+      final success = await service.syncAll();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -84,7 +105,7 @@ class _CloudBackupDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final lastSync = _syncService.lastSyncTime;
+    final lastSync = _syncService?.lastSyncTime;
     final lastSyncStr =
         lastSync != null ? '${lastSync.toLocal()}'.split('.').first : context.l10n.settingsNeverLabel;
 
@@ -183,7 +204,7 @@ class _CloudBackupDashboardScreenState
             value: _syncFavorites,
             onChanged: (v) async {
               setState(() => _syncFavorites = v);
-              await _syncService.setFavoritesSyncEnabled(v);
+              await _syncService?.setFavoritesSyncEnabled(v);
             },
           ),
           _SyncScopeTile(
@@ -193,7 +214,7 @@ class _CloudBackupDashboardScreenState
             value: _syncPlaylists,
             onChanged: (v) async {
               setState(() => _syncPlaylists = v);
-              await _syncService.setPlaylistsSyncEnabled(v);
+              await _syncService?.setPlaylistsSyncEnabled(v);
             },
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -215,7 +236,7 @@ class _CloudBackupDashboardScreenState
                     fontWeight: FontWeight.w700,
                     fontSize: AppFontSize.callout),
               ),
-              onPressed: _isSyncing ? null : _performSync,
+              onPressed: (_isSyncing || _syncService == null) ? null : _performSync,
             ),
           ),
         ],

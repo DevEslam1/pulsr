@@ -3449,7 +3449,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String proxyPresetApplied(Object name, Object host, Object port) {
-    return 'Preajuste: $name';
+    return 'Preajuste aplicado: $name ($host:$port)';
   }
 
   @override
@@ -6662,8 +6662,183 @@ class AppLocalizationsEs extends AppLocalizations {
   String get cassetteSideA => 'LADO A • TIPO II (CrO2)';
 
   @override
-  String get cassettePulsrTape => 'CINTA PULSR';
+  String get vinylSpeedRpm => '33⅓ RPM';
 
   @override
-  String get vinylSpeedRpm => '33⅓ RPM';
+  String get exclusiveUsbActive => 'USB exclusivo activo';
+
+  @override
+  String underrunsCount(int count) {
+    return '$count insuficiencias';
+  }
+
+  @override
+  String get dspEngineTelemetry => 'Telemetría del motor DSP';
+
+  @override
+  String rtfPercent(String pct) {
+    return 'RTF: $pct%';
+  }
+
+  @override
+  String get limiterReduction => 'Reducción del limitador';
+
+  @override
+  String get multibandCompReduction => 'Reducción comp multibanda';
+
+  @override
+  String get dynamicEqAdjustments => 'Ajustes de EQ dinámico';
+
+  @override
+  String get resetWeeklyDoseTitle => '¿Restablecer dosis semanal de sonido?';
+
+  @override
+  String get resetWeeklyDoseDesc =>
+      'Esto restablecerá su contador de exposición acústica acumulada al 0% y eliminará la atenuación de seguridad. Solo restablezca si comienza una nueva semana de monitoreo o cambia de entorno de escucha.';
+
+  @override
+  String get resetDoseAction => 'Restablecer dosis';
+
+  @override
+  String get weeklyDoseResetSnackbar =>
+      'La dosis semanal de sonido se ha restablecido al 0.0%';
+
+  @override
+  String get headphoneSafetyTitle => 'Seguridad y dosis de auriculares';
+
+  @override
+  String get headphoneSafetyStandard =>
+      'Estándar acústico WHO-ITU H.870 / EN 62368-1';
+
+  @override
+  String get weeklySoundAllowance => 'Asignación semanal de sonido';
+
+  @override
+  String get safetyLimiterActiveDesc =>
+      'Limitador de seguridad activo (techo de -6 dBFS activado para prevenir daños auditivos)';
+
+  @override
+  String get highSoundDoseWarning =>
+      'Dosis de sonido alta: Considere reducir el volumen para proteger la audición';
+
+  @override
+  String get optimalExposureDesc =>
+      'Exposición óptima: Niveles de escucha seguros dentro del límite de 40 horas';
+
+  @override
+  String get latencySyncDiagnostics =>
+      'Diagnóstico de latencia y sincronización';
+
+  @override
+  String get latencySyncDiagnosticsDesc =>
+      'Métricas de retardo de procesamiento y salida en tiempo real reportadas directamente desde receptores de hardware nativos.';
+
+  @override
+  String get dspPipelineDelay => 'Retardo de canalización DSP';
+
+  @override
+  String get dspPipelineDelayDesc =>
+      'Limitador anticipado + retardo grupal del remuestreador + retardo particionado de reverberación';
+
+  @override
+  String get usbBufferedDelay => 'Retardo de búfer de hardware USB';
+
+  @override
+  String get usbBufferedDelayDesc =>
+      'Ocupación del búfer circular + holgura de cola del kernel URB';
+
+  @override
+  String get totalMonitoredLatency => 'Latencia total monitorizada';
+
+  @override
+  String get totalMonitoredLatencyDesc =>
+      'Suma de procesamiento digital activo y búfer de hardware';
+
+  @override
+  String get directUsbExclusivePath => 'Ruta exclusiva directa USB';
+
+  @override
+  String get lowLatencyDirectOutput => 'Salida directa de baja latencia';
+
+  @override
+  String get dacRateSwitchTitle => 'Cambio de frecuencia de muestreo del DAC';
+
+  @override
+  String dacRateSwitchBody(String supported, String track) {
+    return 'Su DAC admite $supported kHz, pero la pista actual es de $track kHz.';
+  }
+
+  @override
+  String dacRateSwitchResample(String target) {
+    return '¿Remuestrear a $target kHz para una salida bit-perfect?';
+  }
+
+  @override
+  String get dacRateSwitchRemember =>
+      'Cambiar automáticamente siempre en el futuro';
+
+  @override
+  String dacRateSwitchConfirm(String target) {
+    return 'Cambiar ($target k)';
+  }
+
+  @override
+  String get miniPlayerSwipeHint =>
+      'Desliza a la izquierda/derecha para saltar';
+
+  @override
+  String get phoneSpeaker => 'Altavoz del teléfono';
+
+  @override
+  String get usbDacNoneAttached => 'DAC USB: Ninguno conectado';
+
+  @override
+  String get directPlaybackNotReported => 'REPRODUCCIÓN DIRECTA: No reportada';
+
+  @override
+  String directPlaybackUpTo(String rate, String bits) {
+    return 'REPRODUCCIÓN DIRECTA: Hasta $rate Hz / $bits';
+  }
+
+  @override
+  String activeSystemOutputDesc(String rate, String bits) {
+    return 'Dispositivo de salida del sistema activo • Hasta $rate kHz / $bits-bit';
+  }
+
+  @override
+  String deviceOutputSpecsDesc(String typeName, String rate, String bits) {
+    return '$typeName • Hasta $rate kHz / $bits-bit';
+  }
+
+  @override
+  String get bpDirectActiveUsb => 'Paso directo por hardware activo en DAC USB';
+
+  @override
+  String get bpDirectActiveWired =>
+      'Paso directo por hardware activo (cableado directo)';
+
+  @override
+  String get bpPassThroughArmed =>
+      'Paso directo armado • Se activa automáticamente al conectar un DAC compatible';
+
+  @override
+  String get bpBypassesAndroidMixer =>
+      'Omite el mezclador de Android y el DSP para salida bit-matched (USB requiere Android 14+, cableado requiere directo)';
+
+  @override
+  String settingsResultsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ajustes encontrados',
+      one: '1 ajuste encontrado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get cassettePulsrTape => 'PULSR C-90';
+
+  @override
+  String get statusCancelled => 'Cancelado';
 }

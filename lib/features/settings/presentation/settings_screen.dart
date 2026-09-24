@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
@@ -89,6 +90,21 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   String _searchQuery = '';
 
+  void _selectCategory(String catId) {
+    if (_selectedCategoryId == catId) return;
+    setState(() => _selectedCategoryId = catId);
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('settings_last_selected_category', catId);
+    }).catchError((_) {});
+  }
+
   bool _soundPlaybackExpanded = true;
   bool _appearanceGesturesExpanded = true;
   bool _systemPrivacyExpanded = true;
@@ -98,20 +114,42 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _categories = _categoryIds.map((id) => _Category(id, _iconFor(id))).toList();
+    _categories =
+        _categoryIds.map((id) => _Category(id, _iconFor(id))).toList();
+    SharedPreferences.getInstance().then((prefs) {
+      final savedCat = prefs.getString('settings_last_selected_category');
+      if (savedCat != null && _categoryIds.contains(savedCat) && mounted) {
+        setState(() => _selectedCategoryId = savedCat);
+      }
+    }).catchError((_) {});
     // FIX-H05: Debounce search results via Timer with immediate clear on empty
     _searchController.addListener(() {
       final text = _searchController.text;
       if (text.isEmpty && _searchQuery.isNotEmpty) {
         _searchDebounce?.cancel();
         if (mounted) setState(() => _searchQuery = '');
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0.0,
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+          );
+        }
         return;
       }
       _searchDebounce?.cancel();
       _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
         final q = text.trim().toLowerCase();
-        if (mounted && q != _searchQuery) {
+        if (q != _searchQuery) {
           setState(() => _searchQuery = q);
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              0.0,
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+            );
+          }
         }
       });
     });
@@ -147,9 +185,13 @@ class _SettingsScreenState extends State<SettingsScreen>
         return Scaffold(
           body: SafeArea(
             bottom: false,
-            child: isTabletView
-                ? _buildTabletLayout(context, state, cubit, effectiveCategoryId)
-                : _buildPhoneLayout(context, state, cubit),
+            child: FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: isTabletView
+                  ? _buildTabletLayout(
+                      context, state, cubit, effectiveCategoryId)
+                  : _buildPhoneLayout(context, state, cubit),
+            ),
           ),
         );
       },
@@ -165,7 +207,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     final horizontalPad = Adaptive.pagePadding(context);
 
     return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(horizontalPad, AppSpacing.md, horizontalPad, AppSpacing.xs),
+      padding: EdgeInsetsDirectional.fromSTEB(
+          horizontalPad, AppSpacing.md, horizontalPad, AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -232,18 +275,19 @@ class _SettingsScreenState extends State<SettingsScreen>
                   size: 20,
                 ),
                 suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear_rounded,
-                              color: p.textSecondary, size: 18),
-                          tooltip: context.l10n.clear,
-                          onPressed: () {
+                    ? IconButton(
+                        icon: Icon(Icons.clear_rounded,
+                            color: p.textSecondary, size: 18),
+                        tooltip: context.l10n.clear,
+                        onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               ),
             ),
           ),
@@ -326,7 +370,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       _SettingsCategoryItem(
         id: 'about',
         title: context.l10n.settingsCategoryAbout,
-        subtitle: context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
+        subtitle:
+            context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
         icon: Icons.info_outline_rounded,
         tintColor: const Color(0xFF8E8E93),
       ),
@@ -347,7 +392,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     final p = context.palette;
     final categories = _getCategories(context, pro: state.isProfessional);
     final items = [
-      (id: 'all', title: context.l10n.all, icon: Icons.tune_rounded, color: p.accent),
+      (
+        id: 'all',
+        title: context.l10n.all,
+        icon: Icons.tune_rounded,
+        color: p.accent
+      ),
       ...categories.map(
           (c) => (id: c.id, title: c.title, icon: c.icon, color: c.tintColor)),
     ];
@@ -370,48 +420,48 @@ class _SettingsScreenState extends State<SettingsScreen>
             button: true,
             label: item.title,
             child: PulsrPressable(
-            pressedScale: 0.94,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _selectedCategoryId = item.id);
-            },
-            child: AnimatedContainer(
-              duration: context.motionMs(180),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? p.accent.withValues(alpha: 0.16)
-                    : p.surfaceContainer,
-                borderRadius: AppRadii.full,
-                border: Border.all(
-                  color: isSelected ? p.accent : p.hairline,
-                  width: isSelected ? 1.5 : 1.0,
+              pressedScale: 0.94,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _selectCategory(item.id);
+              },
+              child: AnimatedContainer(
+                duration: context.motionMs(180),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? p.accent.withValues(alpha: 0.16)
+                      : p.surfaceContainer,
+                  borderRadius: AppRadii.full,
+                  border: Border.all(
+                    color: isSelected ? p.accent : p.hairline,
+                    width: isSelected ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item.icon,
+                      size: 15,
+                      color: isSelected ? p.accent : item.color,
+                    ),
+                    const SizedBox(width: AppSpacing.s6),
+                    Text(
+                      item.title,
+                      style: TextStyle(
+                        color: isSelected ? p.accent : p.textPrimary,
+                        fontSize: AppFontSize.label,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    item.icon,
-                    size: 15,
-                    color: isSelected ? p.accent : item.color,
-                  ),
-                  const SizedBox(width: AppSpacing.s6),
-                  Text(
-                    item.title,
-                    style: TextStyle(
-                      color: isSelected ? p.accent : p.textPrimary,
-                      fontSize: AppFontSize.label,
-                      fontWeight:
-                          isSelected ? FontWeight.w800 : FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
             ),
-          ),
           );
         },
       ),
@@ -454,7 +504,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   physics: const BouncingScrollPhysics(),
                   itemCount: categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xxs),
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.xxs),
                   itemBuilder: (context, i) {
                     final cat = categories[i];
                     final isSelected = activeCatId == cat.id;
@@ -463,19 +514,16 @@ class _SettingsScreenState extends State<SettingsScreen>
                       pressedScale: 0.985,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        setState(() {
-                          _selectedCategoryId = cat.id;
-                          if (_searchQuery.isNotEmpty) {
-                            _searchController.clear();
-                            _searchQuery = '';
-                          }
-                        });
+                        _selectCategory(cat.id);
+                        if (_searchQuery.isNotEmpty) {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        }
                       },
                       child: AnimatedContainer(
                         duration: context.motionMs(180),
                         curve: Curves.easeOutCubic,
                         padding: const EdgeInsets.symmetric(
-
                             horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: isSelected
@@ -497,7 +545,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                               decoration: BoxDecoration(
                                 color: cat.tintColor.withValues(
                                     alpha: isSelected ? 0.22 : 0.12),
-                                borderRadius: BorderRadius.circular(AppRadii.r12),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r12),
                               ),
                               child: Icon(
                                 cat.icon,
@@ -515,9 +564,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: isSelected
-                                          ? p.accent
-                                          : p.textPrimary,
+                                      color:
+                                          isSelected ? p.accent : p.textPrimary,
                                       fontSize: AppFontSize.bodySmall,
                                       fontWeight: isSelected
                                           ? FontWeight.w800
@@ -577,7 +625,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     final p = context.palette;
 
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxs),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xxs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -654,18 +703,19 @@ class _SettingsScreenState extends State<SettingsScreen>
                   size: 18,
                 ),
                 suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear_rounded,
-                              color: p.textSecondary, size: 16),
-                          tooltip: context.l10n.clear,
-                          onPressed: () {
+                    ? IconButton(
+                        icon: Icon(Icons.clear_rounded,
+                            color: p.textSecondary, size: 16),
+                        tooltip: context.l10n.clear,
+                        onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
                       )
                     : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: AppSpacing.xs),
               ),
             ),
           ),
@@ -795,8 +845,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Appearance & Gestures',
             icon: Icons.palette_outlined,
             isExpanded: _appearanceGesturesExpanded,
-            onToggle: () => setState(
-                () => _appearanceGesturesExpanded = !_appearanceGesturesExpanded),
+            onToggle: () => setState(() =>
+                _appearanceGesturesExpanded = !_appearanceGesturesExpanded),
             children: [
               ..._buildCategoryWidgets(context, 'appearance', state, cubit),
               ..._buildCategoryWidgets(context, 'gestures', state, cubit),
@@ -844,9 +894,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       child: KeyedSubtree(
         key: ValueKey(_selectedCategoryId),
         child: ListView(
+          key: PageStorageKey('settings_category_$_selectedCategoryId'),
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsetsDirectional.only(
-
             bottom: bottomInset,
             top: AppSpacing.md,
             start: horizontalPad,
@@ -1040,7 +1090,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         context.l10n.experienceModeSubtitle,
         [
           const Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+            padding: EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
             child: ExperienceModeSection(),
           ),
         ],
@@ -1061,7 +1112,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             context.l10n.settingsSmartAudioSectionSubtitle,
             [
               const Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                padding: EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                 child: SmartAudioSection(),
               ),
             ],
@@ -1100,7 +1152,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             context.l10n.settingsDeviceProfilesSectionSubtitle,
             [
               const Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                padding: EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                 child: DeviceProfilesSection(),
               ),
             ],
@@ -1158,6 +1211,13 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
               _navTile(
                 context,
+                Icons.new_releases_outlined,
+                "What's New",
+                'See latest updates in v${AppConfig.appVersion}',
+                onTap: () => showWhatsNewSheet(context),
+              ),
+              _navTile(
+                context,
                 Icons.person_outline_rounded,
                 'Developer',
                 AppConfig.developerName,
@@ -1176,31 +1236,25 @@ class _SettingsScreenState extends State<SettingsScreen>
   // Appearance Section
   // ==========================================================================
 
-
   // ==========================================================================
   // Gestures Section
   // ==========================================================================
-
 
   // ==========================================================================
   // Library & Scanning Section
   // ==========================================================================
 
-
   // ==========================================================================
   // Online / Streaming Section
   // ==========================================================================
-
 
   // ==========================================================================
   // Privacy & Backup Section
   // ==========================================================================
 
-
   // ==========================================================================
   // Live Instant Search Mode
   // ==========================================================================
-
 
   // ==========================================================================
   // Category IDs & Helper Navigation
@@ -1267,8 +1321,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   @override
-  _Category _catById(String id) =>
-      _categories.firstWhere((c) => c.id == id, orElse: () => _categories.first);
+  _Category _catById(String id) => _categories.firstWhere((c) => c.id == id,
+      orElse: () => _categories.first);
 
   Widget _catSection(BuildContext context, String id, Widget child) =>
       KeyedSubtree(key: _catById(id).key, child: child);
@@ -1345,8 +1399,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       pressedScale: 0.988,
       onTap: onTap,
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.s2),
         leading: _iconBox(context, icon),
         title: Text(
           title,
@@ -1378,7 +1432,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
-                    margin: const EdgeInsetsDirectional.only(end: AppSpacing.s6),
+                    margin:
+                        const EdgeInsetsDirectional.only(end: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppRadii.r6),
@@ -1418,8 +1473,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       pressedScale: 0.988,
       onTap: () => onChanged(!value),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.s2),
         leading: _iconBox(context, icon),
         title: Text(
           title,
@@ -1532,10 +1587,15 @@ class _SettingsScreenState extends State<SettingsScreen>
     SettingsCubit cubit,
   ) async {
     final l10n = context.l10n;
+    final missingCount = await cubit.getMissingFilesCount();
+    if (!context.mounted) return;
+    final contentText = missingCount > 0
+        ? '${l10n.removeMissingFilesConfirmBody}\n\n$missingCount ${missingCount == 1 ? "missing file" : "missing files"}.'
+        : l10n.removeMissingFilesConfirmBody;
     final confirmed = await PulsrDialogHelper.showPulsrDialog<bool>(
       context,
       title: Text(l10n.removeMissingFilesConfirmTitle),
-      content: Text(l10n.removeMissingFilesConfirmBody),
+      content: Text(contentText),
       actions: [
         TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1594,8 +1654,8 @@ class _SettingsScreenState extends State<SettingsScreen>
             SnackBar(content: Text(l10n.artworkServiceUnavailable)));
         return;
       }
-      count = await getIt<MissingArtworkService>()
-          .fetchAndPersistMissingArtwork();
+      count =
+          await getIt<MissingArtworkService>().fetchAndPersistMissingArtwork();
     } catch (_) {
       messenger.showSnackBar(
           SnackBar(content: Text(l10n.artworkServiceUnavailable)));

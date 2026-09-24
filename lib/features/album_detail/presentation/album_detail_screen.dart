@@ -23,9 +23,14 @@ import 'package:pulsr/core/constants/app_typography.dart';
 class AlbumDetailScreen extends StatefulWidget {
   final AlbumsTableData album;
   final GetAlbumsUseCase? getAlbumsUseCase;
+  final String? heroTag;
 
-  const AlbumDetailScreen(
-      {super.key, required this.album, this.getAlbumsUseCase});
+  const AlbumDetailScreen({
+    super.key,
+    required this.album,
+    this.getAlbumsUseCase,
+    this.heroTag,
+  });
 
   @override
   State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
@@ -51,15 +56,22 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final stored = prefs.getString(_sortPrefsKey(widget.album.id));
-      if (stored == null) return;
-      final matches =
-          _AlbumSort.values.where((e) => e.name == stored).toList();
-      if (matches.isNotEmpty && mounted) {
-        setState(() => _sort = matches.first);
+      if (stored != null) {
+        final matches =
+            _AlbumSort.values.where((e) => e.name == stored).toList();
+        if (matches.isNotEmpty && mounted) {
+          _sort = matches.first;
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to load saved album sort',
           error: e, stackTrace: st, category: 'AlbumDetail');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _cachedSort = null;
+        });
+      }
     }
   }
 
@@ -78,9 +90,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   List<SongsTableData> _cachedSortedSongs = const [];
 
   List<SongsTableData> _sorted(List<SongsTableData> songs) {
-    // FIX-M1 / H7 / H-07: Hash every song's identity AND its sort-relevant
-    // fields. Hashing ids alone served a stale order (and stale metadata) after
-    // a tag edit changed a title/track/duration while the id stayed the same.
+    // FIX-M1 / H7 / H-07 / C-05: Hash every song's identity AND its sort-relevant
+    // fields. Only serve cached result when prefs have finished loading.
     final songsHash = Object.hashAll([
       for (final s in songs)
         Object.hash(s.id, s.title, s.durationMs, s.discNumber, s.trackNumber),
@@ -134,7 +145,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             return Center(
               child: ConstrainedBox(
                 constraints: Adaptive.contentConstraints(context),
-                child: CustomScrollView(
+                child: RefreshIndicator(
+                  color: p.accent,
+                  backgroundColor: p.surfaceContainer,
+                  onRefresh: () async {
+                    if (mounted) setState(() {});
+                  },
+                  child: CustomScrollView(
                   slivers: [
                     SliverAppBar(
                       leading: const PulsrBackButton(),
@@ -155,7 +172,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               Hero(
-                                tag: 'album_${album.id}',
+                                tag: widget.heroTag ?? 'album_${album.id}',
                                 child: CachedArtwork(
                                   id: album.id,
                                   type: ArtworkType.ALBUM,
@@ -370,8 +387,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                 ],
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
       ),
       ),
     );

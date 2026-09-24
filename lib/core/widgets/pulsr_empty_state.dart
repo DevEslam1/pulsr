@@ -36,12 +36,19 @@ class PulsrEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double minH = constraints.maxHeight.isFinite
+            ? constraints.maxHeight * 0.6
+            : 280.0;
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minH),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (illustration != null)
               illustration!
@@ -107,9 +114,12 @@ class PulsrEmptyState extends StatelessWidget {
                 ),
               ),
             ],
-          ],
-        ),
-      ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

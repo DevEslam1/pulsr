@@ -44,8 +44,9 @@ class MiniPlayer extends StatefulWidget {
 
 class _MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
+  bool _controllerDisposed = false;
   int _lastKnownIndex = -1;
-  bool _isUserDragging = false;
+  final ValueNotifier<bool> _isInteracting = ValueNotifier<bool>(false);
   bool _swipeInFlight = false;
   Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
@@ -105,8 +106,9 @@ class _MiniPlayerState extends State<MiniPlayer> {
     final safeInitial = initialIndex >= 0 ? initialIndex : 0;
     _lastKnownIndex = safeInitial;
     _pageController = PageController(initialPage: safeInitial);
+    _isInteracting.addListener(_onInteractionChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || _controllerDisposed) return;
       final playerCubit = context.read<PlayerCubit>();
       final state = playerCubit.state;
       final queue = state.queue.isNotEmpty
@@ -118,69 +120,100 @@ class _MiniPlayerState extends State<MiniPlayer> {
     });
   }
 
+  void _onInteractionChanged() {
+    if (!_isInteracting.value && mounted && !_controllerDisposed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _controllerDisposed) return;
+        final cubit = context.read<PlayerCubit>();
+        final state = cubit.state;
+        final queue = state.queue.isNotEmpty
+            ? state.queue
+            : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
+        if (queue.isNotEmpty) {
+          final target = state.currentIndex.clamp(0, queue.length - 1);
+          if (_pageController != null &&
+              _pageController!.hasClients &&
+              _pageController!.page?.round() != target) {
+            _syncPageController(target, queue.length);
+          }
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _controllerDisposed = true;
+    _isInteracting.removeListener(_onInteractionChanged);
+    _isInteracting.dispose();
     _verticalSwipeTimer?.cancel();
     _pageController?.dispose();
+    _pageController = null;
     super.dispose();
   }
 
   void _syncPageController(int targetIndex, int queueLength) {
-    final controller = _pageController;
-    if (queueLength == 0 || controller == null) return;
-    final safeIndex = targetIndex.clamp(0, queueLength - 1);
-    // Never fight an in-progress user gesture or in-flight skip; the page-change handler releases
-    // the latch once the skip it triggered has completed.
-    if (_isUserDragging || _swipeInFlight) return;
-    if (_lastKnownIndex != safeIndex) {
-      if (!controller.hasClients || !controller.position.hasContentDimensions) {
-        // Retry in post frame callback if dimensions are not yet available,
-        // preventing permanent desync.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _syncPageController(targetIndex, queueLength);
-        });
-        return;
-      }
-      if (controller.page?.round() != safeIndex) {
-        try {
-          final maxPage = controller.position.viewportDimension > 0
-              ? (controller.position.maxScrollExtent / controller.position.viewportDimension).round()
-              : queueLength - 1;
-          if (safeIndex <= maxPage) {
-            controller.jumpToPage(safeIndex);
-            _lastKnownIndex = safeIndex;
-          }
-        } catch (e, st) {
-          ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
-              error: e, stackTrace: st, category: 'MiniPlayer');
+    if (_controllerDisposed || !mounted) return;
+    try {
+      final controller = _pageController;
+      if (queueLength == 0 || controller == null || _controllerDisposed) return;
+      final safeIndex = targetIndex.clamp(0, queueLength - 1);
+      // Never fight an in-progress user gesture or in-flight skip.
+      if (_isInteracting.value || _swipeInFlight) return;
+      if (_lastKnownIndex != safeIndex) {
+        if (!controller.hasClients || !controller.position.hasContentDimensions) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_controllerDisposed) {
+              _syncPageController(targetIndex, queueLength);
+            }
+          });
+          return;
         }
-      } else {
-        _lastKnownIndex = safeIndex;
+        if (controller.page?.round() != safeIndex) {
+          try {
+            final maxPage = controller.position.viewportDimension > 0
+                ? (controller.position.maxScrollExtent / controller.position.viewportDimension).round()
+                : queueLength - 1;
+            if (safeIndex <= maxPage && !_controllerDisposed) {
+              controller.jumpToPage(safeIndex);
+              _lastKnownIndex = safeIndex;
+            }
+          } catch (e, st) {
+            if (e is! FlutterError) {
+              ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
+                  error: e, stackTrace: st, category: 'MiniPlayer');
+            }
+          }
+        } else {
+          _lastKnownIndex = safeIndex;
+        }
+      }
+    } catch (e, st) {
+      if (e is! FlutterError) {
+        ErrorLogger.log('MiniPlayer PageController sync failed',
+            error: e, stackTrace: st, category: 'MiniPlayer');
       }
     }
   }
 
-  /// A swipe landed on [page]: latch the intent and release it only after the
-  /// skip has actually been applied, so a notification that arrives mid-skip
-  /// (e.g. ScrollEnd before the state update) can no longer snap the carousel
-  /// back to the old track.
+  /// A swipe landed on [page]: skip to the new item and safely resync
   Future<void> _completeSwipe(int page, PlayerCubit cubit) async {
-    _swipeInFlight = true;
     try {
       await cubit.skipToQueueItem(page);
     } catch (e, st) {
       ErrorLogger.log('MiniPlayer swipe failed',
           error: e, stackTrace: st, category: 'MiniPlayer');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _swipeInFlight = false;
+        });
+      }
     }
-    if (!mounted) return;
-    setState(() {
-      _isUserDragging = false;
-      _swipeInFlight = false;
-    });
     // Schedule re-sync in post-frame callback so carousel state and layout
-    // have settled, preventing desync or frame-gap jumps (Bug 7).
+    // have settled, preventing desync or frame-gap jumps.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted || _controllerDisposed) return;
       final synced = cubit.state;
       final syncedQueue = synced.queue.isNotEmpty
           ? synced.queue
@@ -216,6 +249,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
           a.currentIndex != b.currentIndex ||
           listContentDiffers(a.queue, b.queue),
       listener: (context, state) {
+        if (!mounted || _controllerDisposed) return;
         final queue = state.queue.isNotEmpty
             ? state.queue
             : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
@@ -397,21 +431,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                       onNotification: (notification) {
                                         if (notification is ScrollStartNotification &&
                                             notification.dragDetails != null) {
-                                          // Latch the swipe intent at drag start.
-                                          _isUserDragging = true;
-                                          _swipeInFlight = false;
+                                          _isInteracting.value = true;
                                         } else if (notification is UserScrollNotification) {
                                           if (notification.direction != ScrollDirection.idle) {
-                                            _isUserDragging = true;
+                                            _isInteracting.value = true;
                                           } else if (!_swipeInFlight) {
-                                            _isUserDragging = false;
+                                            _isInteracting.value = false;
                                           }
                                         } else if (notification is ScrollEndNotification) {
-                                          // Only release immediately when no skip is
-                                          // pending; otherwise the page-change handler
-                                          // releases it after the skip completes.
                                           if (!_swipeInFlight) {
-                                            _isUserDragging = false;
+                                            _isInteracting.value = false;
                                           }
                                         }
                                         return false;
@@ -424,7 +453,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                         itemCount: queue.length,
                                         onPageChanged: (page) {
                                           if (!_swipeInFlight &&
-                                              _isUserDragging &&
+                                              _isInteracting.value &&
                                               page != currentIndex) {
                                             _lastKnownIndex = page;
                                             _swipeInFlight = true;
@@ -553,12 +582,18 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                   tooltip: state.isPlaying
                                       ? context.l10n.pause
                                       : context.l10n.play,
-                                  icon: Icon(
-                                    state.isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: activeAccent,
-                                    size: 32,
+                                  icon: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    transitionBuilder: (child, anim) =>
+                                        ScaleTransition(scale: anim, child: child),
+                                    child: Icon(
+                                      state.isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      key: ValueKey<bool>(state.isPlaying),
+                                      color: activeAccent,
+                                      size: 32,
+                                    ),
                                   ),
                                   onPressed: () {
                                     HapticFeedback.lightImpact();
@@ -615,17 +650,19 @@ class _MiniPlayerState extends State<MiniPlayer> {
         ),
       ),
     ),
-  const Positioned(
-    top: -46,
-    child: GestureHintOverlay(
-      hintKey: 'mini_player_swipe',
-      message: 'Swipe left/right to skip',
-      padding: EdgeInsets.zero,
-      icon: Icons.swipe_rounded,
-    ),
-  ),
-],
-);
+    PositionedDirectional(
+          top: -38,
+          start: 16,
+          end: 16,
+          child: GestureHintOverlay(
+            hintKey: 'mini_player_swipe',
+            message: context.l10n.miniPlayerSwipeHint,
+            padding: EdgeInsets.zero,
+            icon: Icons.swipe_rounded,
+          ),
+        ),
+      ],
+    );
       },
     );
   }

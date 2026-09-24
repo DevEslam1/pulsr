@@ -62,6 +62,8 @@ import 'ab_loop_manager.dart';
 import 'adaptive_quality_manager.dart';
 import 'bpm_override_store.dart';
 import 'per_song_volume_store.dart';
+import 'per_song_playback_store.dart';
+import 'per_song_eq_store.dart';
 import 'dsp_snapshot_store.dart';
 import 'ducking_controller.dart';
 import 'gapless_trim_handler.dart';
@@ -113,28 +115,38 @@ class PulsrAudioHandler extends BaseAudioHandler
     // the notification on every pause — including end-of-queue Next — which
     // users report as "notification disappearing with no action".
     bool keepOnPause = true;
+    String channelName = 'Pulsr Audio Playback';
+    String channelDesc =
+        'Playback controls and now-playing information for Pulsr Music.';
     try {
       final prefs = await SharedPreferences.getInstance();
       keepOnPause = prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? true;
-    } catch (_) {}
+      final langCode = prefs.getString(PrefsKeys.languageCode) ??
+          prefs.getString('setting_language') ??
+          Platform.localeName.split('_').first.toLowerCase();
+      if (langCode == 'ar') {
+        channelName = 'تشغيل الصوت Pulsr';
+        channelDesc =
+            'عناصر التحكم في التشغيل ومعلومات التشغيل الحالي لتطبيق Pulsr.';
+      } else if (langCode == 'es') {
+        channelName = 'Reproducción de Audio Pulsr';
+        channelDesc =
+            'Controles de reproducción e información de reproducción actual para Pulsr.';
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read notification channel preferences',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
     try {
       final initFuture = AudioService.init(
         builder: () {
           built = fallback ?? PulsrAudioHandler(repository, ytmService);
           return built!;
         },
-        // The channel name stays English on purpose (C-6): the config is a const
-        // evaluated while dependencies are still being constructed, before any
-        // SettingsCubit / MaterialApp has resolved the *app-selected* locale — the
-        // platform locale alone would mislabel the channel for users who picked a
-        // different language than the system one, and Android only applies a
-        // channel's name when the channel is first created, so a later re-resolve
-        // could not fix it anyway.
         config: AudioServiceConfig(
           androidNotificationChannelId: 'com.pulsr.music.audio',
-          androidNotificationChannelName: 'Pulsr Audio Playback',
-          androidNotificationChannelDescription:
-              'Playback controls and now-playing information for Pulsr Music.',
+          androidNotificationChannelName: channelName,
+          androidNotificationChannelDescription: channelDesc,
           androidNotificationOngoing: false,
           androidNotificationClickStartsActivity: true,
           androidStopForegroundOnPause: !keepOnPause,
@@ -206,10 +218,14 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   bool _queueDirty = false;
 
-  /// Index last written to the persisted queue. Compared against [_currentIndex]
-  /// on the periodic flush so a skip refreshes the cold-resume row even though
-  /// the queue structure did not change.
+  @override
   int _savedQueueIndex = -1;
+
+  HeadsetControlConfig? _cachedHeadsetConfig;
+  @override
+  HeadsetControlConfig? get cachedHeadsetConfig => _cachedHeadsetConfig;
+  @override
+  set cachedHeadsetConfig(HeadsetControlConfig? value) => _cachedHeadsetConfig = value;
   double? _preDuckVolume;
   double? _preDuckInactiveVolume;
   @override
@@ -287,8 +303,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   final Set<String> _prefetching = {};
 
   @override
-  String _currentStreamingQuality() =>
-      _cachedPrefs?.getString('setting_streaming_quality') ?? 'high';
+  String _currentStreamingQuality() {
+    if (adaptiveQualityManager.enabled) {
+      return adaptiveQualityManager.currentQuality;
+    }
+    return _cachedPrefs?.getString('setting_streaming_quality') ?? 'high';
+  }
 
   @override
   final AdaptiveBufferEngine _adaptiveBufferEngine = AdaptiveBufferEngine();
@@ -335,6 +355,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   final PlaybackBookmarkStore bookmarkStore = PlaybackBookmarkStore();
   @override
+  final PerSongPlaybackStore perSongPlaybackStore = PerSongPlaybackStore();
+  @override
   bool hedgedResolutionEnabled = true;
   DateTime? _lastBookmarkSave;
   DateTime? _lastHealthyReport;
@@ -359,6 +381,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   final Stopwatch _gaplessStopwatch = Stopwatch();
   @override
   bool _gaplessTargetReached = false;
+  @override
+  int _gaplessLoadGeneration = 0;
 
   /// User-facing gapless toggle (persisted as `setting_gapless`). Gapless is
   /// the default engine but is mutually exclusive with crossfade.
@@ -403,6 +427,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   Stream<Duration> get highRatePositionStream =>
       _highRatePositionSubject.stream;
   int _lastHighRatePositionEmitMs = 0;
+
+  /// High-rate stream compensated for DSP and native hardware latency (B-11).
+  Stream<Duration> get compensatedHighRatePositionStream =>
+      _highRatePositionSubject.stream
+          .map((pos) => _dspPipeline.getCompensatedPosition(pos));
 
   /// Stream of playback positions compensated for DSP and native hardware latency.
   Stream<Duration> get compensatedPositionStream => _positionSubject.stream
@@ -690,6 +719,10 @@ class PulsrAudioHandler extends BaseAudioHandler
           finalArtUri = parsed;
         }
       }
+      finalArtUri ??= ArtworkUriResolver.getCachedArtworkUri(song.id) ??
+          (song.albumId != null
+              ? ArtworkUriResolver.getCachedAlbumArtUri(song.albumId!)
+              : null);
     }
 
     return MediaItem(
@@ -722,7 +755,19 @@ class PulsrAudioHandler extends BaseAudioHandler
   SharedPreferences? _cachedPrefs;
 
   Future<void> _initPrefs() async {
-    _cachedPrefs = await SharedPreferences.getInstance();
+    try {
+      _cachedPrefs = await SharedPreferences.getInstance();
+    } catch (e, st) {
+      ErrorLogger.log('SharedPreferences init failed, retrying once...',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      try {
+        _cachedPrefs = await SharedPreferences.getInstance();
+      } catch (e2, st2) {
+        ErrorLogger.log('SharedPreferences init failed permanently',
+            error: e2, stackTrace: st2, category: 'AudioHandler');
+        _cachedPrefs = null;
+      }
+    }
   }
 
   @override
@@ -751,8 +796,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   double _calculateReplayGainVolume(SongsTableData? song) {
     // DoP carries raw DSD inside PCM markers: any software gain corrupts the
-    // 0x05/0xFA framing into white noise, so the mixer stays at unity and the
-    // user volume is hardware-only. This also covers the crossfade/duck paths.
+    // 0x05/0xFA framing into white noise, so the mixer must strictly stay at unity (1.0).
+    // User volume is hardware-only; ReplayGain and per-song volume overrides are bypassed.
     if (AudioQualityInfo.dsdDopActive) {
       // Guarded by readiness (no catch): the controller is late-initialized
       // and must never throw past this point.
@@ -949,6 +994,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  DateTime? _lastNativeRgPush;
+  int? _lastNativeRgSongId;
+
   Future<void> setVolume(double volume) async {
     _volume = volume.clamp(0.0, 1.0);
     final song = currentSong;
@@ -960,7 +1008,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     await _equalizerManager.updateLoudnessVolume(_volume);
     await _activePlayer.setVolume(target);
-    unawaited(_pushNativeReplayGain(song));
+
+    final now = DateTime.now();
+    if (_lastNativeRgPush == null ||
+        _lastNativeRgSongId != song?.id ||
+        now.difference(_lastNativeRgPush!) > const Duration(seconds: 2)) {
+      _lastNativeRgPush = now;
+      _lastNativeRgSongId = song?.id;
+      unawaited(_pushNativeReplayGain(song));
+    }
   }
 
   /// Toggles Direct Volume Control. Enabling pins Android's media stream to
@@ -978,13 +1034,22 @@ class PulsrAudioHandler extends BaseAudioHandler
       final supported = await AudioEffectsChannel().isDvcSupported();
       if (!supported) {
         _dvcEnabled = false;
+        if (_volumeControllerReady) {
+          _volumeController.setDvcEnabled(false);
+        }
         await AudioEffectsChannel().setDvcEnabled(false);
         return;
       }
       _dvcEnabled = true;
+      if (_volumeControllerReady) {
+        _volumeController.setDvcEnabled(true);
+      }
       await AudioEffectsChannel().setDvcEnabled(true);
     } else {
       _dvcEnabled = false;
+      if (_volumeControllerReady) {
+        _volumeController.setDvcEnabled(false);
+      }
       await AudioEffectsChannel().setDvcEnabled(false);
     }
     // Re-apply the current volume so the new gain stage takes effect now.
@@ -1209,6 +1274,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
     _volumeControllerReady = true;
     _volumeController.setDopActive(AudioQualityInfo.dsdDopActive);
+    _volumeController.setDvcEnabled(_dvcEnabled);
+    unawaited(HeadsetControlConfig.load(_cachedPrefs).then((cfg) {
+      _cachedHeadsetConfig = cfg;
+    }));
     _streamResolutionPipeline = StreamResolutionPipeline(
       ytmService: _ytmService,
       getLatencyTracker: () => _latencyTracker,
@@ -1718,17 +1787,21 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _restoreSkipSilence();
       // F2/F7/F9–F11: restore persisted feature state (best-effort).
       try {
-        await trackDelayManager.load();
-        await duckingController.load();
-        await silenceSkipController.load();
-        await dspSnapshotStore.load();
-        await bookmarkStore.load();
+        await Future.wait([
+          trackDelayManager.load(),
+          duckingController.load(),
+          silenceSkipController.load(),
+          dspSnapshotStore.load(),
+          bookmarkStore.load(),
+          perSongPlaybackStore.load(),
+        ]);
         final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
         hedgedResolutionEnabled =
             prefs.getBool('hedged_resolution_enabled') ?? true;
         adaptiveQualityManager.enabled =
             prefs.getBool('adaptive_quality_enabled') ?? true;
-        final savedQ = prefs.getString('setting_streaming_quality');
+        final savedQ = prefs.getString('adaptive_runtime_quality') ??
+            prefs.getString('setting_streaming_quality');
         if (savedQ != null && savedQ.isNotEmpty) {
           adaptiveQualityManager.setQuality(savedQ);
         }
@@ -1972,16 +2045,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       !currentlyPlaying;
 
   // --- PLAYBACK ACTIONS ---
-  @override
-  @override
-  @override
-  @override
-  @override
-  @override
-  @override
-  @override
 
   // --- ANDROID AUTO & HEADSET BUTTON SUPPORT ---
+  @override
   Timer? _headsetClickTimer;
   @override
   int _headsetClickCount = 0;
@@ -2003,10 +2069,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   double _pitch = 1.0;
 
-  @override
-  @override
-  @override
-  @override
   @override
   Future<List<R>> _boundedParallelMap<T, R>(
     List<T> items,
@@ -2079,6 +2141,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         final count = (extras?['count'] as num?)?.toInt() ?? 1;
         await _performHeadsetAction(count.clamp(1, 3));
         return true;
+      case 'setSpeed':
+        final speed = (extras?['speed'] as num?)?.toDouble() ?? 1.0;
+        await setSpeed(speed);
+        return true;
       default:
         return super.customAction(name, extras);
     }
@@ -2086,6 +2152,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> stop() async {
+    _headsetClickTimer?.cancel();
+    _headsetClickTimer = null;
     _sleepTimerManager.cancelSleepTimer();
     unawaited(AudioSessionLog.instance.endSession());
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
@@ -2102,6 +2170,17 @@ class PulsrAudioHandler extends BaseAudioHandler
       final session = await AudioSession.instance;
       await session.setActive(false);
     } catch (_) {}
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: const [],
+        systemActions: const {},
+        androidCompactActionIndices: const [],
+        processingState: AudioProcessingState.idle,
+        playing: false,
+        updatePosition: Duration.zero,
+        bufferedPosition: Duration.zero,
+      ),
+    );
     await super.stop();
   }
 
@@ -2120,6 +2199,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @disposeMethod
   Future<void> dispose() async {
+    _headsetClickTimer?.cancel();
+    _headsetClickTimer = null;
     if (_lifecycleObserver != null) {
       WidgetsBinding.instance.removeObserver(_lifecycleObserver!);
       _lifecycleObserver = null;

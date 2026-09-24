@@ -90,7 +90,7 @@ class _CastSectionState extends State<CastSection> {
     }
 
     // Safety timeout for the scanning spinner
-    Future.delayed(const Duration(seconds: 8), () {
+    Future.delayed(const Duration(seconds: 10), () {
       if (mounted && _scanning) {
         setState(() => _scanning = false);
       }
@@ -107,7 +107,7 @@ class _CastSectionState extends State<CastSection> {
       await _service.stopDiscovery();
       await _service.startDiscovery();
     }
-    Future.delayed(const Duration(seconds: 8), () {
+    Future.delayed(const Duration(seconds: 10), () {
       if (mounted && _scanning) {
         setState(() => _scanning = false);
       }
@@ -186,6 +186,81 @@ class _CastSectionState extends State<CastSection> {
     _snack(result.success
         ? l10n.settingsCastingTo(d.name)
         : (result.message ?? l10n.settingsCastFailed));
+  }
+
+  Widget _buildEmptyDevicesState(PulsrPalette p) {
+    final l10n = context.l10n;
+    if (_scanning) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.s14),
+        child: Row(
+          children: [
+            SizedBox(
+              width: AppSpacing.s18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: p.accent,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                l10n.scanningCastDevices,
+                style: TextStyle(
+                    fontSize: AppFontSize.bodySmall, color: p.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.md),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.speaker_group_outlined,
+                size: 36, color: p.textTertiary),
+            const SizedBox(height: AppSpacing.s6),
+            Text(
+              l10n.noDevicesSeen,
+              style: TextStyle(
+                fontSize: AppFontSize.bodySmall,
+                fontWeight: FontWeight.w600,
+                color: p.textSecondary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              '${l10n.castDevice}: ${l10n.scanningCastDevices.replaceAll('...', '')}',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                color: p.textTertiary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            FilledButton.tonalIcon(
+              onPressed: _busy ? null : _rescan,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(l10n.scanningCastDevices.replaceAll('...', '')),
+              style: FilledButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -347,30 +422,7 @@ class _CastSectionState extends State<CastSection> {
         // Routes or Devices list
         if (_sdk) ...[
           if (_routes.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
-              child: Row(
-                children: [
-                  if (_scanning)
-                    SizedBox(width: AppSpacing.s18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: p.accent,
-                      ),
-                    )
-                  else
-                    Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      l10n.scanningCastDevices,
-                      style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textSecondary),
-                    ),
-                  ),
-                ],
-              ),
-            )
+            _buildEmptyDevicesState(p)
           else
             ..._routes.asMap().entries.map(
               (entry) {
@@ -449,30 +501,7 @@ class _CastSectionState extends State<CastSection> {
             ),
         ] else ...[
           if (_devices.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
-              child: Row(
-                children: [
-                  if (_scanning)
-                    SizedBox(width: AppSpacing.s18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: p.accent,
-                      ),
-                    )
-                  else
-                    Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      l10n.scanningCastDevices,
-                      style: TextStyle(fontSize: AppFontSize.bodySmall, color: p.textSecondary),
-                    ),
-                  ),
-                ],
-              ),
-            )
+            _buildEmptyDevicesState(p)
           else
             ..._devices.asMap().entries.map(
               (entry) {

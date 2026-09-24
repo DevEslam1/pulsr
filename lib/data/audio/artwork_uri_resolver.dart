@@ -68,6 +68,9 @@ class ArtworkUriResolver {
     } catch (_) {}
   }
 
+  static Uri? getCachedArtworkUri(int songId) => _cachedArtworkUris[songId];
+  static Uri? getCachedAlbumArtUri(int albumId) => _cachedAlbumArtUris[albumId];
+
   static Future<Uri?> getArtworkUri(int songId) async {
     if (_cachedArtworkUris.containsKey(songId)) {
       final uri = _cachedArtworkUris.remove(songId)!;

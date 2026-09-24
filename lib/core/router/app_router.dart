@@ -348,13 +348,23 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
         name: 'album',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (context, state) {
-          final album = state.extra is AlbumsTableData
-              ? state.extra as AlbumsTableData
-              : null;
+          AlbumsTableData? album;
+          String? heroTag = state.uri.queryParameters['heroTag'];
+          if (state.extra is AlbumsTableData) {
+            album = state.extra as AlbumsTableData;
+          } else if (state.extra is Map) {
+            final map = state.extra as Map;
+            if (map['album'] is AlbumsTableData) {
+              album = map['album'] as AlbumsTableData;
+            }
+            if (map['heroTag'] is String) {
+              heroTag = map['heroTag'] as String;
+            }
+          }
           if (album != null) {
             return _buildPulsrPageRoute(
               key: state.pageKey,
-              child: AlbumDetailScreen(album: album),
+              child: AlbumDetailScreen(album: album, heroTag: heroTag),
             );
           }
           final id = state.uri.queryParameters['id'];
@@ -365,7 +375,8 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
             fetchSingle: parsedId != null ? () => repo.getAlbumById(parsedId) : null,
             watch: () => repo.watchAlbums(),
             match: (a) => a.id.toString() == id,
-            builder: (context, a) => AlbumDetailScreen(album: a),
+            builder: (context, a) =>
+                AlbumDetailScreen(album: a, heroTag: heroTag),
             notFoundMessage: context.l10n.albumNotFoundHint,
           );
         },
@@ -600,6 +611,12 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
           name: 'ytm-explore',
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) => const YtmBrowseScreen(),
+        ),
+        GoRoute(
+          path: '/browse',
+          name: 'browse',
+          redirect: (context, state) =>
+              AppConfig.ytmEnabled ? '/ytm-search' : '/search',
         ),
         GoRoute(
           path: '/downloads',

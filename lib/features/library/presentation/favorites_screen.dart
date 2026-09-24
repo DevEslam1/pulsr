@@ -40,13 +40,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   int _favTabFilter = 0; // 0: Local, 1: Online
 
   @override
-  void deactivate() {
-    // FIX-M2: Cancel debounce timer in deactivate to prevent setState while inactive
-    _searchDebounce?.cancel();
-    super.deactivate();
-  }
-
-  @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
@@ -157,9 +150,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             return Center(
               child: ConstrainedBox(
                 constraints: Adaptive.contentConstraints(context),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
+                child: RefreshIndicator(
+                  color: p.accent,
+                  backgroundColor: p.surfaceContainer,
+                  onRefresh: () => context.read<LibraryCubit>().init(),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                   children: [
                     // ---------- Local / Online Tabs Switcher ----------
                     Padding(
@@ -371,11 +368,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       )
                     else if (songs.isEmpty && _searchQuery.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
                         child: Center(
-                          child: Text(
-                            '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
-                            style: TextStyle(color: p.textSecondary),
+                          child: EmptyStateWidget(
+                            icon: Icons.search_off_rounded,
+                            title: context.l10n.browseNoSongsMatch,
+                            subtitle: '"$_searchQuery"',
+                            primaryActionLabel: context.l10n.clear,
+                            primaryActionIcon: Icons.clear_rounded,
+                            onPrimaryAction: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
                           ),
                         ),
                       )
@@ -410,6 +414,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               playerCubit.playNext(song);
                             } else {
                               libraryCubit.toggleFavorite(song.id);
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(song.title),
+                                  action: SnackBarAction(
+                                    label: context.l10n.undo,
+                                    onPressed: () => libraryCubit.toggleFavorite(song.id),
+                                  ),
+                                ),
+                              );
                             }
                             return false;
                           },
@@ -436,7 +450,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   ],
                 ),
               ),
-            );
+            ),
+          );
           },
         ),
       ),

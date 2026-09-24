@@ -466,7 +466,6 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     final progress = (snapshot.data ?? 0.0).clamp(0.0, 1.0);
                     return Container(
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
@@ -486,6 +485,27 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
               : null,
           onTap: state.isScanning ? () {} : () => cubit.rescanLibrary(),
         ),
+        if (state.isScanning)
+          StreamBuilder<double>(
+            stream: cubit.scanProgress,
+            initialData: 0.0,
+            builder: (context, snapshot) {
+              final progress = (snapshot.data ?? 0.0).clamp(0.0, 1.0);
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  child: LinearProgressIndicator(
+                    value: progress > 0 ? progress : null,
+                    minHeight: 4,
+                    backgroundColor: p.surfaceContainer,
+                    valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                  ),
+                ),
+              );
+            },
+          ),
         _divider(p),
         _navTile(
           context,

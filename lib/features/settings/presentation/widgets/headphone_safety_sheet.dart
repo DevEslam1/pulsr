@@ -6,6 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 
@@ -51,20 +52,22 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
 
   Future<void> _refreshState() async {
     final dose = await _channel.getWeeklyDose();
+    if (!mounted) return;
     final active = await _channel.isSafetyAttenuationActive();
-    if (mounted) {
-      setState(() {
-        _weeklyDose = dose;
-        _attenuationActive = active;
-        _loading = false;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _weeklyDose = dose;
+      _attenuationActive = active;
+      _loading = false;
+    });
   }
 
   Future<void> _pollTelemetry() async {
     final dose = await _channel.getWeeklyDose();
+    if (!mounted) return;
     final active = await _channel.isSafetyAttenuationActive();
-    if (mounted && (dose != _weeklyDose || active != _attenuationActive)) {
+    if (!mounted) return;
+    if (dose != _weeklyDose || active != _attenuationActive) {
       setState(() {
         _weeklyDose = dose;
         _attenuationActive = active;
@@ -87,21 +90,19 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: context.palette.surfaceContainer,
-        title: const Text("Reset Weekly Sound Dose?"),
-        content: const Text(
-          "This will reset your accumulated acoustic exposure counter to 0% and lift safety attenuation. Only reset if starting a new monitoring week or switching listening environments.",
-        ),
+        title: Text(context.l10n.resetWeeklyDoseTitle),
+        content: Text(context.l10n.resetWeeklyDoseDesc),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text("Cancel"),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text("Reset Dose"),
+            child: Text(context.l10n.resetDoseAction),
           ),
         ],
       ),
@@ -112,9 +113,9 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
       await _refreshState();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Weekly sound dose has been reset to 0.0%"),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(context.l10n.weeklyDoseResetSnackbar),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -160,16 +161,16 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Headphone Safety & Dose",
-                        style: TextStyle(
+                      Text(
+                        context.l10n.headphoneSafetyTitle,
+                        style: const TextStyle(
                           fontSize: AppFontSize.title,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "WHO-ITU H.870 / EN 62368-1 Acoustic Standard",
+                        context.l10n.headphoneSafetyStandard,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: AppFontSize.label,
@@ -200,7 +201,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "Weekly Sound Allowance",
+                        context.l10n.weeklySoundAllowance,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: AppFontSize.body,
@@ -243,10 +244,10 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                       Expanded(
                         child: Text(
                           _attenuationActive
-                              ? 'Safety Limiter Active (-6 dBFS ceiling engaged to prevent hearing damage)'
+                              ? context.l10n.safetyLimiterActiveDesc
                               : (_weeklyDose >= 0.8
-                                  ? 'High sound dose: Consider reducing volume to protect hearing'
-                                  : 'Optimal exposure: Safe listening levels within 40-hour allowance'),
+                                  ? context.l10n.highSoundDoseWarning
+                                  : context.l10n.optimalExposureDesc),
                           style: TextStyle(
                             color: doseColor,
                             fontSize: AppFontSize.caption,
@@ -289,7 +290,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                 ),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 20),
-              label: const Text("Reset Weekly Dose Accumulator"),
+              label: Text(context.l10n.resetDoseAction),
               onPressed: _confirmResetDose,
             ),
           ],

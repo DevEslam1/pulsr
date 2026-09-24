@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
@@ -1195,6 +1196,23 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       ErrorLogger.log('Failed to rebuild search index',
           error: e, stackTrace: st, category: 'SettingsCubit');
       return false;
+    }
+  }
+
+  Future<int> getMissingFilesCount() async {
+    try {
+      if (!getIt.isRegistered<AppDatabase>()) return 0;
+      final db = getIt<AppDatabase>();
+      final countExpr = db.songsTable.id.count();
+      final query = db.selectOnly(db.songsTable)
+        ..addColumns([countExpr])
+        ..where(db.songsTable.isMissing.equals(true) &
+            db.songsTable.source.equals(SongSource.local));
+      final row = await query.getSingleOrNull();
+      final count = row?.read(countExpr) ?? 0;
+      return count;
+    } catch (_) {
+      return 0;
     }
   }
 

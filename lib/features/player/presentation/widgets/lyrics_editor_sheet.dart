@@ -82,7 +82,19 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
           timer.cancel();
           return;
         }
-        _livePosition.value = _livePosition.value + const Duration(milliseconds: 250);
+        bool isPlaying = true;
+        try {
+          isPlaying = context.read<PlayerCubit>().state.isPlaying;
+        } catch (_) {
+          try {
+            if (getIt.isRegistered<PlayerCubit>()) {
+              isPlaying = getIt<PlayerCubit>().state.isPlaying;
+            }
+          } catch (_) {}
+        }
+        if (isPlaying) {
+          _livePosition.value = _livePosition.value + const Duration(milliseconds: 250);
+        }
       });
     }
   }
@@ -254,7 +266,10 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                         color: p.primary,
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
                         onPressed: () {
                           try {
                             final cubit = context.read<PlayerCubit>();
@@ -269,20 +284,26 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       InkWell(
                         onTap: () => _stampCurrentPosition(index),
                         borderRadius: BorderRadius.circular(AppRadii.r8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-
-                              horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
-                          decoration: BoxDecoration(
-                            color: p.primary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: AppSpacing.minTouchTarget,
+                            minWidth: AppSpacing.minTouchTarget,
                           ),
-                          child: Text(
-                            Formatters.formatDuration(line.timestamp),
-                            style: TextStyle(
-                              color: p.primary,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w700,
+                          child: Container(
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
+                            decoration: BoxDecoration(
+                              color: p.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                            ),
+                            child: Text(
+                              Formatters.formatDuration(line.timestamp),
+                              style: TextStyle(
+                                color: p.primary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),

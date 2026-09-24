@@ -133,12 +133,12 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isLandscape = context.isLandscape &&
-            (context.isTwoPane || constraints.maxWidth >= 680);
+        final isLandscape = context.isLandscape ||
+            (context.isTwoPane || constraints.maxWidth >= 600);
 
         // Dynamic vertical spacing ratio for balanced, centered content distribution
         final double heightRatio =
-            (constraints.maxHeight / 720.0).clamp(0.85, 1.25);
+            (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
         final double spacingTrackToSeek =
             (isTablet ? 10.0 : 6.0) * heightRatio;
         final double spacingSeekToControls =
@@ -153,10 +153,10 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             (isTablet ? 6.0 : 3.0) * heightRatio;
 
         final double pillBarWidth = math.min(
-          constraints.maxWidth - (isTablet ? 64 : 36),
+          constraints.maxWidth - (isTablet ? 64 : 28),
           isTablet ? 440.0 : 336.0,
         );
-        final double pillBarHeight = isTablet ? 50.0 : 44.0;
+        final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
         final viewSwitcher = PlayerViewSwitcher(
           state: state,
@@ -393,33 +393,36 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           // 4. Animated Tonearm Assembly Layer
                           Positioned.fill(
                             child: IgnorePointer(
-                              child: BlocSelector<PlayerCubit, PlayerState, Duration>(
-                                selector: (s) => s.position,
-                                builder: (context, position) {
-                                  final progress = state.duration.inMilliseconds > 0
-                                      ? (position.inMilliseconds /
-                                              state.duration.inMilliseconds)
-                                          .clamp(0.0, 1.0)
-                                      : 0.0;
-                                  final playAngle = 0.35 + (progress * 0.14);
-                                  return AnimatedBuilder(
-                                    animation: _tonearmAnimation,
-                                    builder: (context, child) {
-                                      final currentAngle = -0.06 +
-                                          ((playAngle - (-0.06)) *
-                                              _tonearmAnimation.value);
+                              child: RepaintBoundary(
+                                child: BlocSelector<PlayerCubit, PlayerState, int>(
+                                  selector: (s) => s.duration.inMilliseconds > 0
+                                      ? ((s.position.inMilliseconds /
+                                                  s.duration.inMilliseconds) *
+                                              120)
+                                          .round()
+                                      : 0,
+                                  builder: (context, step) {
+                                    final progress = (step / 120.0).clamp(0.0, 1.0);
+                                    final playAngle = 0.35 + (progress * 0.14);
+                                    return AnimatedBuilder(
+                                      animation: _tonearmAnimation,
+                                      builder: (context, child) {
+                                        final currentAngle = -0.06 +
+                                            ((playAngle - (-0.06)) *
+                                                _tonearmAnimation.value);
 
-                                      return CustomPaint(
-                                        painter: _TonearmPainter(
-                                          pivot: pivotOffset,
-                                          angle: currentAngle,
-                                          activeColor: activeColor,
-                                          armLength: armLength,
-                                        ),
-                                      );
-                                    },
-                                  );
-                                },
+                                        return CustomPaint(
+                                          painter: _TonearmPainter(
+                                            pivot: pivotOffset,
+                                            angle: currentAngle,
+                                            activeColor: activeColor,
+                                            armLength: armLength,
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),
@@ -663,7 +666,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               hasPrevious: state.hasPreviousNeighbour,
               hasNext: state.hasNextNeighbour,
               primaryColor: activeColor,
-              mainButtonSize: isTablet ? 72 : (isLandscape ? 56 : 64),
+              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
               onPlayPause: () => cubit.togglePlayPause(),
               onNext: () => cubit.next(),
               onPrevious: () => cubit.previous(),
@@ -879,10 +882,11 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     final double availableHeight =
                         artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
                     final double maxAllowed = isTablet ? 560.0 : 420.0;
-                    final double deckSize = math.min(
-                      math.min(availableWidth, availableHeight),
-                      maxAllowed,
-                    ).clamp(200.0, double.infinity);
+                    final double rawSize =
+                        math.min(availableWidth, availableHeight);
+                    final double deckSize = rawSize <= 0
+                        ? 0.0
+                        : math.min(rawSize, maxAllowed);
 
                     return Center(
                       child: ConstrainedBox(

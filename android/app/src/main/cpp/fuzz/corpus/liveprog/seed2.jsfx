@@ -1,0 +1,10 @@
+@init
+c = 0.25;
+lp0 = 0.0;
+lp1 = 0.0;
+
+@sample
+lp0 = lp0 + c * (spl0 - lp0);
+lp1 = lp1 + c * (spl1 - lp1);
+spl0 = lp0;
+spl1 = lp1;

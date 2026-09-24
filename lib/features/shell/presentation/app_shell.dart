@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../core/widgets/pulsr_toast.dart';
@@ -34,14 +37,38 @@ class _AppShellState extends State<AppShell> {
   final ListQueue<int> _tabHistory = ListQueue<int>()..add(0);
   int _lastNavMs = 0;
   int _lastPopMs = 0;
-  DateTime? _lastBackPressTime;
+  final Stopwatch _backPressStopwatch = Stopwatch();
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreLastShellTab();
+  }
+
+  void _restoreLastShellTab() {
+    SharedPreferences.getInstance().then((prefs) {
+      final savedTab = prefs.getInt('setting_last_shell_tab');
+      if (savedTab != null &&
+          savedTab > 0 &&
+          savedTab < 5 &&
+          mounted &&
+          widget.navigationShell.currentIndex == 0) {
+        widget.navigationShell.goBranch(savedTab);
+      }
+    }).catchError((e, st) {
+      ErrorLogger.log('Failed to restore last shell tab',
+          error: e, stackTrace: st, category: 'Shell');
+    });
+  }
 
   void _onTapNav(int index) {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (nowMs - _lastNavMs < 200) return;
     _lastNavMs = nowMs;
 
-    if (_tabHistory.isEmpty || _tabHistory.last != index) {
+    final isSameTab = index == widget.navigationShell.currentIndex;
+
+    if (!isSameTab && (_tabHistory.isEmpty || _tabHistory.last != index)) {
       _tabHistory.addLast(index);
       while (_tabHistory.length > _maxTabHistory) {
         _tabHistory.removeFirst();
@@ -49,8 +76,21 @@ class _AppShellState extends State<AppShell> {
     }
     widget.navigationShell.goBranch(
       index,
-      initialLocation: index == widget.navigationShell.currentIndex,
+      initialLocation: isSameTab,
     );
+    unawaited(SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt('setting_last_shell_tab', index);
+    }).catchError((e, st) {
+      ErrorLogger.log('Failed to persist last shell tab',
+          error: e, stackTrace: st, category: 'Shell');
+    }));
+    if (isSameTab) {
+      PrimaryScrollController.maybeOf(context)?.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _openNowPlaying(BuildContext context) {
@@ -132,19 +172,22 @@ class _AppShellState extends State<AppShell> {
           }
 
           // 5. On Home tab: double back press to exit application safely
-          final now = DateTime.now();
-          if (_lastBackPressTime == null ||
-              now.difference(_lastBackPressTime!) >
-                  const Duration(seconds: 3)) {
-            _lastBackPressTime = now;
+          if (!_backPressStopwatch.isRunning ||
+              _backPressStopwatch.elapsed > const Duration(seconds: 3)) {
+            _backPressStopwatch
+              ..reset()
+              ..start();
             PulsrToast.show(
               context,
               message: context.l10n.pressBackAgainToExit,
-              icon: Icons.exit_to_app_rounded,
+              icon: Icons.logout_rounded,
             );
             return;
           }
 
+          _backPressStopwatch
+            ..stop()
+            ..reset();
           await SystemNavigator.pop();
         },
         child: PlayerShortcutScope(

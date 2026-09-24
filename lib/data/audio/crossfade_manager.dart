@@ -220,6 +220,20 @@ class CrossfadeManager {
     return List.generate(n + 1, (i) => evaluateSumSafeGainPair(i / n));
   }
 
+  /// Real-time curve audition stream: emits gain pairs over the given [duration].
+  Stream<(double oldGain, double newGain)> auditionCurveProgress({
+    Duration duration = const Duration(seconds: 3),
+    int steps = 30,
+  }) async* {
+    final stepDuration = duration ~/ steps;
+    for (var i = 0; i <= steps; i++) {
+      yield evaluateSumSafeGainPair(i / steps);
+      if (i < steps) {
+        await Future.delayed(stepDuration);
+      }
+    }
+  }
+
   /// Arbitrates the transition between outgoing track and incoming track.
   /// Returns [TransitionType.gapless] or [TransitionType.crossfade].
   static TransitionDecision arbitrateTransition({

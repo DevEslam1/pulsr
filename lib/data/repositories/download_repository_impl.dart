@@ -492,12 +492,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _schedulePersist(immediateOnTerminal: isTerminal);
   }
 
-  void dispose() {
+  Future<void> dispose() async {
     _saveDebounce?.cancel();
     _saveDebounce = null;
-    // Flush pending state synchronously so terminal states are never lost
+    // Flush pending state so terminal states are never lost
     // on a fast close/kill after the debounce window opened.
-    unawaited(_persistNow());
+    await _persistNow();
     // FIX-A07: Cancel all _throttleFlushTimers entries BEFORE closing _streamController
     for (final timer in _throttleFlushTimers.values) {
       timer.cancel();
@@ -505,7 +505,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _throttleFlushTimers.clear();
     _pendingThrottledTasks.clear();
     // FIX-A07: Guard _streamController.close() with if (!_streamController.isClosed)
-    if (!_streamController.isClosed) _streamController.close();
+    if (!_streamController.isClosed) await _streamController.close();
   }
 
   void _schedulePersist({bool immediateOnTerminal = false}) {

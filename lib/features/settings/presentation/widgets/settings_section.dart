@@ -16,6 +16,7 @@ class SettingsSection extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final List<Widget> children;
+  final bool isProminent;
 
   const SettingsSection({
     super.key,
@@ -24,6 +25,7 @@ class SettingsSection extends StatelessWidget {
     this.subtitle,
     this.trailing,
     required this.children,
+    this.isProminent = false,
   });
 
   @override
@@ -60,9 +62,11 @@ class SettingsSection extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: p.textSecondary,
+                          color: isProminent ? p.accent : p.textSecondary,
                           fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: isProminent
+                              ? FontWeight.w900
+                              : FontWeight.w800,
                           letterSpacing: AppTracking.overline,
                         ),
                       ),
@@ -85,10 +89,17 @@ class SettingsSection extends StatelessWidget {
             ),
           ),
           Material(
-            color: p.surfaceContainer,
+            color: isProminent
+                ? p.accentContainer.withValues(alpha: p.isDark ? 0.35 : 0.6)
+                : p.surfaceContainer,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.card),
-              side: BorderSide(color: p.hairline),
+              side: BorderSide(
+                color: isProminent
+                    ? p.accent.withValues(alpha: 0.45)
+                    : p.hairline,
+                width: isProminent ? 1.5 : 1.0,
+              ),
             ),
             clipBehavior: Clip.antiAlias,
             child: Column(

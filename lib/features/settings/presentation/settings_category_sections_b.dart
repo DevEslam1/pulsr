@@ -312,7 +312,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
           return Padding(
             padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.xs, 0, AppSpacing.xs, AppSpacing.sm),
             child: Text(
-              '${results.length} ${results.length == 1 ? "setting" : "settings"} found',
+              context.l10n.settingsResultsCount(results.length),
               style: TextStyle(
                 color: p.textTertiary,
                 fontSize: AppFontSize.caption,
@@ -385,7 +385,19 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
               trailing: r.trailing ??
                   Icon(Icons.chevron_right_rounded,
                       color: p.textTertiary, size: 20),
-              onTap: r.onTap,
+              onTap: () {
+                final catId = _mapCategoryNameToId(r.category, context);
+                r.onTap?.call();
+                if (mounted) {
+                  setState(() {
+                    if (catId.isNotEmpty && catId != 'all') {
+                      _selectedCategoryId = catId;
+                    }
+                    _searchController.clear();
+                    _searchQuery = '';
+                  });
+                }
+              },
             ),
           ),
         );
@@ -393,12 +405,38 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     );
   }
 
+  String _mapCategoryNameToId(String catName, BuildContext context) {
+    if (catName == context.l10n.settingsCategoryAppearance) return 'appearance';
+    if (catName == context.l10n.audioAndSound || catName == context.l10n.settingsSearchCategoryAudio) return 'audio';
+    if (catName == context.l10n.playback) return 'playback';
+    if (catName == context.l10n.gestures) return 'gestures';
+    if (catName == context.l10n.settingsCategoryProfiles) return 'profiles';
+    if (catName == context.l10n.navLibrary) return 'library';
+    if (catName == context.l10n.settingsCategoryOnline) return 'online';
+    if (catName == context.l10n.storageAndCache) return 'storage';
+    if (catName == context.l10n.settingsCategoryPrivacy) return 'privacy';
+    if (catName == context.l10n.settingsCategoryAbout) return 'about';
+    return 'all';
+  }
+
+  List<_SearchItem>? _memoizedSearchEntries;
+  Locale? _memoizedSearchLocale;
+  bool? _memoizedSearchPro;
+
   List<_SearchItem> _getSearchableEntries(
     BuildContext context,
     SettingsState state,
     SettingsCubit cubit,
   ) {
-    return [
+    final currentLocale = Localizations.localeOf(context);
+    if (_memoizedSearchEntries != null &&
+        _memoizedSearchLocale == currentLocale &&
+        _memoizedSearchPro == state.isProfessional) {
+      return _memoizedSearchEntries!;
+    }
+    _memoizedSearchLocale = currentLocale;
+    _memoizedSearchPro = state.isProfessional;
+    return _memoizedSearchEntries = [
       _SearchItem(
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchThemeModeTitle,
@@ -743,6 +781,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
 
   // Requires: provided by the composing class (same library).
   String get _searchQuery;
+  set _searchQuery(String value);
 
   // Requires: provided by the composing class (same library).
   Widget _section( BuildContext context, String title, String subtitle, List<Widget> children, { GlobalKey? key, });

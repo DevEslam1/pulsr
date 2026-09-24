@@ -211,14 +211,17 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                       const SizedBox(height: AppSpacing.s20),
                       SizedBox(
                         height: 130,
-                        child: CustomPaint(
-                          size: const Size(double.infinity, 130),
-                          painter: _ScrobbleBarChartPainter(
-                            data: _last7DaysScrobbles,
-                            labels: _dayLabels,
-                            barColor: p.primary,
-                            labelColor: p.textSecondary,
-                            textDirection: Directionality.of(context),
+                        child: Semantics(
+                          label: '7-day scrobble history chart',
+                          child: CustomPaint(
+                            size: const Size(double.infinity, 130),
+                            painter: _ScrobbleBarChartPainter(
+                              data: _last7DaysScrobbles,
+                              labels: _dayLabels,
+                              barColor: p.primary,
+                              labelColor: p.textSecondary,
+                              textDirection: Directionality.of(context),
+                            ),
                           ),
                         ),
                       ),
@@ -307,8 +310,6 @@ class _ScrobbleBarChartPainter extends CustomPainter {
   final Color labelColor;
   final TextDirection textDirection;
 
-  static final TextPainter _cachedPainter = TextPainter();
-
   const _ScrobbleBarChartPainter({
     required this.data,
     required this.labels,
@@ -328,6 +329,8 @@ class _ScrobbleBarChartPainter extends CustomPainter {
       ..color = barColor
       ..style = PaintingStyle.fill;
 
+    final textPainter = TextPainter(textDirection: textDirection);
+
     for (int i = 0; i < data.length; i++) {
       final val = data[i];
       final heightRatio = val / maxVal;
@@ -342,16 +345,15 @@ class _ScrobbleBarChartPainter extends CustomPainter {
       canvas.drawRRect(rRect, paint);
 
       if (i < labels.length && labels[i].isNotEmpty) {
-        _cachedPainter.text = TextSpan(
+        textPainter.text = TextSpan(
           text: labels[i],
           style: TextStyle(
               color: labelColor, fontSize: AppFontSize.caption, fontWeight: FontWeight.w600),
         );
-        _cachedPainter.textDirection = textDirection;
-        _cachedPainter.layout();
-        _cachedPainter.paint(
+        textPainter.layout();
+        textPainter.paint(
           canvas,
-          Offset(x + (barWidth - _cachedPainter.width) / 2, size.height - 18),
+          Offset(x + (barWidth - textPainter.width) / 2, size.height - 18),
         );
       }
     }

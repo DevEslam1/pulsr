@@ -546,23 +546,27 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val progressOnly = isProgressOnly && cached != null && !cached.isRecycled
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, progressOnly)
+                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing_compact, data, 44, progressOnly)
+                    val viewsSmall = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, progressOnly)
                     val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, progressOnly)
                     val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, progressOnly)
                     val viewMapping = mapOf(
                         SizeF(140f, 60f) to viewsCompact,
-                        SizeF(180f, 110f) to viewsMedium,
-                        SizeF(180f, 160f) to viewsLarge
+                        SizeF(180f, 75f) to viewsSmall,
+                        SizeF(240f, 110f) to viewsMedium,
+                        SizeF(240f, 160f) to viewsLarge
                     )
                     val remoteViews = RemoteViews(viewMapping)
                     appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
                 } else {
                     val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
                     val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+                    val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
                     val (layoutId, artDp) = when {
                         minHeight >= 160 -> Pair(R.layout.widget_now_playing_large, 88)
                         minHeight >= 110 -> Pair(R.layout.widget_now_playing_medium, 68)
-                        else -> Pair(R.layout.widget_now_playing, 56)
+                        minHeight >= 70 && minWidth >= 200 -> Pair(R.layout.widget_now_playing, 56)
+                        else -> Pair(R.layout.widget_now_playing_compact, 44)
                     }
                     val views = createPopulatedRemoteViews(context, layoutId, data, artDp, progressOnly)
                     appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -628,6 +632,10 @@ class NowPlayingWidget : AppWidgetProvider() {
             views.setImageViewResource(
                 R.id.btn_play_pause,
                 if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
+            )
+            views.setContentDescription(
+                R.id.btn_play_pause,
+                context.getString(if (isPlaying) R.string.widget_pause else R.string.widget_play)
             )
 
             // C-4 progress-only tick: re-attach the cached artwork (so the launcher
@@ -704,13 +712,21 @@ class NowPlayingWidget : AppWidgetProvider() {
                 R.id.widget_favorite,
                 if (isFavorite) R.drawable.ic_widget_heart_filled else R.drawable.ic_widget_heart
             )
+            views.setContentDescription(
+                R.id.widget_favorite,
+                context.getString(if (isFavorite) R.string.widget_favorite_remove else R.string.widget_favorite_add)
+            )
 
             // ---- Shuffle / Repeat indicators ----
             val isShuffle = getSafeBoolean(data, "isShuffle", false)
+            views.setContentDescription(
+                R.id.widget_shuffle,
+                context.getString(if (isShuffle) R.string.widget_shuffle_disable else R.string.widget_shuffle_enable)
+            )
             if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_shuffle, if (isShuffle) View.VISIBLE else View.GONE)
                 views.setImageViewResource(R.id.widget_shuffle, R.drawable.ic_widget_shuffle)
-            } else {
+            } else if (layoutId != R.layout.widget_now_playing_compact) {
                 views.setViewVisibility(R.id.widget_shuffle, View.VISIBLE)
                 views.setImageViewResource(
                     R.id.widget_shuffle,
@@ -719,13 +735,19 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
 
             val repeatMode = getSafeString(data, "repeatMode", "off") ?: "off"
+            val repeatDesc = when (repeatMode) {
+                "one" -> context.getString(R.string.widget_repeat_one)
+                "all" -> context.getString(R.string.widget_repeat_all)
+                else -> context.getString(R.string.widget_repeat_off)
+            }
+            views.setContentDescription(R.id.widget_repeat, repeatDesc)
             if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_repeat, if (repeatMode != "off") View.VISIBLE else View.GONE)
                 views.setImageViewResource(
                     R.id.widget_repeat,
                     if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
                 )
-            } else {
+            } else if (layoutId != R.layout.widget_now_playing_compact) {
                 views.setViewVisibility(R.id.widget_repeat, View.VISIBLE)
                 views.setImageViewResource(
                     R.id.widget_repeat,
@@ -793,16 +815,23 @@ class NowPlayingWidget : AppWidgetProvider() {
             )
 
             // ---- 10 Granular Slider Seek Tap Zones (10% steps) ----
-            val seekViews = intArrayOf(
-                R.id.btn_seek_01, R.id.btn_seek_02, R.id.btn_seek_03, R.id.btn_seek_04, R.id.btn_seek_05,
-                R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10
-            )
-            for (i in seekViews.indices) {
-                val ratio = ((i + 1).toFloat() / seekViews.size.toFloat()).coerceIn(0.01f, 0.99f)
-                views.setOnClickPendingIntent(
-                    seekViews[i],
-                    createSeekPendingIntent(context, ratio, 300 + i)
+            if (layoutId != R.layout.widget_now_playing_compact) {
+                val seekViews = intArrayOf(
+                    R.id.btn_seek_01, R.id.btn_seek_02, R.id.btn_seek_03, R.id.btn_seek_04, R.id.btn_seek_05,
+                    R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10
                 )
+                for (i in seekViews.indices) {
+                    val percent = (i + 1) * 10
+                    views.setContentDescription(
+                        seekViews[i],
+                        context.getString(R.string.widget_seek_to, percent)
+                    )
+                    val ratio = ((i + 1).toFloat() / seekViews.size.toFloat()).coerceIn(0.01f, 0.99f)
+                    views.setOnClickPendingIntent(
+                        seekViews[i],
+                        createSeekPendingIntent(context, ratio, 300 + i)
+                    )
+                }
             }
 
             return views

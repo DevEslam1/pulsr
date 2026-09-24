@@ -2,6 +2,7 @@
 part of 'audio_handler.dart';
 
 mixin PulsrAudioStreaming on BaseAudioHandler {
+  String? _lastAppliedPerSongEq;
   int get _preloadCountForCurrentBucket {
     switch (_currentBucket) {
       case BufferBucket.minimal:
@@ -14,11 +15,23 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   }
 
   Future<void> _evaluateBufferBucket(SongsTableData song) async {
+    final isLocal =
+        song.source == SongSource.local || song.isDownloaded == true;
+    bool isWifi = false;
+    if (!isLocal) {
+      try {
+        isWifi = await _ytmService.isWifiConnected();
+      } catch (e, st) {
+        ErrorLogger.log('Network check failed in _evaluateBufferBucket',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+    }
     try {
-      final isLocal = song.source == SongSource.local || song.isDownloaded == true;
-      final isWifi = isLocal ? false : await _ytmService.isWifiConnected();
       _adaptiveBufferEngine.evaluateBucket(isWifi: isWifi, isLocal: isLocal);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Adaptive buffer evaluation failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   void _notifyTrackChanged(SongsTableData song) {
@@ -52,6 +65,13 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     final previousSong = _lastPlayedSong;
     if (previousSong != null && previousSong.id != song.id) {
+      final prevKey = previousSong.id.toString();
+      final curSpeed = _activePlayer.speed;
+      final curPitch = _pitch;
+      if ((curSpeed - 1.0).abs() >= 0.01 || (curPitch - 1.0).abs() >= 0.01) {
+        unawaited(perSongPlaybackStore.setSpeed(prevKey, curSpeed));
+        unawaited(perSongPlaybackStore.setPitch(prevKey, curPitch));
+      }
       _memoryManager.onTrackCompleted(previousSong.id);
       if (previousSong.remoteId != null) {
         // Prefetch registers keys as `remoteId:quality`; evict every variant.
@@ -59,6 +79,47 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       }
     }
     _lastPlayedSong = song;
+
+    // F13: restore per-song speed/pitch memory (B-16)
+    final songKey = song.id.toString();
+    final remSpeed = perSongPlaybackStore.getSpeed(songKey);
+    final remPitch = perSongPlaybackStore.getPitch(songKey);
+    if (remSpeed != null) {
+      unawaited(setSpeed(remSpeed));
+    } else {
+      unawaited(restorePersistedSpeed());
+    }
+    if (remPitch != null) {
+      unawaited(setPitch(remPitch));
+    } else {
+      unawaited(restorePersistedPitch());
+    }
+
+    // Restore per-song EQ preset if configured (B-16, N-4)
+    if (getIt.isRegistered<PerSongEqStore>()) {
+      try {
+        final eqStore = getIt<PerSongEqStore>();
+        final presetName = eqStore.getPresetForTrack(songKey);
+        if (presetName != null) {
+          final matchedPreset = EqPreset.defaultPresets.firstWhere(
+            (p) => p.name.toLowerCase() == presetName.toLowerCase(),
+            orElse: () =>
+                _equalizerManager.currentPreset.copyWith(name: presetName),
+          );
+          _lastAppliedPerSongEq = presetName;
+          unawaited(_equalizerManager.setPreset(matchedPreset));
+        } else if (_lastAppliedPerSongEq != null) {
+          _lastAppliedPerSongEq = null;
+          final baseName =
+              _cachedPrefs?.getString(PrefsKeys.eqPresetName) ?? 'Flat';
+          final basePreset = EqPreset.defaultPresets.firstWhere(
+            (p) => p.name.toLowerCase() == baseName.toLowerCase(),
+            orElse: () => EqPreset.defaultPresets.first,
+          );
+          unawaited(_equalizerManager.setPreset(basePreset));
+        }
+      } catch (_) {}
+    }
     _onTrackChangedSubject.add(song);
     // Signature-scan local lossless files so MQA material is labeled honestly
     // instead of silently reported as plain FLAC on the next quality rebuild.
@@ -171,20 +232,19 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         '[AudioHandler] Adaptive bitrate switching stepped down streaming quality to $newQuality');
     final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
     await prefs.setString('setting_streaming_quality', newQuality);
-    // Quality is part of EVERY downstream cache key: clear all of them so the
-    // next resolve actually fetches the lower rendition instead of reusing a
-    // stale higher-quality URL (previously only _streamCache was cleared).
-    _streamCache.clear();
-    _inFlightResolves.clear();
-    _prefetching.clear();
-    _preloadScheduler.clear();
+    final song = currentSong;
+    final remoteId = song?.remoteId;
+    if (remoteId != null && remoteId.isNotEmpty) {
+      _streamCache.removeWhere((k, _) =>
+          k.startsWith('$remoteId:') || k.startsWith(remoteId));
+      _streamResolutionPipeline.invalidateCache(remoteId);
+    }
     _resolveEpoch++;
     try {
       if (getIt.isRegistered<YtmUrlCache>()) {
         final urlCache = getIt<YtmUrlCache>();
-        final song = currentSong;
-        if (song?.remoteId != null) {
-          urlCache.invalidate(song!.remoteId!);
+        if (remoteId != null && remoteId.isNotEmpty) {
+          urlCache.invalidate(remoteId);
         }
       }
     } catch (e, st) {
@@ -277,7 +337,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       _broadcastState(_activePlayer.playbackEvent);
     } else {
       _consecutiveFailures++;
-      if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
+      if (PulsrAudioHandler.shouldHaltFailureCascade(
+        consecutiveFailures: _consecutiveFailures,
+        rapidGaplessChanges: _rapidGaplessChangeCount,
+        queueLength: _songs.length,
+      )) {
         _consecutiveFailures = 0;
         _rapidGaplessChangeCount = 0;
         _activePlayer.pause().ignore();
@@ -302,6 +366,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         (!song.path.startsWith('ytmusic://') && song.path.isNotEmpty) &&
         (song.path.startsWith('content:') ||
             song.isDownloaded == true ||
+            (song.fileSize != null && !song.isMissing) ||
             (_pathExistsCache[song.path] ??= File(song.path).existsSync()));
     // FIX-#8: Evict oldest 25% when the cache exceeds the bound to prevent
     // an unbounded memory leak over long listening sessions.
@@ -547,6 +612,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
           timer.cancel();
           return;
         }
+        // Guard against premature volume restore before slow decoders are actually ready
+        if (player.processingState != ProcessingState.ready) {
+          return;
+        }
         // Player is playing but volume is still muted
         final target = _calculateReplayGainVolume(currentSong).clamp(0.0, 1.0);
         if (target > 0.05) {
@@ -785,8 +854,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // Throttle: position ticks fire continuously in the last 30s of a track;
     // without this the same videoId is re-scheduled on every tick.
     final nowMs = DateTime.now().millisecondsSinceEpoch;
-    final key =
-        '${_currentIndex}_${_songs[_currentIndex].remoteId ?? _songs[_currentIndex].id}';
+    final song = _songs[_currentIndex];
+    final stableId = (song.remoteId?.isNotEmpty ?? false)
+        ? song.remoteId!
+        : song.path;
+    final key = '${_currentIndex}_$stableId';
     if (key == _lastSmartPrefetchKey && nowMs - _lastSmartPrefetchMs < 10000) {
       return;
     }
@@ -1248,4 +1320,14 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   SilenceSkipController get silenceSkipController;
+
+  // Requires: provided by the composing class (same library).
+  StreamResolutionPipeline get _streamResolutionPipeline;
+
+  // Requires: provided by the composing class (same library).
+  PerSongPlaybackStore get perSongPlaybackStore;
+  double get _pitch;
+  Future<void> setPitch(double pitch);
+  Future<void> restorePersistedSpeed();
+  Future<void> restorePersistedPitch();
 }

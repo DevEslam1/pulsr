@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -118,6 +119,21 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     });
   }
 
+  static double computeDockHeight({
+    required bool hasSong,
+    required DockStackMode mode,
+    required double navBarTotalHeight,
+  }) {
+    if (!hasSong) return navBarTotalHeight;
+    final isStacked = mode != DockStackMode.defaultLayout;
+    final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
+    return !isStacked
+        ? (navBarTotalHeight + _miniPlayerHeight)
+        : (isNavBarOnTop
+            ? (_peekOffset + _miniPlayerHeight)
+            : (navBarTotalHeight + _peekOffset));
+  }
+
   void _syncDock({required bool hasSong}) {
     if (!mounted) return;
     final isTablet = Adaptive.isTablet(context);
@@ -125,33 +141,41 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
     final double navBarTotalHeight = barHeight + navBarPaddingVertical;
 
-    if (!hasSong) {
-      _maybeUpdateDock(height: navBarTotalHeight, miniPlayer: false);
-      return;
-    }
-
-    final mode = widget.mode;
-    final isStacked = mode != DockStackMode.defaultLayout;
-    final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
-
-    final double dockHeight = !isStacked
-        ? (navBarTotalHeight + _miniPlayerHeight)
-        : (isNavBarOnTop
-            ? (_peekOffset + _miniPlayerHeight)
-            : (navBarTotalHeight + _peekOffset));
-
-    _maybeUpdateDock(height: dockHeight, miniPlayer: true);
+    final double dockHeight = computeDockHeight(
+      hasSong: hasSong,
+      mode: widget.mode,
+      navBarTotalHeight: navBarTotalHeight,
+    );
+    _maybeUpdateDock(height: dockHeight, miniPlayer: hasSong);
   }
 
   bool? _lastKnownHasSong;
+  int? _lastKnownSongId;
+  Timer? _dockSyncDebounceTimer;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final hasSong = context.read<PlayerCubit>().state.currentSong != null;
-    if (_lastKnownHasSong != hasSong) {
-      _lastKnownHasSong = hasSong;
-      _syncDock(hasSong: hasSong);
+    try {
+      final currentSong = context.read<PlayerCubit>().state.currentSong;
+      final songId = currentSong?.id;
+      final hasSong = currentSong != null;
+      if (_lastKnownSongId != songId || _lastKnownHasSong != hasSong) {
+        final isFirstSync = _lastKnownHasSong == null;
+        _lastKnownSongId = songId;
+        _lastKnownHasSong = hasSong;
+        _dockSyncDebounceTimer?.cancel();
+        if (isFirstSync) {
+          _syncDock(hasSong: hasSong);
+        } else {
+          _dockSyncDebounceTimer = Timer(const Duration(milliseconds: 50), () {
+            if (!mounted) return;
+            _syncDock(hasSong: hasSong);
+          });
+        }
+      }
+    } catch (_) {
+      // PlayerCubit not yet provided or tree detaching
     }
   }
 
@@ -159,18 +183,30 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   void didUpdateWidget(covariant StackedBottomDock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mode != widget.mode) {
-      final hasSong = context.read<PlayerCubit>().state.currentSong != null;
-      _lastKnownHasSong = hasSong;
-      _syncDock(hasSong: hasSong);
+      try {
+        final currentSong = context.read<PlayerCubit>().state.currentSong;
+        final hasSong = currentSong != null;
+        _lastKnownSongId = currentSong?.id;
+        _lastKnownHasSong = hasSong;
+        _syncDock(hasSong: hasSong);
+      } catch (_) {
+        if (_lastKnownHasSong != null) {
+          _syncDock(hasSong: _lastKnownHasSong!);
+        }
+      }
     }
   }
 
   @override
   void dispose() {
+    _dockSyncDebounceTimer?.cancel();
+    _dockSyncDebounceTimer = null;
     // FIX-H14: Clear pending dock state and update dock tracker immediately
     _postFrameCallbackScheduled = false;
     _pendingDockHeight = null;
     _pendingMiniPlayer = null;
+    _lastReportedHeight = null;
+    _lastReportedMiniPlayer = null;
     PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
     super.dispose();
   }
@@ -239,11 +275,11 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           // mini player peeks above the nav bar, so its top is
           // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
           // which clipped it).
-          final double dockHeight = !isStacked
-              ? (navBarTotalHeight + _miniPlayerHeight)
-              : (isNavBarOnTop
-                  ? (_peekOffset + _miniPlayerHeight)
-                  : (navBarTotalHeight + _peekOffset));
+          final double dockHeight = computeDockHeight(
+            hasSong: true,
+            mode: mode,
+            navBarTotalHeight: navBarTotalHeight,
+          );
 
         // Calculate card bottom offsets, scales, and opacities
         final double miniPlayerBottom;
@@ -348,20 +384,15 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           left: 0,
           right: 0,
           bottom: miniPlayerBottom,
-          child: AnimatedScale(
+          child: _AnimatedCardTransform(
             duration: animDuration,
             curve: animCurve,
             scale: miniPlayerScale,
-            alignment: Alignment.bottomCenter,
-            child: AnimatedOpacity(
-              duration: animDuration,
-              curve: animCurve,
-              opacity: miniPlayerOpacity,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxDockWidth),
-                  child: miniPlayerWidget,
-                ),
+            opacity: miniPlayerOpacity,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxDockWidth),
+                child: miniPlayerWidget,
               ),
             ),
           ),
@@ -401,20 +432,15 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           left: 0,
           right: 0,
           bottom: navBarBottom,
-          child: AnimatedScale(
+          child: _AnimatedCardTransform(
             duration: animDuration,
             curve: animCurve,
             scale: navBarScale,
-            alignment: Alignment.bottomCenter,
-            child: AnimatedOpacity(
-              duration: animDuration,
-              curve: animCurve,
-              opacity: navBarOpacity,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxDockWidth),
-                  child: navBarWidget,
-                ),
+            opacity: navBarOpacity,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxDockWidth),
+                child: navBarWidget,
               ),
             ),
           ),
@@ -460,5 +486,58 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     ),
   ),
 );
+  }
+}
+
+class _AnimatedCardTransform extends ImplicitlyAnimatedWidget {
+  final double scale;
+  final double opacity;
+  final Widget child;
+
+  const _AnimatedCardTransform({
+    required this.scale,
+    required this.opacity,
+    required this.child,
+    required super.duration,
+    required super.curve,
+  });
+
+  @override
+  AnimatedWidgetBaseState<_AnimatedCardTransform> createState() =>
+      _AnimatedCardTransformState();
+}
+
+class _AnimatedCardTransformState
+    extends AnimatedWidgetBaseState<_AnimatedCardTransform> {
+  Tween<double>? _scaleTween;
+  Tween<double>? _opacityTween;
+
+  @override
+  void forEachTween(TweenVisitor<dynamic> visitor) {
+    _scaleTween = visitor(
+      _scaleTween,
+      widget.scale,
+      (dynamic value) => Tween<double>(begin: value as double),
+    ) as Tween<double>?;
+    _opacityTween = visitor(
+      _opacityTween,
+      widget.opacity,
+      (dynamic value) => Tween<double>(begin: value as double),
+    ) as Tween<double>?;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentScale = _scaleTween?.evaluate(animation) ?? widget.scale;
+    final currentOpacity =
+        (_opacityTween?.evaluate(animation) ?? widget.opacity).clamp(0.0, 1.0);
+    return Transform.scale(
+      scale: currentScale,
+      alignment: Alignment.bottomCenter,
+      child: Opacity(
+        opacity: currentOpacity,
+        child: widget.child,
+      ),
+    );
   }
 }

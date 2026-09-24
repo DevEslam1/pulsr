@@ -117,15 +117,16 @@ class _LyricsViewState extends State<LyricsView> {
       if (pos == null) {
         try {
           pos = context.read<PlayerCubit>().state.position;
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Lyrics reading PlayerCubit position failed',
+              error: e, stackTrace: st, category: 'Lyrics');
+        }
       }
       if (pos != null) {
         // Defer one frame so LyricController finishes internal parse.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _updateProgress(pos!);
         });
-        // Also try immediate for fast highlight.
-        _updateProgress(pos);
       }
     } else {
       // Plain-text lyrics: clear synced controller so stale synced data
@@ -154,6 +155,7 @@ class _LyricsViewState extends State<LyricsView> {
       return 0;
     }).then((ms) {
       if (!mounted || _offsetSongPath != path) return;
+      _offsetSongPath = path;
       _applyManualOffset(ms);
     });
   }
@@ -285,6 +287,14 @@ class _LyricsViewState extends State<LyricsView> {
     if (widget.currentPosition != null &&
         widget.currentPosition != oldWidget.currentPosition) {
       _updateProgress(widget.currentPosition!);
+    } else if (lyricsChanged) {
+      Duration? pos = widget.currentPosition;
+      if (pos == null) {
+        try {
+          pos = context.read<PlayerCubit>().state.position;
+        } catch (_) {}
+      }
+      if (pos != null) _updateProgress(pos);
     }
   }
 
@@ -386,7 +396,10 @@ class _LyricsViewState extends State<LyricsView> {
       icon: Icon(icon, color: widget.activeColor, size: 20),
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      constraints: const BoxConstraints(
+        minWidth: AppSpacing.minTouchTarget,
+        minHeight: AppSpacing.minTouchTarget,
+      ),
       onPressed: onPressed,
     );
   }
@@ -419,8 +432,6 @@ class _LyricsViewState extends State<LyricsView> {
       addRepaintBoundaries: true,
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
       itemCount: widget.lyrics.length,
-      // FIX-F02: Use fixed itemExtent for lists > 100 lines to prevent layout thrash and scroll jank
-      itemExtent: widget.lyrics.length > 100 ? 36.0 : null,
       itemBuilder: (context, index) {
         final line = widget.lyrics[index];
         return Padding(
@@ -639,8 +650,8 @@ class _LyricsViewState extends State<LyricsView> {
         content = BlocListener<PlayerCubit, PlayerState>(
           listenWhen: (previous, current) {
             if (!_isSynced) return false;
-            final delta = (current.position - previous.position).inMilliseconds;
-            return delta.abs() >= 100 || delta < 0;
+            return previous.position != current.position ||
+                previous.currentSong?.id != current.currentSong?.id;
           },
           listener: (context, state) {
             _updateProgress(state.position);

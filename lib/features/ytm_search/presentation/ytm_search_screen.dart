@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
@@ -46,6 +47,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   List<String> _history = const [];
   bool _historyLoaded = false;
   bool _historyLoading = false;
+  bool _historyRefreshPending = false;
+  int _historyRetryCount = 0;
 
   @override
   void initState() {
@@ -54,26 +57,39 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   }
 
   Future<void> _refreshHistory() async {
-    // M-09: Guard against overlapping loads (initState + BlocListener).
-    if (_historyLoading) return;
+    // M-09: Guard against overlapping loads and replay pending requests.
+    if (_historyLoading) {
+      _historyRefreshPending = true;
+      return;
+    }
     _historyLoading = true;
     try {
       final items = await context.read<YtmSearchCubit>().getSearchHistory();
       if (mounted) {
+        _historyRetryCount = 0;
         setState(() {
           _history = items;
           _historyLoaded = true;
         });
       }
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to refresh YTM search history',
+          error: e, stackTrace: st, category: 'YtmSearch');
       if (mounted) {
         setState(() {
-          _history = const [];
+          _history = _history.isNotEmpty ? _history : const [];
           _historyLoaded = true;
         });
       }
     } finally {
       _historyLoading = false;
+      if (_historyRefreshPending && mounted) {
+        _historyRefreshPending = false;
+        if (_historyRetryCount < 3) {
+          _historyRetryCount++;
+          _refreshHistory();
+        }
+      }
     }
   }
 

@@ -88,6 +88,37 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     );
   }
 
+  void _autoSelectBestQuality() {
+    int updatedCount = 0;
+    for (final group in _duplicateGroups) {
+      if (group.songs.isEmpty) continue;
+      final sorted = List<SongsTableData>.from(group.songs)..sort((a, b) {
+        final aBitrate = a.bitrateKbps ?? 0;
+        final bBitrate = b.bitrateKbps ?? 0;
+        if (aBitrate != bBitrate) return bBitrate.compareTo(aBitrate);
+
+        final aIsLossless = a.path.endsWith('.flac') || a.path.endsWith('.wav');
+        final bIsLossless = b.path.endsWith('.flac') || b.path.endsWith('.wav');
+        if (aIsLossless != bIsLossless) return aIsLossless ? -1 : 1;
+
+        final aSize = a.fileSize ?? 0;
+        final bSize = b.fileSize ?? 0;
+        return bSize.compareTo(aSize);
+      });
+
+      final bestSong = sorted.first;
+      _keptSongByGroup[group.key] = bestSong.id;
+      updatedCount++;
+    }
+    setState(() {});
+    if (!mounted) return;
+    PulsrToast.show(
+      context,
+      message: 'Selected highest quality for $updatedCount groups',
+      icon: Icons.auto_awesome_rounded,
+    );
+  }
+
   Future<void> _showResolveSheet(
       DuplicateGroup group, SongsTableData song) async {
     final p = context.palette;
@@ -136,6 +167,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   void _keepSong(DuplicateGroup group, SongsTableData song) {
     setState(() => _keptSongByGroup[group.key] = song.id);
+    if (!mounted) return;
     PulsrToast.show(context,
         message: context.l10n.keepingTitle(song.title),
         icon: Icons.check_circle_rounded);
@@ -181,6 +213,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             _keptSongByGroup.remove(group.key);
           }
         });
+        if (!mounted) return;
         PulsrToast.show(context,
             message: l10n.deletedTitle(song.title),
             icon: Icons.delete_outline_rounded);
@@ -204,6 +237,16 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
+            if (_duplicateGroups.isNotEmpty)
+              IconButton(
+                icon: Icon(Icons.auto_awesome_rounded, color: p.accent),
+                tooltip: 'Keep best quality for all',
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                onPressed: _autoSelectBestQuality,
+              ),
             IconButton(
               icon: _isFetchingArtwork
                   ? SizedBox(width: AppSpacing.s20,
@@ -215,11 +258,19 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                     )
                   : Icon(Icons.image_search_rounded, color: p.textPrimary),
               tooltip: context.l10n.fetchMissingArtworkTooltip,
+              constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               onPressed: _isFetchingArtwork ? null : _fetchMissingArtwork,
             ),
             IconButton(
               icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
               tooltip: context.l10n.rescanLibrary,
+              constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               onPressed: _isScanning ? null : _scan,
             ),
           ],

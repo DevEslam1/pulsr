@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/widgets/lyrics_view.dart';
@@ -55,9 +56,10 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
     final p = context.palette;
 
     final activeColor = p.accent;
+    final inspectorWidth = (Adaptive.widthOf(context) * 0.35).clamp(280.0, 400.0);
 
     return Container(
-      width: 350,
+      width: inspectorWidth,
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(
@@ -178,8 +180,12 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                 const SizedBox(width: AppSpacing.xs),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 20),
-                  tooltip: 'Close panel',
+                  tooltip: context.l10n.close,
                   onPressed: widget.onClose,
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
               ],

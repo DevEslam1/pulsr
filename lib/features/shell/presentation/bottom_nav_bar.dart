@@ -31,6 +31,7 @@ class PulsrBottomNavBar extends StatefulWidget {
 
 class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
   double _dragDy = 0;
+  double _visualDy = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +63,13 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onVerticalDragStart: (_) => _dragDy = 0,
-              onVerticalDragUpdate: (d) => _dragDy += d.delta.dy,
+              onVerticalDragUpdate: (d) {
+                _dragDy += d.delta.dy;
+                final target = (_dragDy * 0.20).clamp(-8.0, 8.0);
+                if ((target - _visualDy).abs() > 0.5) {
+                  setState(() => _visualDy = target);
+                }
+              },
               onVerticalDragEnd: (d) {
                 final v = d.primaryVelocity ?? 0;
                 if (_dragDy > 20 || v > 80) {
@@ -71,9 +78,20 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                   widget.onSwipeUp?.call();
                 }
                 _dragDy = 0;
+                if (_visualDy != 0) {
+                  setState(() => _visualDy = 0);
+                }
               },
-              onVerticalDragCancel: () => _dragDy = 0,
-              child: SizedBox(
+              onVerticalDragCancel: () {
+                _dragDy = 0;
+                if (_visualDy != 0) {
+                  setState(() => _visualDy = 0);
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                curve: Curves.easeOutCubic,
+                transform: Matrix4.translationValues(0, _visualDy, 0),
                 height: barHeight,
                 child: Container(
                   height: barHeight,
@@ -119,24 +137,41 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                         ),
                         padding:
                             const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        child: Stack(
+                          alignment: Alignment.center,
                           children: [
-                            for (int i = 0; i < items.length; i++)
-                              Expanded(
-                                child: _NavTabItem(
-                                  item: items[i],
-                                  isSelected: widget.currentIndex == i,
-                                  p: p,
-                                  isTablet: isTablet,
-                                  onTap: () {
-                                    if (widget.currentIndex != i) {
-                                      HapticFeedback.selectionClick();
-                                      widget.onTap(i);
-                                    }
-                                  },
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Container(
+                                margin: const EdgeInsets.only(top: 2),
+                                width: 24,
+                                height: 2.5,
+                                decoration: BoxDecoration(
+                                  color: p.textTertiary.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(1.5),
                                 ),
                               ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                for (int i = 0; i < items.length; i++)
+                                  Expanded(
+                                    child: _NavTabItem(
+                                      item: items[i],
+                                      isSelected: widget.currentIndex == i,
+                                      p: p,
+                                      isTablet: isTablet,
+                                      onTap: () {
+                                        if (widget.currentIndex != i) {
+                                          HapticFeedback.selectionClick();
+                                          widget.onTap(i);
+                                        }
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -175,13 +210,16 @@ class _NavTabItem extends StatelessWidget {
       selected: isSelected,
       button: true,
       label: item.label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
-          splashColor: p.accent.withValues(alpha: 0.12),
-          highlightColor: Colors.transparent,
+      child: Tooltip(
+        message: item.label,
+        waitDuration: const Duration(milliseconds: 500),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
+            splashColor: p.accent.withValues(alpha: 0.12),
+            highlightColor: Colors.transparent,
           child: AnimatedContainer(
             duration: context.motionMs(250),
             curve: context.motionCurve(Curves.easeOutCubic),
@@ -271,10 +309,12 @@ class _NavTabItem extends StatelessWidget {
                       fontFamily:
                           Theme.of(context).textTheme.bodySmall?.fontFamily,
                     ),
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                      ),
                     ),
                   ),
                 ],
@@ -282,6 +322,7 @@ class _NavTabItem extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

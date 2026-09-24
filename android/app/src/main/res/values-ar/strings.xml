@@ -4,16 +4,37 @@
     <string name="widget_album_artwork">غلاف الألبوم</string>
     <string name="widget_nothing_playing">لا شيء قيد التشغيل</string>
     <string name="widget_toggle_favorite">تبديل المفضلة</string>
+    <string name="widget_favorite_add">إضافة إلى المفضلة</string>
+    <string name="widget_favorite_remove">إزالة من المفضلة</string>
     <string name="widget_previous">السابق</string>
     <string name="widget_play_pause">تشغيل/إيقاف</string>
+    <string name="widget_play">تشغيل</string>
+    <string name="widget_pause">إيقاف مؤقت</string>
     <string name="widget_next">التالي</string>
     <string name="widget_rewind_10s">رجوع 10 ثوانٍ</string>
     <string name="widget_forward_10s">تقديم 10 ثوانٍ</string>
     <string name="widget_shuffle">عشوائي</string>
+    <string name="widget_shuffle_enable">تفعيل التشغيل العشوائي</string>
+    <string name="widget_shuffle_disable">تعطيل التشغيل العشوائي</string>
     <string name="widget_repeat">تكرار</string>
+    <string name="widget_repeat_off">إيقاف التكرار</string>
+    <string name="widget_repeat_all">تكرار الكل</string>
+    <string name="widget_repeat_one">تكرار مقطع واحد</string>
+    <string name="widget_seek_to">تقديم إلى %1$d%%</string>
+    <string name="widget_now_playing_state">قيد التشغيل الآن: %1$s بواسطة %2$s</string>
     <string name="widget_queue_icon">أيقونة قائمة الانتظار</string>
     <string name="widget_up_next">التالي</string>
     <string name="widget_no_upcoming_tracks">لا توجد مقاطع قادمة</string>
+
+    <!-- Playback notification & channel (BUG-013) -->
+    <string name="playback_channel_name">عناصر التحكم في التشغيل</string>
+    <string name="playback_channel_description">يعرض عناصر التحكم في المقطع الحالي</string>
+
+    <!-- Notification permission (BUG-003) -->
+    <string name="notification_permission_title">السماح بإشعارات Pulsr</string>
+    <string name="notification_permission_rationale">تتيح الإشعارات التحكم في التشغيل ومتابعة التنزيلات.</string>
+    <string name="notification_permission_settings">فتح الإعدادات</string>
+    <string name="notification_permission_not_now">ليس الآن</string>
 
     <!-- Download foreground-service notification (C-6) -->
     <string name="download_channel_name">التنزيلات</string>
@@ -21,6 +42,14 @@
     <string name="download_notification_default_title">جارٍ التنزيل</string>
     <string name="download_notification_downloads">التنزيلات</string>
     <string name="download_notification_count">%1$d تنزيلات</string>
+    <plurals name="download_notification_count">
+        <item quantity="zero">لا توجد تنزيلات</item>
+        <item quantity="one">تنزيل واحد</item>
+        <item quantity="two">تنزيلان</item>
+        <item quantity="few">%1$d تنزيلات</item>
+        <item quantity="many">%1$d تنزيلاً</item>
+        <item quantity="other">%1$d تنزيل</item>
+    </plurals>
     <string name="download_notification_preparing">جارٍ التحضير للتنزيل…</string>
     <string name="download_notification_progress">%1$d%% • جارٍ التنزيل</string>
     <string name="download_notification_paused">%1$d%% • متوقف مؤقتًا</string>

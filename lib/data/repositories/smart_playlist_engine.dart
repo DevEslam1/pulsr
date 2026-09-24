@@ -266,9 +266,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       case SmartRuleField.dateAdded:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffSec =
-              DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
-          return t.dateAdded.isBiggerOrEqualValue(cutoffSec);
+          final nowMs = DateTime.now().millisecondsSinceEpoch;
+          final cutoffSec = (nowMs ~/ 1000) - (days * 86400);
+          final cutoffMs = nowMs - (days * 86400 * 1000);
+          return (t.dateAdded.isSmallerOrEqualValue(10000000000) &
+                  t.dateAdded.isBiggerOrEqualValue(cutoffSec)) |
+              (t.dateAdded.isBiggerThanValue(10000000000) &
+                  t.dateAdded.isBiggerOrEqualValue(cutoffMs));
         }
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);

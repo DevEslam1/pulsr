@@ -55,9 +55,22 @@ class _QuranModePanelState extends State<QuranModePanel> {
   Future<EarbudCapabilities>? _capsFuture;
 
   @override
+  void initState() {
+    super.initState();
+    _capsFuture = context.read<PlayerCubit>().detectEarbudCapabilities();
+  }
+
+  void _refreshCaps() {
+    if (mounted) {
+      setState(() {
+        _capsFuture = context.read<PlayerCubit>().detectEarbudCapabilities();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    _capsFuture ??= context.read<PlayerCubit>().detectEarbudCapabilities();
 
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (a, b) =>
@@ -245,13 +258,26 @@ class _QuranModePanelState extends State<QuranModePanel> {
             // Detected output hardware
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: Text(context.l10n.outputHardware,
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: AppTracking.overline,
-                  )),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(context.l10n.outputHardware,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: AppTracking.overline,
+                      )),
+                  GestureDetector(
+                    onTap: _refreshCaps,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xxs),
+                      child: Icon(Icons.refresh_rounded, size: 14, color: p.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: AppSpacing.xs),
             Padding(

@@ -17,9 +17,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // play. The gapless engine instead sets a non-preloaded concat at restore,
     // so play() below prepares and starts it lazily with no special-casing.
     final pending = _pendingLazyPosition;
-    if (pending != null && currentSong != null && !_gaplessMode) {
+    if (pending != null && currentSong != null) {
       _pendingLazyPosition = null;
-      return playSongAt(_currentIndex, initialPosition: pending);
+      if (!_gaplessMode) {
+        return playSongAt(_currentIndex, initialPosition: pending);
+      } else if (!_gaplessLoaded) {
+        return _loadGaplessQueue(initialPosition: pending, preload: true);
+      }
     }
     final generation = _playGeneration;
     final player = _activePlayer;
@@ -69,7 +73,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     final stillLoading = playerState == ProcessingState.loading ||
         playerState == ProcessingState.buffering ||
         playerState == ProcessingState.idle;
-    if (stillLoading && !_gaplessMode) {
+    if (stillLoading) {
       _playGeneration++;
       cancelPrefetches();
       _pendingLazyPosition = _activePlayer.position;
@@ -81,6 +85,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> seek(Duration position) async {
     ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s',
         category: 'player');
+    try {
+      unawaited(HapticFeedback.selectionClick());
+    } catch (_) {
+      // Haptics are best-effort across platforms
+    }
     // Optimistic UI: emit locally first so the slider feels instant,
     // then debounce the backend call to avoid jitter during scrubbing.
     // NOTE: PlayerCubit already throttles scrub floods (100ms). This layer
@@ -151,6 +160,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> skipToNext() async {
     ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
+    try {
+      unawaited(HapticFeedback.lightImpact());
+    } catch (_) {
+      // Haptics are best-effort across platforms
+    }
     // Invalidate stale prefetch completions; the manual playSongAt path below
     // captures its own _playGeneration token (no double-bump here).
     cancelPrefetches();
@@ -240,6 +254,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async {
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
+    try {
+      unawaited(HapticFeedback.lightImpact());
+    } catch (_) {
+      // Haptics are best-effort across platforms
+    }
     cancelPrefetches();
     _isManualSkip = true;
     _rapidGaplessChangeCount = 0;
@@ -389,27 +408,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> _performHeadsetAction(int count) async {
-    HeadsetClickAction action = HeadsetClickAction.playPause;
-    int seekSecs = 10;
-    try {
-      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
-      final key = count <= 1
-          ? PrefsKeys.headsetSingleClick
-          : count == 2
-              ? PrefsKeys.headsetDoubleClick
-              : PrefsKeys.headsetTripleClick;
-      final fallback = count <= 1
-          ? HeadsetClickAction.playPause
-          : count == 2
-              ? HeadsetClickAction.next
-              : HeadsetClickAction.previous;
-      final raw = prefs.getString(key);
-      action = raw == null ? fallback : HeadsetClickAction.fromWire(raw);
-      if (action == HeadsetClickAction.none && raw != 'none') {
-        action = fallback;
-      }
-      seekSecs = (prefs.getInt(PrefsKeys.headsetSeekSeconds) ?? 10).clamp(5, 60);
-    } catch (_) {}
+    final config = cachedHeadsetConfig ?? HeadsetControlConfig.defaults;
+    final action = config.actionForCount(count);
+    final seekSecs = config.seekSeconds;
     switch (action) {
       case HeadsetClickAction.playPause:
         if (_activePlayer.playing) {
@@ -425,7 +426,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         await skipToPrevious();
         break;
       case HeadsetClickAction.stop:
-        await stop();
+        await pause();
+        try {
+          final session = await AudioSession.instance;
+          await session.setActive(false);
+        } catch (_) {}
         break;
       case HeadsetClickAction.seekForward:
         await seekRelative(Duration(seconds: seekSecs));
@@ -449,6 +454,26 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       if (dur != null && target > dur) target = dur;
       await seek(target);
     } catch (_) {}
+  }
+
+  @override
+  Future<void> rewind() async {
+    await seekRelative(const Duration(seconds: -10));
+  }
+
+  @override
+  Future<void> fastForward() async {
+    await seekRelative(const Duration(seconds: 10));
+  }
+
+  @override
+  Future<void> seekBackward(bool begin) async {
+    if (begin) await seekRelative(const Duration(seconds: -10));
+  }
+
+  @override
+  Future<void> seekForward(bool begin) async {
+    if (begin) await seekRelative(const Duration(seconds: 10));
   }
 
   double get minPlaybackSpeed =>
@@ -497,6 +522,19 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           _playerB.setPitch(clampedPitch),
         ]);
       }
+    } catch (_) {}
+  }
+
+  Future<void> restorePersistedPitch() async {
+    try {
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      final savedPitch = prefs.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
+      final clampedPitch = savedPitch.clamp(0.5, 2.0);
+      _pitch = clampedPitch;
+      await Future.wait([
+        _playerA.setPitch(clampedPitch),
+        _playerB.setPitch(clampedPitch),
+      ]);
     } catch (_) {}
   }
 
@@ -1178,4 +1216,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   // Requires: provided by the composing class (same library).
   int get _lastGaplessIndex;
   set _lastGaplessIndex(int value);
+
+  // Requires: provided by the composing class (same library).
+  HeadsetControlConfig? get cachedHeadsetConfig;
+  set cachedHeadsetConfig(HeadsetControlConfig? value);
 }

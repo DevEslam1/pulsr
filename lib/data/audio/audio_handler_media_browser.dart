@@ -2,9 +2,18 @@ part of 'audio_handler.dart';
 
 mixin PulsrAudioMediaBrowser on BaseAudioHandler {
   MediaItem _fastSongToMediaItem(SongsTableData song) {
-    final artUri = song.artworkUri != null
-        ? Uri.tryParse(song.artworkUri!)
-        : (song.remoteArtworkUrl != null ? Uri.tryParse(song.remoteArtworkUrl!) : null);
+    Uri? artUri = ArtworkUriResolver.getCachedArtworkUri(song.id);
+    if (artUri == null && song.albumId != null) {
+      artUri = ArtworkUriResolver.getCachedAlbumArtUri(song.albumId!);
+    }
+    if (artUri == null && song.artworkUri != null) {
+      final parsed = Uri.tryParse(song.artworkUri!);
+      if (parsed != null && parsed.hasScheme) artUri = parsed;
+    }
+    if (artUri == null && song.remoteArtworkUrl != null) {
+      final parsed = Uri.tryParse(song.remoteArtworkUrl!);
+      if (parsed != null && parsed.hasScheme) artUri = parsed;
+    }
     return PulsrAudioHandler._songToMediaItem(song, artUri);
   }
 
@@ -16,6 +25,7 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       case 'root_recent':
         final recentRes = await _repository.getRecentlyPlayed();
         final list = recentRes.fold((l) => <SongsTableData>[], (r) => r);
+        _warmArtworkAsync(list);
         return list.map(_fastSongToMediaItem).toList();
 
       case 'root':
@@ -76,6 +86,7 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       case 'root_songs':
         final songsRes = await _repository.getAllSongs();
         final list = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+        _warmArtworkAsync(list);
         return list.map(_fastSongToMediaItem).toList();
 
       case 'albums':
@@ -141,6 +152,7 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       case 'root_favorites':
         final favoritesRes = await _repository.getFavorites();
         final list = favoritesRes.fold((l) => <SongsTableData>[], (r) => r);
+        _warmArtworkAsync(list);
         return list.map(_fastSongToMediaItem).toList();
 
       default:
@@ -179,7 +191,7 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
         if (parentMediaId == 'ytm_trending') {
           if (!AppConfig.ytmEnabled) return [];
           try {
-            final ytmTracks = await _ytmService.search('trending music');
+            final ytmTracks = await _ytmService.trending(limit: 30);
             return ytmTracks.map((t) {
               final song = t.toSongData();
               return PulsrAudioHandler._songToMediaItem(song,
@@ -467,6 +479,16 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
 
 
 
+
+  void _warmArtworkAsync(List<SongsTableData> songs, {int limit = 30}) {
+    unawaited(() async {
+      for (final song in songs.take(limit)) {
+        if (ArtworkUriResolver.getCachedArtworkUri(song.id) == null) {
+          await ArtworkUriResolver.resolveArtworkUri(song);
+        }
+      }
+    }());
+  }
 
   // Requires: provided by the composing class (same library).
   AudioPlayer get _activePlayer;

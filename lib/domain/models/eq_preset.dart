@@ -190,6 +190,7 @@ class EqPreset {
       _logSpread(64, const [20.0, 20000.0]);
 
   /// The 5-band centers used before 10-band migration.
+  @Deprecated('Used solely for backward compatibility migrations from 5-band EQ presets')
   static const List<double> legacyFrequencies = [60, 230, 910, 3600, 14000];
 
   /// Maps [source] gains onto target frequencies (defaults to [targetFrequencies] or 10-band).

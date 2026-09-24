@@ -20,15 +20,21 @@ class PlaybackVolumeController {
   double _duckFactor = 0.2;
   bool _isDopActive = false;
   bool _nativeRgActive = false;
+  bool _dvcEnabled = false;
 
   double get userVolume => _userVolume;
   String get replayGainMode => _replayGainMode;
   bool get isDucked => _isDucked;
   bool get isDopActive => _isDopActive;
   bool get nativeRgActive => _nativeRgActive;
+  bool get dvcEnabled => _dvcEnabled;
 
   void setDopActive(bool active) {
     _isDopActive = active;
+  }
+
+  void setDvcEnabled(bool enabled) {
+    _dvcEnabled = enabled;
   }
 
   /// Mirrors [PulsrAudioHandler.isNativeRgActive]: when true the native DSP
@@ -65,13 +71,15 @@ class PlaybackVolumeController {
     // to avoid corrupting 0x05 / 0xFA marker bits into white noise.
     if (_isDopActive) return 1.0;
 
+    final effectiveUserVolume = _dvcEnabled ? 1.0 : _userVolume;
     if (song == null) {
-      return _isDucked ? (_userVolume * _duckFactor) : _userVolume;
+      return _isDucked ? (effectiveUserVolume * _duckFactor) : effectiveUserVolume;
     }
 
-    final baseVolume = _isDucked ? (_userVolume * _duckFactor) : _userVolume;
+    final baseVolume =
+        _isDucked ? (effectiveUserVolume * _duckFactor) : effectiveUserVolume;
     // Native pre-gain owns RG: keep the mixer at user volume (+ per-song).
-    final rgVolume = _nativeRgActive
+    final rgVolume = (_nativeRgActive || (_dvcEnabled && _nativeRgActive))
         ? baseVolume
         : ReplayGainMath.apply(
             mode: _replayGainMode,

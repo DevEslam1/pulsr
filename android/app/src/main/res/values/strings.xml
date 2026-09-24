@@ -7,16 +7,38 @@
     <string name="widget_album_artwork">Album Artwork</string>
     <string name="widget_nothing_playing">Nothing playing</string>
     <string name="widget_toggle_favorite">Toggle Favorite</string>
+    <string name="widget_favorite_add">Add to favorites</string>
+    <string name="widget_favorite_remove">Remove from favorites</string>
     <string name="widget_previous">Previous</string>
     <string name="widget_play_pause">Play/Pause</string>
+    <string name="widget_play">Play</string>
+    <string name="widget_pause">Pause</string>
     <string name="widget_next">Next</string>
     <string name="widget_rewind_10s">Rewind 10s</string>
     <string name="widget_forward_10s">Forward 10s</string>
     <string name="widget_shuffle">Shuffle</string>
+    <string name="widget_shuffle_enable">Enable shuffle</string>
+    <string name="widget_shuffle_disable">Disable shuffle</string>
     <string name="widget_repeat">Repeat</string>
+    <string name="widget_repeat_off">Repeat off</string>
+    <string name="widget_repeat_all">Repeat all</string>
+    <string name="widget_repeat_one">Repeat one</string>
+    <string name="widget_seek_to">Seek to %1$d%%</string>
+    <string name="widget_now_playing_state">Now playing: %1$s by %2$s</string>
     <string name="widget_queue_icon">Queue Icon</string>
     <string name="widget_up_next">UP NEXT</string>
     <string name="widget_no_upcoming_tracks">No upcoming tracks</string>
+
+    <!-- Playback notification & channel (BUG-013) -->
+    <string name="playback_channel_name">Playback controls</string>
+    <string name="playback_channel_description">Shows controls for the current track</string>
+    <string name="playback_channel_id" translatable="false">playback_controls</string>
+
+    <!-- Notification permission (BUG-003) -->
+    <string name="notification_permission_title">Allow Pulsr notifications</string>
+    <string name="notification_permission_rationale">Notifications let you control playback and monitor downloads.</string>
+    <string name="notification_permission_settings">Open settings</string>
+    <string name="notification_permission_not_now">Not now</string>
 
     <!-- Download foreground-service notification (C-6) -->
     <string name="download_channel_name">Downloads</string>
@@ -24,6 +46,10 @@
     <string name="download_notification_default_title">Downloading</string>
     <string name="download_notification_downloads">Downloads</string>
     <string name="download_notification_count">%1$d downloads</string>
+    <plurals name="download_notification_count">
+        <item quantity="one">%1$d download</item>
+        <item quantity="other">%1$d downloads</item>
+    </plurals>
     <string name="download_notification_preparing">Preparing download…</string>
     <string name="download_notification_progress">%1$d%% • Downloading</string>
     <string name="download_notification_paused">%1$d%% • Paused</string>

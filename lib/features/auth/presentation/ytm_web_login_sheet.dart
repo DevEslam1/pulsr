@@ -43,21 +43,29 @@ class YtmWebLoginSheet extends StatefulWidget {
     this.isBrowseMode = false,
   });
 
+  static bool _isShowing = false;
+
   static Future<bool?> show(
     BuildContext context, {
     String? initialUrl,
     String? title,
     bool isBrowseMode = false,
-  }) {
-    return PulsrSheetHelper.showPulsrSheet<bool>(
-      context: context,
-      enableDrag: false,
-      builder: (_) => YtmWebLoginSheet(
-        initialUrl: initialUrl,
-        title: title,
-        isBrowseMode: isBrowseMode,
-      ),
-    );
+  }) async {
+    if (_isShowing) return null;
+    _isShowing = true;
+    try {
+      return await PulsrSheetHelper.showPulsrSheet<bool>(
+        context: context,
+        enableDrag: false,
+        builder: (_) => YtmWebLoginSheet(
+          initialUrl: initialUrl,
+          title: title,
+          isBrowseMode: isBrowseMode,
+        ),
+      );
+    } finally {
+      _isShowing = false;
+    }
   }
 
   /// Generates hardened [InAppWebViewSettings] ensuring strict sandboxing:
@@ -135,6 +143,8 @@ class YtmWebLoginSheet extends StatefulWidget {
   State<YtmWebLoginSheet> createState() => _YtmWebLoginSheetState();
 }
 
+enum _AuthPollState { idle, polling, cooldown, dead, done }
+
 class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   InAppWebViewController? _webViewController;
   InAppWebViewSettings? _settings;
@@ -147,18 +157,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   String _resolvedUserAgent = EmbeddedBrowserUa.mobile;
 
   /// Set once the native WebView behind [_webViewController] has been torn down.
-  ///
-  /// The controller is a Dart handle onto a per-instance platform channel
-  /// (`com.pichillilorenzo/flutter_inappwebview_<id>`). When the platform view
-  /// goes away — a hot restart, the engine reclaiming the view while the sheet is
-  /// still mounted — the handle stays non-null and every call on it throws
-  /// `MissingPluginException`. The auth poll calls `getUrl()` every few seconds,
-  /// so it threw on each tick, filed a crash report for each throw and then
-  /// rescheduled itself, forever: an endless stream of
-  /// `MissingPluginException(No implementation found for method getUrl …)` in the
-  /// log and a poll loop that could never recover. Recording it once lets the
-  /// loop stop and lets `onWebViewCreated` restart it against the new instance.
   bool _webViewGone = false;
+  _AuthPollState _pollState = _AuthPollState.idle;
+  int _deadHandleHits = 0;
+  static const int _maxDeadHandleHits = 3;
 
   bool _disposed = false;
 
@@ -173,12 +175,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// callers stop retrying) and crash-reports everything else as before.
   void _handleWebViewError(String context, Object error, StackTrace stack) {
     if (_isWebViewGoneError(error)) {
+      _pollState = _AuthPollState.dead;
+      _deadHandleHits++;
       if (!_webViewGone) {
         _webViewGone = true;
         _webViewController = null;
-        _authPollTimer?.cancel();
+        _cancelAllTimers();
         debugPrint(
-            '[YtmWebLogin] native WebView is gone ($context) — pausing auth poll');
+            '[YtmWebLogin] native WebView is gone ($context, hits: $_deadHandleHits) — pausing auth poll');
+        if (mounted) setState(() {});
       }
       return;
     }
@@ -568,9 +573,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _settings = YtmWebLoginSheet.buildDefaultSettings(userAgent: initialUa);
 
     _hintTimer = Timer(const Duration(seconds: 30), () {
-      if (mounted && !_isLoggedIn && !widget.isBrowseMode) {
-        setState(() => _showHint = true);
-      }
+      if (_disposed || !mounted || _webViewGone || _isLoggedIn || widget.isBrowseMode) return;
+      setState(() => _showHint = true);
     });
 
     _pollIntervalSeconds = 2;
@@ -611,32 +615,38 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   void _scheduleNextAuthPoll() {
     _authPollTimer?.cancel();
-    if (_disposed || !mounted || _isLoggedIn || _webViewGone) return;
+    if (_disposed || !mounted || _isLoggedIn || _webViewGone || _pollState == _AuthPollState.dead || _pollState == _AuthPollState.done) return;
     if (_authPollAttempts >= _maxPollAttempts) {
       debugPrint('[YtmWebLogin] Max poll attempts reached, stopping.');
+      _pollState = _AuthPollState.idle;
       return;
     }
     _authPollAttempts++;
+    _pollState = _AuthPollState.polling;
     final generation = ++_pollGeneration;
-    // Nothing to poll: every call would throw MissingPluginException on the dead
-    // handle. `onWebViewCreated` restarts the loop when a live one arrives.
 
     _authPollTimer = Timer(Duration(seconds: _pollIntervalSeconds), () async {
-      // FIX-H10: Early _disposed and generation check
-      if (_disposed || !mounted || _isLoggedIn || _webViewGone || generation != _pollGeneration) return;
+      if (_disposed) return;
+      if (!mounted || _isLoggedIn || _webViewGone || generation != _pollGeneration || _pollState == _AuthPollState.dead) return;
       if (_webViewController != null && !_isLoading) {
         final loggedIn = await _checkIfLoggedIn();
         if (_disposed || !mounted || generation != _pollGeneration) return;
-        if (loggedIn) return;
-        // _checkIfLoggedIn may have discovered the handle is dead.
-        if (_disposed || _webViewGone || _webViewController == null || generation != _pollGeneration) return;
+        if (loggedIn) {
+          _pollState = _AuthPollState.done;
+          return;
+        }
+        if (_disposed || _webViewGone || _webViewController == null || generation != _pollGeneration) {
+          _pollState = _AuthPollState.dead;
+          return;
+        }
 
         // Check for Google block during polling (detects SPA client-side rejections after tapping Next)
         if (!widget.isBrowseMode && !_blockExhausted && _blockStatus == null) {
-          // Skip block scan during post-recovery cooldown to prevent re-detection
-          // of the same block page before the new page has finished loading.
           final inCooldown = _blockCooldownStopwatch.isRunning &&
               _blockCooldownStopwatch.elapsed < const Duration(seconds: 8);
+          if (inCooldown) {
+            _pollState = _AuthPollState.cooldown;
+          }
           final isBlocked = (!inCooldown && _shouldScanForBlockPage())
               ? await _scanPageForBlockText(_webViewController!)
               : false;
@@ -647,6 +657,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           }
         }
       }
+      if (_disposed || !mounted) return;
       if (_pollIntervalSeconds < 3) {
         _pollIntervalSeconds = 3;
       } else if (_pollIntervalSeconds < 5) {
@@ -660,15 +671,22 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     });
   }
 
+  void _cancelAllTimers() {
+    _hintTimer?.cancel();
+    _hintTimer = null;
+    _authPollTimer?.cancel();
+    _authPollTimer = null;
+    _cookieMismatchDebounce?.cancel();
+    _cookieMismatchDebounce = null;
+  }
+
   @override
   void dispose() {
+    _cancelAllTimers();
     _disposed = true;
     _webViewGone = true;
     _blockCooldownStopwatch.stop();
     _lastBlockScanStopwatch.stop();
-    _hintTimer?.cancel();
-    _authPollTimer?.cancel();
-    _cookieMismatchDebounce?.cancel();
     _progressNotifier.dispose();
     _webViewController = null;
     super.dispose();
@@ -708,8 +726,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     }
 
     _cookieMismatchDebounce?.cancel();
+    if (_disposed || !mounted) return;
     _cookieMismatchDebounce = Timer(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
+      if (!mounted || _disposed || _webViewGone) return;
       _mismatchAutoNavCount++;
       final target =
           widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
@@ -1817,11 +1836,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         if (!_isLoading && progress >= 1.0) {
                           return const SizedBox.shrink();
                         }
-                        return LinearProgressIndicator(
-                          value: _isLoading ? null : progress,
-                          backgroundColor: p.surfaceContainer,
-                          color: p.accent,
-                          minHeight: 2.5,
+                        return Semantics(
+                          label: 'Page loading progress',
+                          value: _isLoading ? null : '${(progress * 100).round()}%',
+                          child: LinearProgressIndicator(
+                            value: _isLoading ? null : progress,
+                            backgroundColor: p.surfaceContainer,
+                            color: p.accent,
+                            minHeight: 2.5,
+                          ),
                         );
                       },
                     ),
@@ -1839,7 +1862,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           )
                         : (!isBrowse && _blockExhausted)
                             ? _buildBlockRecoveryCard(p)
-                            : ClipRRect(
+                            : (_webViewGone || _deadHandleHits >= _maxDeadHandleHits)
+                                ? _buildDeadWebViewCard(p)
+                                : ClipRRect(
                       child: InAppWebView(
                         initialUrlRequest: URLRequest(
                           url: WebUri(_currentUrl),
@@ -2194,6 +2219,59 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDeadWebViewCard(PulsrPalette p) {
+    const sessionInterruptedTitle = 'Web Session Interrupted';
+    const sessionInterruptedDesc =
+        'The web view handle was detached or reclaimed by the system. Tap below to reload the session.';
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sync_problem_rounded, color: p.warning, size: 48),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              sessionInterruptedTitle,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.title,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              sessionInterruptedDesc,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.caption,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() {
+                  _deadHandleHits = 0;
+                  _webViewGone = false;
+                  _pollState = _AuthPollState.idle;
+                  _pollIntervalSeconds = 2;
+                  _authPollAttempts = 0;
+                });
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(context.l10n.retry),
+              style: FilledButton.styleFrom(
+                backgroundColor: p.accent,
+                foregroundColor: p.onAccent,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -6,8 +6,8 @@
         <domain includeSubdomains="false">localhost</domain>
     </domain-config>
 
-    <!-- Allow cleartext traffic for audio playback (e.g. Icecast/Shoutcast internet radio streams) -->
-    <base-config cleartextTrafficPermitted="true">
+    <!-- Allow cleartext traffic for audio playback (e.g. Icecast/Shoutcast internet radio streams) restricted by default -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

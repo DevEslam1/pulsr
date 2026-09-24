@@ -6,6 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 
@@ -153,7 +154,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        "DAC Sample Rate Switch",
+                        context.l10n.dacRateSwitchTitle,
                         style: TextStyle(
                           color: p.textPrimary,
                           fontSize: AppFontSize.title,
@@ -165,7 +166,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Your DAC supports $supportedStr kHz, but the current track is $trackStr kHz.',
+                  context.l10n.dacRateSwitchBody(supportedStr, trackStr),
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: AppFontSize.body,
@@ -189,7 +190,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                       const SizedBox(width: AppSpacing.xs),
                       Expanded(
                         child: Text(
-                          'Resample to $targetStr kHz for bit-perfect output?',
+                          context.l10n.dacRateSwitchResample(targetStr),
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: AppFontSize.caption,
@@ -223,7 +224,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
-                            "Always auto-switch in the future",
+                            context.l10n.dacRateSwitchRemember,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.caption,
@@ -248,7 +249,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                             borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),
                         ),
-                        child: const Text("Cancel"),
+                        child: Text(context.l10n.cancel),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
@@ -265,7 +266,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                           ),
                         ),
                         child: Text(
-                          'Switch ($targetStr k)',
+                          context.l10n.dacRateSwitchConfirm(targetStr),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),

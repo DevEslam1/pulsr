@@ -4447,6 +4447,129 @@
   "nowPlayingSwipeHint": "Pull down to close - Swipe art to skip",
   "vinylDirectDrive": "STUDIO • DIRECT DRIVE",
   "cassetteSideA": "SIDE A • TYPE II (CrO2)",
-  "cassettePulsrTape": "PULSR TAPE",
-  "vinylSpeedRpm": "33⅓ RPM"
+  "vinylSpeedRpm": "33⅓ RPM",
+  "exclusiveUsbActive": "Exclusive USB Active",
+  "underrunsCount": "{count} underruns",
+  "@underrunsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dspEngineTelemetry": "DSP Engine Telemetry",
+  "rtfPercent": "RTF: {pct}%",
+  "@rtfPercent": {
+    "placeholders": {
+      "pct": {
+        "type": "String"
+      }
+    }
+  },
+  "limiterReduction": "Limiter Reduction",
+  "multibandCompReduction": "Multiband Comp Reduction",
+  "dynamicEqAdjustments": "Dynamic EQ Adjustments",
+  "resetWeeklyDoseTitle": "Reset Weekly Sound Dose?",
+  "resetWeeklyDoseDesc": "This will reset your accumulated acoustic exposure counter to 0% and lift safety attenuation. Only reset if starting a new monitoring week or switching listening environments.",
+  "resetDoseAction": "Reset Dose",
+  "weeklyDoseResetSnackbar": "Weekly sound dose has been reset to 0.0%",
+  "headphoneSafetyTitle": "Headphone Safety & Dose",
+  "headphoneSafetyStandard": "WHO-ITU H.870 / EN 62368-1 Acoustic Standard",
+  "weeklySoundAllowance": "Weekly Sound Allowance",
+  "safetyLimiterActiveDesc": "Safety Limiter Active (-6 dBFS ceiling engaged to prevent hearing damage)",
+  "highSoundDoseWarning": "High sound dose: Consider reducing volume to protect hearing",
+  "optimalExposureDesc": "Optimal exposure: Safe listening levels within 40-hour allowance",
+  "latencySyncDiagnostics": "Latency & Sync Diagnostics",
+  "latencySyncDiagnosticsDesc": "Real-time output and processing delay metrics reported directly from native hardware sinks.",
+  "dspPipelineDelay": "DSP Pipeline Delay",
+  "dspPipelineDelayDesc": "Lookahead Limiter + Resampler group delay + Reverb partitioned delay",
+  "usbBufferedDelay": "USB Hardware Buffered Delay",
+  "usbBufferedDelayDesc": "Ring buffer occupancy + URB kernel queue slack",
+  "totalMonitoredLatency": "Total Monitored Latency",
+  "totalMonitoredLatencyDesc": "Sum of active digital processing & hardware buffering",
+  "directUsbExclusivePath": "Direct USB Exclusive Path",
+  "lowLatencyDirectOutput": "Low-Latency Direct Output",
+  "dacRateSwitchTitle": "DAC Sample Rate Switch",
+  "dacRateSwitchBody": "Your DAC supports {supported} kHz, but the current track is {track} kHz.",
+  "@dacRateSwitchBody": {
+    "placeholders": {
+      "supported": {
+        "type": "String"
+      },
+      "track": {
+        "type": "String"
+      }
+    }
+  },
+  "dacRateSwitchResample": "Resample to {target} kHz for bit-perfect output?",
+  "@dacRateSwitchResample": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "dacRateSwitchRemember": "Always auto-switch in the future",
+  "dacRateSwitchConfirm": "Switch ({target} k)",
+  "@dacRateSwitchConfirm": {
+    "placeholders": {
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "miniPlayerSwipeHint": "Swipe left/right to skip",
+  "phoneSpeaker": "Phone Speaker",
+  "usbDacNoneAttached": "USB DAC: None attached",
+  "directPlaybackNotReported": "DIRECT PLAYBACK: Not reported",
+  "directPlaybackUpTo": "DIRECT PLAYBACK: Up to {rate} Hz / {bits}",
+  "@directPlaybackUpTo": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      },
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "activeSystemOutputDesc": "Active system output device • Up to {rate} kHz / {bits}-bit",
+  "@activeSystemOutputDesc": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      },
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "deviceOutputSpecsDesc": "{typeName} • Up to {rate} kHz / {bits}-bit",
+  "@deviceOutputSpecsDesc": {
+    "placeholders": {
+      "typeName": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "bits": {
+        "type": "String"
+      }
+    }
+  },
+  "bpDirectActiveUsb": "Hardware direct pass-through active on USB DAC",
+  "bpDirectActiveWired": "Hardware direct pass-through active (wired direct)",
+  "bpPassThroughArmed": "Pass-through armed • Engages automatically when capable DAC is connected",
+  "bpBypassesAndroidMixer": "Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)",
+  "settingsResultsCount": "{count, plural, =1{1 setting found} other{{count} settings found}}",
+  "@settingsResultsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cassettePulsrTape": "PULSR C-90",
+  "statusCancelled": "Cancelled"
 }
