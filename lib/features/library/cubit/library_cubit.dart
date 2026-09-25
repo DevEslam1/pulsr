@@ -145,8 +145,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         excludedFolders: excluded,
       ),
       (result) {
+        if (isClosed || t != _songsToken) return;
         result.fold(
           (failure) {
+            if (isClosed || t != _songsToken) return;
             _isLoadingMoreSongs = false;
             safeEmit(state.copyWith(
                 errorMessage: failure.message,
@@ -154,12 +156,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 isLoadingMore: false));
           },
           (songs) async {
+            if (isClosed || t != _songsToken) return;
             if (isRatingSort) {
               _hasMoreSongs = false;
               _isLoadingMoreSongs = false;
               final hasHitCap = songs.length >= ratingSortCap;
               final sortedSongs = await _sortByRating(songs, ascending: state.ascending);
-              if (isClosed) return;
+              if (isClosed || t != _songsToken) return;
               // FIX-M02: Emit 5,000-cap notice as informational message rather than error
               safeEmit(state.copyWith(
                   songs: sortedSongs,
@@ -171,9 +174,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                   isLoadingMore: false));
               return;
             }
-              // Hitting the cap means the DB may hold more rows.
-              _hasMoreSongs = !isRatingSort && songs.length >= window;
+            // Hitting the cap means the DB may hold more rows.
+            _hasMoreSongs = !isRatingSort && songs.length >= window;
             _isLoadingMoreSongs = false;
+            if (isClosed || t != _songsToken) return;
             safeEmit(state.copyWith(
                 songs: songs,
                 errorMessage: null,

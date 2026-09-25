@@ -63,9 +63,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     }
   }
 
-  // FIX-M8: Guard against totalCount <= 1 to prevent division by zero in calculations
+  // FIX-M8 / H-07: Guard against totalCount <= 0 and <= 1 to prevent division by zero
   ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
-    if (totalCount <= 1) return (startIndex: 0, visibleCount: totalCount);
+    if (totalCount <= 0) return (startIndex: 0, visibleCount: 0);
+    if (totalCount == 1) return (startIndex: 0, visibleCount: 1);
     final int visibleCount = (totalCount /
             _zoomScale.clamp(PlayerConstants.waveformMinZoom,
                 PlayerConstants.waveformMaxZoom))

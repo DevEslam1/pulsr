@@ -394,23 +394,44 @@ class _RecentsScreenState extends State<RecentsScreen> {
                     ),
                   ),
                 ),
-              if (_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty)
+              if ((_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty) ||
+                  _historyLimit > _persistedHistoryLimit)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                     child: Center(
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.expand_more_rounded),
-                        label: Text(context.l10n.loadMoreHistory),
-                        onPressed: () {
-                          if (allRecents.length < _historyLimit) {
-                            setState(() => _hasMore = false);
-                            return;
-                          }
-                          setState(() {
-                            _historyLimit = (_historyLimit + 100).clamp(_persistedHistoryLimit, _maxHistoryLimit);
-                          });
-                        },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty)
+                            TextButton.icon(
+                              icon: const Icon(Icons.expand_more_rounded),
+                              label: Text(context.l10n.loadMoreHistory),
+                              onPressed: () {
+                                if (allRecents.length < _historyLimit) {
+                                  setState(() => _hasMore = false);
+                                  return;
+                                }
+                                setState(() {
+                                  _historyLimit = (_historyLimit + 100).clamp(_persistedHistoryLimit, _maxHistoryLimit);
+                                });
+                              },
+                            ),
+                          if (_historyLimit > _persistedHistoryLimit) ...[
+                            if (_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty)
+                              const SizedBox(width: AppSpacing.sm),
+                            TextButton.icon(
+                              icon: const Icon(Icons.expand_less_rounded),
+                              label: const Text('Show less'),
+                              onPressed: () {
+                                setState(() {
+                                  _historyLimit = _persistedHistoryLimit;
+                                  _hasMore = true;
+                                });
+                              },
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),

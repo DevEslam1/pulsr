@@ -139,6 +139,10 @@ class WidgetService {
           await HomeWidget.saveWidgetData<String>('artwork', cachedArt);
         } else if (_lastSavedArtworkSongId != song.id) {
           _pendingArtworkQueue.removeWhere((s) => s.id == song.id);
+          // C-04: Cap queue at 3 entries, drop oldest on rapid track changes
+          while (_pendingArtworkQueue.length >= 3) {
+            _pendingArtworkQueue.removeFirst();
+          }
           _pendingArtworkQueue.add(song);
           _drainPendingArtwork();
         }
@@ -149,6 +153,7 @@ class WidgetService {
           await HomeWidget.saveWidgetData<String>('nextTrack$i', '');
         }
         await HomeWidget.saveWidgetData<String>('artwork', '');
+        await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
         _pendingArtworkQueue.clear();
         _lastSavedArtworkSongId = null;
       }
@@ -185,6 +190,7 @@ class WidgetService {
         }
         _lastSavedArtworkSongId = song.id;
         await HomeWidget.saveWidgetData<String>('artwork', artPath);
+        await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
         await _bumpContentVersion();
         await HomeWidget.updateWidget(
           name: androidWidgetName,
@@ -193,12 +199,13 @@ class WidgetService {
           iOSName: iOSWidgetName,
         );
       } else {
-        // FIX-G03: Push empty string on resolution failure so widget doesn't stay stuck on stale artwork
+        // FIX-G03 / I12: Push empty string and flag error on failure
         if (_pendingArtworkQueue.isNotEmpty && _pendingArtworkQueue.any((s) => s.id != song.id)) {
           return;
         }
         _lastSavedArtworkSongId = song.id;
         await HomeWidget.saveWidgetData<String>('artwork', '');
+        await HomeWidget.saveWidgetData<bool>('artworkFailed', true);
         await _bumpContentVersion();
         await HomeWidget.updateWidget(
           name: androidWidgetName,
@@ -210,9 +217,10 @@ class WidgetService {
     } catch (e, st) {
       ErrorLogger.log('Widget artwork async resolve failed',
           error: e, stackTrace: st, category: 'WidgetService');
-      // FIX-G03: Reset artwork on error
+      // FIX-G03 / I12: Reset artwork and flag error on error
       try {
         await HomeWidget.saveWidgetData<String>('artwork', '');
+        await HomeWidget.saveWidgetData<bool>('artworkFailed', true);
         await _bumpContentVersion();
         await HomeWidget.updateWidget(
           name: androidWidgetName,
@@ -260,9 +268,12 @@ class WidgetService {
     if (cachedPath != null) {
       final f = File(cachedPath);
       if (await f.exists() && await f.length() > 0) {
-        // L-09: refresh LRU position on hit.
+        // L-09 / M-03: refresh LRU position on hit and update mtime to align with disk pruner
         _artworkCache.remove(songId);
         _artworkCache[songId] = cachedPath;
+        try {
+          await f.setLastModified(DateTime.now());
+        } catch (_) {}
         return cachedPath;
       }
       _artworkCache.remove(songId);
@@ -387,7 +398,13 @@ class WidgetService {
       // Enforce LRU bounds
       if (_artworkCache.length > _maxCacheSize) {
         final oldestKey = _artworkCache.keys.first;
-        _artworkCache.remove(oldestKey);
+        final evictedPath = _artworkCache.remove(oldestKey);
+        if (evictedPath != null) {
+          try {
+            final f = File(evictedPath);
+            if (f.existsSync()) f.deleteSync();
+          } catch (_) {}
+        }
       }
       if (_roundedArtworkCache.length > _maxCacheSize) {
         final oldestKey = _roundedArtworkCache.keys.first;

@@ -1869,13 +1869,25 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           ),
                         ],
                       ),
-                      ),
                     ),
-                  );
-                }).toList(),
+                  ),
+                );
+              }).toList(),
               ),
             ),
           ),
+          if (!isLeRoute)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(top: AppSpacing.s6),
+              child: Text(
+                'LE Audio codecs (LC3 / Opus) require a Bluetooth LE Audio connection.',
+                style: TextStyle(
+                  fontSize: AppFontSize.tiny,
+                  color: p.textTertiary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
 
           const SizedBox(height: AppSpacing.s14),
 

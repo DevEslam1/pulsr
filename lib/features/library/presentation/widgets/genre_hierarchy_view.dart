@@ -1,4 +1,5 @@
 // lib/features/library/presentation/widgets/genre_hierarchy_view.dart
+import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -57,13 +58,16 @@ class GenreHierarchyView extends StatefulWidget {
 
 class _GenreHierarchyViewState extends State<GenreHierarchyView> {
   static final Set<_GenreHierarchyViewState> _activeInstances = <_GenreHierarchyViewState>{};
-  static bool _cacheClearScheduled = false;
+  static Timer? _cacheClearTimer;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    // M-02: Cancel any scheduled cache clearance when a new instance mounts
+    _cacheClearTimer?.cancel();
+    _cacheClearTimer = null;
     _activeInstances.add(this);
   }
 
@@ -71,16 +75,13 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
   void dispose() {
     _searchController.dispose();
     _activeInstances.remove(this);
-    if (_activeInstances.isEmpty && !_cacheClearScheduled) {
-      _cacheClearScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Double frame check: ensure route replacement/transition didn't mount a new instance
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _cacheClearScheduled = false;
-          if (_activeInstances.isEmpty) {
-            GenreCategory.clearCache();
-          }
-        });
+    // M-02: Debounce cache clearance so transitions between routes don't clear hot cache prematurely
+    if (_activeInstances.isEmpty) {
+      _cacheClearTimer?.cancel();
+      _cacheClearTimer = Timer(const Duration(seconds: 10), () {
+        if (_activeInstances.isEmpty) {
+          GenreCategory.clearCache();
+        }
       });
     }
     super.dispose();

@@ -310,20 +310,25 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }
   }
 
+  static const int _maxNegativeIdEntries = 1000;
   final Map<String, int> _remoteIdToNegativeId = {};
   int _nextAssignedNegativeId = -2;
 
   int _resolveMediaItemId(String id) {
     final parsed = int.tryParse(id);
     if (parsed != null) return parsed;
+    final cached = _remoteIdToNegativeId[id];
+    if (cached != null) return cached;
+    if (_remoteIdToNegativeId.length >= _maxNegativeIdEntries) {
+      _remoteIdToNegativeId.remove(_remoteIdToNegativeId.keys.first);
+    }
     // Map non-numeric IDs into collision-free negative integer space (never colliding on 0 or positive DB IDs)
-    return _remoteIdToNegativeId.putIfAbsent(id, () {
-      final h = -(id.hashCode.abs() % 1000000000 + 2);
-      if (!_remoteIdToNegativeId.containsValue(h)) {
-        return h;
-      }
-      return _nextAssignedNegativeId--;
-    });
+    final h = -(id.hashCode.abs() % 1000000000 + 2);
+    final assigned = !_remoteIdToNegativeId.containsValue(h)
+        ? h
+        : _nextAssignedNegativeId--;
+    _remoteIdToNegativeId[id] = assigned;
+    return assigned;
   }
 
   void _listenToAudioService() {

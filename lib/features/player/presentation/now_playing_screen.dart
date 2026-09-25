@@ -179,8 +179,17 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   late final Tween<double> _tween;
   late Animation<double> _anim;
   double _dragOffset = 0.0;
-  int _activePointers = 0;
-  bool get _singleTouch => _activePointers <= 1;
+  final Set<int> _activePointerIds = <int>{};
+  bool get _singleTouch => _activePointerIds.length <= 1;
+
+  @override
+  void didUpdateWidget(covariant _SwipeDownToDismiss oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // H-10: Clean stale pointers on rebuild when idle
+    if (_dragOffset == 0.0 && !_animController.isAnimating) {
+      _activePointerIds.clear();
+    }
+  }
 
   @override
   void initState() {
@@ -250,7 +259,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragCancel() {
-    _activePointers = 0;
+    _activePointerIds.clear();
     if (_dragOffset > 0) {
       _tween.begin = _dragOffset;
       _tween.end = 0.0;
@@ -276,13 +285,9 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
         dismissAction: widget.onDismiss,
       },
       child: Listener(
-        onPointerDown: (_) => _activePointers++,
-        onPointerUp: (_) {
-          _activePointers = (_activePointers - 1).clamp(0, 99);
-        },
-        onPointerCancel: (_) {
-          _activePointers = (_activePointers - 1).clamp(0, 99);
-        },
+        onPointerDown: (e) => _activePointerIds.add(e.pointer),
+        onPointerUp: (e) => _activePointerIds.remove(e.pointer),
+        onPointerCancel: (e) => _activePointerIds.remove(e.pointer),
         child: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onVerticalDragStart: _onVerticalDragStart,

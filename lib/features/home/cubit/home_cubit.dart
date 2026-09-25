@@ -28,14 +28,17 @@ class HomeCubit extends PulsrCubit<HomeState> {
   HomeCubit({
     required YtmService ytmService,
     required YtmAccountService accountService,
+    Stopwatch? clock,
   })  : _ytm = ytmService,
         _account = accountService,
+        _monotonicClock = (clock ?? Stopwatch())..start(),
         super(HomeState(isLoggedIn: accountService.isLoggedIn)) {
     _account.loginState.addListener(_onLoginChanged);
   }
 
   final YtmService _ytm;
   final YtmAccountService _account;
+  final Stopwatch _monotonicClock;
 
   /// Resolved once and reused across rebuilds with a 10-minute TTL.
   static const Duration categoryTtl = Duration(minutes: 10);
@@ -67,8 +70,6 @@ class HomeCubit extends PulsrCubit<HomeState> {
       _allCategories.where((c) => !c.$3).map((c) => c.$1).toList();
 
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
-  // FIX-G3: Monotonic clock for cache TTL calculations
-  static final Stopwatch _monotonicClock = Stopwatch()..start();
   final Map<String, int> _categoryFetchTimestamps = {};
   // FIX-H6: Track in-flight categories to prevent TTL eviction while request is pending
   final Set<String> _inFlightCategories = {};
@@ -122,7 +123,8 @@ class HomeCubit extends PulsrCubit<HomeState> {
     _inFlightCategories.add(category);
     _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
 
-    final future = () async {
+    late final Future<List<YtmTrack>> future;
+    future = () async {
       try {
         if (category == 'Recommended For You') {
           if (_account.isLoggedIn) {
@@ -152,8 +154,11 @@ class HomeCubit extends PulsrCubit<HomeState> {
         final query = categoryQueries[category] ?? '$category songs';
         return await _ytm.searchWithFallback(query, limit: 25);
       } catch (e, st) {
-        _categoryFutures.remove(category);
-        _categoryFetchTimestamps.remove(category);
+        // C-05: Only remove if the cached future is still this in-flight instance
+        if (identical(_categoryFutures[category], future)) {
+          _categoryFutures.remove(category);
+          _categoryFetchTimestamps.remove(category);
+        }
         // FIX-H05: Return empty list and log error instead of unhandled rethrow in widget FutureBuilder
         ErrorLogger.log('Failed to fetch home category $category',
             error: e, stackTrace: st, category: 'HomeCubit');

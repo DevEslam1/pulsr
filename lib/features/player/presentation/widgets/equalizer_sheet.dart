@@ -7491,6 +7491,16 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
   }
 
   @override
+  void didUpdateWidget(covariant _VerticalEqSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // H-06: Preserve _dragGain while actively dragging so parent rebuilds
+    // cannot stomp on the in-flight gesture with stale props.
+    if (!_isDragging) {
+      _dragGain = null;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final gain = (_isDragging && _dragGain != null ? _dragGain! : widget.value)
         .clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);

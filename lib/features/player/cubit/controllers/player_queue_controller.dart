@@ -329,19 +329,27 @@ class PlayerQueueController {
           );
           try {
             await _audioHandler.pause();
+          } catch (_) {}
+          try {
             await _audioHandler.clearQueue();
           } catch (_) {}
-          if (!_isClosed()) {
-            final broken = _getState();
-            _emit(broken.copyWith(
-              queueSlice:
-                  broken.queueSlice.copyWith(queue: const [], currentIndex: 0),
-              playback: broken.playback.copyWith(
-                currentSong: null,
-                isPlaying: false,
-                errorMessage: 'Playback unavailable — please pick another track',
-              ),
-            ));
+          try {
+            if (!_isClosed()) {
+              final broken = _getState();
+              _emit(broken.copyWith(
+                queueSlice: broken.queueSlice
+                    .copyWith(queue: const [], currentIndex: 0),
+                playback: broken.playback.copyWith(
+                  currentSong: null,
+                  isPlaying: false,
+                  errorMessage:
+                      'Playback unavailable — please pick another track',
+                ),
+              ));
+            }
+          } catch (emitError, emitSt) {
+            ErrorLogger.log('Failed to emit terminal error state on queue failure',
+                error: emitError, stackTrace: emitSt, category: 'PlayerQueueController');
           }
         }
       }

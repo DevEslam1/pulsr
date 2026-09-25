@@ -125,10 +125,17 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       return _cachedQuickSongs!;
     }
     final res = await useCase.getAllSongs(limit: 50);
-    final list = res.fold((_) => <SongsTableData>[], (r) => r);
-    _cachedQuickSongs = list;
-    _cachedQuickSongsStopwatch = Stopwatch()..start();
-    return list;
+    return res.fold(
+      (failure) {
+        // H-09: Do not cache on failure so next call retries rather than returning empty list for 60s
+        return <SongsTableData>[];
+      },
+      (songs) {
+        _cachedQuickSongs = songs;
+        _cachedQuickSongsStopwatch = Stopwatch()..start();
+        return songs;
+      },
+    );
   }
 
   List<String> get _onlineCategories => _homeCubit.onlineCategories;

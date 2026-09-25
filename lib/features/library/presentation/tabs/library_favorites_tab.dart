@@ -341,8 +341,14 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       return;
     }
 
-    final downloadCubit =
-        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final downloadCubit = context.read<YtmDownloadCubit?>() ??
+        (getIt.isRegistered<YtmDownloadCubit>() ? getIt<YtmDownloadCubit>() : null);
+    if (downloadCubit == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Download service unavailable')),
+      );
+      return;
+    }
     final queuedCount = downloadCubit.downloadAll(songs);
 
     if (queuedCount > 0) {
@@ -385,16 +391,19 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       SnackBar(
         content: Row(
           children: [
-            SizedBox(width: AppSpacing.md,
+            SizedBox(
+              width: AppSpacing.md,
               height: 16,
               child: CircularProgressIndicator(
-                  strokeWidth: 2, color: Colors.white),
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.onInverseSurface,
+              ),
             ),
-            SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.sm),
             Text(context.l10n.syncingYtm),
           ],
         ),
-        duration: Duration(seconds: 4),
+        duration: const Duration(seconds: 4),
       ),
     );
 
@@ -634,10 +643,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                         borderRadius: BorderRadius.circular(AppRadii.r14)),
                   ),
                   child: isLoading
-                      ? const SizedBox(width: AppSpacing.s20,
+                      ? SizedBox(width: AppSpacing.s20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2, color: p.onAccent),
                         )
                       : Text(context.l10n.importTracks,
                           style: TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/formatters.dart';
@@ -210,8 +211,13 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   }
 
   Widget _buildStandardSeekBar(BuildContext context) {
-    final isPlaying =
-        context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
+    bool isPlaying = false;
+    try {
+      isPlaying = context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
+    } catch (_) {
+      final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
+      isPlaying = fallback?.state.isPlaying ?? false;
+    }
     return _withPosition((position) {
       final double maxDuration = widget.duration.inMilliseconds.toDouble();
       final double currentPos = position.inMilliseconds.toDouble();
@@ -343,8 +349,13 @@ class _PlayerPositionScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final position =
-        context.select<PlayerCubit, Duration>((c) => c.state.position);
+    Duration position;
+    try {
+      position = context.select<PlayerCubit, Duration>((c) => c.state.position);
+    } catch (_) {
+      final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
+      position = fallback?.state.position ?? Duration.zero;
+    }
     return builder(position);
   }
 }

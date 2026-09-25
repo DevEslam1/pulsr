@@ -190,8 +190,28 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     try {
       await _audioHandler.reorderQueue(oldIndex, newIndex);
     } catch (e, st) {
+      // H-08: Roll back queue and slot state if audio handler reorder throws
       ErrorLogger.log('Failed to reorder queue in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
+      final current = _getState();
+      setQueueSlot(
+        state.activeQueueSlot,
+        songs: state.queue,
+        currentIndex: state.currentIndex,
+        position: state.position,
+        speed: state.playbackSpeed,
+      );
+      debouncedPersistQueueSlots();
+      _bumpQueueVersion();
+      _emit(current.copyWith(
+        queueSlice: current.queueSlice.copyWith(
+          queue: state.queue,
+          currentIndex: state.currentIndex,
+        ),
+        playback: current.playback.copyWith(
+          errorMessage: 'Failed to reorder queue',
+        ),
+      ));
     }
   }
 

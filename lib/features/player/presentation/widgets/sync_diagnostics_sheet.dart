@@ -31,7 +31,8 @@ class SyncDiagnosticsSheet extends StatefulWidget {
   State<SyncDiagnosticsSheet> createState() => _SyncDiagnosticsSheetState();
 }
 
-class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
+class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
+    with WidgetsBindingObserver {
   int _pipelineLatencyFrames = 0;
   double _appliedSampleRate = 48000.0;
   double _usbBufferedMs = 0.0;
@@ -41,16 +42,39 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _appliedSampleRate = widget.sampleRate > 0 ? widget.sampleRate : 48000.0;
     _fetchDiagnostics();
-    _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    // M-06 / I-15: Poll every 1s (reduced from 250ms) to save battery
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       _fetchDiagnostics();
     });
   }
 
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTimer();
+      _fetchDiagnostics();
+    } else {
+      _stopTimer();
+    }
+  }
+
   @override
   void dispose() {
-    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stopTimer();
     super.dispose();
   }
 

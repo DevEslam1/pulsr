@@ -112,9 +112,13 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     _previewSub = null;
     if (oldSub != null) {
       removeFromComposite(oldSub);
-      // FIX-H3 / H-09: Await cancellation before subscribing so the previous
-      // stream cannot fire one more stale preview into the new generation.
-      await oldSub.cancel();
+      // FIX-H3 / H-09 / H-05: Await cancellation with timeout so a slow or hanging cancel cannot stall previews
+      try {
+        await oldSub.cancel().timeout(const Duration(milliseconds: 500));
+      } catch (e, st) {
+        ErrorLogger.log('Smart playlist old preview sub cancel timed out or failed',
+            error: e, stackTrace: st, category: 'SmartPlaylist');
+      }
     }
     if (isClosed) return;
     final gen = ++_previewGen;

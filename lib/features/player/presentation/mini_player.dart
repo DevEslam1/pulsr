@@ -152,7 +152,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
     super.dispose();
   }
 
-  void _syncPageController(int targetIndex, int queueLength) {
+  void _syncPageController(int targetIndex, int queueLength, {int retryCount = 0}) {
     if (_controllerDisposed || !mounted) return;
     try {
       final controller = _pageController;
@@ -162,11 +162,14 @@ class _MiniPlayerState extends State<MiniPlayer> {
       if (_isInteracting.value || _swipeInFlight) return;
       if (_lastKnownIndex != safeIndex) {
         if (!controller.hasClients || !controller.position.hasContentDimensions) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && !_controllerDisposed) {
-              _syncPageController(targetIndex, queueLength);
-            }
-          });
+          // H-04: Limit recursive post-frame callbacks to avoid infinite loops if unattached
+          if (retryCount < 3) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !_controllerDisposed) {
+                _syncPageController(targetIndex, queueLength, retryCount: retryCount + 1);
+              }
+            });
+          }
           return;
         }
         if (controller.page?.round() != safeIndex) {

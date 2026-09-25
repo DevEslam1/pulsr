@@ -140,6 +140,24 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// instead of writing to (or reading) a disposed notifier.
   bool _disposed = false;
 
+  /// Safe accessor that returns default state if cubit/notifier is disposed.
+  YtmOnlineState get onlineState => _disposed ? const YtmOnlineState() : ytmOnline.value;
+
+  /// Safe state mutator guarded against post-dispose execution (C2).
+  void _setOnlineState(YtmOnlineState Function(YtmOnlineState current) update) {
+    if (_disposed || isClosed) return;
+    try {
+      ytmOnline.value = update(ytmOnline.value);
+    } catch (_) {}
+  }
+
+  void _setOnlineStateDirect(YtmOnlineState newState) {
+    if (_disposed || isClosed) return;
+    try {
+      ytmOnline.value = newState;
+    } catch (_) {}
+  }
+
   PlaylistCubit({required PlaylistUseCases playlistUseCases})
       : _playlistUseCases = playlistUseCases,
         super(const PlaylistState(isLoading: true)) {
@@ -248,7 +266,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           return entry;
         }).toList();
 
-        ytmOnline.value = ytmOnline.value.copyWith(
+        _setOnlineStateDirect(onlineState.copyWith(
           likedTracks: likedTracks,
           likedStatus: likedTracks.isNotEmpty
               ? YtmFetchStatus.done
@@ -261,7 +279,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           customStatus: customPlaylists.isNotEmpty
               ? YtmFetchStatus.done
               : YtmFetchStatus.idle,
-        );
+        ));
       }
     } on FormatException catch (e, st) {
       ErrorLogger.log('Corrupted JSON in online playlist cache',
@@ -278,58 +296,71 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// Serializes cache writes so concurrent callers cannot persist a snapshot
   /// taken before another section landed.
   Future<void> _saveOnlineCache() {
-    _cacheSaveQueue.add(_writeOnlineCache);
+    if (_disposed || isClosed) return Future.value();
+    // H-03: Coalesce saves — only 1 queued write is needed since _writeOnlineCache
+    // persists the full latest snapshot.
+    if (_cacheSaveQueue.isEmpty) {
+      _cacheSaveQueue.add(_writeOnlineCache);
+    }
     return _drainCacheSaveQueue();
   }
 
   Future<void> _drainCacheSaveQueue() async {
-    if (_cacheSaveRunning) return;
+    if (_cacheSaveRunning || _disposed || isClosed) return;
     _cacheSaveRunning = true;
-    while (_cacheSaveQueue.isNotEmpty) {
-      final fn = _cacheSaveQueue.removeFirst();
-      try {
-        await fn();
-      } catch (e, st) {
-        ErrorLogger.log('Online cache save queue task failed',
-            error: e, stackTrace: st, category: 'PlaylistCubit');
+    try {
+      while (_cacheSaveQueue.isNotEmpty && !_disposed && !isClosed) {
+        final fn = _cacheSaveQueue.removeFirst();
+        try {
+          await fn().timeout(const Duration(seconds: 7));
+        } catch (e, st) {
+          ErrorLogger.log('Online cache save queue task failed',
+              error: e, stackTrace: st, category: 'PlaylistCubit');
+        }
       }
+    } finally {
+      _cacheSaveRunning = false;
     }
-    _cacheSaveRunning = false;
   }
 
-    Future<void> _writeOnlineCache() async {
+  Future<void> _writeOnlineCache() async {
+    if (_disposed || isClosed) return;
+    try {
+      final prefs = await SharedPreferences.getInstance().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('SharedPreferences timeout'),
+      );
       if (_disposed || isClosed) return;
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        if (_disposed || isClosed) return;
-        // Bounded cache: prefs is not a database. Liked tracks capped at 200,
-        // custom playlists at the 10 most recent with 50 tracks each — full
-        // track lists are re-fetched on open, so the cache only needs enough
-        // for instant paint. Previously unbounded (200-track × N playlists).
-        final onlineValue = ytmOnline.value;
-        final liked = onlineValue.likedTracks;
-        final customs = onlineValue.customPlaylists;
-        final cappedCustoms = customs.length > 10
-            ? customs.sublist(customs.length - 10)
-            : customs;
-        final data = {
-          'likedTracks': liked
-              .take(200)
-              .map((t) => t.toJson())
-              .toList(),
-          'accountPlaylists':
-              onlineValue.accountPlaylists.map((p) => p.toJson()).toList(),
-          'customPlaylists': [
-            for (final p in cappedCustoms)
-              () {
-                final json = Map<String, dynamic>.from(p.toJson());
-                final tracks = (json['tracks'] as List? ?? []);
-                json['tracks'] = tracks.take(50).toList();
-                return json;
-              }(),
-          ],
-        };
-        await prefs.setString(_onlineCacheKey, jsonEncode(data));
+      // Bounded cache: prefs is not a database. Liked tracks capped at 200,
+      // custom playlists at the 10 most recent with 50 tracks each — full
+      // track lists are re-fetched on open, so the cache only needs enough
+      // for instant paint.
+      final onlineValue = onlineState;
+      final liked = onlineValue.likedTracks;
+      final customs = onlineValue.customPlaylists;
+      final cappedCustoms = customs.length > 10
+          ? customs.sublist(customs.length - 10)
+          : customs;
+      final data = {
+        'likedTracks': liked
+            .take(200)
+            .map((t) => t.toJson())
+            .toList(),
+        'accountPlaylists':
+            onlineValue.accountPlaylists.map((p) => p.toJson()).toList(),
+        'customPlaylists': [
+          for (final p in cappedCustoms)
+            () {
+              final json = Map<String, dynamic>.from(p.toJson());
+              final tracks = (json['tracks'] as List? ?? []);
+              json['tracks'] = tracks.take(50).toList();
+              return json;
+            }(),
+        ],
+      };
+      await prefs.setString(_onlineCacheKey, jsonEncode(data)).timeout(
+        const Duration(seconds: 5),
+      );
     } catch (e, st) {
       ErrorLogger.log('Failed to save online playlist cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
@@ -512,18 +543,27 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (!account.isLoggedIn) return;
 
     if (!force &&
-        ytmOnline.value.likedStatus == YtmFetchStatus.done &&
-        ytmOnline.value.accountStatus == YtmFetchStatus.done) {
+        onlineState.likedStatus == YtmFetchStatus.done &&
+        onlineState.accountStatus == YtmFetchStatus.done) {
       return;
     }
 
-    ytmOnline.value = ytmOnline.value.copyWith(isAutoFetching: true);
-    await Future.wait([
-      fetchLikedSongsPlaylist(),
-      fetchAccountPlaylists(),
-    ]);
-    if (_disposed || isClosed) return;
-    ytmOnline.value = ytmOnline.value.copyWith(isAutoFetching: false);
+    _setOnlineState((s) => s.copyWith(isAutoFetching: true));
+    try {
+      // M-12: Run both independently so one throwing does not cancel or discard the other
+      await Future.wait([
+        fetchLikedSongsPlaylist().catchError((e, st) {
+          ErrorLogger.log('fetchLikedSongsPlaylist failed during autoFetch',
+              error: e, stackTrace: st, category: 'PlaylistCubit');
+        }),
+        fetchAccountPlaylists().catchError((e, st) {
+          ErrorLogger.log('fetchAccountPlaylists failed during autoFetch',
+              error: e, stackTrace: st, category: 'PlaylistCubit');
+        }),
+      ]);
+    } finally {
+      _setOnlineState((s) => s.copyWith(isAutoFetching: false));
+    }
   }
 
   /// Fetches the authenticated user's Liked Music from YouTube Music.
@@ -531,22 +571,22 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (!AppConfig.ytmEnabled) return;
     final account = getIt<YtmAccountService>();
     if (!account.isLoggedIn) {
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         likedStatus: YtmFetchStatus.error,
         likedError: 'Not signed in to YouTube Music',
-      );
+      ));
       return;
     }
 
-    ytmOnline.value = ytmOnline.value.copyWith(
+    _setOnlineState((s) => s.copyWith(
       likedStatus: YtmFetchStatus.loading,
       clearLikedError: true,
-    );
+    ));
 
     try {
       final tracks = await account.fetchLikedSongs();
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         likedStatus:
             tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
         likedTracks: tracks,
@@ -554,7 +594,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             ? 'No liked songs found. Try re-logging into YouTube Music.'
             : null,
         clearLikedError: tracks.isNotEmpty,
-      );
+      ));
       if (tracks.isNotEmpty) {
         await _saveOnlineCache();
         try {
@@ -566,18 +606,18 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       }
     } on YtmException catch (e) {
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         likedStatus: YtmFetchStatus.error,
         likedError: e.isAuth
             ? 'Session expired — please sign in again.'
             : (e.details ?? e.code),
-      );
+      ));
     } catch (e) {
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         likedStatus: YtmFetchStatus.error,
         likedError: e.toString().replaceAll('Exception: ', ''),
-      );
+      ));
     }
   }
 
@@ -586,43 +626,43 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (!AppConfig.ytmEnabled) return;
     final account = getIt<YtmAccountService>();
     if (!account.isLoggedIn) {
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         accountStatus: YtmFetchStatus.error,
         accountError: 'Not signed in to YouTube Music',
-      );
+      ));
       return;
     }
 
-    ytmOnline.value = ytmOnline.value.copyWith(
+    _setOnlineState((s) => s.copyWith(
       accountStatus: YtmFetchStatus.loading,
       clearAccountError: true,
-    );
+    ));
 
     try {
       final playlists = await account.fetchAccountPlaylists();
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         accountStatus: YtmFetchStatus.done,
         accountPlaylists: playlists,
         clearAccountError: true,
-      );
+      ));
       if (playlists.isNotEmpty) {
         await _saveOnlineCache();
       }
     } on YtmException catch (e) {
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         accountStatus: YtmFetchStatus.error,
         accountError: e.isAuth
             ? 'Session expired — please sign in again.'
             : (e.details ?? e.code),
-      );
+      ));
     } catch (e) {
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         accountStatus: YtmFetchStatus.error,
         accountError: e.toString().replaceAll('Exception: ', ''),
-      );
+      ));
     }
   }
 
@@ -634,13 +674,13 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (input.isEmpty) return;
 
     // Prevent duplicate fetches
-    final existing = ytmOnline.value.customPlaylists.any((p) => p.id == input);
+    final existing = onlineState.customPlaylists.any((p) => p.id == input);
     if (existing) return;
 
-    ytmOnline.value = ytmOnline.value.copyWith(
+    _setOnlineState((s) => s.copyWith(
       customStatus: YtmFetchStatus.loading,
       clearCustomError: true,
-    );
+    ));
 
     try {
       final accountService = getIt.isRegistered<YtmAccountService>()
@@ -657,10 +697,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       }
 
       if (tracks.isEmpty) {
-        ytmOnline.value = ytmOnline.value.copyWith(
+        _setOnlineState((s) => s.copyWith(
           customStatus: YtmFetchStatus.error,
           customError: 'Playlist is empty or could not be fetched.',
-        );
+        ));
         return;
       }
 
@@ -688,39 +728,40 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       );
 
       final updated =
-          List<OnlinePlaylistEntry>.from(ytmOnline.value.customPlaylists)
+          List<OnlinePlaylistEntry>.from(onlineState.customPlaylists)
             ..add(entry);
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         customStatus: YtmFetchStatus.done,
         customPlaylists: updated,
         clearCustomError: true,
-      );
+      ));
       await _saveOnlineCache();
     } catch (e) {
       if (_disposed || isClosed) return;
-      ytmOnline.value = ytmOnline.value.copyWith(
+      _setOnlineState((s) => s.copyWith(
         customStatus: YtmFetchStatus.error,
         customError: e.toString().replaceAll('Exception: ', ''),
-      );
+      ));
     }
   }
 
   /// Removes a previously fetched custom online playlist.
   void removeCustomPlaylist(String id) {
     final updated =
-        ytmOnline.value.customPlaylists.where((p) => p.id != id).toList();
-    ytmOnline.value = ytmOnline.value.copyWith(customPlaylists: updated);
+        onlineState.customPlaylists.where((p) => p.id != id).toList();
+    _setOnlineState((s) => s.copyWith(customPlaylists: updated));
     unawaited(_saveOnlineCache());
   }
 
   /// Resets all online playlist state (liked + fetched list).
   void clearOnlinePlaylists() {
-    ytmOnline.value = const YtmOnlineState();
+    _setOnlineStateDirect(const YtmOnlineState());
     unawaited(_saveOnlineCache());
   }
 
   @override
   Future<void> close() async {
+    _disposed = true;
     if (AppConfig.ytmEnabled) {
       try {
         getIt<YtmAccountService>()
@@ -728,11 +769,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             .removeListener(_onYtmLoginStateChanged);
       } catch (_) {}
     }
-    // FIX-M04 / H-08: Mark disposed, then reset ytmOnline to default before
-    // disposal so listeners don't retain stale state or touch a dead notifier.
-    _disposed = true;
-    ytmOnline.value = const YtmOnlineState();
-    ytmOnline.dispose();
+    _cacheSaveQueue.clear();
     _playlistsSub?.cancel();
     _playlistSongsSub?.cancel();
     for (final sub in _smartSubscriptions.values) {
@@ -740,6 +777,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
     _smartSubscriptions.clear();
     _smartCriteriaJson.clear();
+    try {
+      ytmOnline.value = const YtmOnlineState();
+    } catch (_) {}
+    ytmOnline.dispose();
     return super.close();
   }
 }

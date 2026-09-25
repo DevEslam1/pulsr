@@ -294,23 +294,14 @@ class _LibraryScreenState extends State<LibraryScreen>
 
       if (!mounted) return;
 
-      if (_tabController.length != _activeTabs.length ||
-          _tabController.index != targetIndex) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            // Rebuild with the new controller; disposing the old one without a
-            // setState left mounted TabBar/TabBarView holding a dead controller.
-            setState(() => _rebuildTabController(initialIndex: targetIndex));
-          }
-        });
-      }
-
-      if (mounted) {
-        setState(() {
-          _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
-          _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
-        });
-      }
+      setState(() {
+        if (_tabController.length != _activeTabs.length ||
+            _tabController.index != targetIndex) {
+          _rebuildTabController(initialIndex: targetIndex);
+        }
+        _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
+        _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
+      });
     } catch (e, st) {
       ErrorLogger.log('Failed to load library preferences',
           error: e, stackTrace: st, category: 'Library');
