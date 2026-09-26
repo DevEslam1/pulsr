@@ -84,7 +84,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool reduceMotion,
     @Default(0.80) double liquidGlassTint,
     @Default('system') String languageCode,
-    @Default(0xFF9B9EF5) int customAccentColorValue,
+    @Default(0xFFFF2A85) int customAccentColorValue,
     // Custom Theme Studio shape controls. Applied to the now-playing chrome
     // bars and the classic player card so the builder has a real effect.
     @Default(24.0) double customThemeRadius,

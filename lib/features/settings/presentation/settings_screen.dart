@@ -41,6 +41,7 @@ import 'widgets/settings_section.dart';
 import 'widgets/storage_cache_section.dart';
 import 'widgets/theme_schedule_row.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
+import 'widgets/love_dedication_card.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 part 'settings_category_sections_a.dart';
@@ -822,6 +823,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           end: horizontalPad,
         ),
         children: [
+          const LoveDedicationCard(),
           if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
             const SettingsHeroCard(),
           _experienceModeCard(context),

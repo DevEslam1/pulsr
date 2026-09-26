@@ -271,7 +271,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       (e) => e.name == themeModeStr,
       orElse: () => AppThemeMode.dark,
     );
-    final customAccentValue = prefs.getInt(_keyCustomAccent) ?? 0xFF9B9EF5;
+    final customAccentValue = prefs.getInt(_keyCustomAccent) ?? 0xFFFF2A85;
 
     final playerThemeStr =
         prefs.getString(_keyPlayerThemeMode) ?? PlayerThemeMode.classic.name;

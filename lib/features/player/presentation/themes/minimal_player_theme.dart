@@ -17,6 +17,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
+import '../../../../core/utils/love_feedback.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_visualizer.dart';
@@ -329,6 +330,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                 onTap: () {
                                   if (song != null) {
                                     cubit.toggleFavorite(song.id);
+                                    showFavoriteFeedback(context, !song.isFavorite);
                                   }
                                 },
                               ),
@@ -337,16 +339,53 @@ class MinimalPlayerTheme extends StatelessWidget {
                         ],
                       ),
 
-                      // Symmetrical Audio Quality Badge
+                      // Symmetrical Audio Quality Badge & Dr. Basbosa Love Pill
                       if (song != null) ...[
                         const SizedBox(height: AppSpacing.s6),
-                        Center(
-                          child: AudioQualityBadge(
-                            song: song,
-                            activeColor: activeColor,
-                            compact: true,
-                            showDevice: false,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AudioQualityBadge(
+                              song: song,
+                              activeColor: activeColor,
+                              compact: true,
+                              showDevice: false,
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: () => showNowPlayingLoveMessage(
+                                context,
+                                songTitle: song.title,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF2A85).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFFFF2A85).withValues(alpha: 0.3),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.favorite_rounded, size: 10, color: Color(0xFFFF2A85)),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'For Dr. Basbosa ❤️',
+                                      style: TextStyle(
+                                        color: Color(0xFFFF85BC),
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],
@@ -506,7 +545,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                   ),
                                   const SizedBox(width: AppSpacing.s6),
                                   Text(
-                                    context.l10n.playingFrom.toUpperCase(),
+                                    'DR. BASBOSA EDITION',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodySmall
@@ -514,8 +553,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                           fontSize: AppFontSize.tiny,
                                           letterSpacing: AppTracking.wide,
                                           fontWeight: FontWeight.w800,
-                                          color: p.textSecondary
-                                              .withValues(alpha: 0.8),
+                                          color: const Color(0xFFFF85BC),
                                         ),
                                   ),
                                 ],

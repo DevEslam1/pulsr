@@ -46,6 +46,81 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
             ),
           ),
 
+          // ---------- Dr. Basbosa Favorites Love Banner ----------
+          if (_favTabFilter == 0)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: Adaptive.pagePadding(context),
+                vertical: 6,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF380D26),
+                      Color(0xFF1E0716),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: const Color(0xFFFF2A85).withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFF2A85).withValues(alpha: 0.16),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFFF2A85).withValues(alpha: 0.22),
+                      ),
+                      child: const Icon(
+                        Icons.favorite_rounded,
+                        color: Color(0xFFFF2A85),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Dr. Basbosa\'s Favorites 💕',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'You will always be my #1 favorite person in the entire universe. — Eng. Eslam ✨',
+                            style: TextStyle(
+                              color: Color(0xFFF3D5E4),
+                              fontSize: 11.5,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // ---------- Quick Play Header (if songs exist in current tab) ----------
           if (currentFavorites.isNotEmpty)
             Padding(
@@ -270,10 +345,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       BuildContext context, PulsrPalette p, int tabIndex) {
     if (tabIndex == 0) {
       return EmptyStateWidget(
-        icon: Icons.favorite_border_rounded,
-        iconColor: p.favorite,
-        title: context.l10n.noLocalFavorites,
-        subtitle: context.l10n.noLocalFavoritesSubtitle,
+        icon: Icons.favorite_rounded,
+        iconColor: const Color(0xFFFF2A85),
+        title: 'You Are My Favorite Person, Dr. Basbosa 💕',
+        subtitle:
+            'No favorite tracks yet, but you are always my #1 in the entire world! Tap the heart on songs you love.',
         primaryActionLabel: context.l10n.songs,
         primaryActionIcon: Icons.library_music_rounded,
         onPrimaryAction: () => _tabController.animateTo(0),
@@ -713,8 +789,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: () =>
-                          context.read<LibraryCubit>().toggleFavorite(song.id),
+                      onTap: () {
+                        context.read<LibraryCubit>().toggleFavorite(song.id);
+                        showFavoriteFeedback(context, !song.isFavorite);
+                      },
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.s6),
                         child: Icon(Icons.favorite_rounded,

@@ -223,20 +223,16 @@ class AuraTheme {
       onAccent: onAccent,
       accentContainer: accent.withValues(alpha: 0.14),
       glow: accent.withValues(alpha: 0.28),
-      // Near-neutral dark base. Was #0A0C12 (blue-tinted); blue is the most
-      // fatiguing wavelength in dark rooms, so this drops the cool cast.
-      bg: const Color(0xFF0B0B0F),
-      surface: const Color(0xFF12141D),
-      surfaceContainer: const Color(0xFF171B28),
-      surfaceContainerHigh: const Color(0xFF1E2235),
+      bg: const Color(0xFF0E0A12),
+      surface: const Color(0xFF16101D),
+      surfaceContainer: const Color(0xFF1E1627),
+      surfaceContainerHigh: const Color(0xFF261D32),
       hairline: Colors.white.withValues(alpha: 0.07),
       // Dim white point softens peak white for night listening (12.8:1).
       textPrimary:
-          dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFEDEFF7),
-      textSecondary: const Color(0xFF98A0B3),
-      // AA-compliant tertiary (5.18:1 on bg, 4.52:1 on cards).
-      // Was #5C6478 (3.30:1 / 2.90:1) which failed WCAG for small text.
-      textTertiary: const Color(0xFF7A8399),
+          dimWhitePoint ? const Color(0xFFE4CFDA) : const Color(0xFFFDF0F6),
+      textSecondary: const Color(0xFFA89CAE),
+      textTertiary: const Color(0xFF7A6D82),
       favorite: AppColors.favorite,
       success: AppColors.success,
       error: AppColors.error,

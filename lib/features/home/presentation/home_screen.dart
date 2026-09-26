@@ -33,6 +33,7 @@ import '../../../domain/models/ytm_track.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../cubit/home_cubit.dart';
+import 'widgets/home_love_card.dart';
 
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -357,6 +358,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         ),
                       ],
                     ),
+                  ),
+
+                  // ---------- Dr. Basbosa Edition Love Dedication Banner ----------
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context),
+                    ),
+                    child: const HomeLoveCard(),
                   ),
 
                   // ---------- Notification Permission Denied Banner (B-37) ----------

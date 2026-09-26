@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.pulsr.music"
+        applicationId = "com.pulsr.music.bb"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
@@ -29,7 +29,7 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["appName"] = "Pulsr Music"
+        manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
 
         externalNativeBuild {
             cmake {
@@ -50,19 +50,19 @@ android {
         create("dev") {
             dimension = "default"
             applicationIdSuffix = ".plus"
-            manifestPlaceholders["appName"] = "Pulsr Plus"
+            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition Plus"
             proguardFile(file("src/dev/proguard-rules.pro"))
         }
         create("prod") {
             dimension = "default"
-            manifestPlaceholders["appName"] = "Pulsr Music"
+            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
         }
         // Off-Play distribution build. Identical to prod but compiles the
         // NewPipeExtractor bridge, so YouTube Music search/stream/download works.
         create("ytm") {
             dimension = "default"
             applicationIdSuffix = ".ytm"
-            manifestPlaceholders["appName"] = "Pulsr Music"
+            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
             proguardFile(file("src/ytm/proguard-rules.pro"))
         }
     }

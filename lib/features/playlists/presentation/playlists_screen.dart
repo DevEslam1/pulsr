@@ -589,8 +589,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             padding: EdgeInsets.symmetric(
                 horizontal: Adaptive.pagePadding(context)),
             child: _PlaylistHeroCard(
-              title: context.l10n.favorites,
-              subtitle: context.l10n.likedTracks,
+              title: "Dr. Basbosa's Liked Songs 💕",
+              subtitle: "Your favorites • Made for my #1 favorite person",
               icon: Icons.favorite_rounded,
               colors: [p.favorite, AppColors.roseDeep],
               onTap: () => context.push('/favorites'),

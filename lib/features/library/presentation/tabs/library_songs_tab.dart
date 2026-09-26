@@ -172,6 +172,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             playerCubit.playNext(song);
           } else {
             cubit.toggleFavorite(song.id);
+            showFavoriteFeedback(context, !song.isFavorite);
           }
           return false;
         },
