@@ -289,11 +289,17 @@ class _NavTabItem extends StatelessWidget {
                     scale: isSelected ? 1.08 : 1.0,
                     duration: context.motionMs(220),
                     curve: context.motionCurve(Curves.easeOutBack),
-                    child: Icon(
-                      isSelected ? item.activeIcon : item.icon,
-                      size: iconSize,
-                      color: isSelected ? p.accent : p.textTertiary,
-                    ),
+                    child: item.index == 2
+                        ? _AnimatedSearchHeartIcon(
+                            isSelected: isSelected,
+                            iconSize: iconSize,
+                            p: p,
+                          )
+                        : Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            size: iconSize,
+                            color: isSelected ? p.accent : p.textTertiary,
+                          ),
                   ),
                   const SizedBox(height: 1),
                   AnimatedDefaultTextStyle(
@@ -324,6 +330,94 @@ class _NavTabItem extends StatelessWidget {
         ),
       ),
       ),
+    );
+  }
+}
+
+class _AnimatedSearchHeartIcon extends StatefulWidget {
+  final bool isSelected;
+  final double iconSize;
+  final PulsrPalette p;
+
+  const _AnimatedSearchHeartIcon({
+    required this.isSelected,
+    required this.iconSize,
+    required this.p,
+  });
+
+  @override
+  State<_AnimatedSearchHeartIcon> createState() => _AnimatedSearchHeartIconState();
+}
+
+class _AnimatedSearchHeartIconState extends State<_AnimatedSearchHeartIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool _showHeart = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2-second total cycle: 1 second search icon, 1 second heart icon
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _controller.repeat();
+        }
+      });
+
+    _controller.addListener(() {
+      final shouldShowHeart = _controller.value >= 0.5;
+      if (shouldShowHeart != _showHeart) {
+        setState(() {
+          _showHeart = shouldShowHeart;
+        });
+      }
+    });
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.isSelected ? widget.p.accent : widget.p.textTertiary;
+    final heartColor = widget.isSelected
+        ? widget.p.accent
+        : widget.p.favorite;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutBack,
+      switchOutCurve: Curves.easeInBack,
+      transitionBuilder: (child, animation) {
+        return ScaleTransition(
+          scale: animation,
+          child: FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+        );
+      },
+      child: _showHeart
+          ? Icon(
+              Icons.favorite_rounded,
+              key: const ValueKey('heart_icon'),
+              size: widget.iconSize,
+              color: heartColor,
+            )
+          : Icon(
+              Icons.search_rounded,
+              key: const ValueKey('search_icon'),
+              size: widget.iconSize,
+              color: color,
+            ),
     );
   }
 }
