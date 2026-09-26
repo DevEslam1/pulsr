@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/safe_file_path.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
@@ -69,10 +70,13 @@ class _BackupSectionState extends State<BackupSection> {
       );
 
       if (outputUri != null) {
+        final pathStr = outputUri.isScheme('file') ? outputUri.toFilePath() : outputUri.path;
+        final safeOutput = SafeFilePath.validateSavePath(pathStr, allowedExtensions: ['json']);
+        if (safeOutput == null) throw 'Invalid save location or file extension';
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(context.l10n.backupExportedTo(outputUri)),
+              content: Text(context.l10n.backupExportedTo(safeOutput.path)),
               backgroundColor: context.palette.accent,
             ),
           );
@@ -100,9 +104,11 @@ class _BackupSectionState extends State<BackupSection> {
     );
 
     if (result == null) return;
+    final safeFile = SafeFilePath.validate(result.path, allowedExtensions: ['json']);
+    if (safeFile == null) return;
     const maxBackupBytes = 10 * 1024 * 1024;
 
-    final length = await result.length();
+    final length = await safeFile.length();
     if (length > maxBackupBytes) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

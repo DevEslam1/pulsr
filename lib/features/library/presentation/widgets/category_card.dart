@@ -31,9 +31,13 @@ class CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.r18),
+    return Semantics(
+      button: true,
+      label: '$title, $subtitle',
+      selected: isSelected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.r18),
       child: AnimatedContainer(
             duration: context.motionMs(180),
         curve: Curves.easeOutCubic,
@@ -88,6 +92,7 @@ class CategoryCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }

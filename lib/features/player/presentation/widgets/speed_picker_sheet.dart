@@ -36,6 +36,9 @@ class SpeedPickerSheet extends StatelessWidget {
   /// 0.5-3.0 set; when the advanced 0.1-8.0 range is enabled it adds the
   /// extended steps so the toggle is actually usable.
   static List<double> speedOptionsFor(double min, double max) {
+    if (min > max) {
+      return speedOptions;
+    }
     final base = <double>[
       0.1,
       0.25,
@@ -53,7 +56,8 @@ class SpeedPickerSheet extends StatelessWidget {
       7.0,
       8.0,
     ];
-    return base.where((s) => s >= min && s <= max).toList();
+    final filtered = base.where((s) => s >= min && s <= max).toList();
+    return filtered.isNotEmpty ? filtered : speedOptions;
   }
 
   static const List<double> pitchSemitoneOptions = [

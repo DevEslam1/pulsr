@@ -35,6 +35,7 @@ import 'audio_quality_sheet.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../../settings/presentation/widgets/room_correction_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
@@ -79,16 +80,26 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   String _searchQuery = '';
   bool _isLoadingProfiles = true;
   bool _isAbComparing = false;
+  Timer? _abCompareTimer;
   bool? _isStudioModeOverride;
 
   bool _isStudio(BuildContext context) {
     if (_isStudioModeOverride != null) return _isStudioModeOverride!;
     try {
-      final settings = context.read<SettingsCubit>().state;
+      final settings = context.watch<SettingsCubit>().state;
       return settings.isProfessional;
     } catch (_) {
       return false;
     }
+  }
+
+  void _setStudioMode(BuildContext context, bool studio) {
+    setState(() => _isStudioModeOverride = studio);
+    try {
+      context.read<SettingsCubit>().setExperienceMode(
+            studio ? ExperienceMode.professional : ExperienceMode.normal,
+          );
+    } catch (_) {}
   }
 
   double _getBassGain(PlayerState state) {
@@ -210,6 +221,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   @override
   void dispose() {
+    _abCompareTimer?.cancel();
+    _abCompareTimer = null;
     _degradedSessionSub?.cancel();
     _tabController.dispose();
     _searchController.dispose();
@@ -1721,7 +1734,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: GestureDetector(
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  setState(() => _isStudioModeOverride = false);
+                  _setStudioMode(context, false);
                 },
                 child: AnimatedContainer(
                   duration: context.motionMs(200),
@@ -1767,7 +1780,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: GestureDetector(
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  setState(() => _isStudioModeOverride = true);
+                  _setStudioMode(context, true);
                 },
                 child: AnimatedContainer(
                   duration: context.motionMs(200),
@@ -1982,7 +1995,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               label: Text(context.l10n.eqUnlockStudioConsole),
               onPressed: () {
                 HapticFeedback.lightImpact();
-                setState(() => _isStudioModeOverride = true);
+                _setStudioMode(context, true);
               },
             ),
           ),
@@ -2197,14 +2210,25 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   opacity: dspBlocked != null ? 0.45 : 1.0,
                   child: GestureDetector(
                     onTapDown: (_) {
+                      _abCompareTimer?.cancel();
                       setState(() => _isAbComparing = true);
                       cubit.startAbComparison();
+                      _abCompareTimer = Timer(const Duration(seconds: 10), () {
+                        if (mounted) {
+                          setState(() => _isAbComparing = false);
+                        }
+                        cubit.endAbComparison();
+                      });
                     },
                     onTapUp: (_) {
+                      _abCompareTimer?.cancel();
+                      _abCompareTimer = null;
                       setState(() => _isAbComparing = false);
                       cubit.endAbComparison();
                     },
                     onTapCancel: () {
+                      _abCompareTimer?.cancel();
+                      _abCompareTimer = null;
                       setState(() => _isAbComparing = false);
                       cubit.endAbComparison();
                     },

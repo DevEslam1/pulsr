@@ -1,9 +1,9 @@
 // lib/data/visualizer/visualizer_preset_store.dart
 import 'dart:convert';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/safe_file_path.dart';
 import '../../domain/models/visualizer_preset.dart';
 
 /// Persists a user-authored Custom (JSON) visualizer preset.
@@ -42,10 +42,8 @@ class VisualizerPresetStore {
         allowedExtensions: const ['json'],
       );
       if (file == null) return null;
-      final path = file.path;
-      if (path == null || path.isEmpty) return null;
-      final ioFile = File(path);
-      if (!await ioFile.exists()) return null;
+      final ioFile = SafeFilePath.validate(file.path, allowedExtensions: const ['json']);
+      if (ioFile == null) return null;
       final content = await ioFile.readAsString();
       final preset = VisualizerPreset.fromJsonString(content);
       await save(preset);

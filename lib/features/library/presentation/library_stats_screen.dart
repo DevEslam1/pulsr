@@ -49,10 +49,18 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     _loadAllSongs();
   }
 
+  DateTime? _lastLoadedAt;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _loadAllSongs();
+      final now = DateTime.now();
+      if (_allSongs == null ||
+          _allSongs!.isEmpty ||
+          _lastLoadedAt == null ||
+          now.difference(_lastLoadedAt!).inSeconds >= 60) {
+        _loadAllSongs();
+      }
     }
   }
 
@@ -68,7 +76,10 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     final res = await repo.getAllSongs();
     if (!mounted) return;
     res.fold((_) {}, (songs) {
-      if (mounted) setState(() => _allSongs = songs);
+      if (mounted) {
+        _lastLoadedAt = DateTime.now();
+        setState(() => _allSongs = songs);
+      }
     });
   }
 

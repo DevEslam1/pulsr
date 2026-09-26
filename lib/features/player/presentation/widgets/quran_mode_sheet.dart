@@ -69,6 +69,12 @@ class _QuranModePanelState extends State<QuranModePanel> {
   }
 
   @override
+  void dispose() {
+    _capsFuture = null;
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
 

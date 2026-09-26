@@ -89,7 +89,20 @@ class QueueSlotCodec {
     if (version != null && (version is! int || version > currentSchemaVersion || version < 1)) {
       return null;
     }
+    if (version == null) {
+      return migrateDocument(map);
+    }
     return map;
+  }
+
+  /// Migrates older schema payloads up to [currentSchemaVersion].
+  static Map<String, dynamic> migrateDocument(Map<String, dynamic> document) {
+    final doc = Map<String, dynamic>.from(document);
+    final version = doc['schemaVersion'] as int? ?? 0;
+    if (version == 0) {
+      doc['schemaVersion'] = 1;
+    }
+    return doc;
   }
 
   /// Parses a restorable slot key ('0'..'2'); null for anything else.

@@ -1,6 +1,5 @@
 // lib/features/player/cubit/controllers/player_dsp_controller.dart
 import 'dart:async';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
@@ -11,6 +10,7 @@ import '../../../../core/services/room_correction_service.dart';
 import '../../../../core/services/settings_profiles_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/comparison_slot.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
@@ -100,6 +100,8 @@ class PlayerDspController {
   }
 
   void dispose() {
+    _abRevertTimer?.cancel();
+    _abRevertTimer = null;
     _deviceSub?.cancel();
     _deviceSub = null;
   }
@@ -340,8 +342,21 @@ class PlayerDspController {
     }
   }
 
-  Future<void> startAbComparison() => _audioHandler.startAbComparison();
-  Future<void> endAbComparison() => _audioHandler.endAbComparison();
+  Timer? _abRevertTimer;
+
+  Future<void> startAbComparison() async {
+    _abRevertTimer?.cancel();
+    _abRevertTimer = Timer(const Duration(seconds: 10), () {
+      endAbComparison();
+    });
+    return _audioHandler.startAbComparison();
+  }
+
+  Future<void> endAbComparison() {
+    _abRevertTimer?.cancel();
+    _abRevertTimer = null;
+    return _audioHandler.endAbComparison();
+  }
 
   Future<void> setBandMode(int count) async {
     if (count == 10 || count == 32) {

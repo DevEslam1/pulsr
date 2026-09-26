@@ -1,8 +1,8 @@
 // lib/data/visualizer/milkdrop_preset_store.dart
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/safe_file_path.dart';
 import '../../domain/models/milkdrop_preset.dart';
 
 /// Persists a user-imported Milkdrop preset (raw .milk text) for the visualizer.
@@ -47,10 +47,8 @@ class MilkdropPresetStore {
         allowedExtensions: const ['milk'],
       );
       if (file == null) return null;
-      final path = file.path;
-      if (path == null || path.isEmpty) return null;
-      final ioFile = File(path);
-      if (!await ioFile.exists()) return null;
+      final ioFile = SafeFilePath.validate(file.path, allowedExtensions: const ['milk']);
+      if (ioFile == null) return null;
       final content = await ioFile.readAsString();
       final cleanName = file.name.replaceAll(RegExp(r'\.milk$', caseSensitive: false), '');
       final preset = MilkdropPreset.fromMilk(

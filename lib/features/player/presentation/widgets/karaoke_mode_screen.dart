@@ -30,12 +30,6 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Maintain immersiveSticky across orientation and dependency changes
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

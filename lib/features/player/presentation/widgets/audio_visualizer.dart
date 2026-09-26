@@ -162,6 +162,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       final shader = program.fragmentShader();
       if (!mounted) {
         shader.dispose();
+        _shaderFailed = true;
         return;
       }
       setState(() {

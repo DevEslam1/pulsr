@@ -16,6 +16,7 @@ import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/safe_file_path.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
@@ -350,9 +351,12 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       type: FileType.custom,
       allowedExtensions: ['m3u', 'm3u8', 'pls', 'wpl'],
     );
-    if (result == null || result.path == null) return;
+    if (result == null) return;
+    final file = SafeFilePath.validate(result.path,
+        allowedExtensions: ['m3u', 'm3u8', 'pls', 'wpl']);
+    if (file == null) return;
 
-    final filePath = result.path!;
+    final filePath = file.path;
     final playlistName = result.name.replaceAll(
       RegExp(r'\.(m3u8?|pls|wpl)$', caseSensitive: false),
       '',

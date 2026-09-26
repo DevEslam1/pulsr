@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/network/connectivity_guard.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
@@ -126,6 +127,11 @@ class HomeCubit extends PulsrCubit<HomeState> {
     late final Future<List<YtmTrack>> future;
     future = () async {
       try {
+        if (!await ConnectivityGuard.hasConnection()) {
+          ErrorLogger.log('Skipping category $category fetch: no network connectivity',
+              category: 'HomeCubit');
+          return <YtmTrack>[];
+        }
         if (category == 'Recommended For You') {
           if (_account.isLoggedIn) {
             try {

@@ -1,9 +1,9 @@
 // lib/features/player/presentation/widgets/viper_ddc_sheet.dart
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/safe_file_path.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -53,10 +53,10 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         type: FileType.custom,
         allowedExtensions: ['vdc', 'txt'],
       );
-      if (result != null && result.path != null) {
-        final file = File(result.path!);
-        if (!await file.exists()) {
-          throw 'File does not exist';
+      if (result != null) {
+        final file = SafeFilePath.validate(result.path, allowedExtensions: ['vdc', 'txt']);
+        if (file == null) {
+          throw 'Invalid or inaccessible file';
         }
         final length = await file.length();
         if (length == 0 || length > 2 * 1024 * 1024) {

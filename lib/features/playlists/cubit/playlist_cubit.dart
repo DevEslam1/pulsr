@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/network/connectivity_guard.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
@@ -545,6 +546,12 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (!force &&
         onlineState.likedStatus == YtmFetchStatus.done &&
         onlineState.accountStatus == YtmFetchStatus.done) {
+      return;
+    }
+
+    if (!await ConnectivityGuard.hasConnection()) {
+      ErrorLogger.log('Skipping autoFetchOnlineLibrary: no network connectivity',
+          category: 'PlaylistCubit');
       return;
     }
 

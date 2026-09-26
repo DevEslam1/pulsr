@@ -16,7 +16,7 @@ typedef PlayerThemeBuilder = Widget Function(PlayerThemeProps props);
 class ThemeRegistry {
   ThemeRegistry._();
 
-  static final Map<PlayerThemeMode, PlayerThemeBuilder> _builders = {
+  static final Map<PlayerThemeMode, PlayerThemeBuilder> _defaultBuilders = {
     PlayerThemeMode.classic: (props) => ClassicPlayerTheme(props: props),
     PlayerThemeMode.card: (props) => CardPlayerTheme(props: props),
     PlayerThemeMode.circle: (props) => CirclePlayerTheme(props: props),
@@ -26,6 +26,9 @@ class ThemeRegistry {
     PlayerThemeMode.waveform: (props) => WaveformPlayerTheme(props: props),
     PlayerThemeMode.lyricsFocus: (props) => LyricsPlayerTheme(props: props),
   };
+
+  static final Map<PlayerThemeMode, PlayerThemeBuilder> _builders =
+      Map.from(_defaultBuilders);
 
   /// Builds the widget corresponding to the given [mode] and [props].
   static Widget build(PlayerThemeMode mode, PlayerThemeProps props) {
@@ -40,5 +43,12 @@ class ThemeRegistry {
   @visibleForTesting
   static void register(PlayerThemeMode mode, PlayerThemeBuilder builder) {
     _builders[mode] = builder;
+  }
+
+  /// Restores default theme builders after testing overrides.
+  @visibleForTesting
+  static void reset() {
+    _builders.clear();
+    _builders.addAll(_defaultBuilders);
   }
 }

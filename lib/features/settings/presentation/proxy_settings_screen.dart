@@ -1,5 +1,4 @@
 // lib/features/settings/presentation/proxy_settings_screen.dart
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +16,7 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import '../../../core/utils/input_sanitizer.dart';
+import '../../../core/utils/safe_file_path.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -370,11 +370,18 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                                   'conf'
                                 ],
                               );
-                              if (result != null && result.path != null) {
-                                final path = result.path!;
-                                final file = File(path);
-                                final content = await file.readAsString();
-                                textController.text = content;
+                              if (result != null) {
+                                final file = SafeFilePath.validate(result.path,
+                                    allowedExtensions: [
+                                      'txt',
+                                      'csv',
+                                      'list',
+                                      'conf'
+                                    ]);
+                                if (file != null) {
+                                  final content = await file.readAsString();
+                                  textController.text = content;
+                                }
                               }
                             } catch (e) {
                               if (ctx.mounted) {

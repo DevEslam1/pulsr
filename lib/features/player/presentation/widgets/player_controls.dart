@@ -286,6 +286,7 @@ class _ControlButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
+      excludeFromSemantics: true,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

@@ -8,6 +8,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_logo.dart';
@@ -1836,12 +1837,19 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
   MediaScannerService? _getScanner() {
     try {
       return context.read<MediaScannerService>();
-    } catch (_) {
+    } on ProviderNotFoundException catch (_) {
       try {
         if (getIt.isRegistered<MediaScannerService>()) {
           return getIt<MediaScannerService>();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('GetIt lookup for MediaScannerService failed',
+            error: e, stackTrace: st, category: 'HomeScreen');
+      }
+      return null;
+    } catch (e, st) {
+      ErrorLogger.log('Unexpected error reading MediaScannerService from context',
+          error: e, stackTrace: st, category: 'HomeScreen');
       return null;
     }
   }

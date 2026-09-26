@@ -53,9 +53,16 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
   }
 
   void _startPolling() {
+    if (!mounted) return;
     _pollTimer?.cancel();
     _pollDiagnostics();
-    _pollTimer = Timer.periodic(const Duration(seconds: 1), (_) => _pollDiagnostics());
+    _pollTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) {
+        _stopPolling();
+        return;
+      }
+      _pollDiagnostics();
+    });
   }
 
   void _stopPolling() {
