@@ -70,6 +70,27 @@ class UsbAudioControlParserTest {
     }
 
     @Test
+    fun parsesAsyncFeedbackEndpoint() {
+        val configWithFeedback = byteArrayOf(
+            // Audio Control interface
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            // AudioStreaming interface #1
+            9, 0x04, 0x01, 0x00, 0x00, 0x01, 0x02, 0x20, 0x00,
+            // Isochronous OUT endpoint (addr 0x01, attrs 0x05 = Asynchronous Isochronous OUT)
+            7, 0x05, 0x01, 0x05, 0x40, 0x00, 0x01,
+            // Isochronous IN feedback endpoint (addr 0x81, attrs 0x11 = Feedback Isochronous IN)
+            7, 0x05, 0x81.toByte(), 0x11, 0x04, 0x00, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(configWithFeedback)
+        assertNotNull(result.streamingEndpoint)
+        assertEquals(0x01, result.streamingEndpoint!!.address)
+        assertTrue(result.hasFeedbackEndpoint)
+        assertNotNull(result.feedbackEndpoint)
+        assertEquals(0x81, result.feedbackEndpoint!!.address)
+        assertEquals(4, result.feedbackEndpoint!!.maxPacketSize)
+    }
+
+    @Test
     fun malformedDescriptorsDoNotThrow() {
         assertNull(UsbAudioControlParser.parse(null).volumeUnit)
         assertEquals(0, UsbAudioControlParser.parse(ByteArray(0)).uacVersion)
@@ -77,5 +98,36 @@ class UsbAudioControlParserTest {
             0,
             UsbAudioControlParser.parse(byteArrayOf(0xFF.toByte(), 0x24, 0x06)).uacVersion,
         )
+    }
+
+    @Test
+    fun fuzzedDescriptorsNeverCrashParser() {
+        // Zero-length chunk loop-guard
+        val zeroLengthChunk = byteArrayOf(0x00, 0x01, 0x02, 0x03)
+        val r0 = UsbAudioControlParser.parse(zeroLengthChunk)
+        assertEquals(0, r0.uacVersion)
+
+        // Oversized length claims (buffer overrun defense)
+        val oversizedLength = byteArrayOf(120, 0x04, 0x00, 0x00)
+        val r1 = UsbAudioControlParser.parse(oversizedLength)
+        assertNull(r1.volumeUnit)
+
+        // Truncated endpoint descriptors
+        val truncatedEp = byteArrayOf(
+            9, 0x04, 0x01, 0x00, 0x00, 0x01, 0x02, 0x20, 0x00,
+            3, 0x05, 0x01 // says length is 3, endpoint expects 7
+        )
+        val r2 = UsbAudioControlParser.parse(truncatedEp)
+        assertNull(r2.streamingEndpoint)
+
+        // Pseudo-random fuzzed byte arrays
+        val random = java.util.Random(1337)
+        for (i in 0 until 100) {
+            val length = random.nextInt(128)
+            val bytes = ByteArray(length)
+            random.nextBytes(bytes)
+            val res = UsbAudioControlParser.parse(bytes)
+            assertNotNull(res) // Must gracefully return a result object without uncaught exception
+        }
     }
 }

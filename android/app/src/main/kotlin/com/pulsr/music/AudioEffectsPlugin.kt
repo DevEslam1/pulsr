@@ -13,6 +13,7 @@ import android.media.audiofx.Virtualizer
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -405,6 +406,243 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeIsSafetyAttenuationActive(): Boolean
     private external fun nativeSetHeadphoneSafetyParams(enabled: Boolean, threshold: Double, ceilingDb: Double)
     private external fun nativeReset()
+    private external fun nativeTriggerStageAutoDegrade(stageBitmask: Int)
+    private external fun nativeRecoverStageAutoDegrade(stageBitmask: Int)
+    private external fun nativeSetBypassCompare(enabled: Boolean, gainCompensationDb: Double)
+
+    @Volatile private var isRtfGovernorEnabled = true
+    @Volatile private var consecutiveHighRtfCount = 0
+    @Volatile private var consecutiveLowRtfCount = 0
+    @Volatile private var proactivelyDegradedStages = 0
+    private var rtfGovernorRunnable: Runnable? = null
+    @Volatile private var isBypassCompareActive = false
+    @Volatile private var bypassCompareGainCompensationDb = 0.0
+
+    private fun startRtfGovernor() {
+        if (rtfGovernorRunnable != null) return
+        val r = object : Runnable {
+            override fun run() {
+                if (disposed.get() || !isRtfGovernorEnabled) return
+                if (isNativeDspLoaded) {
+                    val rtf = try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
+                    if (rtf > 0.60) {
+                        consecutiveHighRtfCount++
+                        consecutiveLowRtfCount = 0
+                        if (consecutiveHighRtfCount >= 4) {
+                            proactivelyDemoteCheapestHeavyStage()
+                            consecutiveHighRtfCount = 0
+                        }
+                    } else if (rtf < 0.40) {
+                        consecutiveLowRtfCount++
+                        consecutiveHighRtfCount = 0
+                        if (consecutiveLowRtfCount >= 4) {
+                            proactivelyRecoverStage()
+                            consecutiveLowRtfCount = 0
+                        }
+                    } else {
+                        consecutiveHighRtfCount = 0
+                        consecutiveLowRtfCount = 0
+                    }
+                }
+                mainHandler.postDelayed(this, 500L)
+            }
+        }
+        rtfGovernorRunnable = r
+        mainHandler.postDelayed(r, 500L)
+    }
+
+    private fun stopRtfGovernor() {
+        rtfGovernorRunnable?.let { mainHandler.removeCallbacks(it) }
+        rtfGovernorRunnable = null
+        consecutiveHighRtfCount = 0
+        consecutiveLowRtfCount = 0
+    }
+
+    private fun proactivelyDemoteCheapestHeavyStage() {
+        if (!isNativeDspLoaded) return
+        val currentDegraded = try { nativeGetAutoDegradedStages() } catch (_: Exception) { 0 }
+        val candidateStages = intArrayOf(
+            STAGE_REVERB,
+            STAGE_LIVE_PROG,
+            STAGE_ARBITRARY_EQ,
+            STAGE_MULTIBAND_COMPRESSOR,
+            STAGE_DYNAMIC_BASS,
+            STAGE_SATURATION
+        )
+        for (stage in candidateStages) {
+            if ((activeDspStages and stage) != 0 && (currentDegraded and stage) == 0 && (proactivelyDegradedStages and stage) == 0) {
+                try {
+                    nativeTriggerStageAutoDegrade(stage)
+                    proactivelyDegradedStages = proactivelyDegradedStages or stage
+                    Log.w(TAG, "[RTF Governor] High RTF sustained > 0.6. Proactively demoting stage $stage (proactivelyDegradedMask=$proactivelyDegradedStages)")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to trigger proactive stage demote: ${e.message}")
+                }
+                break
+            }
+        }
+    }
+
+    private fun proactivelyRecoverStage() {
+        if (!isNativeDspLoaded || proactivelyDegradedStages == 0) return
+        val candidateStagesInReverse = intArrayOf(
+            STAGE_SATURATION,
+            STAGE_DYNAMIC_BASS,
+            STAGE_MULTIBAND_COMPRESSOR,
+            STAGE_ARBITRARY_EQ,
+            STAGE_LIVE_PROG,
+            STAGE_REVERB
+        )
+        for (stage in candidateStagesInReverse) {
+            if ((proactivelyDegradedStages and stage) != 0) {
+                try {
+                    nativeRecoverStageAutoDegrade(stage)
+                    proactivelyDegradedStages = proactivelyDegradedStages and stage.inv()
+                    Log.i(TAG, "[RTF Governor] RTF recovered < 0.4. Restoring stage $stage (remaining proactivelyDegradedMask=$proactivelyDegradedStages)")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to recover proactive stage: ${e.message}")
+                }
+                break
+            }
+        }
+    }
+
+    private var thermalListener: Any? = null
+    @Volatile private var currentThermalStatus: Int = 0
+
+    private fun registerThermalListener(ctx: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+            val listener = PowerManager.OnThermalStatusChangedListener { status ->
+                currentThermalStatus = status
+                Log.w(TAG, "[ThermalGovernor] Thermal status changed to $status")
+                if (status >= PowerManager.THERMAL_STATUS_MODERATE) {
+                    proactivelyDemoteCheapestHeavyStage()
+                    if (status >= PowerManager.THERMAL_STATUS_SEVERE) {
+                        proactivelyDemoteCheapestHeavyStage()
+                    }
+                } else if (status <= PowerManager.THERMAL_STATUS_LIGHT) {
+                    proactivelyRecoverStage()
+                }
+            }
+            try {
+                pm.addThermalStatusListener(listener)
+                thermalListener = listener
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to add thermal status listener: ${e.message}")
+            }
+        }
+    }
+
+    private fun unregisterThermalListener(ctx: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val listener = thermalListener as? PowerManager.OnThermalStatusChangedListener ?: return
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+            try {
+                pm.removeThermalStatusListener(listener)
+            } catch (_: Exception) {}
+            thermalListener = null
+        }
+    }
+
+    private fun getDspBatteryDrainEstimate(): Map<String, Any?> {
+        val rtf = if (isNativeDspLoaded) {
+            try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
+        } else 0.0
+
+        val activeCount = Integer.bitCount(activeDspStages)
+        val dspActive = isNativeDspLoaded && activeCount > 0 && !isBitPerfectBypassActive && !isBypassCompareActive
+
+        val baselineMahPerHr = 75.0
+        val dspDeltaMahPerHr = if (dspActive) {
+            (activeCount * 8.5) + (rtf * 40.0)
+        } else {
+            0.0
+        }
+        val totalDrainMahPerHr = baselineMahPerHr + dspDeltaMahPerHr
+
+        val thermalName = when (currentThermalStatus) {
+            0 -> "NONE"
+            1 -> "LIGHT"
+            2 -> "MODERATE"
+            3 -> "SEVERE"
+            4 -> "CRITICAL"
+            5 -> "EMERGENCY"
+            6 -> "SHUTDOWN"
+            else -> "UNKNOWN"
+        }
+
+        return mapOf(
+            "dspActive" to dspActive,
+            "activeStagesCount" to activeCount,
+            "rollingRtf" to rtf,
+            "baselineMahPerHour" to baselineMahPerHr,
+            "estimatedMahPerHour" to totalDrainMahPerHr,
+            "dspDeltaMahPerHour" to dspDeltaMahPerHr,
+            "thermalStatus" to currentThermalStatus,
+            "thermalStatusName" to thermalName,
+            "proactivelyDegradedStages" to proactivelyDegradedStages
+        )
+    }
+
+    private fun getChainOfCustodyReport(): Map<String, Any?> {
+        val activeStagesList = mutableListOf<String>()
+        val stages = activeDspStages
+        if ((stages and STAGE_EQ) != 0) activeStagesList.add("EQUALIZER")
+        if ((stages and STAGE_CROSSFEED) != 0) activeStagesList.add("CROSSFEED")
+        if ((stages and STAGE_REVERB) != 0) activeStagesList.add("REVERB")
+        if ((stages and STAGE_PANNER) != 0) activeStagesList.add("PANNER")
+        if ((stages and STAGE_LIMITER) != 0) activeStagesList.add("LIMITER")
+        if ((stages and STAGE_RESAMPLER) != 0) activeStagesList.add("RESAMPLER")
+        if ((stages and STAGE_SATURATION) != 0) activeStagesList.add("SATURATION")
+        if ((stages and STAGE_WIDTH) != 0) activeStagesList.add("STEREO_WIDTH")
+        if ((stages and STAGE_LOUDNESS) != 0) activeStagesList.add("LOUDNESS_CONTOUR")
+        if ((stages and STAGE_CROSSOVER) != 0) activeStagesList.add("SUB_CROSSOVER")
+        if ((stages and STAGE_DYNEQ) != 0) activeStagesList.add("DYNAMIC_EQ")
+        if ((stages and STAGE_DITHER) != 0) activeStagesList.add("DITHER")
+        if ((stages and STAGE_MULTIBAND_COMPRESSOR) != 0) activeStagesList.add("MULTIBAND_COMPRESSOR")
+        if ((stages and STAGE_DYNAMIC_BASS) != 0) activeStagesList.add("DYNAMIC_BASS")
+        if ((stages and STAGE_VIPER_DDC) != 0) activeStagesList.add("VIPER_DDC")
+        if ((stages and STAGE_ARBITRARY_EQ) != 0) activeStagesList.add("ARBITRARY_EQ")
+        if ((stages and STAGE_LIVE_PROG) != 0) activeStagesList.add("LIVE_PROG")
+
+        val rtf = if (isNativeDspLoaded) {
+            try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
+        } else 0.0
+
+        val appliedSampleRate = if (isNativeDspLoaded) {
+            try { nativeGetAppliedSampleRate() } catch (_: Exception) { 44100.0 }
+        } else 44100.0
+
+        val latencyFrames = if (isNativeDspLoaded) {
+            try { nativeGetPipelineLatencyFrames() } catch (_: Exception) { 0 }
+        } else 0
+
+        val lookahead = if ((stages and STAGE_LIMITER) != 0) limiterLookaheadMs else 0.0
+        val estimatedLatencyMs = if (appliedSampleRate > 0) {
+            ((latencyFrames.toDouble() / appliedSampleRate) * 1000.0) + lookahead
+        } else {
+            lookahead
+        }
+
+        val isBitExact = isBitPerfectBypassActive || (activeDspStages == 0 && !isDitherEnabled)
+
+        return mapOf(
+            "nativeEngineLoaded" to isNativeDspLoaded,
+            "sampleRate" to appliedSampleRate,
+            "bufferSize" to (if (latencyFrames > 0) latencyFrames else 512),
+            "activeStagesBitmask" to activeDspStages,
+            "activeStages" to activeStagesList,
+            "isBitPerfectActive" to isBitPerfectBypassActive,
+            "isBypassCompareActive" to isBypassCompareActive,
+            "isDitherEnabled" to isDitherEnabled,
+            "ditherBitDepth" to ditherTargetBitDepth,
+            "rollingRtf" to rtf,
+            "estimatedLatencyMs" to estimatedLatencyMs,
+            "isBitExactChain" to isBitExact,
+            "thermalStatus" to currentThermalStatus
+        )
+    }
 
     @Volatile private var cachedDebugReport: Map<String, Any?>? = null
 
@@ -810,6 +1048,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             )
         }
         configureNativeMemoryBudget(appContext)
+        startRtfGovernor()
+        registerThermalListener(appContext)
         // Prefetch OEM info off main thread
         Thread { try { getCachedOemInfo(appContext) } catch (_: Exception) {} }.start()
 
@@ -903,6 +1143,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
         }
         audioDeviceCallback = null
+        context?.let { unregisterThermalListener(it) }
+        stopRtfGovernor()
         systemAudioEffectsController?.release()
         systemAudioEffectsController = null
 
@@ -1066,6 +1308,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
                 "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers",
                 "setDynamicBassParams", "getTelemetry", "getLimiterGrDb", "getDynEqGrDb", "getMultibandGrDb", "getRollingRtf",
+                "getRtfGovernorStatus", "setRtfGovernorEnabled", "setBypassCompare",
+                "getThermalStatus", "getDspBatteryDrainEstimate", "getChainOfCustodyReport",
                 "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams" -> {
                     synchronized(stateLock) {
                         handleNativeDspCall(call, result)
@@ -1729,6 +1973,62 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     } else {
                         result.success(0.0)
                     }
+                }
+
+                "getRtfGovernorStatus" -> {
+                    result.success(mapOf(
+                        "enabled" to isRtfGovernorEnabled,
+                        "rtf" to if (isNativeDspLoaded) {
+                            try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
+                        } else 0.0,
+                        "consecutiveHighRtfCount" to consecutiveHighRtfCount,
+                        "proactivelyDegradedStages" to proactivelyDegradedStages,
+                        "isDegraded" to (proactivelyDegradedStages != 0 || (if (isNativeDspLoaded) {
+                            try { nativeGetAutoDegradedStages() != 0 } catch (_: Exception) { false }
+                        } else false))
+                    ))
+                }
+
+                "setRtfGovernorEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    isRtfGovernorEnabled = enabled
+                    if (!enabled) {
+                        if (proactivelyDegradedStages != 0 && isNativeDspLoaded) {
+                            try { nativeRecoverStageAutoDegrade(proactivelyDegradedStages) } catch (_: Exception) {}
+                            proactivelyDegradedStages = 0
+                        }
+                        stopRtfGovernor()
+                    } else {
+                        startRtfGovernor()
+                    }
+                    result.success(true)
+                }
+
+                "setBypassCompare" -> {
+                    val bypass = call.argument<Boolean>("bypass") ?: false
+                    val gainCompensationDb = call.argument<Double>("gainCompensationDb") ?: 0.0
+                    isBypassCompareActive = bypass
+                    bypassCompareGainCompensationDb = gainCompensationDb
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetBypassCompare(bypass, gainCompensationDb)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetBypassCompare failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "getThermalStatus" -> {
+                    result.success(currentThermalStatus)
+                }
+
+                "getDspBatteryDrainEstimate" -> {
+                    result.success(getDspBatteryDrainEstimate())
+                }
+
+                "getChainOfCustodyReport" -> {
+                    result.success(getChainOfCustodyReport())
                 }
 
                 "getWeeklyDose" -> {

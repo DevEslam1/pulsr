@@ -180,6 +180,36 @@ uint32_t DspEngineRegistry::getAutoDegradedStages() {
     return degraded;
 }
 
+void DspEngineRegistry::triggerStageAutoDegrade(uint32_t stageBitmask) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine::instance().triggerStageAutoDegrade(stageBitmask);
+    for (auto* engine : engines_) {
+        if (engine) {
+            engine->triggerStageAutoDegrade(stageBitmask);
+        }
+    }
+}
+
+void DspEngineRegistry::recoverStageAutoDegrade(uint32_t stageBitmask) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine::instance().recoverStageAutoDegrade(stageBitmask);
+    for (auto* engine : engines_) {
+        if (engine) {
+            engine->recoverStageAutoDegrade(stageBitmask);
+        }
+    }
+}
+
+void DspEngineRegistry::setBypassCompare(bool enabled, double gainCompensationDb) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine::instance().setBypassCompare(enabled, gainCompensationDb);
+    for (auto* engine : engines_) {
+        if (engine) {
+            engine->setBypassCompare(enabled, gainCompensationDb);
+        }
+    }
+}
+
 void DspEngineRegistry::getTelemetry(double* outArray, int size) {
     if (!outArray || size < 15) return;
     std::lock_guard<std::mutex> lock(mutex_);
@@ -302,6 +332,15 @@ uint32_t AudioDspEngine::getActiveStages() const {
     auto snapshot = getParams();
     return snapshot ? snapshot->activeStages : 0xFFFFFFFF;
 }
+
+void AudioDspEngine::setBypassCompare(bool enabled, double gainCompensationDb) {
+    const double gainLinear = std::pow(10.0, gainCompensationDb / 20.0);
+    updateParams([enabled, gainLinear](DspParamSnapshot& snap) {
+        snap.bypassCompare.enabled = enabled;
+        snap.bypassCompare.gainCompensationLinear = gainLinear;
+    });
+}
+
 
 void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snapshot) {
     if (!snapshot) return;
@@ -446,6 +485,19 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     if (snapshot->bitPerfect.enabled) {
         return frames;
     }
+
+    // Level-Matched A/B Bypass: instant level-matched A/B comparison without volume drop.
+    if (snapshot->bypassCompare.enabled) {
+        if (std::abs(snapshot->bypassCompare.gainCompensationLinear - 1.0) > 1e-4) {
+            const int totalSamples = frames * channels;
+            const float gain = static_cast<float>(snapshot->bypassCompare.gainCompensationLinear);
+            for (int i = 0; i < totalSamples; ++i) {
+                buffer[i] *= gain;
+            }
+        }
+        return frames;
+    }
+
 
     // ReplayGain 2.0 / EBU R128 pre-gain calculation
     if (snapshot->replayGain.enabled && snapshot->replayGain.mode != ReplayGainMode::Off) {

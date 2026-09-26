@@ -42,9 +42,11 @@ object UsbAudioControlParser {
         val volumeUnit: FeatureUnitVolume?,
         val streamingInterface: Int?,
         val streamingEndpoint: StreamingEndpoint? = null,
+        val feedbackEndpoint: StreamingEndpoint? = null,
         val supportedRates: List<Int> = emptyList(),
     ) {
         val hasVolumeControl: Boolean get() = volumeUnit != null
+        val hasFeedbackEndpoint: Boolean get() = feedbackEndpoint != null
     }
 
     private const val DESC_INTERFACE = 0x04
@@ -87,6 +89,7 @@ object UsbAudioControlParser {
         var volumeUnit: FeatureUnitVolume? = null
         var streamingInterface: Int? = null
         var streamingEndpoint: StreamingEndpoint? = null
+        var feedbackEndpoint: StreamingEndpoint? = null
         val supportedRates = mutableListOf<Int>()
         val standardRates = intArrayOf(44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000)
 
@@ -129,10 +132,10 @@ object UsbAudioControlParser {
 
                 DESC_ENDPOINT -> {
                     // First isochronous OUT endpoint on an AudioStreaming
-                    // interface is the exclusive playback target.
+                    // interface is the exclusive playback target. Also detect
+                    // asynchronous feedback IN endpoints (Pillar 3).
                     if (currentClass == CLASS_AUDIO &&
                         currentSubclass == SUBCLASS_AUDIOSTREAMING &&
-                        streamingEndpoint == null &&
                         i + OFF_EP_MAX_PACKET + 1 < descriptors.size
                     ) {
                         val address = descriptors[i + OFF_EP_ADDRESS].toInt() and 0xFF
@@ -140,15 +143,28 @@ object UsbAudioControlParser {
                         val maxPacket =
                             (descriptors[i + OFF_EP_MAX_PACKET].toInt() and 0xFF) or
                                 ((descriptors[i + OFF_EP_MAX_PACKET + 1].toInt() and 0xFF) shl 8)
-                        if ((attributes and 0x03) == XFER_ISOCHRONOUS &&
-                            (address and EP_DIR_IN) == 0
-                        ) {
+                        val isIso = (attributes and 0x03) == XFER_ISOCHRONOUS
+                        val isOut = (address and EP_DIR_IN) == 0
+                        val isIn = (address and EP_DIR_IN) != 0
+
+                        if (isIso && isOut && streamingEndpoint == null) {
                             streamingEndpoint = StreamingEndpoint(
                                 address = address,
                                 interfaceNumber = currentAsInterface,
                                 altSetting = currentAltSetting,
                                 maxPacketSize = maxPacket,
                             )
+                        } else if (isIso && isIn && feedbackEndpoint == null) {
+                            val usage = (attributes and 0x30)
+                            val synch = (attributes and 0x0C)
+                            if (usage == 0x10 || synch == 0x04 || maxPacket in 3..8) {
+                                feedbackEndpoint = StreamingEndpoint(
+                                    address = address,
+                                    interfaceNumber = currentAsInterface,
+                                    altSetting = currentAltSetting,
+                                    maxPacketSize = maxPacket,
+                                )
+                            }
                         }
                     }
                 }
@@ -242,6 +258,7 @@ object UsbAudioControlParser {
             volumeUnit = volumeUnit,
             streamingInterface = streamingInterface,
             streamingEndpoint = streamingEndpoint,
+            feedbackEndpoint = feedbackEndpoint,
             supportedRates = supportedRates.distinct().sorted(),
         )
     }

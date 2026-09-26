@@ -1,4 +1,4 @@
-﻿// lib/core/services/device_profile_service.dart
+// lib/core/services/device_profile_service.dart
 import 'dart:convert';
 
 import 'package:injectable/injectable.dart';
@@ -189,6 +189,33 @@ class DeviceProfileService {
       ErrorLogger.log('Failed to load device registry',
           error: e, stackTrace: st, category: 'DeviceProfileService');
       return const [];
+    }
+  }
+
+  /// Exports all device-profile links as JSON for backup or sync across devices (Pillar 2).
+  Future<String> exportLinksJson() async {
+    final links = await getLinks();
+    return json.encode(links.map((k, v) => MapEntry(k, v.toJson())));
+  }
+
+  /// Imports device-profile links from JSON (merging with existing links).
+  Future<bool> importLinksJson(String jsonStr) async {
+    try {
+      final decoded = json.decode(jsonStr) as Map<String, dynamic>;
+      final links = await getLinks();
+      for (final entry in decoded.entries) {
+        if (entry.value is Map<String, dynamic>) {
+          links[entry.key] = DeviceProfileLink.fromJson(entry.value as Map<String, dynamic>);
+        }
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyLinks,
+          json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to import device profile links from JSON',
+          error: e, stackTrace: st, category: 'DeviceProfileService');
+      return false;
     }
   }
 }

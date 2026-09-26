@@ -30,6 +30,7 @@ class CastMediaServer {
     private val running = AtomicBoolean(false)
 
     private val servedFiles = java.util.concurrent.ConcurrentHashMap<String, ServedFile>()
+    private val prebufferCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
     @Volatile private var servingPath: String? = null
     @Volatile private var servingMime: String = "application/octet-stream"
     @Volatile private var port: Int = 0
@@ -61,6 +62,7 @@ class CastMediaServer {
         thread = null
         servingPath = null
         servedFiles.clear()
+        prebufferCache.clear()
     }
 
     /**
@@ -77,6 +79,7 @@ class CastMediaServer {
         while (it.hasNext()) {
             val entry = it.next()
             if (now - entry.value.timestampMs > EVICTION_TTL_MS) {
+                prebufferCache.remove(entry.key)
                 it.remove()
             }
         }
@@ -88,6 +91,28 @@ class CastMediaServer {
         servingMime = resolvedMime
         val host = localIpv4() ?: return null
         return "http://$host:$port/media/$token"
+    }
+
+    /**
+     * Pre-buffers the beginning of [path] into memory and returns the Cast streaming URL.
+     * Guarantees zero-latency immediate byte delivery on track change for gapless Cast playback.
+     */
+    fun preBufferFile(path: String, mime: String?): String? {
+        val url = serveFile(path, mime) ?: return null
+        val token = url.substringAfterLast("/")
+        try {
+            val f = File(path)
+            if (f.exists() && f.isFile) {
+                val prebufSize = minOf(f.length(), 256 * 1024L).toInt()
+                val bytes = ByteArray(prebufSize)
+                f.inputStream().use { it.read(bytes, 0, prebufSize) }
+                prebufferCache[token] = bytes
+                Log.d(TAG, "Pre-buffered $prebufSize bytes for gapless Cast playback: $token")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Pre-buffering failed non-fatally for $path: ${e.message}")
+        }
+        return url
     }
 
     private fun acceptLoop(ss: ServerSocket) {
@@ -179,15 +204,30 @@ class CastMediaServer {
         }
         out.write(header.toByteArray())
 
+        val token = if (target.startsWith("/media/")) target.removePrefix("/media/").trimEnd('/') else null
+        val prebuf = if (start == 0L && token != null) prebufferCache[token] else null
+
         file.inputStream().use { fis ->
-            var skipped = 0L
-            while (skipped < start) {
-                val s = fis.skip(start - skipped)
-                if (s <= 0) break
-                skipped += s
+            var remaining = contentLength
+            if (prebuf != null && prebuf.isNotEmpty()) {
+                val prebufToSend = minOf(prebuf.size.toLong(), remaining).toInt()
+                out.write(prebuf, 0, prebufToSend)
+                remaining -= prebufToSend
+                var toSkipInFis = prebufToSend.toLong()
+                while (toSkipInFis > 0) {
+                    val s = fis.skip(toSkipInFis)
+                    if (s <= 0) break
+                    toSkipInFis -= s
+                }
+            } else {
+                var skipped = 0L
+                while (skipped < start) {
+                    val s = fis.skip(start - skipped)
+                    if (s <= 0) break
+                    skipped += s
+                }
             }
             val buf = ByteArray(64 * 1024)
-            var remaining = contentLength
             while (remaining > 0) {
                 val toRead = minOf(buf.size.toLong(), remaining).toInt()
                 val n = fis.read(buf, 0, toRead)

@@ -324,6 +324,11 @@ struct HeadphoneSafetyParamSet {
     bool attenuationActive = false;
 };
 
+struct BypassCompareParamSet {
+    bool enabled = false;
+    double gainCompensationLinear = 1.0;
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -350,4 +355,6 @@ struct DspParamSnapshot {
     ArbitraryEqParamSet arbitraryEq;
     LiveProgParamSet liveProg;
     HeadphoneSafetyParamSet headphoneSafety;
+    BypassCompareParamSet bypassCompare;
 };
+

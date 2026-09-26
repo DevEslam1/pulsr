@@ -315,6 +315,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "getDopCapabilities" -> {
             result.success(getDopCapabilities())
         }
+        "verifyDopLock" -> {
+            result.success(verifyDopLockInternal())
+        }
         "setTargetOutputFormat", "configureTargetAudio" -> {
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
@@ -1169,7 +1172,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val hasDsd64Carrier = rates.contains(176400)
         val hasDsd128Carrier = rates.contains(352800)
         val hasDsd256Carrier = rates.contains(705600)
-        val dopVerified = isUac2 && (hasDsd64Carrier || hasDsd128Carrier || hasDsd256Carrier)
+        val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
+        val devKey = "${usbDac.productName ?: "usb_dac"}_${usbDac.id}"
+        val explicitlyVerified = prefs.getBoolean("dop_verified_$devKey", false)
+        val dopVerified = explicitlyVerified || (isUac2 && (hasDsd64Carrier || hasDsd128Carrier || hasDsd256Carrier))
 
         return mapOf(
             "dsd64" to hasDsd64Carrier,
@@ -1180,6 +1186,32 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "nativeDac" to true,
             "isUac2" to isUac2,
             "dopVerified" to dopVerified,
+        )
+    }
+
+    private fun verifyDopLockInternal(): Map<String, Any?> {
+        val usbDac = try {
+            audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.firstOrNull {
+                it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+            }
+        } catch (_: Exception) { null }
+        if (usbDac == null) {
+            return mapOf("success" to false, "reason" to "no_usb_dac", "dopVerified" to false)
+        }
+        val (uac, _) = probeUsbDac()
+        val isUac2 = (uac == UsbDacDiagnostics.UAC2 || uac == UsbDacDiagnostics.UAC3)
+        val rates = usbDac.sampleRates.toSet()
+        val hasCarrier = rates.contains(176400) || rates.contains(352800) || rates.contains(705600)
+        val verified = isUac2 && hasCarrier
+        val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
+        val devKey = "${usbDac.productName ?: "usb_dac"}_${usbDac.id}"
+        prefs.edit().putBoolean("dop_verified_$devKey", verified).apply()
+        return mapOf(
+            "success" to verified,
+            "dopVerified" to verified,
+            "isUac2" to isUac2,
+            "hasCarrier" to hasCarrier,
+            "deviceName" to (usbDac.productName ?: "USB DAC"),
         )
     }
 

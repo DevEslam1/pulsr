@@ -98,13 +98,42 @@ enum class YtmBlockSignal(val code: String) {
             "not available on this app"
         )
 
-        // 2026-09: SABR enforcement wording. Checked BEFORE geo/gone tables
-        // so a SABR-forced response is never misread as VideoGone/BotChallenge.
         private val SABR_SUBSTRINGS = listOf(
             "forcing sabr",
             "sabr streaming",
             "missing a url",
             "server-based adaptive bitrate"
+        )
+
+        private val NETWORK_UNAVAILABLE_SUBSTRINGS = listOf(
+            "unknownhostexception",
+            "connectexception",
+            "sockettimeoutexception",
+            "no route to host",
+            "network is unreachable",
+            "failed to connect to",
+            "econnrefused",
+            "ehostunreach",
+            "enonetwork",
+            "network unavailable",
+            "ytm_network"
+        )
+
+        private val SIGNATURE_DECIPHER_SUBSTRINGS = listOf(
+            "signature decipher",
+            "decipher",
+            "n-sig",
+            "nsig",
+            "signature_decipher_failed",
+            "unable to extract signature",
+            "could not decipher"
+        )
+
+        private val INTERRUPTED_SUBSTRINGS = listOf(
+            "interruptedioexception",
+            "thread interrupted",
+            "coroutine interrupted",
+            "interrupted"
         )
 
         /**
@@ -150,6 +179,21 @@ enum class YtmBlockSignal(val code: String) {
                 ?.optString("simpleText") ?: "").lowercase()
 
             val combinedReasons = "$body $reason $subreason"
+
+            // 0. Cancellation / Interrupted
+            if (INTERRUPTED_SUBSTRINGS.any { combinedReasons.contains(it) }) {
+                return Interrupted
+            }
+
+            // 0.5 Network Unavailable (offline, connection failure)
+            if (NETWORK_UNAVAILABLE_SUBSTRINGS.any { combinedReasons.contains(it) }) {
+                return NetworkUnavailable
+            }
+
+            // 0.8 Signature Decipher Failure (cipher decode failure)
+            if (SIGNATURE_DECIPHER_SUBSTRINGS.any { combinedReasons.contains(it) }) {
+                return SignatureDecipherFailed
+            }
 
             // 1. Bot Challenge (highest priority detection)
             if (BOT_SUBSTRINGS.any { combinedReasons.contains(it) } ||

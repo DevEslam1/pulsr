@@ -79,6 +79,7 @@ class UsbExclusivePlugin(
 
     private var nativeLoaded = false
     @Volatile private var streaming = false
+    @Volatile private var currentStreamingRate = 0
     private var claimedStreamingInterface: UsbInterface? = null
 
     // Raw UAC2 isochronous streaming, implemented in UsbAudioSink.cpp.
@@ -186,6 +187,24 @@ class UsbExclusivePlugin(
                 }
                 "getBufferedMs" -> {
                     result.success(if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0)
+                }
+                "setVolumeCalibrationOffset" -> {
+                    val offsetDb = call.argument<Double>("offsetDb") ?: 0.0
+                    val device = openedDevice ?: findAudioDevice()
+                    if (device != null) {
+                        setVolumeCalibrationOffset(device.vendorId, device.productId, offsetDb)
+                        emitState()
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "getVolumeCalibrationOffset" -> {
+                    val device = openedDevice ?: findAudioDevice()
+                    val offset = if (device != null) {
+                        getVolumeCalibrationOffset(device.vendorId, device.productId)
+                    } else 0.0
+                    result.success(offset)
                 }
                 "querySupportedRates" -> {
                     val device = openedDevice ?: findAudioDevice()
@@ -356,6 +375,8 @@ class UsbExclusivePlugin(
             "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
             "underrunCount" to if (nativeLoaded) nativeUsbStreamGetUnderrunCount() else 0L,
             "overrunCount" to if (nativeLoaded) nativeUsbStreamGetOverrunCount() else 0L,
+            "bufferedMs" to if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0,
+            "volumeCalibrationOffsetDb" to getVolumeCalibrationOffset(device.vendorId, device.productId),
         )
     }
 
@@ -381,7 +402,19 @@ class UsbExclusivePlugin(
         "maxVolumeDb" to null,
         "interfaceNumber" to null,
         "supportedRates" to emptyList<Int>(),
+        "bufferedMs" to 0.0,
+        "volumeCalibrationOffsetDb" to (device?.let { getVolumeCalibrationOffset(it.vendorId, it.productId) } ?: 0.0),
     )
+
+    private fun getVolumeCalibrationOffset(vendorId: Int, productId: Int): Double {
+        val prefs = context.getSharedPreferences("pulsr_usb_vol_prefs", Context.MODE_PRIVATE)
+        return prefs.getFloat("cal_${vendorId}_${productId}", 0.0f).toDouble()
+    }
+
+    private fun setVolumeCalibrationOffset(vendorId: Int, productId: Int, offsetDb: Double) {
+        val prefs = context.getSharedPreferences("pulsr_usb_vol_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putFloat("cal_${vendorId}_${productId}", offsetDb.toFloat()).apply()
+    }
 
     private fun deviceLabel(device: UsbDevice): String =
         listOfNotNull(device.manufacturerName, device.productName)
@@ -516,7 +549,9 @@ class UsbExclusivePlugin(
             return failure("unsupported_uac")
         }
         refreshVolumeRange()
-        val target = db.coerceIn(minDb(), maxDb())
+        val offset = getVolumeCalibrationOffset(device.vendorId, device.productId)
+        val calibratedDb = db + offset
+        val target = calibratedDb.coerceIn(minDb(), maxDb())
         val raw = dbToRaw(target)
         val bytes = rawToBytes(raw)
         val ok = transfer(conn, BM_SET, REQ_SET_CUR, unit, 0, bytes)
@@ -635,7 +670,14 @@ class UsbExclusivePlugin(
     // ---- raw UAC2 isochronous streaming ----
 
     private fun startStreamingInternal(sampleRate: Int, channels: Int): Map<String, Any?> {
-        if (streaming) return buildStatus() + mapOf("success" to true)
+        if (streaming) {
+            if (currentStreamingRate == sampleRate) {
+                return buildStatus() + mapOf("success" to true)
+            }
+            // Gapless rate switching: stop native isochronous sink worker without releasing claimed interface
+            try { nativeUsbStreamStop() } catch (_: Throwable) {}
+            streaming = false
+        }
         if (!nativeLoaded) return failure("native_unavailable")
         val device = findAudioDevice() ?: return failure("no_usb_device")
         if (usbManager?.hasPermission(device) != true) return failure("permission_required")
@@ -715,6 +757,7 @@ class UsbExclusivePlugin(
             }
             mainHandler.removeCallbacks(watchdog)
             streaming = true
+            currentStreamingRate = sampleRate
             claimedStreamingInterface = iface
             emitState()
             return buildStatus() + mapOf("success" to true, "resultCode" to 0)
@@ -743,6 +786,7 @@ class UsbExclusivePlugin(
             try { nativeUsbStreamStop() } catch (_: Exception) {}
         }
         streaming = false
+        currentStreamingRate = 0
         val iface = claimedStreamingInterface
         val conn = connection
         if (iface != null && conn != null) {

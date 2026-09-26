@@ -215,6 +215,49 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(false)
                 }
             }
+            "persistChunkProgress" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                val chunkIndex = call.argument<Int>("chunkIndex") ?: 0
+                val totalChunks = call.argument<Int>("totalChunks") ?: 1
+                val downloadedBytes = call.argument<Number>("downloadedBytes")?.toLong() ?: 0L
+                val totalBytes = call.argument<Number>("totalBytes")?.toLong() ?: 0L
+                if (videoId.isNotEmpty()) {
+                    DownloadChunkStateStore.saveChunkProgress(
+                        currentContext, videoId, chunkIndex, totalChunks, downloadedBytes, totalBytes
+                    )
+                    result.success(true)
+                } else {
+                    result.success(false)
+                }
+            }
+            "getPersistedChunkProgress" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                if (videoId.isNotEmpty()) {
+                    val chunks = DownloadChunkStateStore.getAllChunksForVideo(currentContext, videoId)
+                    val list = chunks.map {
+                        mapOf(
+                            "videoId" to it.videoId,
+                            "chunkIndex" to it.chunkIndex,
+                            "totalChunks" to it.totalChunks,
+                            "downloadedBytes" to it.downloadedBytes,
+                            "totalBytes" to it.totalBytes,
+                            "updatedAt" to it.updatedAt,
+                        )
+                    }
+                    result.success(list)
+                } else {
+                    result.success(emptyList<Map<String, Any>>())
+                }
+            }
+            "clearPersistedChunkProgress" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                if (videoId.isNotEmpty()) {
+                    DownloadChunkStateStore.clearChunksForVideo(currentContext, videoId)
+                    result.success(true)
+                } else {
+                    result.success(false)
+                }
+            }
             else -> result.notImplemented()
         }
     }

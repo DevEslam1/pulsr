@@ -189,6 +189,16 @@ class CastSessionPlugin(
                         loadOnSession(url, call, result)
                     }
                 }
+                "preBufferFile" -> {
+                    val path = call.argument<String>("path")
+                    val mime = call.argument<String>("mime")
+                    val url = if (path != null) mediaServer.preBufferFile(path, mime) else null
+                    if (url == null) {
+                        result.success(mapOf("success" to false))
+                    } else {
+                        result.success(mapOf("success" to true, "url" to url))
+                    }
+                }
                 "castUrl" -> {
                     val url = call.argument<String>("url")
                     if (url.isNullOrBlank()) {

@@ -210,6 +210,15 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) =>
       _equalizerManager.setReverb(enabled, preset: preset, wetDry: wetDry);
 
+  Future<void> setBypassCompare({
+    required bool bypass,
+    double gainCompensationDb = 0.0,
+  }) =>
+      _equalizerManager.setBypassCompare(
+        bypass: bypass,
+        gainCompensationDb: gainCompensationDb,
+      );
+
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) =>
       _equalizerManager.loadCustomImpulseResponse(irSamples);
 

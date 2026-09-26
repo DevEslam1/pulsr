@@ -17,16 +17,18 @@ typedef StreamUrlResolver = Future<YtmStream> Function(String videoId,
 /// - Idempotent cache writes into [YtmUrlCache]
 /// - Non-blocking, cancellable, and dispose-safe
 class StreamPreResolver {
+  static const int defaultPreResolveCount = 4;
+
   final StreamUrlResolver resolveUrl;
   final YtmUrlCache urlCache;
   final String Function() qualityProvider;
   final Duration debounceDuration;
   final bool Function(String videoId)? isAlreadyPrefetching;
+  final int preResolveWindowSize;
 
   Timer? _debounceTimer;
-  // FIX B7: use a simple Object token instead of allocating an unawaited Completer
-  Object? _activeResolutionToken;
-  String? _inFlightVideoId;
+  final Map<String, Object> _activeResolutionTokens = {};
+  final Set<String> _inFlightVideoIds = {};
   bool _disposed = false;
 
   StreamPreResolver({
@@ -36,6 +38,7 @@ class StreamPreResolver {
     this.debounceDuration = const Duration(milliseconds: 100),
     this.isAlreadyPrefetching,
     this.repeatQueueProvider,
+    this.preResolveWindowSize = 1,
   });
 
   final bool Function()? repeatQueueProvider;
@@ -43,7 +46,8 @@ class StreamPreResolver {
   static String _defaultQuality() => 'high';
 
   /// Current video ID actively resolving in background, if any.
-  String? get inFlightVideoId => _inFlightVideoId;
+  String? get inFlightVideoId => _inFlightVideoIds.isEmpty ? null : _inFlightVideoIds.first;
+  Set<String> get inFlightVideoIds => Set.unmodifiable(_inFlightVideoIds);
 
   /// Called immediately when a track starts playing.
   void onTrackStarted({
@@ -107,8 +111,8 @@ class StreamPreResolver {
     if (videoId == null || videoId.isEmpty) return;
 
     final quality = qualityProvider();
-    if (urlCache.contains(videoId, quality: quality)) return;
-    if (_inFlightVideoId == videoId ||
+    if (!urlCache.needsRefresh(videoId, quality: quality, refreshThreshold: const Duration(minutes: 10))) return;
+    if (_inFlightVideoIds.contains(videoId) ||
         isAlreadyPrefetching?.call(videoId) == true) {
       return;
     }
@@ -125,106 +129,126 @@ class StreamPreResolver {
     if (queue.isEmpty || currentIndex < 0) return;
 
     final repeatQueue = repeatQueueProvider?.call() ?? false;
-    final nextSong = _determineNextSong(
+    final nextSongs = _determineNextSongs(
       queue: queue,
       currentIndex: currentIndex,
       isShuffle: isShuffle,
       shuffleIndices: shuffleIndices,
       repeatQueue: repeatQueue,
+      count: preResolveWindowSize,
     );
 
-    if (nextSong == null) return;
-
-    // Only YouTube tracks require network URL pre-resolution
-    final videoId = nextSong.remoteId;
-    if (nextSong.source != SongSource.youtube ||
-        videoId == null ||
-        videoId.isEmpty) {
-      return;
-    }
-
+    if (nextSongs.isEmpty) return;
     final quality = qualityProvider();
 
-    // Idempotent: skip if already valid in URL cache
-    if (urlCache.contains(videoId, quality: quality)) {
-      return;
-    }
+    for (final song in nextSongs) {
+      final videoId = song.remoteId;
+      if (song.source != SongSource.youtube ||
+          videoId == null ||
+          videoId.isEmpty) {
+        continue;
+      }
 
-    // Skip if already in flight for the same video
-    if (_inFlightVideoId == videoId ||
-        isAlreadyPrefetching?.call(videoId) == true) {
-      return;
-    }
+      // If already cached and fresh (>10 min remaining), no need to resolve
+      if (urlCache.contains(videoId, quality: quality)) {
+        bool shouldRefresh = false;
+        try {
+          shouldRefresh = urlCache.needsRefresh(
+            videoId,
+            quality: quality,
+            refreshThreshold: const Duration(minutes: 10),
+          );
+        } catch (_) {
+          shouldRefresh = false;
+        }
+        if (!shouldRefresh) {
+          continue;
+        }
+      }
 
-    _resolveNow(nextSong, quality);
+      if (_inFlightVideoIds.contains(videoId) ||
+          isAlreadyPrefetching?.call(videoId) == true) {
+        continue;
+      }
+
+      _resolveNow(song, quality);
+      // Bound background concurrency to 2 in-flight requests
+      if (_inFlightVideoIds.length >= 2) break;
+    }
   }
 
   void _resolveNow(SongsTableData song, String quality) {
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) return;
 
-    _cancelInFlight();
-    _inFlightVideoId = videoId;
-
+    _inFlightVideoIds.add(videoId);
     final token = Object();
-    _activeResolutionToken = token;
+    _activeResolutionTokens[videoId] = token;
 
     resolveUrl(videoId, quality: quality).then((stream) {
-      if (_disposed || !identical(_activeResolutionToken, token)) return;
+      if (_disposed || !identical(_activeResolutionTokens[videoId], token)) return;
       urlCache.putStream(stream, quality: quality);
       debugPrint(
           '[StreamPreResolver] Successfully pre-resolved track ($videoId)');
     }).catchError((e) {
-      if (_disposed || !identical(_activeResolutionToken, token)) return;
+      if (_disposed || !identical(_activeResolutionTokens[videoId], token)) return;
       debugPrint(
           '[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
     }).whenComplete(() {
-      if (identical(_activeResolutionToken, token)) {
-        _inFlightVideoId = null;
-        _activeResolutionToken = null;
+      if (identical(_activeResolutionTokens[videoId], token)) {
+        _inFlightVideoIds.remove(videoId);
+        _activeResolutionTokens.remove(videoId);
       }
     });
   }
 
-  SongsTableData? _determineNextSong({
+  List<SongsTableData> _determineNextSongs({
     required List<SongsTableData> queue,
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
     bool repeatQueue = false,
+    int count = defaultPreResolveCount,
   }) {
-    if (queue.isEmpty) return null;
+    if (queue.isEmpty) return const [];
+    final results = <SongsTableData>[];
 
     if (isShuffle && shuffleIndices != null && shuffleIndices.isNotEmpty) {
       final currentPosInShuffle = shuffleIndices.indexOf(currentIndex);
-      if (currentPosInShuffle >= 0 &&
-          currentPosInShuffle + 1 < shuffleIndices.length) {
-        final nextOriginalIndex = shuffleIndices[currentPosInShuffle + 1];
-        if (nextOriginalIndex >= 0 && nextOriginalIndex < queue.length) {
-          return queue[nextOriginalIndex];
+      if (currentPosInShuffle >= 0) {
+        for (var i = 1; i <= count; i++) {
+          final nextPos = currentPosInShuffle + i;
+          if (nextPos < shuffleIndices.length) {
+            final nextOriginalIndex = shuffleIndices[nextPos];
+            if (nextOriginalIndex >= 0 && nextOriginalIndex < queue.length) {
+              results.add(queue[nextOriginalIndex]);
+            }
+          } else if (repeatQueue && shuffleIndices.isNotEmpty) {
+            final wrappedPos = (nextPos - shuffleIndices.length) % shuffleIndices.length;
+            final nextOriginalIndex = shuffleIndices[wrappedPos];
+            if (nextOriginalIndex >= 0 && nextOriginalIndex < queue.length) {
+              results.add(queue[nextOriginalIndex]);
+            }
+          }
         }
-      } else if (repeatQueue && shuffleIndices.isNotEmpty) {
-        final firstOriginalIndex = shuffleIndices.first;
-        if (firstOriginalIndex >= 0 && firstOriginalIndex < queue.length) {
-          return queue[firstOriginalIndex];
+      }
+    } else {
+      for (var i = 1; i <= count; i++) {
+        final nextIndex = currentIndex + i;
+        if (nextIndex < queue.length) {
+          results.add(queue[nextIndex]);
+        } else if (queue.isNotEmpty && repeatQueue) {
+          final wrappedIndex = nextIndex % queue.length;
+          results.add(queue[wrappedIndex]);
         }
       }
     }
-
-    // Normal linear queue order
-    final nextIndex = currentIndex + 1;
-    if (nextIndex < queue.length) {
-      return queue[nextIndex];
-    } else if (queue.length > 1 && repeatQueue) {
-      // Loop around to head only if repeat queue is enabled
-      return queue.first;
-    }
-    return null;
+    return results;
   }
 
   void _cancelInFlight() {
-    _inFlightVideoId = null;
-    _activeResolutionToken = null;
+    _inFlightVideoIds.clear();
+    _activeResolutionTokens.clear();
   }
 
   void cancel() {

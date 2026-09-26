@@ -73,7 +73,8 @@ object ProxyPool {
         var deadUntilTimestamp: Long = 0L,
         var isEnabled: Boolean = true,
         val quality: Quality = Quality.UNKNOWN,
-        var lastFailureType: FailureType = FailureType.UNKNOWN
+        var lastFailureType: FailureType = FailureType.UNKNOWN,
+        var ewmaSuccessRate: Double = 1.0
     ) {
         val isAlive: Boolean
             get() {
@@ -158,9 +159,8 @@ object ProxyPool {
                 return null
             }
 
-            // 2026-09 gap 5: prefer residential > unknown > datacenter; stable
-            // within a tier so rotation behavior is preserved.
-            val ranked = aliveList.sortedBy { it.quality.ordinal }
+            // 2026-09 gap 5: prefer residential > unknown > datacenter, broken ties by EWMA success rate
+            val ranked = aliveList.sortedWith(compareBy<ProxyNode> { it.quality.ordinal }.thenByDescending { it.ewmaSuccessRate })
             selected = ranked[Math.floorMod(activeProxyIndex, ranked.size)]
             activeProxyId = selected.id
             currentPathLabel = "${selected.type.name}:${selected.host}:${selected.port}"
@@ -216,6 +216,7 @@ object ProxyPool {
             if (failing != null) {
                 failing.lastFailureType = failureType
                 failing.consecutiveFailures++
+                failing.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * failing.ewmaSuccessRate
                 val timeout = when (failureType) {
                     FailureType.NETWORK -> 30_000L
                     FailureType.TIMEOUT -> 60_000L
@@ -231,7 +232,7 @@ object ProxyPool {
                 val remainingAlive = proxies.filter { it.isAlive }
                 if (remainingAlive.isNotEmpty()) {
                     activeProxyIndex = (activeProxyIndex + 1) % remainingAlive.size
-                    val ranked = remainingAlive.sortedBy { it.quality.ordinal }
+                    val ranked = remainingAlive.sortedWith(compareBy<ProxyNode> { it.quality.ordinal }.thenByDescending { it.ewmaSuccessRate })
                     val newActive = ranked[Math.floorMod(activeProxyIndex, ranked.size)]
                     activeProxyId = newActive.id
                     val newLabel = "${newActive.type.name}:${newActive.host}:${newActive.port}"
@@ -261,7 +262,112 @@ object ProxyPool {
                         if (it.isNotEmpty()) it[Math.floorMod(activeProxyIndex, it.size)] else null
                     }
             }
-            target?.consecutiveFailures = 0
+            target?.let {
+                it.consecutiveFailures = 0
+                it.ewmaSuccessRate = 0.2 * 1.0 + 0.8 * it.ewmaSuccessRate
+            }
+        }
+    }
+
+    /**
+     * Happy-Eyeballs RFC 8305 proxy racing against generic probe endpoint (e.g. generate_204).
+     * Dispatches candidate 0 immediately; if it doesn't respond within [staggerMs],
+     * fires candidate 1 concurrently. The first candidate to verify wins and is promoted.
+     */
+    fun raceCandidatesHappyEyeballs(
+        candidates: List<ProxyNode>,
+        probeUrl: String = "https://www.google.com/generate_204",
+        staggerMs: Long = 200L,
+        timeoutMs: Int = 4000,
+        callback: (ProxyNode?) -> Unit
+    ) {
+        if (candidates.isEmpty()) {
+            callback(null)
+            return
+        }
+        if (candidates.size == 1) {
+            probeExecutor.execute {
+                val success = testSingleProxy(candidates[0], probeUrl, timeoutMs)
+                callback(if (success) candidates[0] else null)
+            }
+            return
+        }
+
+        probeExecutor.execute {
+            val winnerRef = java.util.concurrent.atomic.AtomicReference<ProxyNode?>(null)
+            val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
+            val total = candidates.size.coerceAtMost(3)
+            val latch = java.util.concurrent.CountDownLatch(1)
+
+            for (i in 0 until total) {
+                if (winnerRef.get() != null) break
+                val node = candidates[i]
+                probeExecutor.execute {
+                    val success = testSingleProxy(node, probeUrl, timeoutMs)
+                    if (success && winnerRef.compareAndSet(null, node)) {
+                        latch.countDown()
+                    }
+                    if (completedCount.incrementAndGet() >= total) {
+                        latch.countDown()
+                    }
+                }
+                if (i < total - 1 && winnerRef.get() == null) {
+                    try {
+                        Thread.sleep(staggerMs)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
+                }
+            }
+
+            try {
+                latch.await(timeoutMs.toLong() + 500L, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            val winner = winnerRef.get()
+            if (winner != null) {
+                synchronized(lock) {
+                    activeProxyId = winner.id
+                    currentPathLabel = "${winner.type.name}:${winner.host}:${winner.port}"
+                }
+            }
+            callback(winner)
+        }
+    }
+
+    private fun testSingleProxy(node: ProxyNode, probeUrl: String, timeoutMs: Int): Boolean {
+        var conn: HttpURLConnection? = null
+        val start = System.currentTimeMillis()
+        return try {
+            val url = URL(probeUrl)
+            conn = url.openConnection(node.toJavaProxy()) as HttpURLConnection
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.instanceFollowRedirects = true
+            conn.requestMethod = "GET"
+            if (node.username.isNotEmpty()) {
+                val userPass = "${node.username}:${node.password}"
+                val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
+                conn.setRequestProperty("Proxy-Authorization", basicAuth)
+            }
+            val code = conn.responseCode
+            val latency = System.currentTimeMillis() - start
+            val success = code in 200..399
+            node.latencyMs = if (success) latency else -1L
+            if (success) {
+                node.consecutiveFailures = 0
+                node.deadUntilTimestamp = 0L
+                node.ewmaSuccessRate = 0.2 * 1.0 + 0.8 * node.ewmaSuccessRate
+            } else {
+                node.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * node.ewmaSuccessRate
+            }
+            success
+        } catch (_: Throwable) {
+            node.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * node.ewmaSuccessRate
+            false
+        } finally {
+            conn?.disconnect()
         }
     }
 

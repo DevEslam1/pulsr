@@ -269,5 +269,71 @@ void main() {
       expect(resolverClosureInvoked, isFalse,
           reason: 'Cache hit skips plugin call');
     });
+
+    test('multi-item window: pre-resolves upcoming 3 items when preResolveWindowSize is 3', () async {
+      final multiPreResolver = StreamPreResolver(
+        resolveUrl: (videoId, {quality = 'high'}) async {
+          resolvedVideoIds.add(videoId);
+          return YtmStream(
+            videoId: videoId,
+            url: 'https://googlevideo.com/stream_$videoId.m4a',
+            mimeType: 'audio/mp4',
+            container: 'm4a',
+            bitrateKbps: 256,
+            duration: const Duration(seconds: 200),
+            title: 'Track $videoId',
+            artist: 'Artist',
+          );
+        },
+        urlCache: urlCache,
+        preResolveWindowSize: 3,
+        debounceDuration: const Duration(milliseconds: 10),
+      );
+
+
+      final queue = [
+        createSong(1, 'Track 1', remoteId: 'w1'),
+        createSong(2, 'Track 2', remoteId: 'w2'),
+        createSong(3, 'Track 3', remoteId: 'w3'),
+        createSong(4, 'Track 4', remoteId: 'w4'),
+        createSong(5, 'Track 5', remoteId: 'w5'),
+      ];
+
+      multiPreResolver.onTrackStarted(
+        queue: queue,
+        currentIndex: 0,
+        isShuffle: false,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(resolvedVideoIds, containsAll(['w2', 'w3']));
+      expect(urlCache.contains('w2'), isTrue);
+      expect(urlCache.contains('w3'), isTrue);
+      multiPreResolver.dispose();
+    });
+
+    test('refreshes URL expiring within 10 minutes', () async {
+      // Put a track expiring in 5 minutes relative to clock
+      final fiveMinExpiry = clock.now().add(const Duration(minutes: 5));
+      urlCache.put('exp1', 'https://googlevideo.com/expiring.m4a', explicitExpiry: fiveMinExpiry);
+      expect(urlCache.contains('exp1'), isTrue);
+      expect(urlCache.needsRefresh('exp1', refreshThreshold: const Duration(minutes: 10)), isTrue);
+
+      final queue = [
+        createSong(1, 'Track 1', remoteId: 'now_playing'),
+        createSong(2, 'Track 2', remoteId: 'exp1'),
+      ];
+
+      preResolver.onTrackStarted(
+        queue: queue,
+        currentIndex: 0,
+        isShuffle: false,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(resolvedVideoIds, contains('exp1'));
+    });
   });
 }
+

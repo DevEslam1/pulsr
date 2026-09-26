@@ -479,6 +479,25 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAutoDegradedStages(
     return static_cast<jint>(DspEngineRegistry::instance().getAutoDegradedStages());
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeTriggerStageAutoDegrade(
+        JNIEnv* /* env */, jobject /* thiz */, jint stageBitmask) {
+    DspEngineRegistry::instance().triggerStageAutoDegrade(static_cast<uint32_t>(stageBitmask));
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeRecoverStageAutoDegrade(
+        JNIEnv* /* env */, jobject /* thiz */, jint stageBitmask) {
+    DspEngineRegistry::instance().recoverStageAutoDegrade(static_cast<uint32_t>(stageBitmask));
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBypassCompare(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jdouble gainCompensationDb) {
+    DspEngineRegistry::instance().setBypassCompare(enabled == JNI_TRUE, static_cast<double>(gainCompensationDb));
+}
+
+
 JNIEXPORT jdouble JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetLimiterGrDb(
         JNIEnv* /* env */, jobject /* thiz */) {

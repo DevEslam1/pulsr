@@ -13,8 +13,9 @@ import android.util.Log
  */
 internal class ClientWinnerStore(context: Context) {
 
+    private val appContext: Context = context.applicationContext
     private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     companion object {
         private const val TAG = "ClientWinnerStore"
@@ -51,24 +52,49 @@ internal class ClientWinnerStore(context: Context) {
         }
     }
 
-    /**
-     * Returns the cached winning client for [trackType], or null if none is recorded,
-     * it has expired, or it failed too many times.
-     */
-    @Synchronized
-    fun getWinningClient(trackType: String = TRACK_TYPE_MUSIC): InnertubeClient.ClientType? {
-        val clientName = prefs.getString(KEY_PREFIX_WINNER + trackType, null) ?: return null
-        val failures = prefs.getInt(KEY_PREFIX_FAILURES + trackType, 0)
+    fun getCurrentNetworkClass(): String {
+        return try {
+            val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                ?: return "unknown"
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                val net = cm.activeNetwork ?: return "none"
+                val caps = cm.getNetworkCapabilities(net) ?: return "unknown"
+                when {
+                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "wifi"
+                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+                    else -> "other"
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val info = cm.activeNetworkInfo ?: return "none"
+                @Suppress("DEPRECATION")
+                if (info.type == android.net.ConnectivityManager.TYPE_WIFI) "wifi" else "cellular"
+            }
+        } catch (_: Throwable) {
+            "unknown"
+        }
+    }
+
+    fun buildDimensionKey(trackType: String, hourBucket: Int? = null, networkClass: String? = null): String {
+        val h = hourBucket ?: (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) / 4)
+        val net = networkClass ?: getCurrentNetworkClass()
+        return "${trackType}_h${h}_$net"
+    }
+
+    private fun getWinningClientForKey(key: String): InnertubeClient.ClientType? {
+        val clientName = prefs.getString(KEY_PREFIX_WINNER + key, null) ?: return null
+        val failures = prefs.getInt(KEY_PREFIX_FAILURES + key, 0)
         if (failures >= MAX_CONSECUTIVE_FAILURES) {
-            Log.d(TAG, "Evicting winner $clientName for $trackType due to $failures consecutive failures")
-            clearWinner(trackType)
+            Log.d(TAG, "Evicting winner $clientName for $key due to $failures consecutive failures")
+            clearWinner(key)
             return null
         }
-        val recordedAt = prefs.getLong(KEY_PREFIX_RECORDED_AT + trackType, 0L)
+        val recordedAt = prefs.getLong(KEY_PREFIX_RECORDED_AT + key, 0L)
         val age = System.currentTimeMillis() - recordedAt
         if (recordedAt <= 0L || age > WINNER_TTL_MS || age < 0L) {
-            Log.d(TAG, "Evicting stale winner $clientName for $trackType (age ${age}ms)")
-            clearWinner(trackType)
+            Log.d(TAG, "Evicting stale winner $clientName for $key (age ${age}ms)")
+            clearWinner(key)
             return null
         }
         return try {
@@ -79,37 +105,73 @@ internal class ClientWinnerStore(context: Context) {
     }
 
     /**
-     * Records a successful client resolution for [trackType], resetting any failure count.
+     * Returns the cached winning client for [trackType] in the current (or specified)
+     * hour-bucket and network-class, falling back to the coarse trackType winner if none recorded.
      */
     @Synchronized
-    fun recordWinningClient(trackType: String = TRACK_TYPE_MUSIC, client: InnertubeClient.ClientType) {
+    fun getWinningClient(
+        trackType: String = TRACK_TYPE_MUSIC,
+        hourBucket: Int? = null,
+        networkClass: String? = null
+    ): InnertubeClient.ClientType? {
+        val dimKey = buildDimensionKey(trackType, hourBucket, networkClass)
+        val dimWinner = getWinningClientForKey(dimKey)
+        if (dimWinner != null) return dimWinner
+        return getWinningClientForKey(trackType)
+    }
+
+    /**
+     * Records a successful client resolution for [trackType] under both the dimensioned
+     * and general keys, resetting any failure count.
+     */
+    @Synchronized
+    fun recordWinningClient(
+        trackType: String = TRACK_TYPE_MUSIC,
+        client: InnertubeClient.ClientType,
+        hourBucket: Int? = null,
+        networkClass: String? = null
+    ) {
         if (client in NON_PROMOTABLE) {
             Log.d(TAG, "Not promoting last-resort client ${client.name} for $trackType")
             return
         }
+        val now = System.currentTimeMillis()
+        val dimKey = buildDimensionKey(trackType, hourBucket, networkClass)
         prefs.edit()
             .putString(KEY_PREFIX_WINNER + trackType, client.name)
             .putInt(KEY_PREFIX_FAILURES + trackType, 0)
-            .putLong(KEY_PREFIX_RECORDED_AT + trackType, System.currentTimeMillis())
+            .putLong(KEY_PREFIX_RECORDED_AT + trackType, now)
+            .putString(KEY_PREFIX_WINNER + dimKey, client.name)
+            .putInt(KEY_PREFIX_FAILURES + dimKey, 0)
+            .putLong(KEY_PREFIX_RECORDED_AT + dimKey, now)
             .apply()
-        Log.d(TAG, "Recorded winning client ${client.name} for $trackType")
+        Log.d(TAG, "Recorded winning client ${client.name} for $trackType (dim=$dimKey)")
     }
 
     /**
      * Increments the consecutive failure count for the current winner of [trackType].
      */
     @Synchronized
-    fun recordFailure(trackType: String = TRACK_TYPE_MUSIC, client: InnertubeClient.ClientType) {
-        val currentWinner = prefs.getString(KEY_PREFIX_WINNER + trackType, null)
-        if (currentWinner == client.name) {
-            val failures = prefs.getInt(KEY_PREFIX_FAILURES + trackType, 0) + 1
-            prefs.edit().putInt(KEY_PREFIX_FAILURES + trackType, failures).apply()
-            Log.w(TAG, "Recorded failure for winner $currentWinner on $trackType (total: $failures)")
-            if (failures >= MAX_CONSECUTIVE_FAILURES) {
-                clearWinner(trackType)
+    fun recordFailure(
+        trackType: String = TRACK_TYPE_MUSIC,
+        client: InnertubeClient.ClientType,
+        hourBucket: Int? = null,
+        networkClass: String? = null
+    ) {
+        val dimKey = buildDimensionKey(trackType, hourBucket, networkClass)
+        for (key in listOf(trackType, dimKey)) {
+            val currentWinner = prefs.getString(KEY_PREFIX_WINNER + key, null)
+            if (currentWinner == client.name) {
+                val failures = prefs.getInt(KEY_PREFIX_FAILURES + key, 0) + 1
+                prefs.edit().putInt(KEY_PREFIX_FAILURES + key, failures).apply()
+                Log.w(TAG, "Recorded failure for winner $currentWinner on $key (total: $failures)")
+                if (failures >= MAX_CONSECUTIVE_FAILURES) {
+                    clearWinner(key)
+                }
             }
         }
     }
+
 
     /**
      * Clears recorded winner for [trackType].

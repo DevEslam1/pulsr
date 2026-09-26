@@ -53,7 +53,13 @@ class RateLimiter(
         DOWNLOAD(6, 3.0, 300L)
     }
 
-    private class BucketState(val bucket: Bucket, var availableTokens: Double, var lastRefill: Long, var lastRequest: Long = 0L)
+    private class BucketState(
+        val bucket: Bucket,
+        var availableTokens: Double,
+        var lastRefill: Long,
+        var lastRequest: Long = 0L,
+        var dynamicRefillRate: Double = bucket.refillPerSecond
+    )
 
     private val bucketStates = ConcurrentHashMap<Bucket, BucketState>()
     private val globalSemaphore = Semaphore(8, true)
@@ -157,7 +163,7 @@ class RateLimiter(
                 // Refill bucket tokens
                 val elapsedSec = (postAcquireNow - state.lastRefill) / 1000.0
                 if (elapsedSec > 0) {
-                    state.availableTokens = min(bucket.maxTokens.toDouble(), state.availableTokens + (elapsedSec * bucket.refillPerSecond))
+                    state.availableTokens = min(bucket.maxTokens.toDouble(), state.availableTokens + (elapsedSec * state.dynamicRefillRate))
                     state.lastRefill = postAcquireNow
                 }
 
@@ -183,7 +189,7 @@ class RateLimiter(
                     return true
                 }
 
-                val waitTimeMs = ((1.0 - state.availableTokens) / bucket.refillPerSecond * 1000.0).toLong().coerceIn(50L, 500L)
+                val waitTimeMs = ((1.0 - state.availableTokens) / state.dynamicRefillRate * 1000.0).toLong().coerceIn(50L, 500L)
                 globalSemaphore.release()
                 try {
                     condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
@@ -242,6 +248,7 @@ class RateLimiter(
             bucketStates.values.forEach {
                 it.availableTokens = 0.0
                 it.lastRefill = drainAt
+                it.dynamicRefillRate = (it.dynamicRefillRate * 0.70).coerceAtLeast(0.50)
             }
         } finally {
             lock.unlock()
@@ -259,12 +266,24 @@ class RateLimiter(
         lastSuccessTimestamp.set(now)
         cleanSinceTimestamp.compareAndSet(0L, now)
         prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+        lock.lock()
+        try {
+            bucketStates.values.forEach {
+                it.dynamicRefillRate = min(it.bucket.refillPerSecond, it.dynamicRefillRate * 1.05)
+            }
+        } finally {
+            lock.unlock()
+        }
     }
 
     fun getRemainingBackoffMs(): Long {
         val now = clock.elapsedRealtime()
         val until = backoffUntilTimestamp.get()
         return (until - now).coerceAtLeast(0L)
+    }
+
+    fun getDynamicRefillRate(bucket: Bucket): Double {
+        return bucketStates[bucket]?.dynamicRefillRate ?: bucket.refillPerSecond
     }
 
     /**
@@ -282,6 +301,7 @@ class RateLimiter(
             bucketStates.values.forEach {
                 it.availableTokens = it.bucket.maxTokens.toDouble()
                 it.lastRefill = now
+                it.dynamicRefillRate = it.bucket.refillPerSecond
             }
             condition.signalAll()
         } finally {

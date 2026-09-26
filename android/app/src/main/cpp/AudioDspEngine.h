@@ -104,6 +104,7 @@ public:
 
     void setActiveStages(uint32_t bitmask);
     uint32_t getActiveStages() const;
+    void setBypassCompare(bool enabled, double gainCompensationDb);
 
     // Transactional parameter mutation & publishing
     using SnapshotMutator = std::function<void(DspParamSnapshot&)>;
@@ -322,6 +323,9 @@ public:
     float getMultibandGrDb(int band);
     double getRollingRtf();
     uint32_t getAutoDegradedStages();
+    void triggerStageAutoDegrade(uint32_t stageBitmask);
+    void recoverStageAutoDegrade(uint32_t stageBitmask);
+    void setBypassCompare(bool enabled, double gainCompensationDb);
     void getTelemetry(double* outArray, int size);
     double getWeeklyDose();
     void resetWeeklyDose();

@@ -11,7 +11,8 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-
+New folder/
+.kilo/
 # IntelliJ related
 *.iml
 *.ipr

@@ -84,5 +84,30 @@ void main() {
         await sub.cancel();
       },
     );
+
+    test('setBypassCompare forwards bypass and gainCompensationDb', () async {
+      final effectsChannel = AudioEffectsChannel();
+      await effectsChannel.setBypassCompare(bypass: true, gainCompensationDb: -3.5);
+
+      final sent = log.where((c) => c.method == 'setBypassCompare').toList();
+      expect(sent, hasLength(1));
+      expect(sent.single.arguments, {
+        'bypass': true,
+        'gainCompensationDb': -3.5,
+      });
+    });
+
+    test('setRtfGovernorEnabled and getRtfGovernorStatus interact with platform channel', () async {
+      final effectsChannel = AudioEffectsChannel();
+      await effectsChannel.setRtfGovernorEnabled(true);
+
+      final sent = log.where((c) => c.method == 'setRtfGovernorEnabled').toList();
+      expect(sent, hasLength(1));
+      expect(sent.single.arguments, {'enabled': true});
+
+      final status = await effectsChannel.getRtfGovernorStatus();
+      expect(status, isA<Map<String, dynamic>>());
+    });
   });
 }
+

@@ -416,4 +416,124 @@ class RoomCorrectionService {
     return Int16List.view(
         bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
   }
+
+  /// Closed-loop convergence verification (Pillar 2).
+  ///
+  /// Evaluates pre-correction vs post-correction frequency response to verify
+  /// whether the correction FIR has successfully flattened the room acoustics.
+  static ConvergenceResult computeConvergence({
+    required List<double> preResponseDb,
+    required List<double> postResponseDb,
+  }) {
+    if (preResponseDb.isEmpty || postResponseDb.isEmpty) {
+      return const ConvergenceResult(
+        score: 0.0,
+        initialVarianceDb: 0.0,
+        residualVarianceDb: 0.0,
+        maxResidualDeltaDb: 0.0,
+        converged: false,
+      );
+    }
+
+    final n = math.min(preResponseDb.length, postResponseDb.length);
+    var preVarSum = 0.0;
+    var postVarSum = 0.0;
+    var maxDelta = 0.0;
+
+    for (var i = 0; i < n; i++) {
+      final pre = preResponseDb[i];
+      final post = postResponseDb[i];
+      preVarSum += pre * pre;
+      postVarSum += post * post;
+      final delta = post.abs();
+      if (delta > maxDelta) maxDelta = delta;
+    }
+
+    final preRms = math.sqrt(preVarSum / n);
+    final postRms = math.sqrt(postVarSum / n);
+
+    final score = preRms > 1e-6
+        ? ((1.0 - (postRms / preRms)) * 100.0).clamp(0.0, 100.0)
+        : 100.0;
+
+    final converged = postRms < (preRms * 0.75) || maxDelta <= 3.0;
+
+    return ConvergenceResult(
+      score: (score * 10).roundToDouble() / 10.0,
+      initialVarianceDb: preRms,
+      residualVarianceDb: postRms,
+      maxResidualDeltaDb: maxDelta,
+      converged: converged,
+    );
+  }
+
+  /// Loopback verification mode (Pillar 1).
+  ///
+  /// Evaluates recorded loopback tones against expected target curve.
+  /// Gate to 10: FR within ±0.5 dB of target.
+  static LoopbackVerificationResult evaluateLoopback({
+    required List<double> measuredDb,
+    required List<double> targetDb,
+    double gateThresholdDb = 0.5,
+  }) {
+    if (measuredDb.isEmpty || targetDb.isEmpty) {
+      return const LoopbackVerificationResult(
+        maxDeviationDb: 0.0,
+        meanDeviationDb: 0.0,
+        thdEstimatePercent: 0.0,
+        isWithinGate: false,
+      );
+    }
+
+    final n = math.min(measuredDb.length, targetDb.length);
+    var maxDev = 0.0;
+    var totalDev = 0.0;
+
+    for (var i = 0; i < n; i++) {
+      final dev = (measuredDb[i] - targetDb[i]).abs();
+      if (dev > maxDev) maxDev = dev;
+      totalDev += dev;
+    }
+
+    final meanDev = totalDev / n;
+    final thdPercent = (meanDev * 0.05).clamp(0.001, 10.0);
+    final isWithinGate = maxDev <= gateThresholdDb;
+
+    return LoopbackVerificationResult(
+      maxDeviationDb: (maxDev * 100).roundToDouble() / 100.0,
+      meanDeviationDb: (meanDev * 100).roundToDouble() / 100.0,
+      thdEstimatePercent: (thdPercent * 1000).roundToDouble() / 1000.0,
+      isWithinGate: isWithinGate,
+    );
+  }
+}
+
+class ConvergenceResult {
+  final double score; // 0.0 to 100.0%
+  final double initialVarianceDb;
+  final double residualVarianceDb;
+  final double maxResidualDeltaDb;
+  final bool converged;
+
+  const ConvergenceResult({
+    required this.score,
+    required this.initialVarianceDb,
+    required this.residualVarianceDb,
+    required this.maxResidualDeltaDb,
+    required this.converged,
+  });
+}
+
+class LoopbackVerificationResult {
+  final double maxDeviationDb;
+  final double meanDeviationDb;
+  final double thdEstimatePercent;
+  final bool isWithinGate;
+
+  const LoopbackVerificationResult({
+    required this.maxDeviationDb,
+    required this.meanDeviationDb,
+    required this.thdEstimatePercent,
+    required this.isWithinGate,
+  });
 }

@@ -261,6 +261,23 @@ class YtmUrlCache {
     return true;
   }
 
+  /// Checks if entry is missing, expired, or expiring within [refreshThreshold] (default 10m).
+  bool needsRefresh(
+    String videoId, {
+    String quality = 'high',
+    Duration refreshThreshold = const Duration(minutes: 10),
+  }) {
+    final key = _buildKey(videoId, quality);
+    final entry = _cache[key];
+    if (entry == null) return true;
+    final now = _clock.now();
+    if (entry.isExpired(now)) {
+      _cache.remove(key);
+      return true;
+    }
+    return entry.remainingTtl(now) <= refreshThreshold;
+  }
+
   /// Stores a resolved stream URL into the LRU cache.
   void put(
     String videoId,

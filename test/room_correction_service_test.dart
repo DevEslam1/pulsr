@@ -128,4 +128,46 @@ void main() {
       expect(preset.bassBoost, 0.0);
     });
   });
+
+  group('computeConvergence (Pillar 2)', () {
+    test('measures convergence score and variance reduction', () {
+      final pre = [6.0, 5.0, -4.0, 3.0, -5.0, 4.0];
+      final post = [0.8, 0.5, -0.6, 0.4, -0.5, 0.3];
+      final res = RoomCorrectionService.computeConvergence(
+        preResponseDb: pre,
+        postResponseDb: post,
+      );
+      expect(res.converged, isTrue);
+      expect(res.score, greaterThan(80.0));
+      expect(res.residualVarianceDb, lessThan(res.initialVarianceDb));
+      expect(res.maxResidualDeltaDb, lessThanOrEqualTo(0.8));
+    });
+  });
+
+  group('evaluateLoopback (Pillar 1)', () {
+    test('evaluates loopback within gate threshold of +/- 0.5 dB', () {
+      final measured = [0.2, -0.3, 0.1, 0.4, -0.2, 0.3];
+      final target = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+      final res = RoomCorrectionService.evaluateLoopback(
+        measuredDb: measured,
+        targetDb: target,
+        gateThresholdDb: 0.5,
+      );
+      expect(res.isWithinGate, isTrue);
+      expect(res.maxDeviationDb, lessThanOrEqualTo(0.5));
+      expect(res.meanDeviationDb, lessThan(0.5));
+    });
+
+    test('fails gate when deviation exceeds threshold', () {
+      final measured = [1.2, -0.3, 0.1, 0.4, -0.2, 0.3];
+      final target = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+      final res = RoomCorrectionService.evaluateLoopback(
+        measuredDb: measured,
+        targetDb: target,
+        gateThresholdDb: 0.5,
+      );
+      expect(res.isWithinGate, isFalse);
+      expect(res.maxDeviationDb, greaterThan(0.5));
+    });
+  });
 }

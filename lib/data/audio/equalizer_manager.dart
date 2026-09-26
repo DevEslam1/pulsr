@@ -2209,6 +2209,20 @@ class EqualizerManager {
     _syncPipeline();
   }
 
+  /// Level-Matched A/B Bypass: instant level-matched A/B comparison without volume drop.
+  Future<void> setBypassCompare({
+    required bool bypass,
+    double gainCompensationDb = 0.0,
+  }) async {
+    if (PlatformCapabilities.isAndroid) {
+      await _effectsChannel.setBypassCompare(
+        bypass: bypass,
+        gainCompensationDb: gainCompensationDb,
+      );
+    }
+  }
+
+
   /// Owned DSP-preference routing. Persisted to the same key SettingsCubit
   /// uses, so both writers converge instead of diverging.
   Future<void> setDspPreference(String preference) async {

@@ -653,4 +653,14 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         sampleRate: sampleRate,
         taps: taps,
       );
+
+  Future<void> setBypassCompare({
+    required bool bypass,
+    double gainCompensationDb = 0.0,
+  }) =>
+      _audioHandler.setBypassCompare(
+        bypass: bypass,
+        gainCompensationDb: gainCompensationDb,
+      );
 }
+

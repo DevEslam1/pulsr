@@ -424,7 +424,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               const SizedBox(width: AppSpacing.sm),
                             TextButton.icon(
                               icon: const Icon(Icons.expand_less_rounded),
-                              label: Text('${"Show less"}'),
+                              label: const Text('Show less'),
                               onPressed: () {
                                 setState(() {
                                   _userExpanded = false;

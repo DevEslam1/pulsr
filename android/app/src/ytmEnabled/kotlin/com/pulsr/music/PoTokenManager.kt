@@ -84,9 +84,78 @@ object PoTokenManager {
     @Volatile
     private var generator: PoTokenGenerator? = null
 
-    /** A non-null generator that is also still able to mint. */
+    @Volatile
+    private var standbyGenerator: PoTokenGenerator? = null
+
+    @Volatile
+    private var standbyVisitorData: String = ""
+
+    /** A non-null generator that is also still able to mint (either active or hot standby). */
     private val hasWarmGenerator: Boolean
-        get() = generator?.isExpired() == false
+        get() = (generator?.isExpired() == false) || (standbyGenerator?.isExpired() == false)
+
+    private val egressRejectionScores = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    fun recordEgressRejection(egressId: String = currentEgressId()) {
+        val count = egressRejectionScores.compute(egressId) { _, current -> (current ?: 0) + 1 } ?: 1
+        Log.w(TAG, "Egress '$egressId' received rejection (score=$count)")
+        if (count >= 3) {
+            Log.w(TAG, "Egress '$egressId' crossed rejection threshold (score=$count) -> early invalidating degraded tokens")
+            synchronized(tokenLru) { tokenLru.evictAll() }
+            streamingPoToken = ""
+            expiryInstant = 0L
+            invalidate()
+        }
+    }
+
+    fun recordEgressSuccess(egressId: String = currentEgressId()) {
+        egressRejectionScores.remove(egressId)
+    }
+
+    private fun getOrPromoteGenerator(): PoTokenGenerator? {
+        val current = generator
+        if (current != null && !current.isExpired()) return current
+        synchronized(this) {
+            val standby = standbyGenerator
+            if (standby != null && !standby.isExpired()) {
+                val curVisitor = visitorData
+                if (curVisitor.isNotEmpty() && standbyVisitorData.isNotEmpty() && curVisitor != standbyVisitorData) {
+                    Log.w(TAG, "Standby generator visitorData mismatch ('$standbyVisitorData' vs '$curVisitor') -> discarding stale standby")
+                    Handler(Looper.getMainLooper()).post { standby.close() }
+                    standbyGenerator = null
+                    standbyVisitorData = ""
+                    preWarmStandby()
+                    return generator
+                }
+                Log.i(TAG, "Promoting warm standby PoTokenGenerator to active (zero-latency failover)")
+                generator = standby
+                standbyGenerator = null
+                standbyVisitorData = ""
+                preWarmStandby()
+                return standby
+            }
+            return generator
+        }
+    }
+
+    private fun preWarmStandby() {
+        val ctx = appContext ?: return
+        if (standbyGenerator?.isExpired() == false || webViewBroken) return
+        val currentVisitor = visitorData
+        managerScope.launch(Dispatchers.Main) {
+            try {
+                if (webViewBroken) return@launch
+                val standby = PoTokenWebView.newPoTokenGenerator(ctx)
+                if (!standby.isExpired()) {
+                    standbyGenerator = standby
+                    standbyVisitorData = currentVisitor
+                    Log.i(TAG, "Hot standby PoTokenWebView pre-warmed successfully")
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Pre-warming standby generator failed non-fatally: ${t.message}")
+            }
+        }
+    }
 
     private var appContext: Context? = null
     private val managerScope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
@@ -318,9 +387,17 @@ object PoTokenManager {
      * Never blocks critical-path playback if a token is already cached or stored.
      */
     fun poTokenForSync(identifier: String): String {
-        checkEgress()
+        val curEgress = currentEgressId()
+        if (activeEgressId.isNotEmpty() && activeEgressId != curEgress) {
+            onEgressChanged(curEgress)
+        }
         val currentVisitor = visitorData
         val now = Instant.now().epochSecond
+
+        // Synchronous egress mismatch guard: never attach token to mismatched egress
+        if (activeEgressId.isNotEmpty() && activeEgressId != curEgress) {
+            return fallbackTokenFor(identifier)
+        }
 
         // 1. In-memory LRU cache
         synchronized(tokenLru) {
@@ -340,8 +417,8 @@ object PoTokenManager {
             return fallbackTokenFor(identifier)
         }
 
-        // 4. Use existing warm generator if available
-        val gen = generator
+        // 4. Use existing warm or promoted standby generator if available
+        val gen = getOrPromoteGenerator()
         if (gen != null && !gen.isExpired()) {
             return try {
                 val minted = gen.generatePoToken(identifier)
@@ -445,6 +522,9 @@ object PoTokenManager {
     fun invalidate() {
         val oldGen = generator
         generator = null
+        val oldStandby = standbyGenerator
+        standbyGenerator = null
+        standbyVisitorData = ""
         expiryInstant = 0L
         sessionVisitorData = ""
         visitorData = ""
@@ -453,6 +533,7 @@ object PoTokenManager {
         webViewBrokenUntilElapsed = 0L
         lastBackgroundRefreshMs.set(0L)
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
+        oldStandby?.let { Handler(Looper.getMainLooper()).post { it.close() } }
         appContext?.let { PoTokenStore.clearAttestation(it) }
         synchronized(tokenLru) {
             tokenLru.evictAll()
@@ -580,6 +661,8 @@ object PoTokenManager {
             tokenLru.evictAll() // Flush old visitorData bindings
             tokenLru.put(newVisitorData, CachedToken(newStreamingToken, newVisitorData, now))
         }
+
+        preWarmStandby()
 
         Log.i(TAG, "Successfully refreshed PoToken attestation. Valid until epoch $newExpiry")
     }

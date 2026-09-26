@@ -718,6 +718,77 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Level-Matched A/B Bypass: instant level-matched A/B comparison without volume drop.
+  /// When [bypass] is true, effects are bypassed and [gainCompensationDb] is applied
+  /// to match perceptual loudness between DSP-on and DSP-off.
+  Future<void> setBypassCompare({
+    required bool bypass,
+    double gainCompensationDb = 0.0,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod('setBypassCompare', {
+        'bypass': bypass,
+        'gainCompensationDb': gainCompensationDb,
+      }).timeout(const Duration(seconds: 5));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set bypass compare ($bypass, $gainCompensationDb dB)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  /// Retrieves the current status of the proactive RTF (Real-Time Factor) Governor.
+  Future<Map<String, dynamic>> getRtfGovernorStatus() async {
+    if (!_isAndroid) {
+      return {
+        'enabled': false,
+        'rtf': 0.0,
+        'consecutiveHighRtfCount': 0,
+        'proactivelyDegradedStages': 0,
+        'isDegraded': false,
+      };
+    }
+    try {
+      final res = await _channel.invokeMethod<Map>('getRtfGovernorStatus');
+      return Map<String, dynamic>.from(res ?? {});
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to get RTF governor status',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return {
+        'enabled': false,
+        'rtf': 0.0,
+        'consecutiveHighRtfCount': 0,
+        'proactivelyDegradedStages': 0,
+        'isDegraded': false,
+      };
+    }
+  }
+
+  /// Enables or disables the proactive RTF Governor.
+  Future<void> setRtfGovernorEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _channel.invokeMethod('setRtfGovernorEnabled', {
+        'enabled': enabled,
+      }).timeout(const Duration(seconds: 5));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set RTF governor enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
   // --- NATIVE REPLAYGAIN (tag-supplied pre-gain in DSP) ---
 
   /// Pushes ReplayGain tags into the native DSP pre-gain stage. The gain comes
@@ -2000,6 +2071,63 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+    }
+  }
+
+  /// Queries current device thermal throttling status (0=None, 1=Light, 2=Moderate, 3=Severe, etc.).
+  Future<int> getThermalStatus() async {
+    if (!_isAndroid) return 0;
+    try {
+      final int? status = await _channel
+          .invokeMethod<int>('getThermalStatus')
+          .timeout(const Duration(seconds: 2));
+      return status ?? 0;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getThermalStatus failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 0;
+    }
+  }
+
+  /// Calculates real-time DSP battery drain estimate (mAh/hr with DSP active vs off).
+  Future<Map<String, dynamic>> getDspBatteryDrainEstimate() async {
+    if (!_isAndroid) return const {};
+    try {
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('getDspBatteryDrainEstimate')
+          .timeout(const Duration(seconds: 2));
+      return res ?? const {};
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getDspBatteryDrainEstimate failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return const {};
+    }
+  }
+
+  /// Retrieves the native engine custody report (sample rate, buffer size, active stages, latency, bit-exactness).
+  Future<Map<String, dynamic>> getChainOfCustodyReport() async {
+    if (!_isAndroid) return const {};
+    try {
+      final res = await _channel
+          .invokeMapMethod<String, dynamic>('getChainOfCustodyReport')
+          .timeout(const Duration(seconds: 2));
+      return res ?? const {};
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getChainOfCustodyReport failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return const {};
     }
   }
 }
