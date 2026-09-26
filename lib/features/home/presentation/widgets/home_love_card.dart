@@ -215,28 +215,6 @@ class _HomeLoveCardState extends State<HomeLoveCard>
       _lastIndex = _currentIndex;
       _loved = true;
     });
-
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.favorite_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Eng. Eslam loves Dr. Basbosa! (#${_currentIndex + 1}/100) 💖✨',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFFFF2A85),
-        duration: const Duration(milliseconds: 2200),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-    );
   }
 
   void _onParticleTick(String id) {
