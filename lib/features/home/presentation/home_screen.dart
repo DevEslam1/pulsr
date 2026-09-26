@@ -205,9 +205,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   String _getGreeting(BuildContext context) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return context.l10n.goodMorning;
-    if (hour < 17) return context.l10n.goodAfternoon;
-    return context.l10n.goodEvening;
+    if (hour < 12) return 'Good morning Basbosa 💖';
+    if (hour < 17) return 'Good afternoon Basbosa 💖';
+    return 'Good evening Basbosa 💖';
   }
 
   String _categoryLabel(BuildContext context, String category) {
