@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.pulsr.music.bb"
+        applicationId = "com.pulsr.music"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
@@ -29,7 +29,7 @@ android {
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
+        manifestPlaceholders["appName"] = "Pulsr Music"
 
         externalNativeBuild {
             cmake {
@@ -47,21 +47,27 @@ android {
 
     flavorDimensions += "default"
     productFlavors {
+        create("bb") {
+            dimension = "default"
+            applicationIdSuffix = ".bb"
+            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
+            proguardFile(file("src/bb/proguard-rules.pro"))
+        }
         create("dev") {
             dimension = "default"
             applicationIdSuffix = ".plus"
-            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition Plus"
+            manifestPlaceholders["appName"] = "Pulsr Plus"
             proguardFile(file("src/dev/proguard-rules.pro"))
         }
         create("prod") {
             dimension = "default"
-            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
+            manifestPlaceholders["appName"] = "Pulsr Music"
         }
         // Off-Play distribution build. Identical to prod but compiles the
         // NewPipeExtractor bridge, so YouTube Music search/stream/download works.
         create("ytm") {
             dimension = "default"
-            manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
+            manifestPlaceholders["appName"] = "Pulsr Music"
             proguardFile(file("src/ytm/proguard-rules.pro"))
         }
     }
@@ -82,6 +88,10 @@ android {
     // The assets dir carries the BotGuard page the poToken WebView runs, which is
     // likewise GPL and so likewise kept out of prod.
     sourceSets {
+        getByName("bb") {
+            kotlin.srcDir("src/ytmEnabled/kotlin")
+            assets.srcDir("src/ytmEnabled/assets")
+        }
         getByName("dev") {
             kotlin.srcDir("src/ytmEnabled/kotlin")
             assets.srcDir("src/ytmEnabled/assets")
@@ -174,6 +184,7 @@ dependencies {
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
     // solves YouTube's JS signature challenges on-device.
     val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
+    "bbImplementation"(newPipeExtractor)
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
 
@@ -181,6 +192,7 @@ dependencies {
     // "Pure" variant strips INTERNET and must not ship Cast or Play Services
     // routing. The matching code lives in sourceSets dev/ytm (src/ytmEnabled).
     val castFramework = "com.google.android.gms:play-services-cast-framework:21.5.0"
+    "bbImplementation"(castFramework)
     "devImplementation"(castFramework)
     "ytmImplementation"(castFramework)
 
