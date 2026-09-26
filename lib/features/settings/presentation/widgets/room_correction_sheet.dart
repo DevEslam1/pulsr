@@ -59,6 +59,7 @@ class RoomCorrectionSheet extends StatefulWidget {
   static Future<void> show(BuildContext context) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => const RoomCorrectionSheet(),
     );
   }

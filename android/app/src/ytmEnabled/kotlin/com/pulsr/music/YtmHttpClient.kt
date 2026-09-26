@@ -144,7 +144,7 @@ internal object YtmHttpClient {
         }
     }
 
-    private val connectionPool = ConnectionPool(8, 5, TimeUnit.MINUTES)
+    private val connectionPool = ConnectionPool(16, 5, TimeUnit.MINUTES)
     private val preConnectExecutor = Executors.newFixedThreadPool(2) { r ->
         Thread(r).apply {
             isDaemon = true

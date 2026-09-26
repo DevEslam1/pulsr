@@ -1978,6 +1978,15 @@ class MusicRepository implements IMusicRepository {
                   isDownloaded: const Value(true),
                   dateAdded: Value(resolvedDateAdded),
                   pendingDownloadPath: const Value(null),
+                  bitrateKbps: fallbackSong?.bitrateKbps != null
+                      ? Value(fallbackSong!.bitrateKbps)
+                      : const Value.absent(),
+                  codec: fallbackSong?.codec != null
+                      ? Value(fallbackSong!.codec)
+                      : const Value.absent(),
+                  sampleRate: fallbackSong?.sampleRate != null
+                      ? Value(fallbackSong!.sampleRate)
+                      : const Value.absent(),
                 ),
               );
               survivingId = oldId;
@@ -2011,6 +2020,15 @@ class MusicRepository implements IMusicRepository {
                       remoteId: Value(fallbackSong.remoteId),
                       remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
                       dateAdded: Value(nowMs),
+                      bitrateKbps: fallbackSong.bitrateKbps != null
+                          ? Value(fallbackSong.bitrateKbps)
+                          : const Value.absent(),
+                      codec: fallbackSong.codec != null
+                          ? Value(fallbackSong.codec)
+                          : const Value.absent(),
+                      sampleRate: fallbackSong.sampleRate != null
+                          ? Value(fallbackSong.sampleRate)
+                          : const Value.absent(),
                     ),
                     mode: InsertMode.insertOrReplace,
                   );

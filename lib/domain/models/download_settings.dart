@@ -25,7 +25,9 @@ class DownloadSettings {
       final prefs = await SharedPreferences.getInstance();
       return DownloadSettings(
         wifiOnly: prefs.getBool(_kWifi) ?? false,
-        quality: prefs.getString(_kQuality) ?? 'high',
+        quality: prefs.getString('setting_streaming_quality') ??
+            prefs.getString(_kQuality) ??
+            'high',
         maxConcurrent: prefs.getInt(_kConcurrency) ?? 3,
         downloadLocation: prefs.getString(_kLocation),
       );

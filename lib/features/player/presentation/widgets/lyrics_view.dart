@@ -201,6 +201,7 @@ class _LyricsViewState extends State<LyricsView> {
     final l10n = context.l10n;
     await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheet) {
           return Container(
@@ -373,6 +374,7 @@ class _LyricsViewState extends State<LyricsView> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => LyricsEditorSheet(
         song: song,
         currentPosition: cubit.state.position,

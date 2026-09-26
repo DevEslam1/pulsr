@@ -57,6 +57,7 @@ class YtmWebLoginSheet extends StatefulWidget {
       return await PulsrSheetHelper.showPulsrSheet<bool>(
         context: context,
         enableDrag: false,
+        wrapWithContainer: false,
         builder: (_) => YtmWebLoginSheet(
           initialUrl: initialUrl,
           title: title,

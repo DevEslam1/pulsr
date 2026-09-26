@@ -93,15 +93,16 @@ class AudioQualityInfo {
 
     final path = song.path.toLowerCase();
 
-    // YouTube Music online streaming track
-    if (song.source == SongSource.youtube ||
-        song.source == 'youtube' ||
-        path.startsWith('ytmusic://')) {
+    // YouTube Music online streaming track (not yet downloaded)
+    if ((song.source == SongSource.youtube ||
+            song.source == 'youtube' ||
+            path.startsWith('ytmusic://')) &&
+        song.isDownloaded != true) {
       final defaultKbps = streamingQuality == YtmAudioQuality.low
           ? 64
           : streamingQuality == YtmAudioQuality.medium
               ? 128
-              : 256;
+              : 160;
       final kbps = explicitBitrateKbps ??
           (song.bitrateKbps != null && song.bitrateKbps! > 0
               ? song.bitrateKbps!
@@ -122,7 +123,7 @@ class AudioQualityInfo {
         bitrateKbps: kbps,
         sampleRate: song.sampleRate != null && song.sampleRate! > 0
             ? '${(song.sampleRate! / 1000).toStringAsFixed(1)} kHz'
-            : '48.0 kHz',
+            : (format == 'OPUS' ? '48.0 kHz' : '44.1 kHz'),
         bitDepth: song.bitDepth != null && song.bitDepth! > 0
             ? '${song.bitDepth}-bit'
             : '16-bit',
@@ -134,7 +135,7 @@ class AudioQualityInfo {
                 ? 'Medium Quality Stream'
                 : 'Data Saver Stream',
         shortBadgeLabel: '$format • ${kbps}k',
-        description: 'Online YouTube Music audio stream ($kbps kbps)',
+        description: 'Online YouTube Music audio stream ($kbps kbps $format)',
         badgeColor: const Color(0xFFE11D48),
         icon: Icons.wifi_tethering_rounded,
       );

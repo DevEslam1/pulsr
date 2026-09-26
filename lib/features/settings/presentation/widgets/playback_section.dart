@@ -430,17 +430,6 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: AppSpacing.s14),
-                      decoration: BoxDecoration(
-                        color: p.hairline,
-                        borderRadius: BorderRadius.circular(AppRadii.r2),
-                      ),
-                    ),
-                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                     child: Text(context.l10n.sponsorBlockCategoriesLabel,

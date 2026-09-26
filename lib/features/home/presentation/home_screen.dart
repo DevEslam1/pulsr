@@ -572,6 +572,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     ];
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (sheetContext) {
         final sp = sheetContext.palette;
         return SafeArea(

@@ -804,14 +804,19 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       unawaited(_warmStreamCache(initialSong));
     }
 
-    // Gapless Album Pre-buffering: pre-buffer opening 3 tracks (0, 1, 2) when queue is loaded
+    // Gapless Album Pre-buffering: pre-buffer upcoming tracks (1, 2) with a short delay
+    // so track 0 gets 100% of network bandwidth, thread pool, and rate-limiter headroom.
+    final warmGeneration = _playGeneration;
     for (int i = 1; i <= 2; i++) {
       final lookaheadIdx = targetIdx + i;
       if (lookaheadIdx < songs.length) {
         final lookaheadSong = songs[lookaheadIdx];
         if (lookaheadSong.source == SongSource.youtube &&
             (lookaheadSong.remoteId?.isNotEmpty ?? false)) {
-          unawaited(_warmStreamCache(lookaheadSong));
+          unawaited(Future.delayed(Duration(seconds: 2 * i), () async {
+            if (_playGeneration != warmGeneration) return;
+            await _warmStreamCache(lookaheadSong);
+          }));
         }
         unawaited(ArtworkUriResolver.resolveArtworkUri(lookaheadSong));
       }

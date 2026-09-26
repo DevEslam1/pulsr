@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:drift/drift.dart' show Value;
 import '../../data/audio/adaptive_buffer_engine.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
@@ -442,7 +443,10 @@ class YtDownloadService {
       await _ytmService.ensurePoTokenReady();
 
       final prefs = await SharedPreferences.getInstance();
-      final quality = prefs.getString('setting_download_quality') ?? 'high';
+      // Use the sound quality the user chose to stream (fallback to setting_download_quality or 'high')
+      final quality = prefs.getString('setting_streaming_quality') ??
+          prefs.getString('setting_download_quality') ??
+          'high';
       final dir = await getTemporaryDirectory();
       // Download high-res master artwork in parallel with stream resolution
       final rawArtUrl = song.remoteArtworkUrl;
@@ -608,10 +612,22 @@ class YtDownloadService {
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
       ErrorLogger.addBreadcrumb('Download indexing: $videoId',
           category: 'download', data: {'path': finalPath});
+      final realBitrate = stream.bitrateKbps > 0
+          ? stream.bitrateKbps
+          : (quality == 'low' ? 64 : quality == 'medium' ? 128 : 160);
+      final realCodec = mimeType.contains('webm') ||
+              mimeType.contains('opus') ||
+              ext == 'webm'
+          ? 'OPUS'
+          : 'AAC';
       final reconciled = await _repository.reconcileDownloadedSong(
         oldId: song.id,
         newPath: finalPath,
-        fallbackSong: song,
+        fallbackSong: song.copyWith(
+          bitrateKbps: Value(realBitrate),
+          codec: Value(realCodec),
+          sampleRate: Value(realCodec == 'OPUS' ? 48000 : 44100),
+        ),
       );
 
       // FIX: Downloaded song repeated twice — full rescan after reconcile creates duplicate path row

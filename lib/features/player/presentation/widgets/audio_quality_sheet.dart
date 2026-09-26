@@ -41,6 +41,7 @@ class AudioQualitySheet extends StatelessWidget {
     HapticFeedback.mediumImpact();
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => AudioQualitySheet(song: song, activeColor: activeColor),
     );
   }
@@ -177,6 +178,44 @@ class AudioQualitySheet extends StatelessWidget {
                       ],
                     ),
                   ),
+
+                  // Streaming & Download Quality Selector for YouTube online streams
+                  if ((song.source == SongSource.youtube ||
+                          song.source == 'youtube' ||
+                          song.path.toLowerCase().startsWith('ytmusic://')) &&
+                      song.isDownloaded != true) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          context.l10n.streamingQuality,
+                          style: TextStyle(
+                            fontSize: AppFontSize.caption,
+                            letterSpacing: AppTracking.wide,
+                            fontWeight: FontWeight.w800,
+                            color: p.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          'Downloads match stream',
+                          style: TextStyle(
+                            fontSize: AppFontSize.tiny,
+                            color: activeColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _buildStreamingQualitySelector(
+                      context,
+                      settingsCubit,
+                      streamingQuality ?? YtmAudioQuality.high,
+                      p,
+                      activeColor,
+                    ),
+                  ],
 
                   const SizedBox(height: AppSpacing.s20),
 
@@ -682,6 +721,85 @@ class AudioQualitySheet extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStreamingQualitySelector(
+    BuildContext context,
+    SettingsCubit? cubit,
+    YtmAudioQuality current,
+    PulsrPalette p,
+    Color activeColor,
+  ) {
+    final options = [
+      (
+        quality: YtmAudioQuality.high,
+        label: 'High • 160k',
+        icon: Icons.high_quality_rounded
+      ),
+      (
+        quality: YtmAudioQuality.medium,
+        label: 'Med • 128k',
+        icon: Icons.graphic_eq_rounded
+      ),
+      (
+        quality: YtmAudioQuality.low,
+        label: 'Low • 64k',
+        icon: Icons.data_saver_on_rounded
+      ),
+    ];
+
+    return Row(
+      children: options.map((opt) {
+        final isSelected = opt.quality == current;
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+            child: Material(
+              color: isSelected
+                  ? activeColor.withValues(alpha: 0.16)
+                  : p.surfaceContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r12),
+                side: BorderSide(
+                  color: isSelected ? activeColor : p.hairline,
+                  width: isSelected ? 1.5 : 1.0,
+                ),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadii.r12),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  cubit?.setStreamingQuality(opt.quality);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        opt.icon,
+                        size: 18,
+                        color: isSelected ? activeColor : p.textSecondary,
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        opt.label,
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? activeColor : p.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

@@ -32,6 +32,7 @@ class YtmOAuthLoginSheet extends StatefulWidget {
     return PulsrSheetHelper.showPulsrSheet<bool>(
       context: context,
       enableDrag: false,
+      wrapWithContainer: false,
       builder: (_) => const YtmOAuthLoginSheet(),
     );
   }

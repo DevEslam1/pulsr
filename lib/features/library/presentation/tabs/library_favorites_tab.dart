@@ -462,6 +462,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
     PulsrSheetHelper.showPulsrSheet(
       context: context,
+      wrapWithContainer: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;

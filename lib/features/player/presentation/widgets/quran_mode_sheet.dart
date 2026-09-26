@@ -22,6 +22,7 @@ class QuranModeSheet extends StatelessWidget {
   static Future<void> show(BuildContext context) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => const QuranModeSheet(),
     );
   }

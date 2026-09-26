@@ -29,6 +29,7 @@ import '../../domain/models/genre_item.dart';
 import '../../domain/models/headphone_profile.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import 'package:drift/drift.dart' show Value;
 import '../db/app_database.dart';
 import 'artwork_uri_resolver.dart';
 import 'audio_effects_channel.dart';
@@ -1934,6 +1935,25 @@ class PulsrAudioHandler extends BaseAudioHandler
         try {
           _latencyTracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
+        final songIndex = _songs.indexWhere((s) =>
+            s.id == song.id || (s.remoteId != null && s.remoteId == song.remoteId));
+        if (songIndex != -1) {
+          final target = _songs[songIndex];
+          if (target.bitrateKbps == null || target.bitrateKbps == 0) {
+            final defaultKbps =
+                quality == 'low' ? 64 : quality == 'medium' ? 128 : 160;
+            final defaultCodec = quality == 'medium' ? 'AAC' : 'OPUS';
+            final updated = target.copyWith(
+              bitrateKbps: Value(defaultKbps),
+              codec: Value(defaultCodec),
+              sampleRate: Value(defaultCodec == 'OPUS' ? 48000 : 44100),
+            );
+            _songs[songIndex] = updated;
+            if (songIndex == _currentIndex && !_onTrackChangedSubject.isClosed) {
+              _onTrackChangedSubject.add(updated);
+            }
+          }
+        }
         return (
           url: cached.url,
           userAgent: cached.userAgent,
@@ -1964,6 +1984,34 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (stream.url.trim().isEmpty) {
         throw const YtmException(
             'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
+      }
+
+      final realBitrate = stream.bitrateKbps > 0
+          ? stream.bitrateKbps
+          : (quality == 'low' ? 64 : quality == 'medium' ? 128 : 160);
+      final realCodec = stream.container.toUpperCase() == 'WEBM' ||
+              stream.mimeType.contains('webm') ||
+              stream.mimeType.contains('opus')
+          ? 'OPUS'
+          : (stream.container.toUpperCase() == 'M4A' ||
+                  stream.mimeType.contains('mp4') ||
+                  stream.mimeType.contains('aac')
+              ? 'AAC'
+              : 'OPUS');
+
+      final songIndex = _songs.indexWhere((s) =>
+          s.id == song.id || (s.remoteId != null && s.remoteId == song.remoteId));
+      if (songIndex != -1) {
+        final target = _songs[songIndex];
+        final updated = target.copyWith(
+          bitrateKbps: Value(realBitrate),
+          codec: Value(realCodec),
+          sampleRate: Value(realCodec == 'OPUS' ? 48000 : 44100),
+        );
+        _songs[songIndex] = updated;
+        if (songIndex == _currentIndex && !_onTrackChangedSubject.isClosed) {
+          _onTrackChangedSubject.add(updated);
+        }
       }
       // Prefer the resolver-provided expiry, then the URL stamp (which may be a
       // ?expire= query param or /expire/<s>/ path segment), then a safe default.

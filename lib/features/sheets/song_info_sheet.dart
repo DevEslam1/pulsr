@@ -41,6 +41,7 @@ class SongInfoSheet extends StatelessWidget {
   static Future<void> show(BuildContext context, {required SongsTableData song}) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => SongInfoSheet(song: song),
     );
   }
@@ -784,11 +785,11 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
   String? _eqDropdownValue(String? stored) {
     if (stored == null || stored.isEmpty) return null;
     final lower = stored.toLowerCase();
-    if (EqPreset.defaultPresets.any((d) => d.name.toLowerCase() == lower)) {
-      return stored;
+    for (final d in EqPreset.defaultPresets) {
+      if (d.name.toLowerCase() == lower) return d.name;
     }
-    if (_headphoneProfiles.any((hp) => hp.name.toLowerCase() == lower)) {
-      return stored;
+    for (final hp in _headphoneProfiles) {
+      if (hp.name.toLowerCase() == lower) return hp.name;
     }
     return null;
   }
@@ -851,6 +852,20 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
     final currentEq = _eqStore.getPresetForTrack(trackKey);
     final currentBpm = _bpmStore.getBpmForTrack(trackKey);
 
+    final seenPresetNames = <String>{};
+    final eqOptions = <({String? value, String label})>[
+      (value: null, label: context.l10n.defaultGlobalEq),
+    ];
+    for (final preset in EqPreset.defaultPresets) {
+      seenPresetNames.add(preset.name.toLowerCase());
+      eqOptions.add((value: preset.name, label: preset.name));
+    }
+    for (final hp in _headphoneProfiles) {
+      if (seenPresetNames.add(hp.name.toLowerCase())) {
+        eqOptions.add((value: hp.name, label: '${hp.name} • AutoEQ'));
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
       padding: const EdgeInsets.all(AppSpacing.s14),
@@ -908,55 +923,62 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
 
           // Per-Track EQ Preset Override
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                context.l10n.trackEqOverride,
-                style: TextStyle(
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w700,
-                  color: p.textSecondary,
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Text(
+                  context.l10n.trackEqOverride,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w700,
+                    color: p.textSecondary,
+                  ),
                 ),
               ),
-              DropdownButton<String?>(
-                value: _eqDropdownValue(currentEq),
-                underline: const SizedBox(),
-                dropdownColor: p.surfaceContainer,
-                icon: Icon(Icons.arrow_drop_down, color: p.accent),
-                style: TextStyle(
-                  color: currentEq != null ? p.accent : p.textPrimary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w600,
-                ),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(context.l10n.defaultGlobalEq),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: DropdownButton<String?>(
+                  isExpanded: true,
+                  value: _eqDropdownValue(currentEq),
+                  underline: const SizedBox(),
+                  dropdownColor: p.surfaceContainer,
+                  icon: Icon(Icons.arrow_drop_down, color: p.accent),
+                  style: TextStyle(
+                    color: currentEq != null ? p.accent : p.textPrimary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
                   ),
-                  ...EqPreset.defaultPresets.map(
-                    (preset) => DropdownMenuItem<String?>(
-                      value: preset.name,
-                      child: Text(preset.name),
-                    ),
-                  ),
-                  // Custom + AutoEQ headphone profiles
-                  ..._headphoneProfiles
-                      .where((hp) => EqPreset.defaultPresets.every(
-                          (d) =>
-                              d.name.toLowerCase() !=
-                              hp.name.toLowerCase()))
-                      .map(
-                        (hp) => DropdownMenuItem<String?>(
-                          value: hp.name,
-                          child: Text('${hp.name} • AutoEQ'),
+                  selectedItemBuilder: (context) {
+                    return eqOptions.map((opt) {
+                      return Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Text(
+                          opt.label,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          textAlign: TextAlign.end,
                         ),
+                      );
+                    }).toList();
+                  },
+                  items: eqOptions.map((opt) {
+                    return DropdownMenuItem<String?>(
+                      value: opt.value,
+                      child: Text(
+                        opt.label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                ],
-                onChanged: (newPreset) async {
-                  await _eqStore.setPresetForTrack(trackKey, newPreset);
-                  playerCubit?.setSongEqOverride(widget.song.id, newPreset);
-                  if (mounted) setState(() {});
-                },
+                    );
+                  }).toList(),
+                  onChanged: (newPreset) async {
+                    await _eqStore.setPresetForTrack(trackKey, newPreset);
+                    playerCubit?.setSongEqOverride(widget.song.id, newPreset);
+                    if (mounted) setState(() {});
+                  },
+                ),
               ),
             ],
           ),

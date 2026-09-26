@@ -275,17 +275,6 @@ void showThemePickerSheet(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: AppSpacing.sm),
-            Center(
-              child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: outlineColor.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.s20, vertical: AppSpacing.xxs),

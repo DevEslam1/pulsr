@@ -33,6 +33,7 @@ class AddToPlaylistSheet extends StatefulWidget {
   }) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => AddToPlaylistSheet(song: song, songs: songs),
     );
   }

@@ -41,9 +41,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   Future<void> setStreamingQuality(YtmAudioQuality quality) async {
     markDirty('streamingQuality');
-    safeEmit(state.copyWith(streamingQuality: quality));
+    markDirty('downloadQuality');
+    safeEmit(state.copyWith(
+      streamingQuality: quality,
+      downloadQuality: quality,
+    ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(SettingsCubit._keyStreamingQuality, quality.name);
+    await prefs.setString(SettingsCubit._keyDownloadQuality, quality.name);
   }
 
   Future<void> setDownloadQuality(YtmAudioQuality quality) async {

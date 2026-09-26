@@ -185,17 +185,6 @@ class _BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: p.hairline,
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
             Text(
               context.l10n.bluetoothLatencyTitle,
               style: TextStyle(

@@ -28,6 +28,7 @@ class SortFilterSheet extends StatelessWidget {
   }) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => SortFilterSheet(
         currentSort: currentSort,
         ascending: ascending,

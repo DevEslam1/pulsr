@@ -378,6 +378,11 @@ class YtmResolvingSource extends StreamAudioSource {
     }
 
     final cacheFile = await _cacheFileFor(videoId, url, quality);
+    final isNativeClient = effectiveUa != null &&
+        (effectiveUa.contains('com.google.android') ||
+            effectiveUa.contains('com.google.ios') ||
+            (effectiveUa.contains('Android') && !effectiveUa.contains('Mozilla')));
+
     final headers = <String, String>{
       if (effectiveUa != null && effectiveUa.isNotEmpty)
         'User-Agent': effectiveUa
@@ -392,7 +397,11 @@ class YtmResolvingSource extends StreamAudioSource {
           effectiveCookies.isNotEmpty &&
           _cookiesBelongOn(url))
         'Cookie': effectiveCookies,
-      'Referer': 'https://music.youtube.com/',
+      // Native clients (e.g. ANDROID_VR, IOS_MUSIC) stream from googlevideo CDN
+      // without a web Referer. Sending 'https://music.youtube.com/' with a native
+      // app User-Agent flags the request as spoofed to CDN edge nodes and causes HTTP 403.
+      if (!isNativeClient)
+        'Referer': 'https://music.youtube.com/',
     };
 
     // Serialize creation per cache path so two sources for the same videoId

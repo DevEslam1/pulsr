@@ -21,6 +21,7 @@ class PulsrCastSheet extends StatefulWidget {
     HapticFeedback.lightImpact();
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (_) => const PulsrCastSheet(),
     );
   }

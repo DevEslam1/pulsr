@@ -55,7 +55,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val threadCounter = AtomicInteger(0)
-    private val executor: ExecutorService = Executors.newFixedThreadPool(3, ThreadFactory { r ->
+    private val executor: ExecutorService = Executors.newFixedThreadPool(6, ThreadFactory { r ->
         Thread(r, "ytm-plugin-${threadCounter.incrementAndGet()}").apply {
             isDaemon = true
         }

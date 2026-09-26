@@ -269,6 +269,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
 
     await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
+      wrapWithContainer: false,
       builder: (ctx) {
         return Align(
           alignment: Alignment.bottomCenter,
