@@ -129,7 +129,12 @@ class YtmAccountService {
   /// resolve path issues up to 9 sequential player requests; keep-alive skips
   /// a fresh TCP+TLS handshake on each). Field, not a ctor param, so the
   /// injectable binding stays untouched.
-  final http.Client _innertubeClient = http.Client();
+  http.Client _innertubeClient = http.Client();
+
+  /// Swaps in a scripted client so tests can drive the Tier-1 player chain's
+  /// timing without touching the network.
+  @visibleForTesting
+  set debugInnertubeClient(http.Client client) => _innertubeClient = client;
 
   String? _cookies;
   String? _accountName;
@@ -2063,6 +2068,24 @@ class YtmAccountService {
   /// 2. ANDROID client
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
+  /// Mints the content-bound (videoId) player poToken.
+  ///
+  /// Split out so the mint can be *started* as soon as the generator is ready
+  /// and awaited alongside the guest-state read, instead of queueing behind it.
+  /// Never throws: an unmintable token simply means the request goes out
+  /// without one rather than with the wrong one.
+  Future<String?> _mintPlayerPoToken(String videoId) async {
+    try {
+      return await getIt<YtmService>()
+          .getPlayerPoToken(videoId)
+          .timeout(const Duration(seconds: 4));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to mint content-bound player poToken',
+          error: e, stackTrace: st, category: 'YTM_ACCOUNT');
+      return null;
+    }
+  }
+
   Future<YtmStream?> resolvePlayerStream(String videoId,
       {String quality = 'high'}) async {
     try {
@@ -2083,17 +2106,26 @@ class YtmAccountService {
     final isAuthenticated =
         isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
 
-    if (_dataSyncId == null && isLoggedIn) {
-      await _warmSession().timeout(const Duration(seconds: 3), onTimeout: () {});
-    }
-
+    // The session warm-up (a browse round-trip) and the BotGuard warm-up (a
+    // local generator spin-up) touch different subsystems, so they are started
+    // together and only awaited afterwards: queued back-to-back they put up to
+    // 5 s of pure waiting in front of the first /player request on a cold
+    // start, which is exactly the budget the cold bucket does not have.
+    final sessionWarm = (_dataSyncId == null && isLoggedIn)
+        ? _warmSession().timeout(const Duration(seconds: 3), onTimeout: () {})
+        : Future<void>.value();
     // Warm the native BotGuard attestation once so both the account-bound and
     // guest minting below have a live generator instead of a cold WebView.
-    try {
-      await getIt<YtmService>()
-          .ensurePoTokenReady()
-          .timeout(const Duration(seconds: 2));
-    } catch (_) {}
+    final tokenReady = () async {
+      try {
+        await getIt<YtmService>()
+            .ensurePoTokenReady()
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }();
+    await sessionWarm;
+    await tokenReady;
+
     // Two attestation pairs, kept strictly apart. A poToken is only valid for
     // the identity it was minted against, and the session cookies are only
     // valid alongside the account-bound one — so the authenticated WEB_REMIX
@@ -2107,6 +2139,32 @@ class YtmAccountService {
     // Whether this pass may carry the session (cookies + SAPISIDHASH). Only an
     // account-bound poToken earns that; otherwise the pass runs as a clean guest.
     var useSessionAuth = isAuthenticated;
+
+    // Guest pair, needed by every non-WEB_REMIX client in the chain even when
+    // signed in — those clients are only reachable as guests. Started right
+    // after the generator is ready: it only *reads* PoTokenManager, so it runs
+    // alongside the account-bound / content-bound mints instead of queueing
+    // behind them.
+    String? guestPoToken;
+    String? guestVisitorData;
+    final guestState = () async {
+      try {
+        final poState = await getIt<YtmService>()
+            .getPoTokenState()
+            .timeout(const Duration(seconds: 2));
+        guestPoToken = poState?['streamingPoToken'] as String?;
+        guestVisitorData = poState?['visitorData'] as String?;
+      } catch (_) {}
+    }();
+
+    Future<Map<String, dynamic>?>? accountMint;
+    // Web-shaped clients send the token as `serviceIntegrityDimensions`, which
+    // must be bound to the *video*; the visitor-bound streaming token makes
+    // YouTube answer UNPLAYABLE "Video unavailable" even though a token is
+    // attached. Mint the content-bound one up front (null when unavailable, in
+    // which case the request goes out without a token rather than the wrong one).
+    Future<String?>? playerMint;
+
     if (isAuthenticated) {
       // dataSyncId guard: if we still don't have a dataSyncId (e.g. first play
       // immediately after login before _warmSession completed) we cannot mint an
@@ -2121,61 +2179,53 @@ class YtmAccountService {
             'running Tier-1 as a guest pass (no session cookies).');
         useSessionAuth = false;
       } else {
-        try {
+        accountMint = () async {
           final account = await getIt<YtmService>()
               .getAccountPoToken(dsid)
               .timeout(const Duration(seconds: 2));
-          accountPoToken = account?['poToken'] as String?;
-          final vd = account?['visitorData'] as String?;
-          accountVisitorData =
-              _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
-          if (accountPoToken != null && accountPoToken.isNotEmpty) {
-            hadAccountPoToken = true;
-          }
-        } catch (e) {
-          debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
-        }
-        // Account-bound minting failed (e.g. BotGuard not ready yet): fall back
-        // to a guest pass rather than sending a guest token with session
-        // cookies. Both the token and the visitorData must be the guest ones,
-        // so drop what the account attempt left behind.
-        if (!hadAccountPoToken) {
-          debugPrint('[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
-              'running Tier-1 as a guest pass (no session cookies).');
-          useSessionAuth = false;
-          accountPoToken = null;
-          accountVisitorData = null;
-        }
+          return account;
+        }();
       }
     }
-    // Guest pair, needed by every non-WEB_REMIX client in the chain even when
-    // signed in — those clients are only reachable as guests.
-    String? guestPoToken;
-    String? guestVisitorData;
-    try {
-      final poState = await getIt<YtmService>()
-          .getPoTokenState()
-          .timeout(const Duration(seconds: 2));
-      guestPoToken = poState?['streamingPoToken'] as String?;
-      guestVisitorData = poState?['visitorData'] as String?;
-    } catch (_) {}
+    if (!useSessionAuth) {
+      playerMint = _mintPlayerPoToken(videoId);
+    }
 
-    // Web-shaped clients send the token as `serviceIntegrityDimensions`, which
-    // must be bound to the *video*; the visitor-bound streaming token makes
-    // YouTube answer UNPLAYABLE "Video unavailable" even though a token is
-    // attached. Mint the content-bound one up front (null when unavailable, in
-    // which case the request goes out without a token rather than the wrong one).
+    if (accountMint != null) {
+      try {
+        final account = await accountMint;
+        accountPoToken = account?['poToken'] as String?;
+        final vd = account?['visitorData'] as String?;
+        accountVisitorData =
+            _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
+        if (accountPoToken != null && accountPoToken.isNotEmpty) {
+          hadAccountPoToken = true;
+        }
+      } catch (e) {
+        debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
+      }
+      // Account-bound minting failed (e.g. BotGuard not ready yet): fall back
+      // to a guest pass rather than sending a guest token with session
+      // cookies. Both the token and the visitorData must be the guest ones,
+      // so drop what the account attempt left behind.
+      if (!hadAccountPoToken) {
+        debugPrint('[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
+            'running Tier-1 as a guest pass (no session cookies).');
+        useSessionAuth = false;
+        accountPoToken = null;
+        accountVisitorData = null;
+      }
+    }
+
     String? playerPoToken;
     if (!useSessionAuth) {
-      try {
-        playerPoToken = await getIt<YtmService>()
-            .getPlayerPoToken(videoId)
-            .timeout(const Duration(seconds: 4));
-      } catch (e, st) {
-        ErrorLogger.log('Failed to mint content-bound player poToken',
-            error: e, stackTrace: st, category: 'YTM_ACCOUNT');
-      }
+      // The account mint may be what demoted this pass to a guest one, so the
+      // content-bound token is only awaited here when it could not be started
+      // up front. [_mintPlayerPoToken] never throws.
+      playerMint ??= _mintPlayerPoToken(videoId);
+      playerPoToken = await playerMint;
     }
+    await guestState;
 
     final rawChain = useSessionAuth
         ? [

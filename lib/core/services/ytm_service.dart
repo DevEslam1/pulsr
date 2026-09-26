@@ -17,6 +17,7 @@ import 'ytm_account_service.dart';
 import 'ytm_browse_service.dart';
 import 'ytm_client_version_resolver.dart';
 import 'ytm_url_cache.dart';
+import '../../data/audio/hedged_stream_resolver.dart';
 import '../../domain/models/ytm_track.dart';
 import '../telemetry/playback_latency_tracker.dart';
 import '../utils/error_logger.dart';
@@ -131,11 +132,29 @@ class YtmException implements Exception {
       'YtmException($code${traceId != null ? ' [trace=$traceId]' : ''}${details == null ? '' : ': $details'})';
 }
 
+/// Descriptor for one client in the pure-Dart (desktop / native-fallback)
+/// InnerTube player chain.
+typedef _DartPlayerClient = ({
+  String name,
+  String version,
+  String clientNameId,
+  String ua,
+  String host,
+});
+
 @singleton
 class YtmService {
   static const String channelName = PulsrChannels.ytm;
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
   static const Duration _defaultResolveTimeout = Duration(seconds: 15);
+
+  /// How long Tier-1 (the authenticated account InnerTube resolve) runs alone
+  /// before Tier-2 (the native multi-client chain) is started alongside it.
+  /// Long enough that a warm signed-in resolve — the case this ordering exists
+  /// for — still finishes first and never pays for a redundant native chain;
+  /// short enough that a slow account hop no longer delays the native chain by
+  /// its full duration.
+  static const Duration _tier1HedgeDelay = Duration(milliseconds: 1500);
 
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
@@ -145,7 +164,12 @@ class YtmService {
   /// fallback). Keep-alive reuses TCP+TLS across requests; the previous
   /// top-level `http.post` paid a fresh handshake per call (~100-400ms).
   /// (Field, not a ctor param, so injectable codegen stays untouched.)
-  final http.Client _httpClient = http.Client();
+  http.Client _httpClient = http.Client();
+
+  /// Swaps in a scripted client so tests can drive the InnerTube search
+  /// fallback's timing without touching the network.
+  @visibleForTesting
+  set debugHttpClient(http.Client client) => _httpClient = client;
 
   bool? _available;
 
@@ -542,28 +566,74 @@ class YtmService {
 
   /// Search with fallback: First tries native extractor, then falls back to
   /// Innertube search if the extractor returns empty or throws.
+  ///
+  /// The two engines race instead of queueing. Native is asked first and, when
+  /// it answers inside [_searchHedgeDelay], it wins outright — the fallback is
+  /// never started, so the happy path still costs exactly one search. Past the
+  /// hedge delay the Dart InnerTube search starts alongside it, which is what
+  /// used to be a full wait on native's 25s budget before the second engine was
+  /// even attempted. Whichever hands back a non-empty list first wins.
+  static const Duration _searchHedgeDelay = Duration(milliseconds: 900);
+
   Future<List<YtmTrack>> searchWithFallback(String query,
       {int limit = 30}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
 
-    // 1. Try native extractor search
-    try {
-      final results = await search(trimmed, limit: limit);
-      if (results.isNotEmpty) return results;
-    } catch (e) {
+    final winner = Completer<List<YtmTrack>>();
+    List<YtmTrack> nativeResults = const [];
+    List<YtmTrack>? fallbackResults;
+    var nativeDone = false;
+    var fallbackDone = false;
+    var fallbackStarted = false;
+    Timer? hedge;
+
+    void decide() {
+      if (winner.isCompleted) return;
+      if (nativeResults.isNotEmpty) {
+        winner.complete(nativeResults);
+      } else if (fallbackResults != null && fallbackResults!.isNotEmpty) {
+        winner.complete(fallbackResults!);
+      } else if (nativeDone && fallbackDone) {
+        winner.complete(const []);
+      }
+    }
+
+    void startFallback() {
+      if (fallbackStarted || winner.isCompleted) return;
+      fallbackStarted = true;
+      _searchInnertube(trimmed, limit: limit).then((results) {
+        fallbackResults = results;
+        fallbackDone = true;
+        decide();
+      }).catchError((Object e) {
+        debugPrint('[YTM_SERVICE] Innertube fallback search failed: $e');
+        fallbackDone = true;
+        decide();
+      });
+    }
+
+    hedge = Timer(_searchHedgeDelay, startFallback);
+
+    search(trimmed, limit: limit).then((results) {
+      nativeResults = results;
+      nativeDone = true;
+      hedge?.cancel();
+      // Empty rather than thrown: promote the fallback now instead of waiting
+      // out the hedge delay for a native answer that already said "nothing".
+      if (results.isNotEmpty) {
+        decide();
+      } else {
+        startFallback();
+      }
+    }).catchError((Object e) {
       debugPrint('[YTM_SERVICE] Native search failed, trying fallbacks: $e');
-    }
+      nativeDone = true;
+      hedge?.cancel();
+      startFallback();
+    });
 
-    // 2. Fallback: Innertube search
-    try {
-      final innertubeResults = await _searchInnertube(trimmed, limit: limit);
-      if (innertubeResults.isNotEmpty) return innertubeResults;
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Innertube fallback search failed: $e');
-    }
-
-    return const [];
+    return winner.future;
   }
 
   Future<List<YtmTrack>> _searchInnertube(String query,
@@ -870,11 +940,22 @@ class YtmService {
   ///
   /// Coalesces concurrent identical non-force resolves. A `forceRefresh` bypasses
   /// coalescing so it always performs a fresh resolve.
+  ///
+  /// [coalesce] can also be turned off on its own. A hedged caller needs its
+  /// second, staggered attempt to be a genuinely independent chain — with
+  /// coalescing on, that attempt just awaited the first one's future, so the
+  /// "hedge" raced a promise against itself and never reduced tail latency.
   Future<YtmStream> resolveStream(String videoId,
-      {String quality = 'high', bool forceRefresh = false}) {
+      {String quality = 'high',
+      bool forceRefresh = false,
+      bool coalesce = true}) {
     if (forceRefresh) {
       return _resolveStreamInner(videoId,
           quality: quality, forceRefresh: true);
+    }
+    if (!coalesce) {
+      return _resolveStreamInner(videoId,
+          quality: quality, forceRefresh: false);
     }
     final key = '$videoId:${quality.toLowerCase()}';
     final existing = _inFlightStreamResolves[key];
@@ -964,133 +1045,211 @@ class YtmService {
     try {
       _tracker?.markStage(PlaybackStage.pluginEntered);
     } catch (_) {}
-    // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
-    try {
-      if (!inBotCooldown && getIt.isRegistered<YtmAccountService>()) {
-        final account = getIt<YtmAccountService>();
-        if (account.isLoggedIn) {
-          // Do NOT gate Tier-1 on dataSyncId. YtmAccountService.resolvePlayerStream
-          // already detects a missing/empty dataSyncId and runs its chain as a
-          // clean guest pass (no session cookies), which is strictly better than
-          // skipping Tier-1 entirely: that handed every signed-in resolution to
-          // Tier-2, whose WEB_REMIX request pairs session cookies with a guest
-          // poToken — the mismatch YouTube answers with UNPLAYABLE "Video
-          // unavailable" / LOGIN_REQUIRED. It was also the reason dataSyncId was
-          // never harvested, so the account-bound token could never be minted.
-          //
-          // Kick a (throttled) dataSyncId bootstrap in parallel so later tracks
-          // resolve with the account-bound token; the current resolve proceeds
-          // on the guest/native chain meanwhile.
-          if (account.dataSyncId == null || account.dataSyncId!.isEmpty) {
-            debugPrint('[YTM_SERVICE] Tier-1 running as guest pass for $videoId: '
-                'dataSyncId not yet ready; bootstrapping in background.');
-            unawaited(account.ensureDataSyncId());
-          }
-          try {
-            _tracker?.markStage(PlaybackStage.clientRequestSent);
-            _tracker?.markStage(PlaybackStage.poTokenNeeded);
-          } catch (_) {}
-          final directStream =
-              await account.resolvePlayerStream(videoId, quality: quality);
-          if (directStream != null) {
+    // Tier-1 (authenticated account InnerTube) and Tier-2 (native multi-client
+    // extractor) used to run strictly one after the other, so a slow Tier-1
+    // charged its whole 50 s budget before the native chain — normally the
+    // faster of the two — was even started. They now race: Tier-1 gets
+    // [_tier1HedgeDelay] alone, so the signed-in path still wins outright and
+    // never pays for a redundant native chain, and past that the native tier
+    // starts alongside it. First stream back wins; the loser's result is
+    // dropped. Because a MethodChannel call cannot be cancelled once invoked,
+    // the only cost of losing the race is the single extra chain the hedge
+    // already decided to spend.
+    Timer? tierHedge;
+    Object? nativeError;
+
+    // 1. Direct authenticated YouTube Music InnerTube Player API if logged in
+    Future<YtmStream?> runAccountTier() async {
+      try {
+        if (!inBotCooldown && getIt.isRegistered<YtmAccountService>()) {
+          final account = getIt<YtmAccountService>();
+          if (account.isLoggedIn) {
+            // Do NOT gate Tier-1 on dataSyncId. YtmAccountService.resolvePlayerStream
+            // already detects a missing/empty dataSyncId and runs its chain as a
+            // clean guest pass (no session cookies), which is strictly better than
+            // skipping Tier-1 entirely: that handed every signed-in resolution to
+            // Tier-2, whose WEB_REMIX request pairs session cookies with a guest
+            // poToken — the mismatch YouTube answers with UNPLAYABLE "Video
+            // unavailable" / LOGIN_REQUIRED. It was also the reason dataSyncId was
+            // never harvested, so the account-bound token could never be minted.
+            //
+            // Kick a (throttled) dataSyncId bootstrap in parallel so later tracks
+            // resolve with the account-bound token; the current resolve proceeds
+            // on the guest/native chain meanwhile.
+            if (account.dataSyncId == null || account.dataSyncId!.isEmpty) {
+              debugPrint('[YTM_SERVICE] Tier-1 running as guest pass for $videoId: '
+                  'dataSyncId not yet ready; bootstrapping in background.');
+              unawaited(account.ensureDataSyncId());
+            }
             try {
-              _tracker?.markStage(PlaybackStage.urlObtained);
+              _tracker?.markStage(PlaybackStage.clientRequestSent);
+              _tracker?.markStage(PlaybackStage.poTokenNeeded);
             } catch (_) {}
-            // putStream, not put: the entry keeps the real container, MIME and
-            // bitrate. put() alone let a later cache hit rebuild the stream by
-            // guessing them from the URL, which wrote Opus bytes into a .m4a.
-            urlCache?.putStream(directStream, quality: quality);
-            _noteResolveSuccess(videoId: videoId);
-            return directStream;
+            final directStream =
+                await account.resolvePlayerStream(videoId, quality: quality);
+            if (directStream != null) {
+              try {
+                _tracker?.markStage(PlaybackStage.urlObtained);
+              } catch (_) {}
+              // putStream, not put: the entry keeps the real container, MIME and
+              // bitrate. put() alone let a later cache hit rebuild the stream by
+              // guessing them from the URL, which wrote Opus bytes into a .m4a.
+              urlCache?.putStream(directStream, quality: quality);
+              _noteResolveSuccess(videoId: videoId);
+              return directStream;
+            }
           }
         }
+      } catch (e) {
+        // Never abort the whole chain on a Tier-1 auth failure: an expired or
+        // mismatched (guest-poToken + auth-cookies) WEB_REMIX request must fall
+        // back to guest native/remote playback, otherwise login breaks public
+        // streams that work logged-out. Auth is only surfaced if every tier fails
+        // (see final rethrow below).
+        if (e is YtmException && e.isAuth) {
+          debugPrint('[YTM_SERVICE] Direct account stream auth failure, falling back to guest engines: $e');
+          recordError(e);
+        } else {
+          debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
+          recordError(e);
+        }
+        // If the account tier hit an IP-level block or a bot challenge, activate
+        // cooldown so the native tier doesn't burn through 9 more clients for the
+        // same result. A transport failure is excluded on purpose: the next tier
+        // may well have a route (remote backend), and cooling down on an offline
+        // blip is what made a one-second signal drop look like an IP block.
+        if (!inBotCooldown &&
+            e is YtmException &&
+            (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
+          _noteBotChallenge(e, videoId: videoId);
+        }
       }
-    } catch (e) {
-      // Never abort the whole chain on a Tier-1 auth failure: an expired or
-      // mismatched (guest-poToken + auth-cookies) WEB_REMIX request must fall
-      // back to guest native/remote playback, otherwise login breaks public
-      // streams that work logged-out. Auth is only surfaced if every tier fails
-      // (see final rethrow below).
-      if (e is YtmException && e.isAuth) {
-        debugPrint('[YTM_SERVICE] Direct account stream auth failure, falling back to guest engines: $e');
-        recordError(e);
-      } else {
-        debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
-        recordError(e);
-      }
-      // If the account tier hit an IP-level block or a bot challenge, activate
-      // cooldown so the native tier doesn't burn through 9 more clients for the
-      // same result. A transport failure is excluded on purpose: the next tier
-      // may well have a route (remote backend), and cooling down on an offline
-      // blip is what made a one-second signal drop look like an IP block.
-      if (!inBotCooldown &&
-          e is YtmException &&
-          (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
-        _noteBotChallenge(e, videoId: videoId);
-      }
+      return null;
     }
 
     // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
-    Object? nativeError;
-    try {
-      // Fail fast with a FRESH per-video exception: rethrowing _lastBotChallenge
-      // pastes another video's id + trace id into this video's logs and makes a
-      // stale verdict look like a new native failure. The stored challenge is
-      // only kept for the cooldown window timing.
-      if (inBotCooldown) {
-        throw YtmException('BOT_CHALLENGE',
-            'Cooling down after YouTube verification challenge ($videoId)');
-      }
+    Future<YtmStream?> runNativeTier() async {
       try {
-        _tracker?.markStage(PlaybackStage.clientRequestSent);
-        // Check poToken state heuristically: if we have a cached token, this is warm
-        _tracker?.markStage(PlaybackStage.poTokenNeeded);
-      } catch (_) {}
-      // maxRetries: 0 — the native side already runs its own multi-client
-      // hedged chain with internal retries. A Dart-level timeout retry can't
-      // cancel the still-running native call, so it just stacks a *second* full
-      // 9-client chain on top of the first, the thread-pool starvation this
-      // class is trying to avoid. Let a timeout fall through to the Dart tier.
-      final raw = await _guard(
-        () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
-          'videoId': videoId,
-          'quality': quality,
-        }),
-        timeout: _defaultResolveTimeout,
-        maxRetries: 0,
-      );
-
-      final stream = raw == null ? null : YtmStream.fromChannel(raw);
-      if (stream != null) {
+        // Fail fast with a FRESH per-video exception: rethrowing _lastBotChallenge
+        // pastes another video's id + trace id into this video's logs and makes a
+        // stale verdict look like a new native failure. The stored challenge is
+        // only kept for the cooldown window timing.
+        if (inBotCooldown) {
+          throw YtmException('BOT_CHALLENGE',
+              'Cooling down after YouTube verification challenge ($videoId)');
+        }
         try {
-          _tracker?.markStage(PlaybackStage.urlObtained);
+          _tracker?.markStage(PlaybackStage.clientRequestSent);
+          // Check poToken state heuristically: if we have a cached token, this is warm
+          _tracker?.markStage(PlaybackStage.poTokenNeeded);
         } catch (_) {}
-        urlCache?.putStream(stream, quality: quality);
-        _noteResolveSuccess(videoId: videoId);
-        return stream;
+        // maxRetries: 0 — the native side already runs its own multi-client
+        // hedged chain with internal retries. A Dart-level timeout retry can't
+        // cancel the still-running native call, so it just stacks a *second* full
+        // 9-client chain on top of the first, the thread-pool starvation this
+        // class is trying to avoid. Let a timeout fall through to the Dart tier.
+        final raw = await _guard(
+          () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
+            'videoId': videoId,
+            'quality': quality,
+          }),
+          timeout: _defaultResolveTimeout,
+          maxRetries: 0,
+        );
+
+        final stream = raw == null ? null : YtmStream.fromChannel(raw);
+        if (stream != null) {
+          try {
+            _tracker?.markStage(PlaybackStage.urlObtained);
+          } catch (_) {}
+          urlCache?.putStream(stream, quality: quality);
+          _noteResolveSuccess(videoId: videoId);
+          return stream;
+        }
+      } catch (e) {
+        debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
+        // Same guest-fallback rule as Tier-1: a native LOGIN_REQUIRED (often
+        // caused by stale synced cookies) must still try the remote backend
+        // before surfacing auth to the UI.
+        recordError(e);
+        nativeError = e;
+        // The cooldown short-circuit itself must not extend the window, or a
+        // retry loop would hold it open forever (fixed window from first hit).
+        if (!inBotCooldown &&
+            e is YtmException &&
+            (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
+          _noteBotChallenge(e, videoId: videoId);
+        }
       }
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
-      // Same guest-fallback rule as Tier-1: a native LOGIN_REQUIRED (often
-      // caused by stale synced cookies) must still try the remote backend
-      // before surfacing auth to the UI.
-      recordError(e);
-      nativeError = e;
-      // The cooldown short-circuit itself must not extend the window, or a
-      // retry loop would hold it open forever (fixed window from first hit).
-      if (!inBotCooldown &&
-          e is YtmException &&
-          (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
-        _noteBotChallenge(e, videoId: videoId);
+      return null;
+    }
+
+    final winner = Completer<YtmStream?>();
+    YtmStream? accountResult;
+    YtmStream? nativeResult;
+    var accountDone = false;
+    var nativeDone = false;
+    var nativeStarted = false;
+
+    void settle() {
+      if (winner.isCompleted) return;
+      if (accountResult != null) {
+        winner.complete(accountResult);
+      } else if (nativeResult != null) {
+        winner.complete(nativeResult);
+      } else if (accountDone && nativeDone) {
+        winner.complete(null);
       }
     }
+
+    void startNativeTier() {
+      tierHedge?.cancel();
+      if (nativeStarted || winner.isCompleted) return;
+      nativeStarted = true;
+      runNativeTier().then((stream) {
+        nativeResult = stream;
+        nativeDone = true;
+        settle();
+      }).catchError((Object e) {
+        debugPrint('[YTM_SERVICE] Native tier crashed: $e');
+        nativeDone = true;
+        settle();
+      });
+    }
+
+    tierHedge = Timer(_tier1HedgeDelay, startNativeTier);
+
+    runAccountTier().then((stream) {
+      accountResult = stream;
+      accountDone = true;
+      tierHedge?.cancel();
+      if (stream != null) {
+        settle();
+      } else {
+        // Tier-1 has nothing to offer: promote the native tier now instead of
+        // waiting out the hedge delay for an answer we already know we need.
+        startNativeTier();
+      }
+    }).catchError((Object e) {
+      debugPrint('[YTM_SERVICE] Account tier crashed: $e');
+      accountDone = true;
+      tierHedge?.cancel();
+      startNativeTier();
+    });
+
+    final racedStream = await winner.future;
+    tierHedge.cancel();
+    if (racedStream != null) return racedStream;
 
     // 2.5 PoToken refresh-and-retry (on-device only, no XDM backend).
     // A stale/mismatched BotGuard token fails every client identically; one
     // invalidate + mint + single native retry recovers without burning the
     // full Dart chain or imposing a bot cooldown on a non-bot failure.
-    if (nativeError is YtmException &&
-        nativeError.signal == YtmBlockSignal.poTokenInvalid &&
+    // (Read into a local first: `nativeError` is written from the native
+    // tier's closure, so the type test below cannot promote it in place.)
+    final nativeErr = nativeError;
+    if (nativeErr is YtmException &&
+        nativeErr.signal == YtmBlockSignal.poTokenInvalid &&
         breaker.shouldAllow(YtmBlockSignal.poTokenInvalid)) {
       try {
         debugPrint('[YTM_SERVICE] Tier-2.5 poToken refresh-and-retry for $videoId');
@@ -1187,7 +1346,7 @@ class YtmService {
       guestVisitorData = poState?['visitorData'] as String?;
     } catch (_) {}
 
-    final clients = [
+    final List<_DartPlayerClient> clients = [
       (
         name: 'ANDROID_VR',
         version: androidVrVersion,
@@ -1211,152 +1370,175 @@ class YtmService {
       ),
     ];
 
-    for (final client in clients) {
-      try {
-        final isEmbed = client.name == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
-        final clientContext = <String, dynamic>{
-          'client': {
-            'clientName': client.name,
-            'clientVersion': client.version,
-            'hl': YtmLocale.hl(),
-            'gl': YtmLocale.gl(),
-            if (guestVisitorData != null && guestVisitorData.isNotEmpty)
-              'visitorData': guestVisitorData,
-          },
-          if (isEmbed)
-            'thirdParty': {
-              'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
-            },
-        };
-
-        final body = jsonEncode({
-          'context': clientContext,
-          'videoId': videoId,
-          'racyCheckOk': true,
-          'contentCheckOk': true,
-          if (isEmbed)
-            'thirdParty': {
-              'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
-            },
-          'playbackContext': {
-            'contentPlaybackContext': {
-              'html5Preference': 'HTML5_PREF_WANTS',
-              if (guestPoToken != null && guestPoToken.isNotEmpty)
-                'poToken': guestPoToken,
-            },
-          },
-        });
-
-        final headers = <String, String>{
-          'Content-Type': 'application/json',
-          'User-Agent': client.ua,
-          'X-Goog-Api-Key': apiKey,
-          'x-youtube-client-name': client.clientNameId,
-          'x-youtube-client-version': client.version,
+    Future<YtmStream> attempt(_DartPlayerClient client) async {
+      final isEmbed = client.name == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
+      final clientContext = <String, dynamic>{
+        'client': {
+          'clientName': client.name,
+          'clientVersion': client.version,
+          'hl': YtmLocale.hl(),
+          'gl': YtmLocale.gl(),
           if (guestVisitorData != null && guestVisitorData.isNotEmpty)
-            'X-Goog-Visitor-Id': guestVisitorData,
-        };
+            'visitorData': guestVisitorData,
+        },
+        if (isEmbed)
+          'thirdParty': {
+            'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
+          },
+      };
 
-        final response = await _httpClient
-            .post(
-              Uri.parse(
-                  '${client.host}/youtubei/v1/player?prettyPrint=false&key=$apiKey'),
-              headers: headers,
-              body: body,
-            )
-            // FIX-C06: 12-second timeout per client in _resolveStreamDart
-            .timeout(const Duration(seconds: 12));
+      final body = jsonEncode({
+        'context': clientContext,
+        'videoId': videoId,
+        'racyCheckOk': true,
+        'contentCheckOk': true,
+        if (isEmbed)
+          'thirdParty': {
+            'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
+          },
+        'playbackContext': {
+          'contentPlaybackContext': {
+            'html5Preference': 'HTML5_PREF_WANTS',
+            if (guestPoToken != null && guestPoToken.isNotEmpty)
+              'poToken': guestPoToken,
+          },
+        },
+      });
 
-        if (response.statusCode != 200) continue;
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'User-Agent': client.ua,
+        'X-Goog-Api-Key': apiKey,
+        'x-youtube-client-name': client.clientNameId,
+        'x-youtube-client-version': client.version,
+        if (guestVisitorData != null && guestVisitorData.isNotEmpty)
+          'X-Goog-Visitor-Id': guestVisitorData,
+      };
 
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final playability = data['playabilityStatus'] as Map<String, dynamic>?;
-        final status = playability?['status'] as String? ?? '';
-        if (status == 'LOGIN_REQUIRED' ||
-            status == 'UNPLAYABLE' ||
-            status.contains('BOT')) {
-          continue;
+      final response = await _httpClient
+          .post(
+            Uri.parse(
+                '${client.host}/youtubei/v1/player?prettyPrint=false&key=$apiKey'),
+            headers: headers,
+            body: body,
+          )
+          // FIX-C06: 12-second timeout per client in _resolveStreamDart
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode != 200) {
+        throw YtmException('YTM_HTTP_${response.statusCode}',
+            'Dart client ${client.name} answered HTTP ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final playability = data['playabilityStatus'] as Map<String, dynamic>?;
+      final status = playability?['status'] as String? ?? '';
+      if (status == 'LOGIN_REQUIRED' ||
+          status == 'UNPLAYABLE' ||
+          status.contains('BOT')) {
+        throw YtmException('YTM_UNAVAILABLE',
+            'Dart client ${client.name} answered playability $status');
+      }
+
+      final streamingData = data['streamingData'] as Map<String, dynamic>?;
+      if (streamingData == null) {
+        throw YtmException('YTM_UNAVAILABLE',
+            'Dart client ${client.name} returned no streamingData');
+      }
+
+      final adaptive =
+          (streamingData['adaptiveFormats'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
+
+      final audioFormats = <({Map<String, dynamic> format, String url})>[];
+      for (final f in adaptive) {
+        final mime = f['mimeType'] as String? ?? '';
+        final streamUrl = f['url'] as String?;
+        if (mime.startsWith('audio/') &&
+            streamUrl != null &&
+            streamUrl.isNotEmpty) {
+          audioFormats.add((format: f, url: streamUrl));
         }
+      }
 
-        final streamingData = data['streamingData'] as Map<String, dynamic>?;
-        if (streamingData == null) continue;
-
-        final adaptive = (streamingData['adaptiveFormats'] as List<dynamic>? ??
-                [])
+      if (audioFormats.isEmpty) {
+        final formats = (streamingData['formats'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
             .toList();
-
-        final audioFormats = <({Map<String, dynamic> format, String url})>[];
-        for (final f in adaptive) {
-          final mime = f['mimeType'] as String? ?? '';
+        for (final f in formats) {
           final streamUrl = f['url'] as String?;
-          if (mime.startsWith('audio/') &&
-              streamUrl != null &&
-              streamUrl.isNotEmpty) {
+          if (streamUrl != null && streamUrl.isNotEmpty) {
             audioFormats.add((format: f, url: streamUrl));
           }
         }
-
-        if (audioFormats.isEmpty) {
-          final formats = (streamingData['formats'] as List<dynamic>? ?? [])
-              .whereType<Map<String, dynamic>>()
-              .toList();
-          for (final f in formats) {
-            final streamUrl = f['url'] as String?;
-            if (streamUrl != null && streamUrl.isNotEmpty) {
-              audioFormats.add((format: f, url: streamUrl));
-            }
-          }
-        }
-
-        if (audioFormats.isEmpty) continue;
-
-        final m4a = audioFormats
-            .where((f) =>
-                ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
-            .toList();
-        final pool = m4a.isNotEmpty ? m4a : audioFormats;
-
-        final selected = switch (quality.toLowerCase()) {
-          'low' => pool.reduce((a, b) =>
-              ((a.format['bitrate'] as num?) ?? 0) <
-                      ((b.format['bitrate'] as num?) ?? 0)
-                  ? a
-                  : b),
-          'medium' => pool.reduce((a, b) =>
-              (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
-                      (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
-                  ? a
-                  : b),
-          _ => pool.reduce((a, b) =>
-              ((a.format['bitrate'] as num?) ?? 0) >
-                      ((b.format['bitrate'] as num?) ?? 0)
-                  ? a
-                  : b),
-        };
-
-        final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
-        final bitrate = (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
-        final durationMs = int.tryParse(
-                selected.format['approxDurationMs']?.toString() ?? '0') ??
-            0;
-        final details = data['videoDetails'] as Map<String, dynamic>?;
-
-        return YtmStream(
-          videoId: videoId,
-          url: selected.url,
-          mimeType: mime.split(';').first.trim(),
-          container: mime.contains('mp4') ? 'm4a' : 'webm',
-          bitrateKbps: (bitrate / 1000).round(),
-          duration: Duration(milliseconds: durationMs),
-          title: details?['title'] as String? ?? '',
-          artist: details?['author'] as String? ?? '',
-          artworkUrl: null,
-          userAgent: client.ua,
-        ).withResolvedExpiry();
-      } catch (e) {
-        debugPrint('[YTM_SERVICE] Dart client ${client.name} resolve error: $e');
       }
+
+      if (audioFormats.isEmpty) {
+        throw YtmException('YTM_UNAVAILABLE',
+            'Dart client ${client.name} returned no audio formats');
+      }
+
+      final m4a = audioFormats
+          .where((f) =>
+              ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
+          .toList();
+      final pool = m4a.isNotEmpty ? m4a : audioFormats;
+
+      final selected = switch (quality.toLowerCase()) {
+        'low' => pool.reduce((a, b) =>
+            ((a.format['bitrate'] as num?) ?? 0) <
+                    ((b.format['bitrate'] as num?) ?? 0)
+                ? a
+                : b),
+        'medium' => pool.reduce((a, b) =>
+            (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
+                    (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
+                ? a
+                : b),
+        _ => pool.reduce((a, b) =>
+            ((a.format['bitrate'] as num?) ?? 0) >
+                    ((b.format['bitrate'] as num?) ?? 0)
+                ? a
+                : b),
+      };
+
+      final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
+      final bitrate = (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
+      final durationMs = int.tryParse(
+              selected.format['approxDurationMs']?.toString() ?? '0') ??
+          0;
+      final details = data['videoDetails'] as Map<String, dynamic>?;
+
+      return YtmStream(
+        videoId: videoId,
+        url: selected.url,
+        mimeType: mime.split(';').first.trim(),
+        container: mime.contains('mp4') ? 'm4a' : 'webm',
+        bitrateKbps: (bitrate / 1000).round(),
+        duration: Duration(milliseconds: durationMs),
+        title: details?['title'] as String? ?? '',
+        artist: details?['author'] as String? ?? '',
+        artworkUrl: null,
+        userAgent: client.ua,
+      ).withResolvedExpiry();
+    }
+
+    // The three clients are each a full round trip that can hang for its whole
+    // 12s budget. Run them as a staggered race instead of back-to-back so one
+    // unresponsive client no longer holds the chain hostage: the first client
+    // to return usable formats wins and the rest are abandoned. A block or an
+    // empty payload throws, which the race ignores, so only a real success can
+    // win. If every client fails the race throws and this tier answers null,
+    // exactly as the old sequential loop did.
+    try {
+      return await HedgedStreamResolver.race<YtmStream>(
+        [for (final client in clients) () => attempt(client)],
+        hedgeDelay: const Duration(milliseconds: 300),
+        timeout: const Duration(seconds: 15),
+      );
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Dart InnerTube client race exhausted: $e');
     }
 
     return null;

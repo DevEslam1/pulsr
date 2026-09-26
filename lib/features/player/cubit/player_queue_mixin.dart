@@ -11,6 +11,10 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   Future<void> playRadioStation(RadioStation station) =>
       queueController.playRadioStation(station);
 
+  /// Pre-resolve [song]'s stream URL in the background so a later tap starts
+  /// instantly. Safe and idempotent; call it when a list of songs first renders.
+  void warmStream(SongsTableData song) => queueController.warmStream(song);
+
   Future<void> playSong(
     SongsTableData song, {
     List<SongsTableData>? queue,

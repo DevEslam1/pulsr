@@ -54,6 +54,13 @@ class HedgedStreamResolver {
 
   /// Convenience: race the same resolver twice (e.g. two Innertube clients
   /// or primary + fallback) with dedup-friendly stagger.
+  ///
+  /// Only useful when [resolver] performs a genuinely independent attempt each
+  /// call. A resolver that coalesces identical in-flight work — such as
+  /// `YtmService.resolveStream` with its default `coalesce: true` — turns this
+  /// into a race of one future against itself, which buys no tail latency.
+  /// Hedged callers should call [race] with a second attempt that opts out of
+  /// coalescing instead.
   static Future<T> raceDuplicate<T>(
     Future<T> Function() resolver, {
     Duration hedgeDelay = const Duration(milliseconds: 250),

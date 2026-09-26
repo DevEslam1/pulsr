@@ -67,7 +67,6 @@ import 'per_song_eq_store.dart';
 import 'dsp_snapshot_store.dart';
 import 'ducking_controller.dart';
 import 'gapless_trim_handler.dart';
-import 'hedged_stream_resolver.dart';
 import 'multi_output_router.dart';
 import 'playback_bookmark_store.dart';
 import 'silence_skip_controller.dart';
@@ -1955,16 +1954,13 @@ class PulsrAudioHandler extends BaseAudioHandler
         _latencyTracker?.markStage(PlaybackStage.pluginEntered);
         _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
       } catch (_) {}
-      // F3: hedged resolution — race two client attempts, take first success.
-      // Disabled while an egress block is active: both duplicates target the
-      // same blocked IP, so hedging only doubles the native chain load (and the
-      // CPU/GC churn) for a verdict that is already known.
-      final coolingDown = _ytmService.isBotCoolingDown;
-      final YtmStream stream = (hedgedResolutionEnabled && !coolingDown)
-          ? await HedgedStreamResolver.raceDuplicate<YtmStream>(doResolve,
-              hedgeDelay: const Duration(milliseconds: 300),
-              timeout: const Duration(seconds: 25))
-          : await doResolve();
+      // The native extractor already races its top two clients internally
+      // (InnertubeClient's 350ms hedged race) and bounds each call, so a second,
+      // independent Dart-level chain (coalesce:false) only doubled the native
+      // load — two full multi-client chains contending for a 6-thread pool —
+      // which made cold starts slower, not faster. One chain; the extractor
+      // owns the hedging.
+      final YtmStream stream = await doResolve();
       if (stream.url.trim().isEmpty) {
         throw const YtmException(
             'YTM_UNAVAILABLE', 'Resolved stream URL is empty');

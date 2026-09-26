@@ -191,6 +191,24 @@ internal object YtmHttpClient {
     }
 
     /**
+     * Client for `/player` resolution with a hard per-call ceiling.
+     *
+     * The shared client's 12s connect / 15s read budgets let a single
+     * unresponsive YouTube edge hold a resolve for the whole Dart-side timeout
+     * (15s), which is the dominant cause of an 8-15s tap-to-sound when the fast
+     * hedged candidates miss. Resolution has a much tighter budget than
+     * search/browse/download, so this clone caps the *entire* call (connect +
+     * write + read) while still sharing the connection pool and dispatcher.
+     * Well-behaved responses are unaffected; a dead route fails fast and the
+     * chain falls through to the next candidate instead of stalling.
+     */
+    val resolveOkHttpClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .callTimeout(3000, TimeUnit.MILLISECONDS)
+            .build()
+    }
+
+    /**
      * Asynchronously warms DNS for [url]'s host.
      *
      * This used to fire a real HEAD request to the googlevideo URL. That never

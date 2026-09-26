@@ -391,14 +391,12 @@ void main() {
       await cubit.close();
     });
 
-    test('a settled search warms the top hit stream URL in background',
+    test('a settled search warms the top three hit stream URLs, capped at three',
         () async {
-      final top = YtmTrack.fromChannel(
-          _resultRow(videoId: 'topvideoid1', title: 'Top'))!;
-      final other = YtmTrack.fromChannel(
-          _resultRow(videoId: 'othervideo2', title: 'Other'))!;
-      when(() => service.searchWithFallback(any()))
-          .thenAnswer((_) async => [top, other]);
+      YtmTrack hit(String id) =>
+          YtmTrack.fromChannel(_resultRow(videoId: id, title: id))!;
+      when(() => service.searchWithFallback(any())).thenAnswer((_) async =>
+          [hit('hit1'), hit('hit2'), hit('hit3'), hit('hit4')]);
       when(() => service.isBotCoolingDown).thenReturn(false);
       when(() => service.resolveStream(any())).thenAnswer((_) async =>
           const YtmStream(
@@ -413,11 +411,18 @@ void main() {
 
       final cubit = YtmSearchCubit(service: service);
       cubit.onQueryChanged('something');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      // 300ms query debounce, then the un-staggered warm of the first hit.
+      await Future<void>.delayed(const Duration(milliseconds: 600));
 
-      expect(cubit.state.results.length, equals(2));
-      verify(() => service.resolveStream('topvideoid1')).called(1);
-      verifyNever(() => service.resolveStream('othervideo2'));
+      expect(cubit.state.results.length, equals(4));
+      verify(() => service.resolveStream('hit1')).called(1);
+
+      // Hits 2 and 3 follow one stagger each (400ms apart) behind hit 1; the
+      // fourth hit is never warmed.
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      verify(() => service.resolveStream('hit2')).called(1);
+      verify(() => service.resolveStream('hit3')).called(1);
+      verifyNever(() => service.resolveStream('hit4'));
       await cubit.close();
     });
 

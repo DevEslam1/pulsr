@@ -107,6 +107,16 @@ class PlayerQueueController {
     );
   }
 
+  /// Fire-and-forget stream pre-resolution for a track the user is likely to
+  /// play next — e.g. the first item of a freshly rendered list. Fills the
+  /// shared YtmUrlCache so the eventual tap skips the network resolve entirely
+  /// instead of paying it at tap-to-sound time. Idempotent and non-throwing.
+  void warmStream(SongsTableData song) {
+    try {
+      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
+    } catch (_) {}
+  }
+
   Future<void> playRadioStation(RadioStation station) async {
     final uri = Uri.tryParse(station.url);
     if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {

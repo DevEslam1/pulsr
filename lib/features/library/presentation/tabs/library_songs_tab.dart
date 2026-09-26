@@ -1,11 +1,30 @@
 part of '../library_screen.dart';
 
 mixin LibrarySongsTab on State<LibraryScreen> {
+  /// Ensures the list head is pre-resolved exactly once per screen, so the
+  /// first online tap doesn't pay the network resolve.
+  bool _warmedHeadOnline = false;
+
+  void _warmHeadOnlineIfNeeded(
+      List<SongsTableData> songs, PlayerCubit playerCubit) {
+    if (_warmedHeadOnline || songs.isEmpty) return;
+    for (final s in songs) {
+      if (s.source == SongSource.youtube &&
+          s.isDownloaded != true &&
+          (s.remoteId?.isNotEmpty ?? false)) {
+        _warmedHeadOnline = true;
+        playerCubit.warmStream(s);
+        return;
+      }
+    }
+  }
+
   // ================= SONGS =================
   Widget _buildSongsTab(BuildContext context, LibraryState state,
       LibraryCubit cubit, PlayerCubit playerCubit) {
     final p = context.palette;
     final songs = state.songs;
+    _warmHeadOnlineIfNeeded(songs, playerCubit);
     if (songs.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(

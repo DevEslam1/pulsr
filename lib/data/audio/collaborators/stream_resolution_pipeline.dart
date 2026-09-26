@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
-import 'package:pulsr/data/audio/hedged_stream_resolver.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
@@ -20,7 +19,9 @@ class CachedStreamUrl {
 class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
-  /// F3: when true, race two resolve attempts and take the first success.
+  /// Retained for call-site compatibility. Hedging now lives entirely in the
+  /// native extractor, which races its top two clients and bounds each call;
+  /// racing a second Dart-level chain here only doubled native load.
   bool hedgedEnabled;
 
   final Map<String, CachedStreamUrl> _streamCache = {};
@@ -129,14 +130,10 @@ class StreamResolutionPipeline {
 
       Future<YtmStream> doResolve() =>
           ytmService.resolveStream(videoId, quality: quality, forceRefresh: forceRefresh);
-      // F3: hedged resolution — staggered duplicate race. Skipped while an egress
-      // block is active: both duplicates hit the same blocked IP and only double
-      // the native chain load for a verdict that is already known.
-      final YtmStream stream = (hedgedEnabled && !ytmService.isBotCoolingDown)
-          ? await HedgedStreamResolver.raceDuplicate<YtmStream>(doResolve,
-              hedgeDelay: const Duration(milliseconds: 300),
-              timeout: const Duration(seconds: 25))
-          : await doResolve();
+      // The native extractor already hedges its top two clients and bounds each
+      // call, so racing a second independent chain here only doubled native
+      // load for no tail-latency gain. One chain; the extractor owns the hedge.
+      final YtmStream stream = await doResolve();
       if (stream.url.trim().isEmpty) {
         throw const YtmException('YTM_UNAVAILABLE', 'Resolved stream URL is empty');
       }

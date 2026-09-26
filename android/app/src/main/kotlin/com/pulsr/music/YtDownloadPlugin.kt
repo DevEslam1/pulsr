@@ -224,11 +224,19 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     ): String? {
         val resolver = context.contentResolver
 
+        // Android MediaStore Audio (MediaStore.Audio.Media) strictly validates MIME types
+        // against supported audio types and throws IllegalArgumentException on 'audio/webm'.
+        // Map audio/webm to audio/ogg or determine from extension.
+        val resolvedMimeType = when (mimeType.trim().lowercase()) {
+            "audio/webm" -> "audio/ogg"
+            else -> mimeType
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
                 put(MediaStore.Audio.Media.DISPLAY_NAME, displayName)
                 put(MediaStore.Audio.Media.TITLE, title)
-                put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+                put(MediaStore.Audio.Media.MIME_TYPE, resolvedMimeType)
                 put(MediaStore.Audio.Media.IS_MUSIC, true)
                 put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC + "/")
                 put(MediaStore.Audio.Media.IS_PENDING, 1)
@@ -262,7 +270,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     path = File(musicDir, displayName).absolutePath
                 }
                 if (path != null) {
-                    MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(mimeType), null)
+                    MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(resolvedMimeType), null)
                 }
                 return path
             } finally {
@@ -309,7 +317,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             val values = ContentValues().apply {
                 put(MediaStore.Audio.Media.DISPLAY_NAME, dest.name)
                 put(MediaStore.Audio.Media.TITLE, title)
-                put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+                put(MediaStore.Audio.Media.MIME_TYPE, resolvedMimeType)
                 put(MediaStore.Audio.Media.IS_MUSIC, true)
                 @Suppress("DEPRECATION")
                 put(MediaStore.Audio.Media.DATA, dest.absolutePath)
@@ -320,7 +328,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 // it usable via the scanner rather than deleting user data.
                 android.util.Log.w("YtDownloadPlugin", "MediaStore insert returned null; keeping file at ${dest.absolutePath}")
             }
-            MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(mimeType), null)
+            MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(resolvedMimeType), null)
             return dest.absolutePath
         } catch (e: Exception) {
             try { insertedUri?.let { resolver.delete(it, null, null) } } catch (_: Exception) {}

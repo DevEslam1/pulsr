@@ -744,6 +744,15 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         var primaryError: Throwable? = null
         var innerTubeError: Throwable? = null
 
+        // Supplements 2 and 3 are each a full extra network round trip run
+        // sequentially behind the primary. They only buy more rows, never a
+        // usable answer, so only pay for them when the primary came up short
+        // of a full page: ten songs already fills the search list, and a
+        // near-full primary used to be followed by two more hops that often
+        // added nothing. Callers asking for a smaller page keep the old
+        // behaviour (minOf == their limit).
+        val minAcceptable = minOf(limit, 10)
+
         // 1. Primary: MUSIC_SONGS
         try {
             val songsExtractor = ServiceList.YouTube.getSearchExtractor(
@@ -765,7 +774,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         // 2. Fallback / supplement: General search if not throttled
-        if (results.size < limit) {
+        if (results.size < minAcceptable) {
             if (primaryError !is ReCaptchaException && primaryError !is RateLimitedException) {
                 try {
                     val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
@@ -784,7 +793,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         // 3. Fallback / supplement: Native InnerTube search
-        if (results.size < limit) {
+        if (results.size < minAcceptable) {
             val ctx = context?.applicationContext
             if (ctx != null) {
                 try {

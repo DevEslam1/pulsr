@@ -952,6 +952,10 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection>
   @override
   bool get wantKeepAlive => true;
 
+  /// One background pre-resolve of the list head per loaded category, so the
+  /// first tap doesn't pay the full network resolve.
+  bool _warmedFirst = false;
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1026,6 +1030,10 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection>
 
         final tracks = snapshot.data!;
         final songs = [for (final track in tracks) track.toSongData()];
+        if (!_warmedFirst && songs.isNotEmpty) {
+          _warmedFirst = true;
+          widget.playerCubit.warmStream(songs.first);
+        }
         final ytmCubit = getIt.isRegistered<YtmDownloadCubit>()
             ? getIt<YtmDownloadCubit>()
             : null;

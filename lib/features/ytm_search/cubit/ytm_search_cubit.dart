@@ -29,6 +29,13 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   static const _historyKey = 'ytm_search_history';
   static const _maxHistory = 20;
 
+  /// Leading search results whose stream URLs are warmed speculatively.
+  static const int _warmTopN = 3;
+
+  /// Gap between successive speculative warms, so a cold query never stacks
+  /// several full multi-engine chains on the native thread pool at once.
+  static const Duration _warmStagger = Duration(milliseconds: 400);
+
   Future<List<String>> getSearchHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -168,20 +175,28 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       safeEmit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
       if (results.isNotEmpty) unawaited(_saveToHistory(query));
-      // Speculative warm: the top hit is the most likely tap. Resolving its
-      // stream URL now (one background player request) turns that tap into a
-      // cache hit (~62ms) instead of a full multi-engine resolve (seconds).
-      // Skipped while bot-cooling so a flagged IP isn't hammered further.
-      // Fully defensive: warming must never disturb search results.
+      // Speculative warm: the first [_warmTopN] hits are the taps users make
+      // most often. Resolving each stream URL now (one background player
+      // request) turns that tap into a cache hit (~62ms) instead of a full
+      // multi-engine resolve (seconds). The warm for hit N is deferred by
+      // N * [_warmStagger] so a cold query never stacks three full chains on
+      // the native thread pool at once. Skipped while bot-cooling so a flagged
+      // IP isn't hammered further. Fully defensive: warming must never disturb
+      // search results.
       if (results.isNotEmpty) {
         try {
-          final topId = results.first.videoId;
-          if (topId.isNotEmpty && !_service.isBotCoolingDown) {
-            unawaited(_service
-                .resolveStream(topId)
-                .timeout(const Duration(seconds: 25))
-                .then((_) {})
-                .catchError((_) {}));
+          final warmGeneration = effectiveGeneration;
+          if (!_service.isBotCoolingDown) {
+            for (var i = 0; i < results.length && i < _warmTopN; i++) {
+              final warmId = results[i].videoId;
+              if (warmId.isEmpty) continue;
+              unawaited(Future<void>.delayed(_warmStagger * i).then((_) async {
+                // A newer query superseded this result set while the stagger
+                // was pending; don't spend a resolve on a stale hit.
+                if (isClosed || warmGeneration != _generation) return;
+                await _service.resolveStream(warmId);
+              }).timeout(const Duration(seconds: 25)).catchError((Object _) {}));
+            }
           }
         } catch (_) {
           // FIX-A05: Speculative warming failure is intentionally non-fatal

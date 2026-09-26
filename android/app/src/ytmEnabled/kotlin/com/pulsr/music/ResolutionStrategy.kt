@@ -111,7 +111,13 @@ internal class ResolutionStrategy(
             ) else DEFAULT_BROWSE_CHAIN
         }
 
-        val hasPoToken = !limitedMode && poTokenManager.isReady && !poTokenManager.webViewBroken
+        // Treat a token that is about to expire as absent: `isReady` only checks
+        // "not already expired", so a token with minutes left still put the
+        // poToken-dependent clients (WEB_REMIX) at the front, where they fail
+        // first and drag in the slow fallback. `preWarm`/`ensureReady` refresh
+        // ahead of this margin, so a healthy session is unaffected.
+        val hasPoToken = !limitedMode && poTokenManager.isReady &&
+            !poTokenManager.isExpiringSoon() && !poTokenManager.webViewBroken
         val isLoggedIn = cookieStore.isSessionValid()
         val eligible = baseChain.filter { client ->
             val cap = ClientCapabilityMatrix.getCapability(client)

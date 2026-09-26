@@ -267,6 +267,16 @@ internal class InnertubeClient(
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
         val traceId = UUID.randomUUID().toString()
 
+        // Hard ceiling on the whole native chain. The hedged two-client race is
+        // bounded (HEDGE_RACE_TIMEOUT_MS), but the sequential fallback over the
+        // remaining clients is not: each can burn its full HTTP budget, so a
+        // dead/blocked route walked the entire tail and surfaced as the
+        // 8-15s tap-to-sound. Past the deadline we stop starting new attempts
+        // and surface the best-known signal so the caller can fall back fast.
+        val resolveDeadlineMs = android.os.SystemClock.elapsedRealtime() + RESOLVE_DEADLINE_MS
+        fun deadlineExceeded(): Boolean =
+            android.os.SystemClock.elapsedRealtime() >= resolveDeadlineMs
+
         // FIX #13 & #16: Shared egress bot/block circuit breaker check
         val nowMs = android.os.SystemClock.elapsedRealtime()
         val breakerUntil = globalBlockCooldownUntilMs.get()
@@ -666,6 +676,12 @@ internal class InnertubeClient(
         }
 
         fun tryPoTokenRecovery(): Map<String, Any?>? {
+            // Recovery can block on BotGuard WebView token minting; never enter
+            // it once the overall resolve budget is already spent.
+            if (deadlineExceeded()) {
+                Log.w(TAG, "[$traceId] Resolve deadline exceeded; skipping PoToken recovery for $videoId")
+                return null
+            }
             val sc = shortCircuit.get()
             val recoverySignal = sc?.signal ?: lastSignalRef.get()
             val tokenStale = PoTokenManager.isExpired() || PoTokenManager.isLimitedMode
@@ -826,7 +842,10 @@ internal class InnertubeClient(
         }
 
         // Race remaining active candidates using completionService.poll with remaining timeout
-        val hedgeRaceDeadline = android.os.SystemClock.elapsedRealtime() + HEDGE_RACE_TIMEOUT_MS
+        val hedgeRaceDeadline = minOf(
+            android.os.SystemClock.elapsedRealtime() + HEDGE_RACE_TIMEOUT_MS,
+            resolveDeadlineMs,
+        )
         while (activeFutures.isNotEmpty()) {
             val remainingMs = hedgeRaceDeadline - android.os.SystemClock.elapsedRealtime()
             if (remainingMs <= 0) break
@@ -909,6 +928,12 @@ internal class InnertubeClient(
                     message = "Stream resolution interrupted during sequential fallback for $videoId",
                     traceId = traceId
                 )
+            }
+            // Stop walking the tail once the overall budget is spent rather
+            // than serially paying another client's full timeout.
+            if (deadlineExceeded()) {
+                Log.w(TAG, "[$traceId] Resolve deadline exceeded; abandoning sequential fallback for $videoId")
+                break
             }
 
             val res = attemptClient(client)
@@ -1085,7 +1110,13 @@ internal class InnertubeClient(
     ): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER, maxAttempts = 2, activeCalls = activeCalls)
+        // Resolution uses the tighter-call-timeout client so a single hung edge
+        // cannot stall the whole chain for 15s (see YtmHttpClient.resolveOkHttpClient).
+        return postWithRetry(
+            endpoint, payload, clientType, RateLimiter.Bucket.PLAYER,
+            maxAttempts = 2, activeCalls = activeCalls,
+            client = YtmHttpClient.resolveOkHttpClient,
+        )
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -1156,6 +1187,7 @@ internal class InnertubeClient(
         bucket: RateLimiter.Bucket,
         maxAttempts: Int = 3,
         activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null,
+        client: okhttp3.OkHttpClient = YtmHttpClient.okHttpClient,
     ): JSONObject {
         var lastError: Exception? = null
         val traceId = UUID.randomUUID().toString()
@@ -1259,7 +1291,7 @@ internal class InnertubeClient(
                 }
 
                 // FIX #3 & #12: Thread-safe tracking in activeCalls list per ClientType
-                val builtCall = YtmHttpClient.okHttpClient.newCall(reqBuilder.build())
+                val builtCall = client.newCall(reqBuilder.build())
                 call = builtCall
                 addActiveCall(activeCalls, clientType, builtCall)
 
@@ -1567,6 +1599,10 @@ internal class InnertubeClient(
         private const val TAG = "InnertubeClient"
         const val HEDGE_DELAY_MS = 350L
         const val HEDGE_RACE_TIMEOUT_MS = 3000L
+        // Absolute ceiling for one native resolve chain (race + sequential
+        // fallback + PoToken recovery). Keeps a dead route from turning into an
+        // 8-15s tap-to-sound; the Dart caller also has a 15s hard timeout.
+        const val RESOLVE_DEADLINE_MS = 6000L
         private const val DATASYNC_BOOTSTRAP_INTERVAL_MS = 300_000L
 
         private val lastBotRefreshTriggerMs = AtomicLong(0L)
