@@ -60,6 +60,7 @@ class DownloadService : Service() {
         var onDownloadCancelledListener: ((String) -> Unit)? = null
         var onDownloadPausedListener: ((String) -> Unit)? = null
         var onDownloadResumedListener: ((String) -> Unit)? = null
+        var onDownloadCompletedListener: ((String) -> Unit)? = null
 
         /**
          * C-9: raised when foreground coverage could not be obtained or kept, so
@@ -192,6 +193,7 @@ class DownloadService : Service() {
                 downloadTitles[vid] = title
                 // Remove completed ones
                 if (progress >= 100) {
+                    try { onDownloadCompletedListener?.invoke(vid) } catch (_: Exception) {}
                     activeDownloads.remove(vid)
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
@@ -455,19 +457,21 @@ class DownloadService : Service() {
         // paused mark must survive the stop via timeoutPausedIds (Dart owns it
         // from the callback onward; native keeps a copy for the next instance).
         val snapshotIds = activeDownloads.keys.toList()
-        val target = snapshotIds.firstOrNull()
         val snapshotTitles = snapshotIds.mapNotNull { id ->
             downloadTitles[id]?.let { id to it }
         }.toMap()
-        if (target != null) {
+        for (target in snapshotIds) {
             pausedDownloads.add(target)
             timeoutPausedIds.add(target)
             try { onDownloadPausedListener?.invoke(target) } catch (_: Exception) {}
         }
         degraded = true
         notifyDegraded(this, "timeout", null)
-        val title = snapshotTitles.values.firstOrNull()
-            ?: getString(R.string.download_notification_downloads)
+        val title = if (snapshotIds.size > 1) {
+            resources.getQuantityString(R.plurals.download_notification_count, snapshotIds.size, snapshotIds.size)
+        } else {
+            snapshotTitles.values.firstOrNull() ?: getString(R.string.download_notification_downloads)
+        }
         // Stop the FGS first so its ongoing notification cannot come back, then
         // leave a dismissible notice (separate id) explaining the pause.
         stopForegroundAndSelf()

@@ -59,6 +59,7 @@ import 'collaborators/float_output_controller.dart';
 import 'collaborators/aaudio_output_controller.dart';
 import 'collaborators/playback_volume_controller.dart';
 import 'collaborators/stream_resolution_pipeline.dart';
+import 'playback_queue_state_machine.dart';
 import 'ab_loop_manager.dart';
 import 'adaptive_quality_manager.dart';
 import 'bpm_override_store.dart';
@@ -211,15 +212,39 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   int? _playerBSessionId;
 
+  /// Pure, testable playback queue state machine (P2).
   @override
-  List<SongsTableData> _songs = [];
-  @override
-  int _currentIndex = 0;
-  @override
-  bool _queueDirty = false;
+  final PlaybackQueueStateMachine _queueStateMachine =
+      PlaybackQueueStateMachine();
+
+  PlaybackQueueStateMachine get queueStateMachine => _queueStateMachine;
 
   @override
-  int _savedQueueIndex = -1;
+  List<SongsTableData> get _songs => _queueStateMachine.songs;
+  @override
+  set _songs(List<SongsTableData> value) => _queueStateMachine.setQueue(value);
+
+  @override
+  int get _currentIndex => _queueStateMachine.currentIndex;
+  @override
+  set _currentIndex(int value) => _queueStateMachine.setCurrentIndex(value);
+
+  @override
+  bool get _queueDirty => _queueStateMachine.isQueueDirty;
+  @override
+  set _queueDirty(bool value) {
+    if (value) {
+      _queueStateMachine.markQueueDirty();
+    } else {
+      _queueStateMachine.markQueueClean(_queueStateMachine.currentIndex);
+    }
+  }
+
+  @override
+  int get _savedQueueIndex => _queueStateMachine.savedQueueIndex;
+  @override
+  set _savedQueueIndex(int value) =>
+      _queueStateMachine.setSavedQueueIndex(value);
 
   HeadsetControlConfig? _cachedHeadsetConfig;
   @override
@@ -254,7 +279,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   DateTime? _lastSleepTrackCompletedAt;
   @override
-  final List<int> _shuffleHistory = [];
+  List<int> get _shuffleHistory => _queueStateMachine.shuffleHistory;
   @override
   DateTime? _lastPreviousTapTime;
   @override
@@ -326,12 +351,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final BatteryAwarePlayback _batteryAwarePlayback;
   @override
   late final StreamPreResolver _streamPreResolver;
-  late final PlaybackVolumeController _volumeController;
-
-  /// Set once [_volumeController] has been assigned in the (async) init. The
-  /// settings cubit can emit — and call setVolume() — before that happens on a
-  /// cold start, which used to throw a LateInitializationError on every launch.
-  bool _volumeControllerReady = false;
+  // FIX B9: Nullable controller eliminates the late-initialization race with
+  // early volume updates on cold starts and removes the awkward _volumeControllerReady flag.
+  PlaybackVolumeController? _volumeController;
   @override
   late final StreamResolutionPipeline _streamResolutionPipeline;
   // ── F1–F11 feature managers ──────────────────────────────────────────
@@ -451,10 +473,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   int? get currentAudioSessionId => _currentAudioSessionId;
   Stream<int?> get audioSessionIdStream => _audioSessionIdSubject.stream;
   @override
-  SongsTableData? get currentSong =>
-      (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length)
-          ? _songs[_currentIndex]
-          : null;
+  SongsTableData? get currentSong => _queueStateMachine.currentSong;
 
   @override
   PlaybackLatencyTracker? get _latencyTracker =>
@@ -532,7 +551,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   TripleBufferPipeline get tripleBufferPipeline => _tripleBufferPipeline;
   BatteryAwarePlayback get batteryAwarePlayback => _batteryAwarePlayback;
   StreamPreResolver get streamPreResolver => _streamPreResolver;
-  PlaybackVolumeController get volumeController => _volumeController;
+  PlaybackVolumeController? get volumeController => _volumeController;
   StreamResolutionPipeline get streamResolutionPipeline =>
       _streamResolutionPipeline;
 
@@ -799,12 +818,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     // 0x05/0xFA framing into white noise, so the mixer must strictly stay at unity (1.0).
     // User volume is hardware-only; ReplayGain and per-song volume overrides are bypassed.
     if (AudioQualityInfo.dsdDopActive) {
-      // Guarded by readiness (no catch): the controller is late-initialized
-      // and must never throw past this point.
-      if (_volumeControllerReady) _volumeController.setDopActive(true);
+      _volumeController?.setDopActive(true);
       return 1.0;
     }
-    if (_volumeControllerReady) _volumeController.setDopActive(false);
+    _volumeController?.setDopActive(false);
     if (song == null) {
       if (_dvcEnabled) {
         unawaited(_pushDvcGain(_volume));
@@ -909,10 +926,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Falls back to Dart math on non-Android, bit-perfect bypass, DoP, mode
   /// off, or bridge failure — the mixer then applies RG as before.
   void _syncNativeRgFlag() {
-    // Early return keeps the late-initialized controller access throw-free,
-    // so this stays catch-free by construction.
-    if (!_volumeControllerReady) return;
-    _volumeController.setNativeRgActive(_nativeRgActive);
+    _volumeController?.setNativeRgActive(_nativeRgActive);
   }
 
   @override
@@ -1001,11 +1015,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volume = volume.clamp(0.0, 1.0);
     final song = currentSong;
     final target = _calculateReplayGainVolume(song);
-    // Guard the startup race: the settings cubit's first emission can arrive
-    // before the async init has constructed the volume controller.
-    if (_volumeControllerReady) {
-      _volumeController.updateSettings(userVolume: _volume);
-    }
+    _volumeController?.updateSettings(userVolume: _volume);
     await _equalizerManager.updateLoudnessVolume(_volume);
     await _activePlayer.setVolume(target);
 
@@ -1034,22 +1044,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       final supported = await AudioEffectsChannel().isDvcSupported();
       if (!supported) {
         _dvcEnabled = false;
-        if (_volumeControllerReady) {
-          _volumeController.setDvcEnabled(false);
-        }
+        _volumeController?.setDvcEnabled(false);
         await AudioEffectsChannel().setDvcEnabled(false);
         return;
       }
       _dvcEnabled = true;
-      if (_volumeControllerReady) {
-        _volumeController.setDvcEnabled(true);
-      }
+      _volumeController?.setDvcEnabled(true);
       await AudioEffectsChannel().setDvcEnabled(true);
     } else {
       _dvcEnabled = false;
-      if (_volumeControllerReady) {
-        _volumeController.setDvcEnabled(false);
-      }
+      _volumeController?.setDvcEnabled(false);
       await AudioEffectsChannel().setDvcEnabled(false);
     }
     // Re-apply the current volume so the new gain stage takes effect now.
@@ -1272,9 +1276,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
     );
-    _volumeControllerReady = true;
-    _volumeController.setDopActive(AudioQualityInfo.dsdDopActive);
-    _volumeController.setDvcEnabled(_dvcEnabled);
+    _volumeController?.setDopActive(AudioQualityInfo.dsdDopActive);
+    _volumeController?.setDvcEnabled(_dvcEnabled);
     unawaited(HeadsetControlConfig.load(_cachedPrefs).then((cfg) {
       _cachedHeadsetConfig = cfg;
     }));
@@ -1605,7 +1608,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                   _preDuckVolume = _activePlayer.volume;
                   _preDuckInactiveVolume = _inactivePlayer.volume;
                   final f = duckingController.duckFactor;
-                  _volumeController.updateSettings(duckFactor: f);
+                  _volumeController?.updateSettings(duckFactor: f);
                   await _activePlayer.setVolume(f * (_preDuckVolume ?? 1.0));
                   if (_crossfadeManager.isCrossfading) {
                     await _inactivePlayer
@@ -2292,9 +2295,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       adaptiveQualityManager.dispose();
     } catch (_) {}
     try {
-      if (_volumeControllerReady) {
-        _volumeController.dispose();
-      }
+      _volumeController?.dispose();
     } catch (_) {}
     if (!_positionSubject.isClosed) _positionSubject.close();
     if (!_highRatePositionSubject.isClosed) _highRatePositionSubject.close();

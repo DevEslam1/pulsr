@@ -148,7 +148,7 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
 
         // 1. Try querying MediaStore by DISPLAY_NAME and SIZE to prevent wrong file collision
         val projection = arrayOf(MediaStore.Audio.Media._ID)
-        val selection = "${MediaStore.Audio.Media.DISPLAY_NAME}=? AND ${MediaStore.Audio.Media.SIZE}=?"
+        val selection = "${MediaStore.Audio.Media.DISPLAY_NAME}=? AND ${MediaStore.Audio.Media.SIZE}=? AND ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%'"
         val selectionArgs = arrayOf(fileName, file.length().toString())
 
         val cursor = context.contentResolver.query(

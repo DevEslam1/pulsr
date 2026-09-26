@@ -497,7 +497,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         return
                     }
                     val quality = call.argument<String>("quality")?.trim() ?: "high"
-                    runOffMainThread(result, requireExtractorReady = true) { resolveStreamWithFallback(videoId, quality) }
+                    val preferM4a = call.argument<Boolean>("preferM4a") ?: false
+                    runOffMainThread(result, requireExtractorReady = true) { resolveStreamWithFallback(videoId, quality, preferM4a) }
                 }
                 else -> result.notImplemented()
             }
@@ -1770,7 +1771,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
      * 1. Native InnertubeClient (fast, multi-client, itag ladder)
      * 2. NewPipeExtractor bridge fallback
      */
-    private fun resolveStreamWithFallback(videoId: String, quality: String): Map<String, Any?> {
+    private fun resolveStreamWithFallback(videoId: String, quality: String, preferM4a: Boolean = false): Map<String, Any?> {
         var innertubeError: Throwable? = null
         val ctx = context?.applicationContext
 
@@ -1778,16 +1779,34 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         if (ctx != null) {
             val client = InnertubeClient(ctx)
             try {
-                return client.resolvePlayerStream(videoId, quality)
+                return client.resolvePlayerStream(videoId, quality, preferM4a)
             } catch (e: Throwable) {
                 innertubeError = e
+                if (e is InnertubeClient.InnertubeException) {
+                    when (e.signal) {
+                        YtmBlockSignal.RateLimited,
+                        YtmBlockSignal.NetworkUnavailable,
+                        YtmBlockSignal.Interrupted,
+                        YtmBlockSignal.VideoGone -> {
+                            Log.w(TAG, "Native Innertube stream extraction failed with terminal signal ${e.signal.name} for $videoId. Skipping NewPipe fallback.")
+                            throw e
+                        }
+                        else -> {
+                            // Non-terminal: proceed to NewPipe fallback
+                        }
+                    }
+                }
+                if (e is InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw e
+                }
                 Log.w(TAG, "Native Innertube stream extraction failed for $videoId: ${e.message}. Attempting NewPipeExtractor fallback...")
             }
         }
 
         // 2. Fallback: NewPipeExtractor
         try {
-            return resolveStreamNewPipe(videoId, quality)
+            return resolveStreamNewPipe(videoId, quality, preferM4a)
         } catch (newPipeError: Throwable) {
             Log.w(TAG, "NewPipeExtractor fallback also failed for $videoId: ${newPipeError.message}")
             val primary = innertubeError ?: newPipeError
@@ -1796,7 +1815,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun resolveStreamNewPipe(videoId: String, quality: String): Map<String, Any?> {
+    private fun resolveStreamNewPipe(videoId: String, quality: String, preferM4a: Boolean = false): Map<String, Any?> {
         val info = StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$videoId")
         if (info.streamType == StreamType.LIVE_STREAM || info.streamType == StreamType.AUDIO_LIVE_STREAM) {
             throw ExtractionException("Live streams are not supported")
@@ -1810,8 +1829,22 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         val selected = when (quality.lowercase(Locale.ROOT)) {
-            "low" -> playable.minByOrNull { bitrateToKbps(it.averageBitrate) }
-            "medium" -> playable.minByOrNull { kotlin.math.abs(bitrateToKbps(it.averageBitrate) - 128) }
+            "low" -> {
+                if (preferM4a) {
+                    playable.filter { it.format == MediaFormat.M4A }.minByOrNull { bitrateToKbps(it.averageBitrate) }
+                        ?: playable.minByOrNull { bitrateToKbps(it.averageBitrate) }
+                } else {
+                    playable.minByOrNull { bitrateToKbps(it.averageBitrate) }
+                }
+            }
+            "medium" -> {
+                if (preferM4a) {
+                    playable.firstOrNull { it.format == MediaFormat.M4A }
+                        ?: playable.minByOrNull { kotlin.math.abs(bitrateToKbps(it.averageBitrate) - 128) }
+                } else {
+                    playable.minByOrNull { kotlin.math.abs(bitrateToKbps(it.averageBitrate) - 128) }
+                }
+            }
             else -> {
                 val maxBitrate = playable.maxOfOrNull { bitrateToKbps(it.averageBitrate) } ?: 0
                 val highStreams = playable.filter { bitrateToKbps(it.averageBitrate) >= (maxBitrate - 16) }

@@ -11,6 +11,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 
+data class ServedFile(val path: String, val mime: String, val timestampMs: Long)
+
 /**
  * Minimal local HTTP server used to expose one local audio file to a Cast
  * receiver over the LAN. Cast receivers fetch media by URL, so `file://` paths
@@ -20,12 +22,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 class CastMediaServer {
     companion object {
         private const val TAG = "CastMediaServer"
+        private const val EVICTION_TTL_MS = 5 * 60 * 1000L
     }
 
     private var serverSocket: ServerSocket? = null
     private var thread: Thread? = null
     private val running = AtomicBoolean(false)
 
+    private val servedFiles = java.util.concurrent.ConcurrentHashMap<String, ServedFile>()
     @Volatile private var servingPath: String? = null
     @Volatile private var servingMime: String = "application/octet-stream"
     @Volatile private var port: Int = 0
@@ -56,20 +60,34 @@ class CastMediaServer {
         serverSocket = null
         thread = null
         servingPath = null
+        servedFiles.clear()
     }
 
     /**
-     * Serves [path] under `/media` and returns the LAN URL a Cast receiver can
-     * fetch, or null when the file/server is unavailable.
+     * Serves [path] under `/media/<token>` (or fallback `/media`) and returns the LAN URL
+     * a Cast receiver can fetch, or null when the file/server is unavailable.
      */
     fun serveFile(path: String, mime: String?): String? {
         val f = File(path)
         if (!f.exists() || !f.isFile) return null
         if (!start()) return null
+
+        val now = System.currentTimeMillis()
+        val it = servedFiles.entries.iterator()
+        while (it.hasNext()) {
+            val entry = it.next()
+            if (now - entry.value.timestampMs > EVICTION_TTL_MS) {
+                it.remove()
+            }
+        }
+
+        val resolvedMime = mime?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+        val token = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        servedFiles[token] = ServedFile(f.absolutePath, resolvedMime, now)
         servingPath = f.absolutePath
-        servingMime = mime?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+        servingMime = resolvedMime
         val host = localIpv4() ?: return null
-        return "http://$host:$port/media"
+        return "http://$host:$port/media/$token"
     }
 
     private fun acceptLoop(ss: ServerSocket) {
@@ -111,14 +129,35 @@ class CastMediaServer {
         }
 
         val out = BufferedOutputStream(socket.getOutputStream())
-        val path = servingPath
-        val file = if (path != null) File(path) else null
-        if (file == null || !file.exists()) {
+        val target = parts[1].substringBefore("?")
+        val resolvedFile: File?
+        val resolvedMime: String
+        if (target.startsWith("/media/")) {
+            val token = target.removePrefix("/media/").trimEnd('/')
+            val served = servedFiles[token]
+            if (served != null) {
+                resolvedFile = File(served.path)
+                resolvedMime = served.mime
+            } else {
+                resolvedFile = null
+                resolvedMime = servingMime
+            }
+        } else if (target == "/media") {
+            val path = servingPath
+            resolvedFile = if (path != null) File(path) else null
+            resolvedMime = servingMime
+        } else {
+            resolvedFile = null
+            resolvedMime = servingMime
+        }
+
+        if (resolvedFile == null || !resolvedFile.exists()) {
             out.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".toByteArray())
             out.flush()
             return
         }
 
+        val file = resolvedFile
         val length = file.length()
         val start: Long
         val end: Long
@@ -132,7 +171,7 @@ class CastMediaServer {
         val contentLength = end - start + 1
         val header = buildString {
             append("HTTP/1.1 206 Partial Content\r\n")
-            append("Content-Type: $servingMime\r\n")
+            append("Content-Type: $resolvedMime\r\n")
             append("Accept-Ranges: bytes\r\n")
             append("Content-Range: bytes $start-$end/$length\r\n")
             append("Content-Length: $contentLength\r\n")

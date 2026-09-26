@@ -110,5 +110,37 @@ void main() {
       ));
       expect(info.tier, AudioQualityTier.compact);
     });
+
+    test('a downloaded Opus track with webm.oga or oga path is classified as OPUS not MP3', () {
+      final info = AudioQualityInfo.fromSong(_song(
+        path: '/storage/emulated/0/Music/Song.webm.oga',
+        codec: 'OPUS',
+        bitrateKbps: 160,
+      ));
+      expect(info.format, 'OPUS');
+      expect(info.codecName, 'Opus Interactive Audio');
+      expect(info.shortBadgeLabel, 'OPUS • 160k');
+      expect(info.tier, AudioQualityTier.highQuality);
+    });
+
+    test('a downloaded Opus track without explicit codec but webm path is classified as OPUS', () {
+      final info = AudioQualityInfo.fromSong(_song(
+        path: '/storage/emulated/0/Music/Song.webm',
+        bitrateKbps: 160,
+      ));
+      expect(info.format, 'OPUS');
+      expect(info.shortBadgeLabel, 'OPUS • 160k');
+    });
+
+    test('a downloaded AAC track is classified as AAC', () {
+      final info = AudioQualityInfo.fromSong(_song(
+        path: '/storage/emulated/0/Music/Song.m4a',
+        codec: 'AAC',
+        bitrateKbps: 128,
+      ));
+      expect(info.format, 'AAC');
+      expect(info.shortBadgeLabel, 'AAC • 128k');
+      expect(info.tier, AudioQualityTier.highQuality);
+    });
   });
 }

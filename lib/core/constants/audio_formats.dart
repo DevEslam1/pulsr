@@ -15,6 +15,7 @@ class AudioFormats {
     'dsf',
     'dff',
     'webm',
+    'oga',
     'aiff',
     'aif',
   };

@@ -70,6 +70,9 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         DownloadService.onDownloadResumedListener = { videoId ->
             invokeOnChannel("onDownloadResumed", mapOf("videoId" to videoId))
         }
+        DownloadService.onDownloadCompletedListener = { videoId ->
+            invokeOnChannel("onDownloadCompleted", mapOf("videoId" to videoId))
+        }
         DownloadService.onDownloadDegradedListener = { stage ->
             invokeOnChannel("onDownloadServiceDegraded", mapOf("stage" to stage))
         }
@@ -89,6 +92,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         DownloadService.onDownloadCancelledListener = null
         DownloadService.onDownloadPausedListener = null
         DownloadService.onDownloadResumedListener = null
+        DownloadService.onDownloadCompletedListener = null
         DownloadService.onDownloadDegradedListener = null
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
@@ -224,17 +228,43 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     ): String? {
         val resolver = context.contentResolver
 
-        // Android MediaStore Audio (MediaStore.Audio.Media) strictly validates MIME types
-        // against supported audio types and throws IllegalArgumentException on 'audio/webm'.
-        // Map audio/webm to audio/ogg or determine from extension.
-        val resolvedMimeType = when (mimeType.trim().lowercase()) {
-            "audio/webm" -> "audio/ogg"
-            else -> mimeType
+        val lowerMime = mimeType.trim().lowercase()
+        val lowerName = displayName.trim().lowercase()
+
+        val cleanDisplayName: String
+        val resolvedMimeType: String
+
+        when {
+            lowerMime.contains("webm") || lowerName.endsWith(".webm") || lowerName.endsWith(".webm.oga") -> {
+                // If it is an Opus stream in WebM container, save with clean .opus extension
+                // and audio/opus on Q+ (or .ogg and audio/ogg on pre-Q) so Android MediaProvider does not append .oga
+                val base = displayName.replace(Regex("""\.(webm|oga)+$""", RegexOption.IGNORE_CASE), "")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cleanDisplayName = "$base.opus"
+                    resolvedMimeType = "audio/opus"
+                } else {
+                    cleanDisplayName = "$base.ogg"
+                    resolvedMimeType = "audio/ogg"
+                }
+            }
+            lowerMime.contains("ogg") || lowerName.endsWith(".ogg") || lowerName.endsWith(".oga") -> {
+                val base = displayName.replace(Regex("""\.(ogg|oga)+$""", RegexOption.IGNORE_CASE), "")
+                cleanDisplayName = "$base.ogg"
+                resolvedMimeType = "audio/ogg"
+            }
+            lowerMime.contains("mp4") || lowerMime.contains("m4a") || lowerName.endsWith(".m4a") -> {
+                cleanDisplayName = displayName
+                resolvedMimeType = "audio/mp4"
+            }
+            else -> {
+                cleanDisplayName = displayName
+                resolvedMimeType = mimeType
+            }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
-                put(MediaStore.Audio.Media.DISPLAY_NAME, displayName)
+                put(MediaStore.Audio.Media.DISPLAY_NAME, cleanDisplayName)
                 put(MediaStore.Audio.Media.TITLE, title)
                 put(MediaStore.Audio.Media.MIME_TYPE, resolvedMimeType)
                 put(MediaStore.Audio.Media.IS_MUSIC, true)
@@ -267,7 +297,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 }
                 if (path.isNullOrEmpty()) {
                     val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-                    path = File(musicDir, displayName).absolutePath
+                    path = File(musicDir, cleanDisplayName).absolutePath
                 }
                 if (path != null) {
                     MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(resolvedMimeType), null)
@@ -293,7 +323,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
         if (!musicDir.exists()) musicDir.mkdirs()
 
-        var dest = File(musicDir, displayName)
+        var dest = File(musicDir, cleanDisplayName)
         if (dest.exists()) {
             val base = dest.nameWithoutExtension
             val ext = dest.extension

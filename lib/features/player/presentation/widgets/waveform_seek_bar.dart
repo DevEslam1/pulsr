@@ -45,6 +45,7 @@ class WaveformSeekBar extends StatefulWidget {
 
 class _WaveformSeekBarState extends State<WaveformSeekBar> {
   double? _dragValue;
+  ({int startIndex, int visibleCount})? _dragFrozenWindow;
   double _zoomScale = 1.0;
   int _lastScaleMs = 0;
 
@@ -56,6 +57,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     if (!identical(oldWidget.samples, widget.samples) ||
         oldWidget.duration != widget.duration) {
       _zoomScale = 1.0;
+      _dragFrozenWindow = null;
       if (_dragValue != null && widget.duration.inMilliseconds > 0) {
         _dragValue =
             _dragValue!.clamp(0.0, widget.duration.inMilliseconds.toDouble());
@@ -63,8 +65,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     }
   }
 
-  // FIX-M8 / H-07: Guard against totalCount <= 0 and <= 1 to prevent division by zero
+  // FIX-M8 / H-07 / B-9: Guard against totalCount <= 0 and freeze visible window during drag
+  // to avoid coordinate feedback jitter on fast scrubbing.
   ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
+    if (_dragFrozenWindow != null) return _dragFrozenWindow!;
     if (totalCount <= 0) return (startIndex: 0, visibleCount: 0);
     if (totalCount == 1) return (startIndex: 0, visibleCount: 1);
     final int visibleCount = (totalCount /
@@ -72,7 +76,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                 PlayerConstants.waveformMaxZoom))
         .round()
         .clamp(2, totalCount);
-    final effectiveMs = _dragValue ?? widget.position.inMilliseconds.toDouble();
+    final effectiveMs = widget.position.inMilliseconds.toDouble();
     final double centerRatio = widget.duration.inMilliseconds > 0
         ? effectiveMs / widget.duration.inMilliseconds
         : 0.0;
@@ -181,6 +185,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onHorizontalDragStart: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
+                        _dragFrozenWindow = _visibleWindow(totalCount);
                         final ratio =
                             _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
                         setState(() {
@@ -204,6 +209,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             Duration(milliseconds: _dragValue!.round()));
                         setState(() {
                           _dragValue = null;
+                          _dragFrozenWindow = null;
                         });
                       }
                     },
@@ -211,6 +217,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                       if (_dragValue != null) {
                         setState(() {
                           _dragValue = null;
+                          _dragFrozenWindow = null;
                         });
                       }
                     },

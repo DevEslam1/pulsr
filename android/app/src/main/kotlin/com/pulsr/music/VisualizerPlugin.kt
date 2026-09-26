@@ -134,19 +134,20 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             true
         } catch (e: Throwable) {
             android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable for session $audioSessionId: ${e.message}")
-            if (audioSessionId != 0) {
-                try {
-                    return startVisualizer(0)
-                } catch (_: Throwable) {}
-            }
             false
         }
     }
 
+    private var cachedRawMagnitudes = DoubleArray(512)
+    private val cachedBandValues = DoubleArray(32)
+
     private fun processFftData(fft: ByteArray): DoubleArray {
         val n = fft.size
         val rawBins = n / 2
-        val rawMagnitudes = DoubleArray(rawBins)
+        if (cachedRawMagnitudes.size < rawBins) {
+            cachedRawMagnitudes = DoubleArray(rawBins)
+        }
+        val rawMagnitudes = cachedRawMagnitudes
         rawMagnitudes[0] = kotlin.math.abs(fft[0].toInt()).toDouble()
 
         for (i in 1 until rawBins) {
@@ -157,7 +158,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
 
         // Map raw FFT bins to 32 logarithmic perceptual frequency bands
         val numBands = 32
-        val bandValues = DoubleArray(numBands)
+        val bandValues = cachedBandValues
         for (b in 0 until numBands) {
             val bFraction = b.toDouble() / numBands
             val nextFraction = (b + 1).toDouble() / numBands

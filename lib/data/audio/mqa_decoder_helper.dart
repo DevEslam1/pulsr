@@ -110,12 +110,11 @@ class MqaDecoderHelper {
           // the full signed 24-bit integer value (LE: byte0=LSB, byte2=MSB),
           // NOT the individual bytes — byte-wise averaging produces harmonic
           // distortion because each byte represents a different significance.
-          final sampleA = (s0 | (s1 << 8) | (s2 << 16)) >= 0x800000
-              ? (s0 | (s1 << 8) | (s2 << 16)) - 0x1000000
-              : (s0 | (s1 << 8) | (s2 << 16));
-          final sampleB = (n0 | (n1 << 8) | (n2 << 16)) >= 0x800000
-              ? (n0 | (n1 << 8) | (n2 << 16)) - 0x1000000
-              : (n0 | (n1 << 8) | (n2 << 16));
+          // FIX B6: assemble each 24-bit word once instead of three times.
+          final rawA = s0 | (s1 << 8) | (s2 << 16);
+          final rawB = n0 | (n1 << 8) | (n2 << 16);
+          final sampleA = rawA >= 0x800000 ? rawA - 0x1000000 : rawA;
+          final sampleB = rawB >= 0x800000 ? rawB - 0x1000000 : rawB;
           final interpolated = ((sampleA + sampleB) ~/ 2) & 0xFFFFFF;
 
           outBytes[outOdd] = interpolated & 0xFF;

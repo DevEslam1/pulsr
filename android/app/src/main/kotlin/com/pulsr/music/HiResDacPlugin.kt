@@ -384,14 +384,26 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
     }
 
+    private val lc3CodecType: Int by lazy {
+        if (Build.VERSION.SDK_INT >= 33) {
+            try {
+                BluetoothCodecConfig::class.java.getField("SOURCE_CODEC_TYPE_LC3").getInt(null)
+            } catch (_: Throwable) {
+                5
+            }
+        } else {
+            -1
+        }
+    }
+
     /** Maps codec type int to a human-readable name. */
-    private fun codecTypeName(codecType: Int): String = when (codecType) {
-        BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC    -> "SBC"
-        BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC    -> "AAC"
-        BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX   -> "aptX"
-        BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> "aptX HD"
-        BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC   -> "LDAC"
-        5 -> "LC3"    // BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3 — added in API 33, use literal to avoid compile errors on lower API
+    private fun codecTypeName(codecType: Int): String = when {
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC    -> "SBC"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC    -> "AAC"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX   -> "aptX"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> "aptX HD"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC   -> "LDAC"
+        lc3CodecType != -1 && codecType == lc3CodecType -> "LC3"
         else -> "Unknown ($codecType)"
     }
 
@@ -402,7 +414,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "APTX"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX
         "APTX HD"  -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD
         "LDAC"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
-        "LC3"      -> 5
+        "LC3"      -> if (lc3CodecType != -1) lc3CodecType else -1
         // Unknown names must NOT silently fall back to SBC (that would switch
         // the user's codec without consent); callers reject -1 explicitly.
         else       -> -1
@@ -961,7 +973,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 (targetSampleRate <= 0 || fmt.sampleRate == targetSampleRate) &&
                     (targetBitDepth <= 0 || encodingBitDepth(fmt.encoding) == targetBitDepth)
             }
-            if (match != null) return match
+            if (match != null) {
+                lastBitPerfectReason = null
+                return match
+            }
             lastBitPerfectReason = "target_format_unavailable"
             if (strictTargetFormat) return null
         }
@@ -972,6 +987,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     private fun applyBitPerfectMode(enabled: Boolean): Boolean {
+        lastBitPerfectReason = null
         if (audioManager == null) {
             lastBitPerfectReason = "audio_manager_unavailable"
             return false
@@ -1142,19 +1158,28 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 "dsd256" to false,
                 "dop" to false,
                 "nativeDac" to false,
+                "isUac2" to false,
+                "dopVerified" to false,
             )
         }
 
+        val (uac, _) = probeUsbDac()
+        val isUac2 = (uac == UsbDacDiagnostics.UAC2 || uac == UsbDacDiagnostics.UAC3)
         val rates = usbDac.sampleRates.toSet()
+        val hasDsd64Carrier = rates.contains(176400)
+        val hasDsd128Carrier = rates.contains(352800)
+        val hasDsd256Carrier = rates.contains(705600)
+        val dopVerified = isUac2 && (hasDsd64Carrier || hasDsd128Carrier || hasDsd256Carrier)
+
         return mapOf(
-            "dsd64" to rates.contains(176400),
-            "dsd128" to rates.contains(352800),
-            "dsd256" to rates.contains(705600),
-            // A USB DAC is present; DoP may be accepted even when Android does
-            // not surface the carrier rate, so dop is reported and the per-rate
-            // flags above gate which DSD rate is actually attempted.
-            "dop" to true,
+            "dsd64" to hasDsd64Carrier,
+            "dsd128" to hasDsd128Carrier,
+            "dsd256" to hasDsd256Carrier,
+            // A USB DAC is present; DoP is reported possible if UAC2 or sample rates detected
+            "dop" to (isUac2 || rates.isNotEmpty()),
             "nativeDac" to true,
+            "isUac2" to isUac2,
+            "dopVerified" to dopVerified,
         )
     }
 
@@ -1375,13 +1400,31 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     private fun getCleanDeviceName(device: AudioDeviceInfo): String {
-        val prodName = device.productName.toString().trim()
+        var prodName = device.productName.toString().trim()
         val isGenericModel = prodName.isBlank() ||
             prodName.startsWith("sdk_") ||
             prodName.contains("emulator", ignoreCase = true) ||
+            prodName.equals("generic", ignoreCase = true) ||
             prodName.equals(Build.PRODUCT, ignoreCase = true) ||
             prodName.equals(Build.MODEL, ignoreCase = true) ||
             prodName.equals(Build.DEVICE, ignoreCase = true)
+
+        if (isGenericModel) {
+            val fallback = when {
+                !Build.MODEL.isNullOrBlank() && !Build.MODEL.contains("generic", ignoreCase = true) && !Build.MODEL.startsWith("sdk_") -> Build.MODEL
+                !Build.PRODUCT.isNullOrBlank() && !Build.PRODUCT.contains("generic", ignoreCase = true) && !Build.PRODUCT.startsWith("sdk_") -> Build.PRODUCT
+                !Build.HARDWARE.isNullOrBlank() && !Build.HARDWARE.contains("generic", ignoreCase = true) -> Build.HARDWARE
+                else -> null
+            }
+            if (fallback != null) {
+                prodName = fallback
+            }
+        }
+
+        val effectiveGeneric = prodName.isBlank() ||
+            prodName.startsWith("sdk_") ||
+            prodName.contains("emulator", ignoreCase = true) ||
+            prodName.equals("generic", ignoreCase = true)
 
         return when {
             device.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Phone Speaker"
@@ -1389,21 +1432,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             device.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired Headphones"
             device.type == AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired Headset"
             isBleOutputType(device.type) ->
-                if (!isGenericModel) prodName else "LE Audio Device"
+                if (!effectiveGeneric) prodName else "LE Audio Device"
             device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
                 device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ->
-                if (!isGenericModel) prodName else "Bluetooth Audio"
+                if (!effectiveGeneric) prodName else "Bluetooth Audio"
             device.type == AudioDeviceInfo.TYPE_HEARING_AID ->
-                if (!isGenericModel) prodName else "Hearing Aid"
+                if (!effectiveGeneric) prodName else "Hearing Aid"
             isUsbOutputType(device.type) ->
-                if (!isGenericModel) "$prodName (USB DAC)" else "USB Audio DAC"
+                if (!effectiveGeneric) "$prodName (USB DAC)" else "USB Audio DAC"
             device.type == AudioDeviceInfo.TYPE_LINE_ANALOG ||
                 device.type == AudioDeviceInfo.TYPE_AUX_LINE -> "Line Output (Aux)"
             device.type == AudioDeviceInfo.TYPE_LINE_DIGITAL -> "Digital Line Out"
             device.type == AudioDeviceInfo.TYPE_HDMI ||
                 device.type == AudioDeviceInfo.TYPE_HDMI_ARC ||
                 device.type == AudioDeviceInfo.TYPE_HDMI_EARC -> "HDMI Output"
-            else -> if (!isGenericModel) prodName else getDeviceTypeName(device.type)
+            else -> if (!effectiveGeneric) prodName else getDeviceTypeName(device.type)
         }
     }
 

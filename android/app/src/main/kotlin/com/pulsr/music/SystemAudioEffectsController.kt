@@ -45,6 +45,7 @@ class SystemAudioEffectsController(private val context: Context) {
 
     enum class Status(val value: String) {
         BYPASSED("bypassed"),
+        PARTIALLY_BYPASSED("partiallyBypassed"),
         ACTIVE("active"),
         UNKNOWN("unknown"),
         UNSUPPORTED_DEVICE("unsupportedDevice");
@@ -71,10 +72,12 @@ class SystemAudioEffectsController(private val context: Context) {
     private var currentStatus: Status = Status.UNKNOWN
     private var currentPolicy: Policy = Policy.AUTO
     private var detectedBundles: MutableList<String> = mutableListOf()
+    private var partiallyBypassedEffects: MutableList<String> = mutableListOf()
     private var managedEffects: MutableList<AudioEffect> = mutableListOf()
 
     fun getStatus(): Status = currentStatus
     fun getDetectedBundles(): List<String> = detectedBundles.toList()
+    fun getPartiallyBypassedEffects(): List<String> = partiallyBypassedEffects.toList()
 
     /**
      * Query audio effects installed in the Android HAL / AudioFlinger.
@@ -106,11 +109,15 @@ class SystemAudioEffectsController(private val context: Context) {
             }
 
             currentStatus = if (detectedBundles.isNotEmpty()) {
+                val disabledCount = managedEffects.count { !it.enabled }
                 when {
-                    managedEffects.any { !it.enabled } -> Status.BYPASSED
-                    managedEffects.isNotEmpty() && managedEffects.all { it.enabled } -> Status.ACTIVE
-                    currentStatus == Status.BYPASSED || currentStatus == Status.ACTIVE -> currentStatus
-                    else -> Status.UNKNOWN
+                    disabledCount == 0 -> {
+                        if (managedEffects.isNotEmpty() && managedEffects.all { it.enabled }) Status.ACTIVE
+                        else if (currentStatus == Status.BYPASSED || currentStatus == Status.PARTIALLY_BYPASSED || currentStatus == Status.ACTIVE) currentStatus
+                        else Status.UNKNOWN
+                    }
+                    disabledCount < detectedBundles.size -> Status.PARTIALLY_BYPASSED
+                    else -> Status.BYPASSED
                 }
             } else {
                 Status.UNSUPPORTED_DEVICE
@@ -123,6 +130,7 @@ class SystemAudioEffectsController(private val context: Context) {
         return mapOf(
             "status" to currentStatus.value,
             "detectedBundles" to detectedBundles,
+            "partiallyBypassedEffects" to partiallyBypassedEffects,
             "hasDolbyOrVendor" to (detectedBundles.isNotEmpty())
         )
     }
@@ -164,6 +172,7 @@ class SystemAudioEffectsController(private val context: Context) {
      */
     private fun attemptDisableSession0(): Status {
         releaseManagedEffects()
+        partiallyBypassedEffects.clear()
 
         var disableSuccessCount = 0
         try {
@@ -180,12 +189,16 @@ class SystemAudioEffectsController(private val context: Context) {
                 }
 
                 if (isMatched && desc.type != null && desc.uuid != null) {
+                    val descriptorInfo = "$name ($implementor)"
                     try {
                         val effect = createEffectSafely(desc.type, desc.uuid, 0, 0)
                         if (effect != null && effect.hasControl()) {
                             effect.enabled = false
                             managedEffects.add(effect)
                             disableSuccessCount++
+                            if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                                partiallyBypassedEffects.add(descriptorInfo)
+                            }
                         } else {
                             effect?.release()
                         }
@@ -204,12 +217,16 @@ class SystemAudioEffectsController(private val context: Context) {
             Log.w(TAG, "attemptDisableSession0 query failed: ${e.message}")
         }
 
-        return if (disableSuccessCount > 0) {
-            Status.BYPASSED
-        } else if (detectedBundles.isNotEmpty()) {
-            Status.ACTIVE
-        } else {
-            Status.UNSUPPORTED_DEVICE
+        return when {
+            disableSuccessCount == 0 -> {
+                if (detectedBundles.isNotEmpty()) Status.ACTIVE else Status.UNSUPPORTED_DEVICE
+            }
+            disableSuccessCount < detectedBundles.size -> {
+                Status.PARTIALLY_BYPASSED
+            }
+            else -> {
+                Status.BYPASSED
+            }
         }
     }
 
@@ -249,5 +266,6 @@ class SystemAudioEffectsController(private val context: Context) {
             } catch (_: Exception) {}
         }
         managedEffects.clear()
+        partiallyBypassedEffects.clear()
     }
 }

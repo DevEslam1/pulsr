@@ -66,7 +66,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         (getIt.isRegistered<YtmDownloadCubit>() ? getIt<YtmDownloadCubit>() : null);
     if (downloadCubit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Download service unavailable')),
+        SnackBar(content: Text(context.l10n.downloadErrorDisabled)),
       );
       return;
     }

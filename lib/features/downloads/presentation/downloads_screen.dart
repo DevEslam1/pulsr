@@ -439,9 +439,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
     if (confirmed == true && context.mounted) {
       final cubit = context.read<DownloadsCubit>();
-      for (final t in completedTasks) {
-        await cubit.deleteDownload(t.videoId);
-      }
+      await Future.wait(
+        completedTasks.map((t) => cubit.deleteDownload(t.videoId)),
+      );
     }
   }
 }

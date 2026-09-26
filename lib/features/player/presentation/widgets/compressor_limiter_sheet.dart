@@ -317,12 +317,13 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
             const SizedBox(height: AppSpacing.s28),
             Divider(color: p.hairline),
             const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.graphic_eq_rounded, color: p.primary),
+            if (widget.equalizerManager.isCompressorAdvancedParamsSupported) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.graphic_eq_rounded, color: p.primary),
                     const SizedBox(width: AppSpacing.s10),
                     Text(context.l10n.compressorTitle,
                       style: TextStyle(
@@ -508,6 +509,33 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 ),
               );
             }),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: p.surfaceCard,
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 20, color: p.textTertiary),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        context.l10n.compressorLimitDesc,
+                        style: TextStyle(
+                          color: p.textTertiary,
+                          fontSize: AppFontSize.caption,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

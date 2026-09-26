@@ -83,7 +83,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                 result.error("CAPTURE_UNAVAILABLE", "AudioRecord minBufferSize <= 0", null)
                 return
             }
-            val bufSize = maxOf(minBuf, 4096)
+            val bufSize = maxOf(minBuf * 4, 16384)
             val record = try {
                 val source = if (Build.VERSION.SDK_INT >= 24) {
                     MediaRecorder.AudioSource.UNPROCESSED
@@ -112,14 +112,21 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             record.startRecording()
             captureThread = Thread {
                 val buf = ByteArray(4096)
+                var overrunCount = 0
                 while (capturing.get() && !Thread.currentThread().isInterrupted) {
                     val n = try {
                         record.read(buf, 0, buf.size)
                     } catch (_: Throwable) {
                         break
                     }
-                    if (n > 0 && capturing.get()) {
-                        val payload = mapOf("pcm" to buf.copyOf(n), "frames" to n / 2)
+                    if (n < 0) {
+                        overrunCount++
+                    } else if (n > 0 && capturing.get()) {
+                        val payload = mapOf(
+                            "pcm" to buf.copyOf(n),
+                            "frames" to n / 2,
+                            "overruns" to overrunCount
+                        )
                         mainHandler.post {
                             if (capturing.get()) {
                                 try {

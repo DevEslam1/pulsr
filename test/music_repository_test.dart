@@ -442,5 +442,36 @@ void main() {
       expect(songs.map((s) => s.title), contains('Track One'));
       expect(songs.map((s) => s.title), isNot(contains('Track Two')));
     });
+
+    test('watchAllSongs applies default title ordering on unrecognized sortBy (B4)', () async {
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+                id: const Value(10),
+                title: 'Zebra Song',
+                path: '/music/zebra.mp3'),
+          );
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+                id: const Value(11),
+                title: 'Apple Song',
+                path: '/music/apple.mp3'),
+          );
+
+      final ascResult = await repository
+          .watchAllSongs(sortBy: 'unrecognized_field', ascending: true)
+          .first;
+      expect(ascResult.isRight(), isTrue);
+      final ascSongs = ascResult.getOrElse((_) => []);
+      expect(ascSongs.first.title, equals('Apple Song'));
+      expect(ascSongs.last.title, equals('Zebra Song'));
+
+      final descResult = await repository
+          .watchAllSongs(sortBy: 'unrecognized_field', ascending: false)
+          .first;
+      expect(descResult.isRight(), isTrue);
+      final descSongs = descResult.getOrElse((_) => []);
+      expect(descSongs.first.title, equals('Zebra Song'));
+      expect(descSongs.last.title, equals('Apple Song'));
+    });
   });
 }

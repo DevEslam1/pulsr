@@ -177,6 +177,7 @@ void main() {
 
       // Unmount the widget
       await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 10));
       await tester.pumpAndSettle();
 
       // Clearing cache when count drops to 0 leaves future matching operational

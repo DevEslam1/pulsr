@@ -162,13 +162,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
       if (_isInteracting.value || _swipeInFlight) return;
       if (_lastKnownIndex != safeIndex) {
         if (!controller.hasClients || !controller.position.hasContentDimensions) {
-          // H-04: Limit recursive post-frame callbacks to avoid infinite loops if unattached
+          // B-4 & H-04: Limit recursive post-frame callbacks to avoid infinite loops if unattached.
+          // On final retry failure, force _lastKnownIndex = safeIndex so subsequent track changes diff correctly.
           if (retryCount < 3) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && !_controllerDisposed) {
                 _syncPageController(targetIndex, queueLength, retryCount: retryCount + 1);
               }
             });
+          } else {
+            _lastKnownIndex = safeIndex;
           }
           return;
         }

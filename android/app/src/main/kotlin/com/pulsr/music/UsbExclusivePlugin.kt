@@ -688,7 +688,7 @@ class UsbExclusivePlugin(
             val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
             if (fd < 0) {
                 mainHandler.removeCallbacks(watchdog)
-                try { conn.releaseInterface(iface) } catch (_: Exception) {}
+                rebindKernelDriver(conn, iface)
                 return failure("no_fd")
             }
             val resultCode = try {
@@ -702,7 +702,7 @@ class UsbExclusivePlugin(
             }
             if (resultCode != 0) {
                 mainHandler.removeCallbacks(watchdog)
-                try { conn.releaseInterface(iface) } catch (_: Exception) {}
+                rebindKernelDriver(conn, iface)
                 val errStr = when (resultCode) {
                     1 -> "claim_failed"
                     2 -> "alt_setting_failed"
@@ -720,9 +720,22 @@ class UsbExclusivePlugin(
             return buildStatus() + mapOf("success" to true, "resultCode" to 0)
         } catch (e: Exception) {
             mainHandler.removeCallbacks(watchdog)
-            try { conn.releaseInterface(iface) } catch (_: Exception) {}
+            rebindKernelDriver(conn, iface)
             throw e
         }
+    }
+
+    private fun rebindKernelDriver(conn: UsbDeviceConnection, iface: UsbInterface) {
+        try {
+            conn.releaseInterface(iface)
+        } catch (_: Exception) {}
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                conn.claimInterface(iface, false)
+                conn.releaseInterface(iface)
+            } catch (_: Exception) {}
+            emitState()
+        }, 500L)
     }
 
     private fun stopStreamingInternal(): Map<String, Any?> {
@@ -731,7 +744,10 @@ class UsbExclusivePlugin(
         }
         streaming = false
         val iface = claimedStreamingInterface
-        if (iface != null) {
+        val conn = connection
+        if (iface != null && conn != null) {
+            rebindKernelDriver(conn, iface)
+        } else if (iface != null) {
             try { connection?.releaseInterface(iface) } catch (_: Exception) {}
         }
         claimedStreamingInterface = null

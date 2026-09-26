@@ -23,6 +23,18 @@ class MainActivity : AudioServiceActivity() {
     private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
     private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
     private val pendingAudioUris = ArrayDeque<String>()
+    companion object {
+        private const val MAX_PENDING_AUDIO_URIS = 32
+    }
+
+    private fun addPendingAudioUri(uri: String) {
+        synchronized(pendingAudioUris) {
+            while (pendingAudioUris.size >= MAX_PENDING_AUDIO_URIS) {
+                pendingAudioUris.removeFirstOrNull()
+            }
+            pendingAudioUris.addLast(uri)
+        }
+    }
     private var fileOpenerChannel: MethodChannel? = null
     private var lyricsChannel: MethodChannel? = null
     private var audioEffectsPlugin: AudioEffectsPlugin? = null
@@ -134,9 +146,7 @@ class MainActivity : AudioServiceActivity() {
         if (intent?.action == "android.media.action.MEDIA_PLAY_FROM_SEARCH") {
             val q = intent.getStringExtra("query")
             if (fromColdStart || fileOpenerChannel == null) {
-                synchronized(pendingAudioUris) {
-                    pendingAudioUris.addLast("pulsr://voice-search?query=${Uri.encode(q ?: "")}")
-                }
+                addPendingAudioUri("pulsr://voice-search?query=${Uri.encode(q ?: "")}")
             } else {
                 fileOpenerChannel?.invokeMethod("onVoiceSearch", q ?: "")
             }
@@ -154,9 +164,7 @@ class MainActivity : AudioServiceActivity() {
                 }
                 val list = rawList?.filter { isSafeUri(it) }
                 if (!list.isNullOrEmpty()) {
-                    synchronized(pendingAudioUris) {
-                        for (u in list) pendingAudioUris.addLast(u.toString())
-                    }
+                    for (u in list) addPendingAudioUri(u.toString())
                     if (!fromColdStart && fileOpenerChannel != null) {
                         fileOpenerChannel?.invokeMethod("onAudioFileOpened", list.first().toString())
                     }
@@ -191,9 +199,7 @@ class MainActivity : AudioServiceActivity() {
 
         val uriStr = uri.toString()
         if (fromColdStart || fileOpenerChannel == null) {
-            synchronized(pendingAudioUris) {
-                pendingAudioUris.addLast(uriStr)
-            }
+            addPendingAudioUri(uriStr)
         } else {
             fileOpenerChannel?.invokeMethod("onAudioFileOpened", uriStr)
         }

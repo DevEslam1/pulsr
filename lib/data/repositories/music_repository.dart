@@ -145,6 +145,14 @@ class MusicRepository implements IMusicRepository {
               expression: t.sampleRate,
               mode: ascending ? OrderingMode.asc : OrderingMode.desc)
         ]);
+      } else {
+        // FIX B4: unrecognized sortBy must still yield deterministic ordering;
+        // an unordered query breaks stable pagination for callers.
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.title,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       }
 
       final effectiveLimit =

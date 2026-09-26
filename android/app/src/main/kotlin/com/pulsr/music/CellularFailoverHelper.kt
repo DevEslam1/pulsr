@@ -83,10 +83,10 @@ object CellularFailoverHelper {
                     if (onCloseRef != null) {
                         onCloseRef.set(unregisterAction)
                     } else {
-                        // Fallback: auto-unregister after 60s if caller did not supply a lifecycle ref
+                        // Fallback: auto-unregister after 10s if caller did not supply a lifecycle ref
                         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                             unregisterAction()
-                        }, 60000L)
+                        }, 10000L)
                     }
                     conn
                 } else {

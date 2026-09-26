@@ -264,7 +264,7 @@ internal class InnertubeClient(
         }.getOrDefault(url)
     }
 
-    fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
+    fun resolvePlayerStream(videoId: String, quality: String = "high", preferM4a: Boolean = false): Map<String, Any?> {
         val traceId = UUID.randomUUID().toString()
 
         // Hard ceiling on the whole native chain. The hedged two-client race is
@@ -303,6 +303,7 @@ internal class InnertubeClient(
 
         // Priority-based signal update: higher priority = more actionable recovery action.
         fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
+            YtmBlockSignal.Interrupted             -> 9
             YtmBlockSignal.BotChallenge            -> 8
             YtmBlockSignal.PoTokenInvalid          -> 7
             YtmBlockSignal.RateLimited             -> 6
@@ -428,8 +429,12 @@ internal class InnertubeClient(
                             // FIX #2 & #11: Only increment global breaker if this thread actually sets the short circuit!
                             if (shortCircuit.compareAndSet(null, exc)) {
                                 globalBlockSignal.set(winningSignal)
-                                consecutiveEgressBlocks.incrementAndGet()
-                                globalBlockCooldownUntilMs.set(android.os.SystemClock.elapsedRealtime() + 15_000L)
+                                if (winningSignal == YtmBlockSignal.IpBlocked ||
+                                    winningSignal == YtmBlockSignal.BotChallenge ||
+                                    winningSignal == YtmBlockSignal.PoTokenInvalid) {
+                                    consecutiveEgressBlocks.incrementAndGet()
+                                    globalBlockCooldownUntilMs.set(android.os.SystemClock.elapsedRealtime() + 15_000L)
+                                }
                             }
                         }
                     }
@@ -499,11 +504,29 @@ internal class InnertubeClient(
                     return AttemptResult.Failure(emptySignal, isClientSpecific = isClientSpecific)
                 }
 
-                // Layer 6: Itag Ladder 2026 — Opus 251 (160kbps) preferred over AAC 140
-                val itagLadder = listOf(251, 140, 139, 250, 249)
+                // Layer 6: Itag Ladder 2026 — Opus 251 (160kbps) or AAC 140 (when preferM4a is requested)
+                val itagLadder = if (preferM4a) {
+                    listOf(140, 251, 139, 250, 249)
+                } else {
+                    listOf(251, 140, 139, 250, 249)
+                }
                 val selectedPair = when (quality.lowercase()) {
-                    "low" -> audioFormats.minByOrNull { safeBitrate(it.first) }
-                    "medium" -> audioFormats.minByOrNull { kotlin.math.abs(safeBitrate(it.first) - 128000) }
+                    "low" -> {
+                        if (preferM4a) {
+                            val m4aLow = audioFormats.filter { it.first.optInt("itag", 0) in listOf(140, 139) }
+                            m4aLow.minByOrNull { safeBitrate(it.first) } ?: audioFormats.minByOrNull { safeBitrate(it.first) }
+                        } else {
+                            audioFormats.minByOrNull { safeBitrate(it.first) }
+                        }
+                    }
+                    "medium" -> {
+                        if (preferM4a) {
+                            val m4aMed = audioFormats.filter { it.first.optInt("itag", 0) == 140 }
+                            m4aMed.firstOrNull() ?: audioFormats.minByOrNull { kotlin.math.abs(safeBitrate(it.first) - 128000) }
+                        } else {
+                            audioFormats.minByOrNull { kotlin.math.abs(safeBitrate(it.first) - 128000) }
+                        }
+                    }
                     else -> {
                         audioFormats.sortedWith(
                             compareBy<Pair<JSONObject, String>> { pair ->
@@ -610,10 +633,14 @@ internal class InnertubeClient(
                         )
                         if (shortCircuit.compareAndSet(null, exc)) {
                             globalBlockSignal.set(winningSignal)
-                            consecutiveEgressBlocks.incrementAndGet()
-                            globalBlockCooldownUntilMs.set(
-                                android.os.SystemClock.elapsedRealtime() + 15_000L
-                            )
+                            if (winningSignal == YtmBlockSignal.IpBlocked ||
+                                winningSignal == YtmBlockSignal.BotChallenge ||
+                                winningSignal == YtmBlockSignal.PoTokenInvalid) {
+                                consecutiveEgressBlocks.incrementAndGet()
+                                globalBlockCooldownUntilMs.set(
+                                    android.os.SystemClock.elapsedRealtime() + 15_000L
+                                )
+                            }
                         }
                     }
                 }
@@ -761,7 +788,7 @@ internal class InnertubeClient(
 
         if (Thread.currentThread().isInterrupted) {
             throw InnertubeException(
-                signal = YtmBlockSignal.NetworkUnavailable,
+                signal = YtmBlockSignal.Interrupted,
                 message = "Stream resolution interrupted before start for $videoId",
                 traceId = traceId
             )
@@ -797,7 +824,7 @@ internal class InnertubeClient(
                         is AttemptResult.Interrupted -> {
                             cancelAll()
                             throw InnertubeException(
-                                signal = YtmBlockSignal.NetworkUnavailable,
+                                signal = YtmBlockSignal.Interrupted,
                                 message = "Stream resolution interrupted for video $videoId",
                                 traceId = traceId
                             )
@@ -809,7 +836,7 @@ internal class InnertubeClient(
                 Thread.currentThread().interrupt()
                 cancelAll()
                 throw InnertubeException(
-                    signal = YtmBlockSignal.NetworkUnavailable,
+                    signal = YtmBlockSignal.Interrupted,
                     message = "Stream resolution interrupted during hedge delay for $videoId",
                     traceId = traceId
                 )
@@ -830,7 +857,7 @@ internal class InnertubeClient(
         if (Thread.currentThread().isInterrupted) {
             cancelAll()
             throw InnertubeException(
-                signal = YtmBlockSignal.NetworkUnavailable,
+                signal = YtmBlockSignal.Interrupted,
                 message = "Stream resolution interrupted before launching candidate 2 for $videoId",
                 traceId = traceId
             )
@@ -872,7 +899,7 @@ internal class InnertubeClient(
                     is AttemptResult.Interrupted -> {
                         cancelAll()
                         throw InnertubeException(
-                            signal = YtmBlockSignal.NetworkUnavailable,
+                            signal = YtmBlockSignal.Interrupted,
                             message = "Stream resolution interrupted for video $videoId",
                             traceId = traceId
                         )
@@ -883,7 +910,7 @@ internal class InnertubeClient(
                 Thread.currentThread().interrupt()
                 cancelAll()
                 throw InnertubeException(
-                    signal = YtmBlockSignal.NetworkUnavailable,
+                    signal = YtmBlockSignal.Interrupted,
                     message = "Stream resolution interrupted during hedged race for $videoId",
                     traceId = traceId
                 )
@@ -913,18 +940,18 @@ internal class InnertubeClient(
 
         if (Thread.currentThread().isInterrupted) {
             throw InnertubeException(
-                signal = YtmBlockSignal.NetworkUnavailable,
+                signal = YtmBlockSignal.Interrupted,
                 message = "Stream resolution interrupted before sequential fallback for $videoId",
                 traceId = traceId
             )
         }
 
-        // Fallback: sequential check on remaining candidates in chain
-        val remainingClients = clientChain.drop(2)
+        // Fallback: sequential check on remaining candidates in chain (capped at 3)
+        val remainingClients = clientChain.drop(2).take(3)
         for (client in remainingClients) {
             if (Thread.currentThread().isInterrupted) {
                 throw InnertubeException(
-                    signal = YtmBlockSignal.NetworkUnavailable,
+                    signal = YtmBlockSignal.Interrupted,
                     message = "Stream resolution interrupted during sequential fallback for $videoId",
                     traceId = traceId
                 )
@@ -952,7 +979,7 @@ internal class InnertubeClient(
                 }
                 is AttemptResult.Interrupted -> {
                     throw InnertubeException(
-                        signal = YtmBlockSignal.NetworkUnavailable,
+                        signal = YtmBlockSignal.Interrupted,
                         message = "Stream resolution interrupted during sequential fallback for $videoId",
                         traceId = traceId
                     )
@@ -1051,8 +1078,8 @@ internal class InnertubeClient(
             val patternEncoded = Regex("([?&])n=${Regex.escape(encodedOld)}(?=&|$)")
 
             when {
-                patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=$encodedNew")
-                patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=$encodedNew")
+                patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
+                patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
                 else -> {
                     uri.buildUpon().clearQuery().apply {
                         for (name in uri.queryParameterNames) {
@@ -1085,14 +1112,16 @@ internal class InnertubeClient(
     private fun extractBestArtworkUrl(videoDetails: JSONObject?): String? {
         val thumbnails = videoDetails?.optJSONObject("thumbnail")?.optJSONArray("thumbnails") ?: return null
         if (thumbnails.length() == 0) return null
-        var maxW = 0
+        var maxArea = 0L
         var bestUrl: String? = null
         for (i in 0 until thumbnails.length()) {
             val t = thumbnails.optJSONObject(i) ?: continue
-            val w = t.optInt("width", 0)
+            val w = t.optLong("width", 0L)
+            val h = t.optLong("height", 0L)
+            val area = if (w > 0 && h > 0) w * h else w
             val u = t.optString("url")
-            if (w >= maxW && u.isNotEmpty()) {
-                maxW = w
+            if (area >= maxArea && u.isNotEmpty()) {
+                maxArea = area
                 bestUrl = u
             }
         }
@@ -1379,15 +1408,19 @@ internal class InnertubeClient(
                         }
                     }
                 }
-                lastError = e
             } catch (e: IOException) {
                 lastError = e
-                ProxyManager.onPathFailed(urlStr)
-                // FIX #6: Abort retries if thread was interrupted or call was explicitly canceled
-                if (Thread.currentThread().isInterrupted || call?.isCanceled() == true) {
+                val isInterrupted = Thread.currentThread().isInterrupted || call?.isCanceled() == true
+                if (!isInterrupted) {
+                    ProxyManager.onPathFailed(urlStr)
+                    Log.w(TAG, "[$traceId] Network error on attempt $attempt for ${clientType.name}: ${e.message}")
+                } else {
                     break
                 }
-                Log.w(TAG, "[$traceId] Network error on attempt $attempt for ${clientType.name}: ${e.message}")
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                lastError = e
+                break
             } catch (e: JSONException) {
                 // FIX #1: JSON parse errors indicate response malformation, not client deprecation
                 lastError = e
@@ -1406,8 +1439,11 @@ internal class InnertubeClient(
         }
 
         // FIX #1 & #7: Classify terminal signal accurately (JSONException -> NetworkUnavailable)
-        val terminalSignal = when (val err = lastError) {
+        val terminalSignal = if (Thread.currentThread().isInterrupted) {
+            YtmBlockSignal.Interrupted
+        } else when (val err = lastError) {
             is InnertubeException -> err.signal
+            is InterruptedException -> YtmBlockSignal.Interrupted
             is JSONException -> YtmBlockSignal.NetworkUnavailable
             is UnknownHostException,
             is java.net.ConnectException,
@@ -1602,7 +1638,7 @@ internal class InnertubeClient(
         // Absolute ceiling for one native resolve chain (race + sequential
         // fallback + PoToken recovery). Keeps a dead route from turning into an
         // 8-15s tap-to-sound; the Dart caller also has a 15s hard timeout.
-        const val RESOLVE_DEADLINE_MS = 6000L
+        const val RESOLVE_DEADLINE_MS = 5000L
         private const val DATASYNC_BOOTSTRAP_INTERVAL_MS = 300_000L
 
         private val lastBotRefreshTriggerMs = AtomicLong(0L)

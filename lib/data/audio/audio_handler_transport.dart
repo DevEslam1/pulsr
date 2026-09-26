@@ -1113,6 +1113,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   InterruptionStateMachine get _interruption;
 
   // Requires: provided by the composing class (same library).
+  PlaybackQueueStateMachine get _queueStateMachine;
+
+  // Requires: provided by the composing class (same library).
   set _isManualSkip(bool value);
 
   // Requires: provided by the composing class (same library).

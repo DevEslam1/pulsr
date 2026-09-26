@@ -400,7 +400,10 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         if (getIt.isRegistered<PlayerCubit>()) {
           unawaited(getIt<PlayerCubit>().persistQueueSlotsNow());
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to persist queue slots on detach',
+            error: e, stackTrace: st, category: 'PulsrApp');
+      }
     }
   }
 
@@ -409,7 +412,10 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     // Trim artwork and stream caches on GC pressure (LOG-14 14MB/59MB)
     try {
       getIt<ArtworkCacheManager>().clearAllCache();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to clear artwork cache on memory pressure',
+          error: e, stackTrace: st, category: 'PulsrApp');
+    }
     try {
       // ignore: avoid_dynamic_calls
       (getIt.get<ArtworkLruCache>() as dynamic)?.trimForMemoryPressure();
@@ -417,7 +423,10 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       // Fallback direct trim
       try {
         ArtworkLruCache().trimForMemoryPressure();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed direct trim for memory pressure',
+            error: e, stackTrace: st, category: 'PulsrApp');
+      }
     }
   }
 
@@ -450,7 +459,10 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               ),
             );
         });
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to listen for Ytm session expiry',
+            error: e, stackTrace: st, category: 'PulsrApp');
+      }
     });
   }
 
@@ -468,14 +480,23 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
             if (getIt.isRegistered<YtmService>()) {
               await getIt<YtmService>().handleNetworkChange();
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed handling network change in YtmService',
+                error: e, stackTrace: st, category: 'PulsrApp');
+          }
           try {
             if (getIt.isRegistered<PulsrAudioHandler>()) {
               getIt<PulsrAudioHandler>().clearNetworkCaches();
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed clearing audio handler network caches',
+                error: e, stackTrace: st, category: 'PulsrApp');
+          }
         });
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to start network change monitor',
+            error: e, stackTrace: st, category: 'PulsrApp');
+      }
     });
   }
 

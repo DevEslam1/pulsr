@@ -406,7 +406,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetHeadphoneSafetyParams(enabled: Boolean, threshold: Double, ceilingDb: Double)
     private external fun nativeReset()
 
-    fun configureNativeMemoryBudget(ctx: Context) {
+    @Volatile private var cachedDebugReport: Map<String, Any?>? = null
+
+    enum class EqOwner {
+        HAL,
+        NATIVE,
+        NONE
+    }
+    @Volatile private var currentEqOwner: EqOwner = EqOwner.HAL
+
+    private fun configureNativeMemoryBudgetInternal(ctx: Context) {
         if (!isNativeDspLoaded) return
         try {
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
@@ -426,12 +435,23 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER or STAGE_SATURATION or STAGE_WIDTH or STAGE_LOUDNESS or STAGE_CROSSOVER or STAGE_DYNEQ
+    fun configureNativeMemoryBudget(ctx: Context) {
+        if (!isNativeDspLoaded) return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            safeReverbExecute { configureNativeMemoryBudgetInternal(ctx) }
+        } else {
+            configureNativeMemoryBudgetInternal(ctx)
+        }
+    }
+
+    private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER or STAGE_SATURATION or STAGE_WIDTH or STAGE_LOUDNESS or STAGE_CROSSOVER or STAGE_DYNEQ or STAGE_DITHER
 
     @Synchronized
     fun recalculateActiveStages() {
+        cachedDebugReport = null
         // Bit-perfect bypass: force zero stages regardless of toggles
         if (isBitPerfectBypassActive) {
+            currentEqOwner = EqOwner.NONE
             activeDspStages = 0
             if (isNativeDspLoaded) {
                 try { nativeSetActiveStages(0) } catch (_: Exception) {}
@@ -445,8 +465,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // stage must have exactly one owner or it gets applied twice.
         // EQ ownership follows dspPreference; "oem"/"auto"-with-OEM leaves it to
         // the vendor engine, "auto" without OEM keeps the device-tuned HAL path.
-        val useNativeEq = dspPreference == "native"
-        if (isEqEnabled && useNativeEq) mask = mask or STAGE_EQ
+        currentEqOwner = when {
+            !isEqEnabled -> EqOwner.NONE
+            dspPreference == "native" && isNativeDspLoaded -> EqOwner.NATIVE
+            dspPreference == "oem" -> EqOwner.NONE
+            dspPreference == "auto" -> {
+                val hasOem = context?.let { getCachedOemInfo(it)["hasOemAudio"] as? Boolean } ?: false
+                if (hasOem) EqOwner.NONE else if (isNativeDspLoaded) EqOwner.NATIVE else EqOwner.HAL
+            }
+            else -> EqOwner.HAL
+        }
+        if (isEqEnabled && currentEqOwner == EqOwner.NATIVE) mask = mask or STAGE_EQ
         if (isCrossfeedEnabled) mask = mask or STAGE_CROSSFEED
         // Convolution reverb is owned by the native chain: it is the only path
         // that can convolve a user-loaded impulse response, which is what the
@@ -2421,9 +2450,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasSubCrossover" to isNativeDspLoaded,
                         "hasDynamicEq" to isNativeDspLoaded,
                         "hasMultibandCompressor" to isNativeDspLoaded,
-                        "hasDynamicBass" to isNativeDspLoaded,
-                        "eqBandCount" to if (isNativeDspLoaded) 32 else (if (dynamicsSupported) eqBandCount else 0),
-                        "eqCenterFrequencies" to eqCenterFreqs.toList(),
+                        "eqBandCount" to eqBandCount,
+                        "graphicEqBandCount" to eqBandCount,
+                        "parametricEqMaxBands" to if (isNativeDspLoaded) MAX_NATIVE_EQ_BANDS else 0,
                         "hasAudioEffects" to true,
                         "hasTagEditor" to true,
                         "hasRingtoneManager" to true,
@@ -2466,7 +2495,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(
                         mapOf(
                             "status" to (controller?.getStatus()?.value ?: "unknown"),
-                            "detectedBundles" to (controller?.getDetectedBundles() ?: emptyList<String>())
+                            "detectedBundles" to (controller?.getDetectedBundles() ?: emptyList<String>()),
+                            "partiallyBypassedEffects" to (controller?.getPartiallyBypassedEffects() ?: emptyList<String>())
                         )
                     )
                 }
@@ -3374,10 +3404,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     nativeSetMultibandCompressorBand(
                         i, -12.0, 1.0, 15.0, 100.0, 3.0, 0.0, false
                     )
-                    lastNativeMultibandCompressorBands[i] = String.format(
-                        java.util.Locale.US, "%.1f:%.1f:%.1f:%.1f:%.1f:%.1f:%b",
-                        -12.0, 1.0, 15.0, 100.0, 3.0, 0.0, false
-                    )
+                    // H-01 / F-09: Clear neutral band from dedup cache so subsequent standalone MBC config pushes are not skipped
+                    lastNativeMultibandCompressorBands.remove(i)
                 }
             }
             nativeSetMultibandCompressorEnabled(true)
@@ -3567,15 +3595,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      */
     private fun isHalEqSuppressed(): Boolean {
         if (!isNativeDspLoaded) return false
-        return when (dspPreference) {
-            "native" -> lastNativeEqBands.isNotEmpty() // native ParametricEQ owns the band gains only when bands are configured
-            "oem" -> true
-            "auto" -> {
-                val ctx = context ?: return false
-                getCachedOemInfo(ctx)["hasOemAudio"] as? Boolean ?: false
-            }
-            else -> false
-        }
+        return currentEqOwner != EqOwner.HAL
     }
 
     /**

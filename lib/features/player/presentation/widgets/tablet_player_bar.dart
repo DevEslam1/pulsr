@@ -60,8 +60,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
       _maybeUpdateDock(0.0, false);
       return;
     }
-    final playerState = context.read<PlayerCubit>().state;
-    if (playerState.currentSong == null) {
+    final playerCubit = context.read<PlayerCubit?>();
+    final playerState = playerCubit?.state;
+    if (playerState?.currentSong == null) {
       _maybeUpdateDock(0.0, false);
       return;
     }

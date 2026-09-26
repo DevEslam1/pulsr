@@ -340,17 +340,21 @@ internal class PoTokenWebView private constructor(
         if (!closed.compareAndSet(false, true)) return
         val exception = PoTokenException("PoTokenGenerator closed")
         popAllPoTokenFutures().forEach { (_, f) -> f.completeExceptionally(exception) }
-        executor.shutdownNow()
+        try {
+            executor.shutdownNow()
+        } catch (_: Throwable) {}
 
-        webView.clearHistory()
-        // Clears the RAM and disk cache, globally for every WebView in the process.
-        webView.clearCache(true)
-        // Stops the page doing anything further before it is torn down.
-        webView.loadUrl("about:blank")
-        webView.onPause()
-        webView.webChromeClient = null
-        webView.removeAllViews()
-        webView.destroy()
+        try {
+            webView.clearHistory()
+            webView.clearCache(true)
+            webView.loadUrl("about:blank")
+            webView.onPause()
+            webView.webChromeClient = null
+            webView.removeAllViews()
+            webView.destroy()
+        } catch (t: Throwable) {
+            Log.w(TAG, "WebView cleanup error: ${t.message}")
+        }
     }
 
     /**

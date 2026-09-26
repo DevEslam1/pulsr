@@ -721,9 +721,10 @@ class YtDownloadService {
     }
 
     // Remote backend decommissioned: native resolution only.
-    // 1. Native resolution fallback
+    // Prefer M4A (AAC) for downloads: universally supported by all music players & car stereos,
+    // enables metadata/cover-art embedding, and avoids Android MediaStore .webm.oga mangling.
     final native = await _ytmService.resolveStream(videoId,
-        quality: quality, forceRefresh: forceRefresh);
+        quality: quality, forceRefresh: forceRefresh, preferM4a: true);
     final resolved = native.withResolvedExpiry();
     _resolvedStreams[videoId] = resolved; // FIX-A05/C05: Store resolved stream for duration lookup
     if (_resolvedStreams.length > _maxResolvedStreams) {

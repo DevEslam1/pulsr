@@ -38,6 +38,7 @@ class NowPlayingWidget : AppWidgetProvider() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
+        rotateWidgetToken(context)
         scheduleDebouncedWidgetUpdate(context, 0L)
     }
 
@@ -180,7 +181,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                 }
             }
             ACTION_SEEK_RATIO -> {
-                val ratio = intent.getFloatExtra(EXTRA_RATIO, 0.5f)
+                val ratio = intent.getFloatExtra(EXTRA_RATIO, 0.5f).coerceIn(0f, 1f)
                 if (currentDuration > 0) {
                     val seekPos = (currentDuration * ratio).toLong().coerceIn(0L, currentDuration)
                     performMediaAction(
@@ -244,6 +245,7 @@ class NowPlayingWidget : AppWidgetProvider() {
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
+        clearWidgetToken(context)
         synchronized(mediaBrowserLock) {
             try {
                 cachedMediaBrowser?.disconnect()
@@ -284,11 +286,31 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private fun getWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
             val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
-            prefs.getString("token_active", null) ?: run {
-                val newToken = generateToken()
-                prefs.edit().putString("token_active", newToken).commit()
-                newToken
+            val token = prefs.getString("token_active", null)
+            val createdAt = prefs.getLong("token_created_at", 0L)
+            val now = System.currentTimeMillis()
+            val maxAgeMs = 24 * 60 * 60 * 1000L // 24 hours
+            if (token != null && createdAt > 0L && (now - createdAt) < maxAgeMs) {
+                token
+            } else {
+                rotateWidgetToken(context)
             }
+        }
+
+        fun rotateWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
+            val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
+            val newToken = generateToken()
+            val now = System.currentTimeMillis()
+            prefs.edit()
+                .putString("token_active", newToken)
+                .putLong("token_created_at", now)
+                .commit()
+            newToken
+        }
+
+        fun clearWidgetToken(context: Context) = synchronized(widgetTokenLock) {
+            val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
+            prefs.edit().clear().commit()
         }
 
         /// C-10: the complete set of broadcasts this receiver will act on.
@@ -490,10 +512,11 @@ class NowPlayingWidget : AppWidgetProvider() {
         }
 
         private fun getSafeLong(prefs: SharedPreferences, key: String, default: Long = 0L): Long {
-            val v = prefs.all[key] ?: return default
+            val v = try { prefs.all[key] } catch (_: Throwable) { null } ?: return default
             return when (v) {
                 is Number -> v.toLong()
                 is String -> v.toLongOrNull() ?: default
+                is Boolean -> if (v) 1L else 0L
                 else -> default
             }
         }

@@ -75,7 +75,10 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
   void dispose() {
     _searchController.dispose();
     _activeInstances.remove(this);
-    // M-02: Debounce cache clearance so transitions between routes don't clear hot cache prematurely
+    // B-12 & M-02: Debounce cache clearance so transitions between routes don't clear hot cache prematurely.
+    // Invariant: _cacheClearTimer only clears the cache if _activeInstances remains empty
+    // when the 10-second timer fires. If another instance mounts in the meantime, initState()
+    // unconditionally cancels _cacheClearTimer and registers the new instance.
     if (_activeInstances.isEmpty) {
       _cacheClearTimer?.cancel();
       _cacheClearTimer = Timer(const Duration(seconds: 10), () {

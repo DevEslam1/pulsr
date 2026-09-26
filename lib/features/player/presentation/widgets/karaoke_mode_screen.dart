@@ -13,6 +13,7 @@ import 'audio_visualizer.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import '../../../../core/utils/error_logger.dart';
 
 class KaraokeModeScreen extends StatefulWidget {
   const KaraokeModeScreen({super.key});
@@ -290,7 +291,9 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
         );
       },
     );
-    } catch (e) {
+    } catch (e, st) {
+      ErrorLogger.log('KaraokeModeScreen build failed',
+          error: e, stackTrace: st, category: 'Karaoke');
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       rethrow;
     }

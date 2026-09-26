@@ -387,23 +387,4 @@ class PlayerDspController {
     }
     return ok;
   }
-
-  List<double> mergeRoomCorrectionWithHeadphoneCurve(List<double> roomGains, {double maxGainDb = 15.0}) =>
-      RoomCorrectionService.mergeWithHeadphoneCurve(
-        roomGains,
-        _getState().selectedHeadphoneProfile?.gains ?? const <double>[],
-        maxGainDb: maxGainDb,
-      );
-
-  List<double> exportCorrectionImpulseResponse(
-    List<double> gains, {
-    List<double>? centers,
-    int sampleRate = RoomCorrectionService.captureSampleRate,
-    int taps = 127,
-  }) => RoomCorrectionService.exportCorrectionImpulseResponse(
-        gains,
-        centers: centers ?? EqPreset.centerFrequencies,
-        sampleRate: sampleRate,
-        taps: taps,
-      );
 }

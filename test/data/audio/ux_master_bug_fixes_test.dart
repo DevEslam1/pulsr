@@ -209,6 +209,11 @@ void main() {
       expect(repo.get<int>('test_string_key'), isNull);
       expect(repo.get<bool>('test_string_key'), isNull);
       expect(repo.get<String>('test_int_key'), isNull);
+
+      // B8: Type mismatch evicts stale cache entry so subsequent matching read re-fetches
+      await repo.set('dynamic_key', 'text_value', immediate: true);
+      expect(repo.get<int>('dynamic_key'), isNull);
+      expect(repo.get<String>('dynamic_key'), equals('text_value'));
     });
 
     test('B-26: Scanner dateAdded normalization preserves milliseconds and scales seconds', () {

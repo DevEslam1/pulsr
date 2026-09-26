@@ -77,6 +77,12 @@ class AudioMemoryManager {
 
   /// Registers a preloaded stream head and evicts oldest items if exceeding 32MB cap.
   void registerPreload(String key, int sizeBytes) {
+    // FIX B2: reject a single item larger than the whole budget. Without this,
+    // the eviction loop below drains the cache and then still inserts the
+    // oversized entry, leaving _currentPreloadBytes permanently over budget.
+    if (sizeBytes > maxPreloadBudgetBytes) {
+      return;
+    }
     if (_headCache.containsKey(key)) {
       final existing = _headCache.remove(key)!;
       _currentPreloadBytes -= existing.sizeBytes;

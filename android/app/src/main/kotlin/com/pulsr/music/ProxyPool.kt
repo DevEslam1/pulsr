@@ -166,24 +166,23 @@ object ProxyPool {
             currentPathLabel = "${selected.type.name}:${selected.host}:${selected.port}"
         }
 
-        // Set authenticator if required
-        if (selected.username.isNotEmpty()) {
-            Authenticator.setDefault(object : Authenticator() {
-                override fun getPasswordAuthentication(): PasswordAuthentication? {
-                    if (requestorType == RequestorType.PROXY) {
-                        if (requestingHost.equals(selected.host, ignoreCase = true) &&
-                            (requestingPort == selected.port || requestingPort == -1)) {
-                            return PasswordAuthentication(selected.username, selected.password.toCharArray())
-                        }
-                    }
-                    return null
-                }
-            })
-        } else {
-            Authenticator.setDefault(null)
-        }
-
         return selected.toJavaProxy()
+    }
+
+    fun getActiveNode(): ProxyNode? {
+        synchronized(lock) {
+            val id = activeProxyId ?: return null
+            return proxies.firstOrNull { it.id == id }
+        }
+    }
+
+    fun applyAuthHeader(conn: HttpURLConnection, node: ProxyNode? = null) {
+        val targetNode = node ?: getActiveNode()
+        if (targetNode != null && targetNode.username.isNotEmpty()) {
+            val userPass = "${targetNode.username}:${targetNode.password}"
+            val basicAuth = "Basic " + android.util.Base64.encodeToString(userPass.toByteArray(), android.util.Base64.NO_WRAP)
+            conn.setRequestProperty("Proxy-Authorization", basicAuth)
+        }
     }
 
     fun resetNetworkFailures() {
@@ -212,9 +211,6 @@ object ProxyPool {
                 proxies.firstOrNull { it.id == failedHostOrId || "${it.host}:${it.port}" == failedHostOrId || it.host == failedHostOrId }
             } else {
                 activeProxyId?.let { id -> proxies.firstOrNull { it.id == id } }
-                    ?: proxies.filter { it.isAlive }.let {
-                        if (it.isNotEmpty()) it[Math.floorMod(activeProxyIndex, it.size)] else null
-                    }
             }
 
             if (failing != null) {

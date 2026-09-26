@@ -198,7 +198,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Downloads match stream',
+                          '${"Downloads match stream"}',
                           style: TextStyle(
                             fontSize: AppFontSize.tiny,
                             color: activeColor,

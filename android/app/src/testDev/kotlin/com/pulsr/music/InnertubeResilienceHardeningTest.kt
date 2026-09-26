@@ -18,6 +18,7 @@ class InnertubeResilienceHardeningTest {
     @Test
     fun testSignalPriorityPreservesLowerPrioritySignalsWhenStartedNull() {
         fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
+            YtmBlockSignal.Interrupted             -> 9
             YtmBlockSignal.BotChallenge            -> 8
             YtmBlockSignal.PoTokenInvalid          -> 7
             YtmBlockSignal.RateLimited             -> 6

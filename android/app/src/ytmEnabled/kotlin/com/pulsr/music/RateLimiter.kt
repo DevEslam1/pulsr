@@ -94,15 +94,22 @@ class RateLimiter(
      * then release it exactly once. Returns false when the wait was interrupted,
      * in which case no permit is held and the caller must not release one.
      */
-    fun acquirePermit(bucket: Bucket = Bucket.PLAYER): Boolean {
+    fun acquirePermit(bucket: Bucket = Bucket.PLAYER, maxWaitMs: Long = 30_000L): Boolean {
+        val startWait = clock.elapsedRealtime()
         while (true) {
+            val now = clock.elapsedRealtime()
+            if ((now - startWait) >= maxWaitMs) {
+                return false
+            }
             // 1. Backoff check: sleep outside the global concurrency permit to prevent
             // starvations of unrelated calls or pools.
-            val now = clock.elapsedRealtime()
             val backoffUntil = backoffUntilTimestamp.get()
 
             if (now < backoffUntil) {
-                val sleepTime = backoffUntil - now + Random.nextLong(0L, 2000L)
+                val remainingWait = maxWaitMs - (now - startWait)
+                if (remainingWait <= 0) return false
+                val jitter = if (remainingWait > 1) Random.nextLong(0L, minOf(2000L, remainingWait)) else 0L
+                val sleepTime = minOf(backoffUntil - now + jitter, remainingWait)
                 if (sleepTime > 0) {
                     lock.lock()
                     try {

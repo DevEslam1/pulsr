@@ -13,9 +13,9 @@ enum SleepTimerMode {
   afterNTracks,
 }
 
-/// Monotonic, doze-resilient sleep timer manager.
-/// Evaluates countdown progress against actual active playback progression rather than
-/// wall-clock DateTime.now(), guaranteeing accurate timing across Android Doze and CPU deep sleep.
+/// Playback-aware sleep timer manager with persistence recovery.
+/// Evaluates countdown progress against active playback progression and persists
+/// target timestamps for recovery across Android Doze and CPU deep sleep cycles.
 class SleepTimerManager {
   Timer? _countdownTicker;
   Timer? _oneShotTimer;

@@ -506,75 +506,21 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   }
 
   int? _getNextIndex({int offset = 1, bool peek = false}) {
-    if (_songs.isEmpty) return null;
-    if (_activePlayer.loopMode == LoopMode.one) {
-      return _currentIndex;
-    }
-    if (_activePlayer.shuffleModeEnabled && _songs.length > 1) {
-      if (offset == 1 && !peek) {
-        _shuffleHistory.add(_currentIndex);
-        if (_shuffleHistory.length > 50) {
-          _shuffleHistory.removeAt(0);
-        }
-      }
-      if (_songs.length == 2) {
-        // In a 2-song queue with shuffle enabled, alternate to the other song
-        return _currentIndex == 0 ? 1 : 0;
-      }
-      if (_songs.length == 1) {
-        return 0;
-      }
-      final random = math.Random();
-      final recentWindow = math.min(_songs.length - 1, 10);
-      final recent = _shuffleHistory.length >= recentWindow
-          ? _shuffleHistory.sublist(_shuffleHistory.length - recentWindow)
-          : _shuffleHistory;
-
-      int next = random.nextInt(_songs.length);
-      int attempts = 0;
-      final maxAttempts = _songs.length * 2;
-      while ((next == _currentIndex || recent.contains(next)) &&
-          attempts < maxAttempts &&
-          _songs.length > 1) {
-        next = random.nextInt(_songs.length);
-        attempts++;
-      }
-      if (next == _currentIndex && _songs.length > 1) {
-        final candidates = [
-          for (int i = 0; i < _songs.length; i++)
-            if (i != _currentIndex) i
-        ];
-        next = candidates[random.nextInt(candidates.length)];
-      }
-      return next;
-    }
-    if (_currentIndex + offset < _songs.length) {
-      return _currentIndex + offset;
-    } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
-      return (_currentIndex + offset) % _songs.length;
-    }
-    return null;
+    return _queueStateMachine.getNextIndex(
+      offset: offset,
+      peek: peek,
+      shuffleModeEnabled: _activePlayer.shuffleModeEnabled,
+      loopMode: _activePlayer.loopMode,
+    );
   }
 
   int? getPreviousIndex({bool forcePrevious = false}) {
-    if (_songs.isEmpty) return null;
-    if (!forcePrevious && _activePlayer.position.inSeconds > 3) {
-      return _currentIndex;
-    }
-    if (_activePlayer.shuffleModeEnabled && _shuffleHistory.isNotEmpty) {
-      // Drain any stale entries left over from a previous/shorter queue rather
-      // than returning an out-of-range index.
-      while (_shuffleHistory.isNotEmpty) {
-        final previous = _shuffleHistory.removeLast();
-        if (previous >= 0 && previous < _songs.length) return previous;
-      }
-    }
-    if (_currentIndex - 1 >= 0) {
-      return _currentIndex - 1;
-    } else if (_activePlayer.loopMode == LoopMode.all) {
-      return _songs.length - 1;
-    }
-    return null;
+    return _queueStateMachine.getPreviousIndex(
+      forcePrevious: forcePrevious,
+      position: _activePlayer.position,
+      shuffleModeEnabled: _activePlayer.shuffleModeEnabled,
+      loopMode: _activePlayer.loopMode,
+    );
   }
 
   void _broadcastState(PlaybackEvent event) {
@@ -696,13 +642,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   /// real. A single-entry queue (a lone live stream, a one-track album) has no
   /// neighbour; so does the last track of a non-looping queue going forward.
   bool _hasQueueNeighbour({required bool forward}) {
-    if (_songs.length <= 1) return false;
-    if (_activePlayer.shuffleModeEnabled) return true;
-    if (_activePlayer.loopMode == LoopMode.all) return true;
-    if (_gaplessMode && _gaplessLoaded) {
-      return forward ? _activePlayer.hasNext : _activePlayer.hasPrevious;
-    }
-    return forward ? _currentIndex + 1 < _songs.length : _currentIndex > 0;
+    return _queueStateMachine.hasQueueNeighbour(
+      forward: forward,
+      shuffleModeEnabled: _activePlayer.shuffleModeEnabled,
+      loopMode: _activePlayer.loopMode,
+      gaplessMode: _gaplessMode,
+      gaplessLoaded: _gaplessLoaded,
+      playerHasNext: _activePlayer.hasNext,
+      playerHasPrevious: _activePlayer.hasPrevious,
+    );
   }
 
   bool _isSameSongList(List<SongsTableData> a, List<SongsTableData> b) {
@@ -1976,6 +1924,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   void _saveCurrentPosition();
+
+  // Requires: provided by the composing class (same library).
+  PlaybackQueueStateMachine get _queueStateMachine;
 
   // Requires: provided by the composing class (same library).
   List<int> get _shuffleHistory;

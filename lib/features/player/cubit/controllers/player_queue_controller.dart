@@ -378,34 +378,6 @@ class PlayerQueueController {
     }
   }
 
-  void _findNextLocalMatch(
-    SongsTableData currentSong,
-    List<SongsTableData> queue,
-    int currentIndex,
-    int capturedSwapGen,
-    int capturedResolutionGen,
-  ) {
-    if (currentIndex + 1 >= queue.length) return;
-    final nextTrack = queue[currentIndex + 1];
-    if (nextTrack.source != SongSource.youtube) return;
-
-    _repository.findMatchingLocalSong(
-      remoteId: nextTrack.remoteId,
-      title: nextTrack.title,
-      artist: nextTrack.artist,
-    ).then((res) {
-      final match = res.fold((_) => null, (s) => s);
-      if (match != null &&
-          _localMatchSwapGuard.isValid(capturedSwapGen) &&
-          _mediaItemResolutionGuard.isValid(capturedResolutionGen) &&
-          !_isClosed()) {
-        swapReconciledSong(nextTrack.id, match);
-      }
-    }).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('Find next local match failed', error: e, stackTrace: st, category: 'PlayerQueueController');
-    });
-  }
-
   void dispose() {
     _persistQueueDebounce?.cancel();
     _persistQueueDebounce = null;

@@ -16,10 +16,15 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object DnsOverHttpsResolver {
     private const val TAG = "DnsOverHttpsResolver"
-    private val dnsCache = ConcurrentHashMap<String, Pair<InetAddress, Long>>()
     private const val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
-
     private const val MAX_CACHE_SIZE = 256
+
+    private val cacheLock = Any()
+    private val dnsCache = object : LinkedHashMap<String, Pair<InetAddress, Long>>(MAX_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<InetAddress, Long>>?): Boolean {
+            return size > MAX_CACHE_SIZE
+        }
+    }
 
     private fun isNumericIp(ip: String): Boolean {
         val parts = ip.split('.')
@@ -36,29 +41,25 @@ object DnsOverHttpsResolver {
     }
 
     private fun putInCache(hostname: String, address: InetAddress, now: Long) {
-        if (dnsCache.size >= MAX_CACHE_SIZE) {
-            val expired = dnsCache.entries.filter { (now - it.value.second) >= CACHE_TTL_MS }
-            for (entry in expired) {
-                dnsCache.remove(entry.key)
-            }
-            if (dnsCache.size >= MAX_CACHE_SIZE) {
-                // Evict the oldest 25% of entries rather than clearing the entire cache
-                val toEvict = dnsCache.entries
-                    .sortedBy { it.value.second }
-                    .take((MAX_CACHE_SIZE / 4).coerceAtLeast(1))
-                for (entry in toEvict) {
-                    dnsCache.remove(entry.key)
-                }
-            }
+        synchronized(cacheLock) {
+            dnsCache[hostname] = address to now
         }
-        dnsCache[hostname] = address to now
     }
 
     fun resolve(hostname: String): InetAddress? {
         val now = System.currentTimeMillis()
-        val cached = dnsCache[hostname]
-        if (cached != null && (now - cached.second) < CACHE_TTL_MS) {
-            return cached.first
+        val cached = synchronized(cacheLock) {
+            dnsCache[hostname]?.let { entry ->
+                if ((now - entry.second) < CACHE_TTL_MS) {
+                    entry.first
+                } else {
+                    dnsCache.remove(hostname)
+                    null
+                }
+            }
+        }
+        if (cached != null) {
+            return cached
         }
 
         // Try Cloudflare DoH first (A, then AAAA)
@@ -86,8 +87,8 @@ object DnsOverHttpsResolver {
             val conn = url.openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
             try {
                 conn.setRequestProperty("Accept", "application/dns-json")
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
+                conn.connectTimeout = 1500
+                conn.readTimeout = 1500
                 conn.requestMethod = "GET"
 
                 if (conn.responseCode == 200) {

@@ -24,7 +24,8 @@ class StreamPreResolver {
   final bool Function(String videoId)? isAlreadyPrefetching;
 
   Timer? _debounceTimer;
-  Completer<void>? _activeResolution;
+  // FIX B7: use a simple Object token instead of allocating an unawaited Completer
+  Object? _activeResolutionToken;
   String? _inFlightVideoId;
   bool _disposed = false;
 
@@ -165,22 +166,22 @@ class StreamPreResolver {
     _cancelInFlight();
     _inFlightVideoId = videoId;
 
-    final completer = Completer<void>();
-    _activeResolution = completer;
+    final token = Object();
+    _activeResolutionToken = token;
 
     resolveUrl(videoId, quality: quality).then((stream) {
-      if (_disposed || !identical(_activeResolution, completer)) return;
+      if (_disposed || !identical(_activeResolutionToken, token)) return;
       urlCache.putStream(stream, quality: quality);
       debugPrint(
           '[StreamPreResolver] Successfully pre-resolved track ($videoId)');
     }).catchError((e) {
-      if (_disposed || !identical(_activeResolution, completer)) return;
+      if (_disposed || !identical(_activeResolutionToken, token)) return;
       debugPrint(
           '[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
     }).whenComplete(() {
-      if (identical(_activeResolution, completer)) {
+      if (identical(_activeResolutionToken, token)) {
         _inFlightVideoId = null;
-        _activeResolution = null;
+        _activeResolutionToken = null;
       }
     });
   }
@@ -223,7 +224,7 @@ class StreamPreResolver {
 
   void _cancelInFlight() {
     _inFlightVideoId = null;
-    _activeResolution = null;
+    _activeResolutionToken = null;
   }
 
   void cancel() {

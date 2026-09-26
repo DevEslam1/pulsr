@@ -184,64 +184,65 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                 val outIndex = codec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
                 when {
                     outIndex >= 0 -> {
-                        if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutputEOS = true
-                        if (bufferInfo.size > 0 && bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
-                            val outBuf = codec.getOutputBuffer(outIndex)
-                            if (outBuf == null) {
-                                codec.releaseOutputBuffer(outIndex, false)
-                                continue
-                            }
-                            outBuf.position(bufferInfo.offset)
-                            outBuf.limit(bufferInfo.offset + bufferInfo.size)
-                            outBuf.order(ByteOrder.nativeOrder())
+                        try {
+                            if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutputEOS = true
+                            if (bufferInfo.size > 0 && bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
+                                val outBuf = codec.getOutputBuffer(outIndex)
+                                if (outBuf != null) {
+                                    outBuf.position(bufferInfo.offset)
+                                    outBuf.limit(bufferInfo.offset + bufferInfo.size)
+                                    outBuf.order(ByteOrder.nativeOrder())
 
-                            var frameSumSq = 0.0
-                            var frames = 0
-                            if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
-                                val fb = outBuf.asFloatBuffer()
-                                val n = fb.remaining()
-                                for (i in 0 until n) {
-                                    channelAcc += fb.get(i)
-                                    channelIndex++
-                                    if (channelIndex == channelCount) {
-                                        val v = channelAcc / channelCount
-                                        frameSumSq += v * v
-                                        frames++
-                                        channelAcc = 0.0
-                                        channelIndex = 0
+                                    var frameSumSq = 0.0
+                                    var frames = 0
+                                    if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) {
+                                        val fb = outBuf.asFloatBuffer()
+                                        val n = fb.remaining()
+                                        for (i in 0 until n) {
+                                            channelAcc += fb.get(i)
+                                            channelIndex++
+                                            if (channelIndex == channelCount) {
+                                                val v = channelAcc / channelCount
+                                                frameSumSq += v * v
+                                                frames++
+                                                channelAcc = 0.0
+                                                channelIndex = 0
+                                            }
+                                        }
+                                    } else {
+                                        val sb = outBuf.asShortBuffer()
+                                        val n = sb.remaining()
+                                        for (i in 0 until n) {
+                                            channelAcc += sb.get(i) / 32768.0
+                                            channelIndex++
+                                            if (channelIndex == channelCount) {
+                                                val v = channelAcc / channelCount
+                                                frameSumSq += v * v
+                                                frames++
+                                                channelAcc = 0.0
+                                                channelIndex = 0
+                                            }
+                                        }
+                                    }
+
+                                    if (frames > 0) {
+                                        totalFramesDecoded += frames
+                                        if (formatDurationUs > 0) {
+                                            val bucket = ((bufferInfo.presentationTimeUs.toDouble() / formatDurationUs) * count)
+                                                .toInt().coerceIn(0, count - 1)
+                                            sumSq[bucket] += frameSumSq
+                                            cnt[bucket] += frames
+                                        } else {
+                                            fallbackRms.add(sqrt(frameSumSq / frames))
+                                        }
                                     }
                                 }
-                            } else {
-                                val sb = outBuf.asShortBuffer()
-                                val n = sb.remaining()
-                                for (i in 0 until n) {
-                                    channelAcc += sb.get(i) / 32768.0
-                                    channelIndex++
-                                    if (channelIndex == channelCount) {
-                                        val v = channelAcc / channelCount
-                                        frameSumSq += v * v
-                                        frames++
-                                        channelAcc = 0.0
-                                        channelIndex = 0
-                                    }
-                                }
                             }
-
-                            if (frames > 0) {
-                                totalFramesDecoded += frames
-                                if (formatDurationUs > 0) {
-                                    val bucket = ((bufferInfo.presentationTimeUs.toDouble() / formatDurationUs) * count)
-                                        .toInt().coerceIn(0, count - 1)
-                                    sumSq[bucket] += frameSumSq
-                                    cnt[bucket] += frames
-                                } else {
-                                    fallbackRms.add(sqrt(frameSumSq / frames))
-                                }
-                            }
+                        } finally {
+                            codec.releaseOutputBuffer(outIndex, false)
                         }
-                        codec.releaseOutputBuffer(outIndex, false)
                     }
-                        outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                    outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val of = codec.outputFormat
                         if (of.containsKey(MediaFormat.KEY_PCM_ENCODING)) pcmEncoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channelCount = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
@@ -289,8 +290,11 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             var maxV = 0.0
             for (v in rms) if (v > maxV) maxV = v
             val out = DoubleArray(count)
+            if (maxV <= 1e-9) {
+                return out
+            }
             for (b in 0 until count) {
-                val norm = if (maxV > 1e-9) rms[b] / maxV else 0.0
+                val norm = rms[b] / maxV
                 out[b] = norm.coerceIn(0.04, 1.0)
             }
             return out

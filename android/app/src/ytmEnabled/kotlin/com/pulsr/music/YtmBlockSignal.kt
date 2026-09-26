@@ -22,7 +22,8 @@ enum class YtmBlockSignal(val code: String) {
     VideoGone("VIDEO_GONE"),
     NetworkUnavailable("YTM_NETWORK"),
     SignatureDecipherFailed("SIGNATURE_DECIPHER_FAILED"),
-    SabrEnforced("SABR_ENFORCED");
+    SabrEnforced("SABR_ENFORCED"),
+    Interrupted("INTERRUPTED");
 
     companion object {
         private val BOT_SUBSTRINGS = listOf(

@@ -359,17 +359,21 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   /// reconciled against it so the row does not flip back to the pre-toggle DB
   /// truth for the duration of the write.
   final Map<int, bool> _pendingFavoriteTargets = {};
-  // FIX-C02: Per-song mutex serializes concurrent favorite writes. Replaces the
-  // hand-rolled Completer queue whose 10s timeout could stall the awaiting tap
-  // and re-check a stale entry.
-  final Map<int, Mutex> _favoriteLocks = {};
+  // B-1 & FIX-C02: Ref-counted per-song mutex serializes concurrent favorite writes
+  // without losing serialization when a lock is released while callers wait.
+  final Map<int, _SongLock> _favoriteLocks = {};
 
   Future<void> toggleFavorite(int songId) async {
     if (isClosed) return;
-    final lock = _favoriteLocks.putIfAbsent(songId, Mutex.new);
-    await lock.acquire();
+    final songLock = _favoriteLocks.putIfAbsent(songId, _SongLock.new);
+    songLock.refCount++;
+    await songLock.mutex.acquire();
     if (isClosed) {
-      lock.release();
+      songLock.mutex.release();
+      songLock.refCount--;
+      if (songLock.refCount == 0 && _favoriteLocks[songId] == songLock) {
+        _favoriteLocks.remove(songId);
+      }
       return;
     }
 
@@ -476,8 +480,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         _favoriteOpTokens.remove(songId);
         _pendingFavoriteTargets.remove(songId);
       }
-      lock.release();
-      if (!_favoriteOpTokens.containsKey(songId)) {
+      songLock.mutex.release();
+      songLock.refCount--;
+      if (songLock.refCount == 0 && _favoriteLocks[songId] == songLock) {
         _favoriteLocks.remove(songId);
       }
     }
@@ -623,4 +628,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _favoriteLocks.clear();
     return super.close();
   }
+}
+
+class _SongLock {
+  final Mutex mutex = Mutex();
+  int refCount = 0;
 }

@@ -312,7 +312,7 @@ class ImportBackupUseCase {
               'Backup file exceeds maximum allowed size of 10 MB');
         }
         final content = await (file as dynamic).readAsString();
-        return await execute(content);
+        return await execute(content, knownByteLength: (len is int) ? len : null);
       } catch (e) {
         if (e is FormatException) rethrow;
         throw FormatException('Failed reading backup file: $e');
@@ -321,14 +321,28 @@ class ImportBackupUseCase {
     return execute(file);
   }
 
-  Future<ImportResult> execute(String jsonString) async {
-    // Cheap length check first (chars) to avoid double alloc for size check — prevents OOM on low RAM
-    if (jsonString.length > maxBackupSizeBytes) {
-      throw const FormatException(
-          'Backup file exceeds maximum allowed size of 10 MB');
-    } else if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
-      throw const FormatException(
-          'Backup file exceeds maximum allowed size of 10 MB');
+  Future<ImportResult> execute(String jsonString, {int? knownByteLength}) async {
+    // FIX B3: Avoid double-allocating a second full copy of a ≤10MB string just to check utf8 size.
+    // If the caller already know the byte length (e.g. from File.length()), reuse it directly.
+    if (knownByteLength != null) {
+      if (knownByteLength > maxBackupSizeBytes) {
+        throw const FormatException(
+            'Backup file exceeds maximum allowed size of 10 MB');
+      }
+    } else {
+      // String character count is <= byte count for UTF-8 (each char is 1-4 bytes).
+      // If char count exceeds 10MB, UTF-8 byte count definitely exceeds 10MB.
+      if (jsonString.length > maxBackupSizeBytes) {
+        throw const FormatException(
+            'Backup file exceeds maximum allowed size of 10 MB');
+      }
+      // If char count * 4 <= maxBackupSizeBytes (2.5 million chars), UTF-8 is guaranteed <= 10MB
+      // without needing to materialize an encoded byte array.
+      if (jsonString.length > maxBackupSizeBytes ~/ 4 &&
+          utf8.encode(jsonString).length > maxBackupSizeBytes) {
+        throw const FormatException(
+            'Backup file exceeds maximum allowed size of 10 MB');
+      }
     }
 
     final dynamic decoded;

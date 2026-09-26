@@ -42,6 +42,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   bool _sdk = false;
   bool _busy = false;
   bool _scanning = false;
+  bool _initialized = false;
   Timer? _scanTimeoutTimer;
 
   bool get _isAndroid => PlatformCapabilities.isAndroid;
@@ -55,6 +56,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   }
 
   Future<void> _init() async {
+    if (_initialized) return;
+    _initialized = true;
     setState(() => _scanning = true);
     final sdk = await _service.isSessionAvailable();
     if (!mounted) return;

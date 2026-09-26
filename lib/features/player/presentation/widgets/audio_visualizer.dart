@@ -217,6 +217,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     if (state == AppLifecycleState.resumed) {
       _isAppActive = true;
       _permissionAsked = false;
+      _toastShown = false;
       if (_permissionDenied && !_permanentlyDenied && widget.isPlaying && widget.style != VisualizerStyle.off) {
         _initVisualizer();
       }

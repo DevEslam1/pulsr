@@ -331,7 +331,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         if (!isContentUri) {
                             try {
                                 val src = File(path)
-                                val bak = java.io.File(src.parent, ".${src.name}.pulsr.bak")
+                                val bak = java.io.File(src.parent, ".${src.name.take(200)}.pulsr.bak")
                                 runCatching { if (bak.exists()) bak.delete() }
                                 src.copyTo(bak, overwrite = true)
                                 backupFile = bak
@@ -362,14 +362,39 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         // Post-write verification: re-read and compare key fields.
                         // Returns a map so Dart can distinguish written-but-unverified
                         // from fully verified (defect 24-03 scoped-storage honesty).
+                        val verifiedFields = mutableMapOf<String, Boolean>()
                         verified = false
                         try {
                             val reread = AudioFileIO.read(if (isContentUri) file else File(path))
                             val rtag = reread.tag
                             if (rtag != null) {
                                 val expTitle = tags["title"]?.toString()
-                                val gotTitle = runCatching { rtag.getFirst(FieldKey.TITLE) }.getOrNull()
-                                verified = expTitle.isNullOrEmpty() || gotTitle == expTitle
+                                if (!expTitle.isNullOrEmpty()) {
+                                    val gotTitle = runCatching { rtag.getFirst(FieldKey.TITLE) }.getOrNull()
+                                    verifiedFields["title"] = (gotTitle == expTitle)
+                                }
+
+                                val expArtist = tags["artist"]?.toString()
+                                if (!expArtist.isNullOrEmpty()) {
+                                    val gotArtist = runCatching { rtag.getFirst(FieldKey.ARTIST) }.getOrNull()
+                                    verifiedFields["artist"] = (gotArtist == expArtist)
+                                }
+
+                                val expAlbum = tags["album"]?.toString()
+                                if (!expAlbum.isNullOrEmpty()) {
+                                    val gotAlbum = runCatching { rtag.getFirst(FieldKey.ALBUM) }.getOrNull()
+                                    verifiedFields["album"] = (gotAlbum == expAlbum)
+                                }
+
+                                if (tags.containsKey("artworkBytes") || tags.containsKey("artworkPath")) {
+                                    val gotArtwork = runCatching { rtag.firstArtwork }.getOrNull()
+                                    verifiedFields["artwork"] = (gotArtwork != null && gotArtwork.binaryData != null && gotArtwork.binaryData.isNotEmpty())
+                                } else if (tags["removeArtwork"] == true) {
+                                    val gotArtwork = runCatching { rtag.firstArtwork }.getOrNull()
+                                    verifiedFields["artwork"] = (gotArtwork == null || gotArtwork.binaryData == null || gotArtwork.binaryData.isEmpty())
+                                }
+
+                                verified = verifiedFields.values.all { it }
                             }
                         } catch (_: Exception) {
                             verified = false
@@ -386,7 +411,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         }
 
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            result.success(mapOf("ok" to true, "verified" to verified))
+                            result.success(mapOf("ok" to true, "verified" to verified, "verifiedFields" to verifiedFields))
                         }
                     } catch (e: Exception) {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {

@@ -42,8 +42,20 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
   void initState() {
     super.initState();
     final songs = context.read<LibraryCubit>().state.songs;
-    final folders = _extractFolders(songs);
+    final folders = _getFolders(songs);
     _currentPath = _findRootFolder(folders);
+  }
+
+  List<SongsTableData>? _cachedSongsRef;
+  Set<String>? _cachedFolders;
+
+  Set<String> _getFolders(List<SongsTableData> songs) {
+    if (identical(_cachedSongsRef, songs) && _cachedFolders != null) {
+      return _cachedFolders!;
+    }
+    _cachedSongsRef = songs;
+    _cachedFolders = _extractFolders(songs);
+    return _cachedFolders!;
   }
 
   Set<String> _extractFolders(List<SongsTableData> songs) {
@@ -84,7 +96,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
     return BlocConsumer<LibraryCubit, LibraryState>(
       listener: (context, state) {
         // M-09: Reconcile folder path asynchronously via listener instead of mutating state during build()
-        final folders = _extractFolders(state.songs);
+        final folders = _getFolders(state.songs);
         if (_currentPath != null && !folders.contains(_currentPath)) {
           setState(() {
             _currentPath = _findRootFolder(folders);
@@ -105,7 +117,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           );
         }
 
-        final folders = _extractFolders(songs);
+        final folders = _getFolders(songs);
         final effectivePath = _currentPath ?? _findRootFolder(folders) ?? '';
         final currentDir = p_path.posix.normalize(effectivePath.replaceAll('\\', '/'));
         final dirPrefix = currentDir.endsWith('/') ? currentDir : '$currentDir/';

@@ -948,22 +948,23 @@ class YtmService {
   Future<YtmStream> resolveStream(String videoId,
       {String quality = 'high',
       bool forceRefresh = false,
-      bool coalesce = true}) {
+      bool coalesce = true,
+      bool preferM4a = false}) {
     if (forceRefresh) {
       return _resolveStreamInner(videoId,
-          quality: quality, forceRefresh: true);
+          quality: quality, forceRefresh: true, preferM4a: preferM4a);
     }
     if (!coalesce) {
       return _resolveStreamInner(videoId,
-          quality: quality, forceRefresh: false);
+          quality: quality, forceRefresh: false, preferM4a: preferM4a);
     }
-    final key = '$videoId:${quality.toLowerCase()}';
+    final key = '$videoId:${quality.toLowerCase()}${preferM4a ? ":m4a" : ""}';
     final existing = _inFlightStreamResolves[key];
     if (existing != null) {
       return existing.timeout(_defaultResolveTimeout + const Duration(seconds: 5));
     }
     final fut =
-        _resolveStreamInner(videoId, quality: quality, forceRefresh: false);
+        _resolveStreamInner(videoId, quality: quality, forceRefresh: false, preferM4a: preferM4a);
     _inFlightStreamResolves[key] = fut;
     return fut.whenComplete(() {
       if (identical(_inFlightStreamResolves[key], fut)) {
@@ -973,14 +974,17 @@ class YtmService {
   }
 
   Future<YtmStream> _resolveStreamInner(String videoId,
-      {String quality = 'high', bool forceRefresh = false}) async {
+      {String quality = 'high',
+      bool forceRefresh = false,
+      bool preferM4a = false}) async {
     // Check Task 2 in-memory URL cache first
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
+    final cacheQuality = preferM4a ? '$quality:m4a' : quality;
     if (forceRefresh) {
-      urlCache?.invalidate(videoId, quality: quality);
+      urlCache?.invalidate(videoId, quality: cacheQuality);
     } else {
-      final cachedEntry = urlCache?.get(videoId, quality: quality);
+      final cachedEntry = urlCache?.get(videoId, quality: cacheQuality);
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
@@ -1152,6 +1156,7 @@ class YtmService {
           () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
             'videoId': videoId,
             'quality': quality,
+            if (preferM4a) 'preferM4a': true,
           }),
           timeout: _defaultResolveTimeout,
           maxRetries: 0,
@@ -1162,7 +1167,7 @@ class YtmService {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
           } catch (_) {}
-          urlCache?.putStream(stream, quality: quality);
+          urlCache?.putStream(stream, quality: cacheQuality);
           _noteResolveSuccess(videoId: videoId);
           return stream;
         }
@@ -1262,6 +1267,7 @@ class YtmService {
             () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
               'videoId': videoId,
               'quality': quality,
+              if (preferM4a) 'preferM4a': true,
             }),
             timeout: _defaultResolveTimeout,
             maxRetries: 0,
@@ -1271,7 +1277,7 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
             } catch (_) {}
-            urlCache?.putStream(stream, quality: quality);
+            urlCache?.putStream(stream, quality: cacheQuality);
             _noteResolveSuccess(videoId: videoId);
             return stream;
           }
@@ -1299,12 +1305,12 @@ class YtmService {
     // 3. Pure-Dart InnerTube Stream Resolver (Desktop / Non-Android / Native Plugin Fallback)
     try {
       debugPrint('[YTM_SERVICE] Attempting Dart InnerTube stream resolution for $videoId');
-      final dartStream = await _resolveStreamDart(videoId, quality: quality);
+      final dartStream = await _resolveStreamDart(videoId, quality: quality, preferM4a: preferM4a);
       if (dartStream != null) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
-        urlCache?.putStream(dartStream, quality: quality);
+        urlCache?.putStream(dartStream, quality: cacheQuality);
         _noteResolveSuccess(videoId: videoId);
         return dartStream;
       }
@@ -1326,7 +1332,7 @@ class YtmService {
   /// lightweight clients (e.g. ANDROID_VR, TVHTML5) that provide direct audio
   /// stream URLs without requiring native deciphers or MethodChannels.
   Future<YtmStream?> _resolveStreamDart(String videoId,
-      {String quality = 'high'}) async {
+      {String quality = 'high', bool preferM4a = false}) async {
     String apiKey = YtmClientVersionResolver.fallbackApiKey;
     String androidVersion = '19.44.38';
     String androidVrVersion = '1.63.27';
@@ -1483,7 +1489,9 @@ class YtmService {
           .where((f) =>
               ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
           .toList();
-      final pool = m4a.isNotEmpty ? m4a : audioFormats;
+      final pool = (preferM4a && m4a.isNotEmpty)
+          ? m4a
+          : (m4a.isNotEmpty ? m4a : audioFormats);
 
       final selected = switch (quality.toLowerCase()) {
         'low' => pool.reduce((a, b) =>

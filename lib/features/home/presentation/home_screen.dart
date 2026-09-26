@@ -156,7 +156,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       List<SongsTableData> lastSongs = libraryCubit.state.songs;
       _librarySub = libraryCubit.stream.listen((state) {
         if (!mounted) return;
-        if (!identical(state.songs, lastSongs) || state.songs.length != lastSongs.length) {
+        final firstId = state.songs.firstOrNull?.id;
+        final lastFirstId = lastSongs.firstOrNull?.id;
+        if (!identical(state.songs, lastSongs) ||
+            state.songs.length != lastSongs.length ||
+            firstId != lastFirstId) {
           lastSongs = state.songs;
           _cachedQuickSongs = null;
           _cachedQuickSongsStopwatch?.stop();

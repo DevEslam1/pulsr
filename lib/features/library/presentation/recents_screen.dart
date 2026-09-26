@@ -40,6 +40,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
   static const int _maxHistoryLimit = 500;
   int _historyLimit = _persistedHistoryLimit;
   bool _hasMore = true;
+  bool _userExpanded = false;
   late final GetSongsUseCase _getSongsUseCase;
 
   @override
@@ -395,7 +396,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   ),
                 ),
               if ((_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty) ||
-                  _historyLimit > _persistedHistoryLimit)
+                  (_userExpanded && _historyLimit > _persistedHistoryLimit && allRecents.length > _persistedHistoryLimit))
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -413,18 +414,20 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                   return;
                                 }
                                 setState(() {
+                                  _userExpanded = true;
                                   _historyLimit = (_historyLimit + 100).clamp(_persistedHistoryLimit, _maxHistoryLimit);
                                 });
                               },
                             ),
-                          if (_historyLimit > _persistedHistoryLimit) ...[
+                          if (_userExpanded && _historyLimit > _persistedHistoryLimit && allRecents.length > _persistedHistoryLimit) ...[
                             if (_hasMore && allRecents.length >= _historyLimit && _historyLimit < _maxHistoryLimit && _searchQuery.isEmpty)
                               const SizedBox(width: AppSpacing.sm),
                             TextButton.icon(
                               icon: const Icon(Icons.expand_less_rounded),
-                              label: const Text('Show less'),
+                              label: Text('${"Show less"}'),
                               onPressed: () {
                                 setState(() {
+                                  _userExpanded = false;
                                   _historyLimit = _persistedHistoryLimit;
                                   _hasMore = true;
                                 });

@@ -73,10 +73,10 @@ object PoTokenManager {
     // single BadWebViewException used to latch limited mode for the whole process
     // lifetime, silently downgrading every later resolution. Time-box it instead.
     @Volatile
-    private var webViewBrokenUntil: Long = 0L
+    private var webViewBrokenUntilElapsed: Long = 0L
 
     val webViewBroken: Boolean
-        get() = webViewBrokenUntil > Instant.now().epochSecond
+        get() = webViewBrokenUntilElapsed > android.os.SystemClock.elapsedRealtime()
 
     val isLimitedMode: Boolean
         get() = webViewBroken || (isExpired() && visitorData.isEmpty())
@@ -250,7 +250,7 @@ object PoTokenManager {
                     true
                 } catch (e: BadWebViewException) {
                     Log.e(TAG, "System WebView is broken for BotGuard: ${e.message}", e)
-                    webViewBrokenUntil = Instant.now().epochSecond + WEBVIEW_BROKEN_COOLDOWN_SECONDS
+                    webViewBrokenUntilElapsed = android.os.SystemClock.elapsedRealtime() + (WEBVIEW_BROKEN_COOLDOWN_SECONDS * 1000L)
                     visitorData.isNotEmpty()
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to ensure PoToken readiness: ${t.message}", t)
@@ -267,12 +267,12 @@ object PoTokenManager {
     }
 
     fun ensureReadySync(): Boolean {
+        if (isReady && !isExpiringSoon() && hasWarmGenerator) return true
         if (Looper.myLooper() == Looper.getMainLooper()) {
             Log.w(TAG, "ensureReadySync called on main thread; refusing to block")
             return isReady || visitorData.isNotEmpty()
         }
         if (webViewBroken) return visitorData.isNotEmpty()
-        if (isReady && !isExpiringSoon() && hasWarmGenerator) return true
 
         return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
             ensureReady()
@@ -361,7 +361,8 @@ object PoTokenManager {
         //    wrong-binding token that YouTube answers with an empty format list.
         //    That made the first signed-in resolve after every cold start fail,
         //    because a cold start has no generator but does have a stored token.
-        if (identifier == currentVisitor && streamingPoToken.isNotEmpty() && !isExpired()) {
+        val activeVisitor = visitorData
+        if (identifier == activeVisitor && streamingPoToken.isNotEmpty() && !isExpired()) {
             triggerBackgroundRefresh()
             return streamingPoToken
         }
@@ -449,7 +450,7 @@ object PoTokenManager {
         visitorData = ""
         streamingPoToken = ""
         integrityToken = ""
-        webViewBrokenUntil = 0L
+        webViewBrokenUntilElapsed = 0L
         lastBackgroundRefreshMs.set(0L)
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
         appContext?.let { PoTokenStore.clearAttestation(it) }

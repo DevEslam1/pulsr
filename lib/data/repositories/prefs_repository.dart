@@ -24,7 +24,11 @@ class PrefsRepository {
   T? get<T>(String key) {
     if (_memoryCache.containsKey(key)) {
       final v = _memoryCache[key];
-      return v is T ? v : null;
+      if (v is T) return v;
+      // FIX B8: a type-mismatched cache entry is stale; drop it so a later
+      // read re-fetches from disk instead of forever returning null.
+      _memoryCache.remove(key);
+      return null;
     }
     final val = _prefs.get(key);
     if (val is T) {
