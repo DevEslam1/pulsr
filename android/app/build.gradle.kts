@@ -61,7 +61,6 @@ android {
         // NewPipeExtractor bridge, so YouTube Music search/stream/download works.
         create("ytm") {
             dimension = "default"
-            applicationIdSuffix = ".ytm"
             manifestPlaceholders["appName"] = "Pulsr — Dr. Basbosa Edition"
             proguardFile(file("src/ytm/proguard-rules.pro"))
         }
