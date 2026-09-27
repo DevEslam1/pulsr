@@ -8,6 +8,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/glass_container.dart';
@@ -114,8 +115,8 @@ class CardPlayerTheme extends StatelessWidget {
         SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isLandscape = context.isLandscape ||
-                  (context.isTwoPane || constraints.maxWidth >= 600);
+              final isLandscape =
+                  PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
               final double heightRatio =
                   (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -418,9 +419,6 @@ class CardPlayerTheme extends StatelessWidget {
 
                     SizedBox(height: spacingSeekToControls),
 
-                    // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-                    const AdvancedPlaybackBar(),
-
                     // Player Controls
                     PlayerControls(
                       isPlaying: state.isPlaying,
@@ -437,6 +435,11 @@ class CardPlayerTheme extends StatelessWidget {
                       onToggleRepeat: () => cubit.toggleRepeat(),
                     ),
 
+                    if (!isLandscape || constraints.maxHeight >= 480) ...[
+                      // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+                      const AdvancedPlaybackBar(),
+                    ],
+
                     SizedBox(height: spacingControlsToDock),
 
                     // Floating Glass Bottom Action Dock (EQ bar)
@@ -446,33 +449,142 @@ class CardPlayerTheme extends StatelessWidget {
               );
 
               if (isLandscape) {
+                final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+
+                final Widget heroArtworkCard = Center(
+                  key: const ValueKey('artwork_card_landscape'),
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(
+                            resolveCustomRadius(context, AppRadii.r28)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.2),
+                            blurRadius: 30,
+                            spreadRadius: 4,
+                            offset: const Offset(0, 12),
+                          ),
+                          BoxShadow(
+                            color: activeColor.withValues(alpha: 0.3),
+                            blurRadius: 24,
+                            spreadRadius: -2,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: song != null
+                          ? CachedArtwork(
+                              id: song.id,
+                              remoteUrl: song.remoteArtworkUrl,
+                              type: ArtworkType.AUDIO,
+                              size: double.infinity,
+                              borderRadius: 28,
+                              highQuality: true,
+                            )
+                          : Container(
+                              color: isDark ? Colors.grey[900] : Colors.grey[200],
+                              child: const Icon(Icons.music_note, size: 64),
+                            ),
+                    ),
+                  ),
+                );
+
+                final Widget leftPaneContent = isSplitContentMode
+                    ? Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: isTablet ? 440.0 : 380.0,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                                ),
+                                child: viewSwitcher,
+                              ),
+                              bottomGlassCard,
+                            ],
+                          ),
+                        ),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                            child: viewSwitcher,
+                          ),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 520.0 : 310.0),
+                              maxWidth: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 520.0 : 310.0),
+                            ),
+                            child: heroArtworkCard,
+                          ),
+                        ],
+                      );
+
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 32 : 16,
+                    vertical: 4,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         flex: 5,
-                        child: Column(
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(
-                                top: switcherTopPad,
-                                bottom: switcherBottomPad,
-                              ),
-                              child: viewSwitcher,
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: context.motionMs(260),
+                            child: KeyedSubtree(
+                              key: ValueKey('left_pane_${isSplitContentMode ? "split" : "card"}'),
+                              child: leftPaneContent,
                             ),
-                            Expanded(
-                              child: centerDisplay,
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
+                      SizedBox(width: isTablet ? 32 : 16),
                       Expanded(
                         flex: 6,
-                        child: SingleChildScrollView(
-                          child: bottomGlassCard,
+                        child: SizedBox.expand(
+                          child: AnimatedSwitcher(
+                            duration: context.motionMs(260),
+                            layoutBuilder: (currentChild, previousChildren) {
+                              return Stack(
+                                fit: StackFit.expand,
+                                alignment: Alignment.center,
+                                children: <Widget>[
+                                  ...previousChildren,
+                                  if (currentChild != null) currentChild,
+                                ],
+                              );
+                            },
+                            child: state.isLyricsVisible
+                                ? LyricsView(
+                                    key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                    lyrics: state.lyrics,
+                                    isLoading: state.isLoadingLyrics,
+                                    activeColor: activeColor,
+                                    source: state.lyricsSource,
+                                  )
+                                : state.isQueueVisible
+                                    ? const NowPlayingQueueView(
+                                        key: ValueKey('queue_view_card'),
+                                      )
+                                    : Center(
+                                        key: const ValueKey('track_controls_pane'),
+                                        child: SingleChildScrollView(
+                                          child: bottomGlassCard,
+                                        ),
+                                      ),
+                          ),
                         ),
                       ),
                     ],

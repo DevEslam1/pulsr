@@ -28,6 +28,7 @@ class StreamResolutionPipeline {
   /// Explicit LinkedHashMap preserving strict insertion-order for LRU cache eviction.
   final LinkedHashMap<String, CachedStreamUrl> _streamCache = LinkedHashMap();
   final Map<String, Future<({String url, String? userAgent, String? cookies, String quality})>> _inFlightResolves = {};
+  final Map<String, int> _videoIdEpochs = {};
   int _resolveEpoch = 0;
 
   /// Cap on the in-memory URL cache. Without a bound it grew for every distinct
@@ -52,6 +53,8 @@ class StreamResolutionPipeline {
     // Keys are `videoId:quality`; anchor the prefix to the separator so a
     // shorter id can never match a sibling key.
     _streamCache.removeWhere((k, _) => k.startsWith('$videoId:'));
+    _inFlightResolves.removeWhere((k, _) => k.startsWith('$videoId:'));
+    _videoIdEpochs[videoId] = (_videoIdEpochs[videoId] ?? 0) + 1;
   }
 
   /// Clears in-flight and cached stream URLs and advances the epoch so
@@ -59,6 +62,7 @@ class StreamResolutionPipeline {
   void clearNetworkCaches() {
     _streamCache.clear();
     _inFlightResolves.clear();
+    _videoIdEpochs.clear();
     _resolveEpoch++;
   }
 
@@ -106,6 +110,7 @@ class StreamResolutionPipeline {
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
     final cacheKey = '$videoId:${quality.toLowerCase()}';
     final resolveEpoch = _resolveEpoch;
+    final videoEpoch = _videoIdEpochs[videoId] ?? 0;
 
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
@@ -153,7 +158,7 @@ class StreamResolutionPipeline {
           ? DateTime.fromMillisecondsSinceEpoch(stamp)
           : DateTime.now().add(const Duration(hours: 5));
 
-      if (_resolveEpoch == resolveEpoch) {
+      if (_resolveEpoch == resolveEpoch && (_videoIdEpochs[videoId] ?? 0) == videoEpoch) {
         _streamCache[cacheKey] = CachedStreamUrl(
           stream.url,
           expires,

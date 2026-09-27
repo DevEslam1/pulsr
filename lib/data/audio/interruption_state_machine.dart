@@ -1,7 +1,7 @@
 // lib/data/audio/interruption_state_machine.dart
 
 /// The kind of audio-focus interruption that began.
-enum InterruptionKind { duck, pause, unknown }
+enum InterruptionKind { duck, pause, systemUiSound, mediaButtonLongPress, unknown }
 
 /// Pure, type-safe bookkeeping for audio-session interruptions.
 ///
@@ -65,6 +65,14 @@ class InterruptionStateMachine {
     _activeKind = null;
     _wasPlaying = false;
   }
+
+  /// Whether the active interruption is a ducking type.
+  bool get isDuck =>
+      _activeKind == InterruptionKind.duck ||
+      _activeKind == InterruptionKind.systemUiSound;
+
+  /// Whether the active interruption is transient (e.g. system sound ding).
+  bool get isTransient => _activeKind == InterruptionKind.systemUiSound;
 
   /// Clears everything unconditionally (permanent/unknown focus loss end).
   void reset() {

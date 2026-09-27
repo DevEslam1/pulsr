@@ -27,17 +27,60 @@ class ScanError {
   });
 }
 
+class ScanProgressUpdate {
+  final double progress; // 0.0 to 1.0
+  final String? currentFile;
+  final int scannedCount;
+  final int totalCount;
+  final bool isIncremental;
+
+  const ScanProgressUpdate({
+    required this.progress,
+    this.currentFile,
+    this.scannedCount = 0,
+    this.totalCount = 0,
+    this.isIncremental = false,
+  });
+
+  @override
+  String toString() =>
+      'ScanProgressUpdate(progress: ${(progress * 100).toStringAsFixed(1)}%, file: $currentFile, count: $scannedCount/$totalCount, incremental: $isIncremental)';
+}
+
 @singleton
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final IMusicRepository _repository;
   final StreamController<double> _progressController =
       StreamController<double>.broadcast();
+  final StreamController<ScanProgressUpdate> _detailedProgressController =
+      StreamController<ScanProgressUpdate>.broadcast();
   final StreamController<ScanError> _errorController =
       StreamController<ScanError>.broadcast();
 
   Stream<double> get scanProgress => _progressController.stream;
+  Stream<ScanProgressUpdate> get detailedProgress =>
+      _detailedProgressController.stream;
   Stream<ScanError> get scanErrors => _errorController.stream;
+
+  void _emitProgress(
+    double progress, {
+    String? currentFile,
+    int scannedCount = 0,
+    int totalCount = 0,
+    bool isIncremental = false,
+  }) {
+    if (!_progressController.isClosed) _progressController.add(progress);
+    if (!_detailedProgressController.isClosed) {
+      _detailedProgressController.add(ScanProgressUpdate(
+        progress: progress,
+        currentFile: currentFile,
+        scannedCount: scannedCount,
+        totalCount: totalCount,
+        isIncremental: isIncremental,
+      ));
+    }
+  }
 
   DateTime? _lastScanAt;
   int? _lastScanEpochSec;
@@ -63,6 +106,9 @@ class MediaScannerService {
 
   void dispose() {
     if (!_progressController.isClosed) _progressController.close();
+    if (!_detailedProgressController.isClosed) {
+      _detailedProgressController.close();
+    }
     if (!_errorController.isClosed) _errorController.close();
   }
 
@@ -183,6 +229,8 @@ class MediaScannerService {
       for (var depth = 0; depth < 12; depth++) {
         final cached = _nomediaDirCache[dir];
         if (cached != null) {
+          _nomediaDirCache.remove(dir);
+          _nomediaDirCache[dir] = cached;
           if (cached) return true;
         } else {
           var hasMarker = false;
@@ -195,7 +243,11 @@ class MediaScannerService {
             hasMarker = false;
           }
           if (_nomediaDirCache.length >= _nomediaCacheMax) {
-            _nomediaDirCache.clear();
+            final toRemove = (_nomediaCacheMax * 0.25).toInt();
+            final keys = _nomediaDirCache.keys.take(toRemove).toList();
+            for (final k in keys) {
+              _nomediaDirCache.remove(k);
+            }
           }
           _nomediaDirCache[dir] = hasMarker;
           if (hasMarker) return true;
@@ -226,8 +278,9 @@ class MediaScannerService {
     int minDurationSec = 30,
     int minSizeKb = 0,
     bool autoHideSystemMedia = true,
+    bool incremental = false,
   }) async {
-    _progressController.add(0.0);
+    _emitProgress(0.0, currentFile: 'Initializing scanner...', isIncremental: incremental);
     try {
       final hasPermission = await checkPermission();
       if (!hasPermission) {
@@ -235,7 +288,7 @@ class MediaScannerService {
         if (!granted) return 0;
       }
 
-      _progressController.add(0.1);
+      _emitProgress(0.1, currentFile: 'Checking library exclusions...', isIncremental: incremental);
       final excludedRes = await _repository.getExcludedFolderPaths();
       final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
 
@@ -253,6 +306,34 @@ class MediaScannerService {
             error: e, stackTrace: stack, category: 'scanner');
         return 0;
       }
+
+      // Filter songs for incremental scan if enabled
+      List<SongModel> songsToProcess = songs;
+      final lastEpoch = _lastScanEpochSec;
+      if (incremental && lastEpoch != null && lastEpoch > 0) {
+        songsToProcess = songs.where((s) {
+          final modSec = (s.dateModified != null && s.dateModified! > 0)
+              ? s.dateModified!
+              : (s.dateAdded ?? 0);
+          return modSec >= lastEpoch;
+        }).toList();
+
+        if (songsToProcess.isEmpty) {
+          _emitProgress(1.0,
+              currentFile: 'No modified or new tracks found',
+              scannedCount: 0,
+              totalCount: songs.length,
+              isIncremental: true);
+          markScanComplete();
+          return 0;
+        }
+      }
+
+      _emitProgress(0.2,
+          currentFile: 'Mapping genre metadata...',
+          scannedCount: 0,
+          totalCount: songsToProcess.length,
+          isIncremental: incremental);
 
       // Query genres mapping from MediaStore to populate genre names
       final Map<int, String> songGenres = {};
@@ -277,14 +358,25 @@ class MediaScannerService {
 
       final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
       ErrorLogger.addBreadcrumb(
-          'Scanner started with ${songs.length} raw MediaStore songs',
+          'Scanner started with ${songsToProcess.length} raw MediaStore songs (incremental: $incremental)',
           category: 'scanner');
 
-      _progressController.add(0.3);
+      // Stream progress preview with sample filenames
+      for (int i = 0; i < songsToProcess.length; i += 30) {
+        final song = songsToProcess[i];
+        final frac = 0.25 + (i / (songsToProcess.isEmpty ? 1 : songsToProcess.length)) * 0.45;
+        _emitProgress(
+          frac,
+          currentFile: song.displayNameWOExt.isNotEmpty ? song.displayNameWOExt : song.title,
+          scannedCount: i,
+          totalCount: songsToProcess.length,
+          isIncremental: incremental,
+        );
+      }
 
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
-        rawSongs: songs.map((s) => Map<String, dynamic>.from(s.getMap)).toList(),
+        rawSongs: songsToProcess.map((s) => Map<String, dynamic>.from(s.getMap)).toList(),
         songGenres: songGenres,
         excludedFolders: excludedFolders,
         minDurationMs: minDurationMs,
@@ -295,7 +387,11 @@ class MediaScannerService {
 
       final parseResult =
           await compute(_parseScannedMediaInIsolate, parseInput);
-      _progressController.add(0.7);
+      _emitProgress(0.75,
+          currentFile: 'Syncing catalog (${parseResult.songs.length} tracks)...',
+          scannedCount: parseResult.songs.length,
+          totalCount: songsToProcess.length,
+          isIncremental: incremental);
 
       await _repository.syncScannedMusic(
         songs: parseResult.songs,
@@ -303,18 +399,24 @@ class MediaScannerService {
         artists: parseResult.artists,
       );
 
-      _progressController.add(0.9);
+      _emitProgress(0.9,
+          currentFile: 'Pruning orphaned catalog entries...',
+          isIncremental: incremental);
 
-      // Clean up orphaned entries
-      await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+      // Clean up orphaned entries (performed on full scans)
+      if (!incremental) {
+        await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+      }
 
-      // Expand sibling CUE sheets into virtual per-track rows. Runs after
-      // cleanup so it only touches live files and is idempotent on rescans.
+      // Expand sibling CUE sheets into virtual per-track rows.
       await _repository.expandCueSheets();
-      _progressController.add(1.0);
+      _emitProgress(1.0,
+          currentFile: 'Scan complete',
+          scannedCount: parseResult.songs.length,
+          totalCount: songsToProcess.length,
+          isIncremental: incremental);
 
-      // A completed scan changes the library, so drop any cached
-      // "Suggested for you" mixes generated from the previous snapshot.
+      // Invalidate playlist suggestions cache on library update
       try {
         if (getIt.isRegistered<PlaylistSuggestionsService>()) {
           getIt<PlaylistSuggestionsService>().invalidateCache();
@@ -329,8 +431,6 @@ class MediaScannerService {
           '${parseResult.nativeDecoderRequiredCount > 0 ? ', ${parseResult.nativeDecoderRequiredCount} file(s) need a native decoder (not indexed)' : ''}',
           category: 'scanner');
 
-      // Full-scan design: the query is DATE_ADDED DESC and the repository
-      // remaps onto existing paths, so re-scans converge without delta args.
       markScanComplete();
       scheduleAudioQualityEnrichment();
       return parseResult.songs.length;

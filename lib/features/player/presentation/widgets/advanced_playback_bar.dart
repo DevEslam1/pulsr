@@ -74,50 +74,70 @@ class AdvancedPlaybackBar extends StatelessWidget {
             if (mode == ExperienceMode.professional)
               Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // F1: AB loop
-                  IconButton(
-                    tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
-                    color: state.abPointA != null ? context.palette.info : null,
-                    onPressed: cubit.setAbPointA,
-                    icon: const Text('A',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  IconButton(
-                    tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
-                    color: state.abPointB != null ? context.palette.info : null,
-                    onPressed: cubit.setAbPointB,
-                    icon: const Text('B',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  IconButton(
-                    tooltip: state.abLoopEnabled
-                        ? l10n.disableAbLoop
-                        : l10n.enableAbLoop,
-                    color: state.abLoopEnabled ? context.palette.success : null,
-                    onPressed: (state.abPointA != null &&
-                            state.abPointB != null)
-                        ? cubit.toggleAbLoop
-                        : null,
-                    icon: const Icon(Icons.repeat_one_rounded),
-                  ),
-                  if (state.abPointA != null || state.abPointB != null)
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // F1: AB loop
                     IconButton(
-                      tooltip: l10n.clearAbLoop,
-                      onPressed: cubit.clearAbLoop,
-                      icon: const Icon(Icons.clear, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
+                      color: state.abPointA != null ? context.palette.info : null,
+                      onPressed: cubit.setAbPointA,
+                      icon: const Text('A',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
-                  const SizedBox(width: AppSpacing.xs),
-                  // F2: per-track delay
-                  IconButton(
-                    tooltip: l10n.audioDelayTooltip(state.trackDelayMs),
-                    onPressed: () =>
-                        _showDelaySheet(context, cubit, state.trackDelayMs),
-                    icon: const Icon(Icons.av_timer_outlined, size: 20),
-                  ),
-                ],
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
+                      color: state.abPointB != null ? context.palette.info : null,
+                      onPressed: cubit.setAbPointB,
+                      icon: const Text('B',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: state.abLoopEnabled
+                          ? l10n.disableAbLoop
+                          : l10n.enableAbLoop,
+                      color: state.abLoopEnabled ? context.palette.success : null,
+                      onPressed: (state.abPointA != null &&
+                              state.abPointB != null)
+                          ? cubit.toggleAbLoop
+                          : null,
+                      icon: const Icon(Icons.repeat_one_rounded),
+                    ),
+                    if (state.abPointA != null || state.abPointB != null)
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                        tooltip: l10n.clearAbLoop,
+                        onPressed: cubit.clearAbLoop,
+                        icon: const Icon(Icons.clear, size: 18),
+                      ),
+                    const SizedBox(width: AppSpacing.xs),
+                    // F2: per-track delay
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                      tooltip: l10n.audioDelayTooltip(state.trackDelayMs),
+                      onPressed: () =>
+                          _showDelaySheet(context, cubit, state.trackDelayMs),
+                      icon: const Icon(Icons.av_timer_outlined, size: 20),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

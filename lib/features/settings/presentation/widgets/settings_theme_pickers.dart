@@ -265,10 +265,71 @@ void showThemePickerSheet(
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
-    builder: (ctx) => SafeArea(
+    builder: (ctx) => _ThemePickerSheetContent(
+      themes: themes,
+      currentMode: currentMode,
+      cubit: cubit,
+      primaryColor: primaryColor,
+      cardColor: cardColor,
+      outlineColor: outlineColor,
+      textPrimary: textPrimary,
+      textSecondary: textSecondary,
+    ),
+  );
+}
+
+class _ThemePickerSheetContent extends StatefulWidget {
+  final List<({PlayerThemeMode mode, String title, String subtitle, IconData icon})> themes;
+  final PlayerThemeMode currentMode;
+  final SettingsCubit cubit;
+  final Color primaryColor;
+  final Color cardColor;
+  final Color outlineColor;
+  final Color textPrimary;
+  final Color textSecondary;
+
+  const _ThemePickerSheetContent({
+    required this.themes,
+    required this.currentMode,
+    required this.cubit,
+    required this.primaryColor,
+    required this.cardColor,
+    required this.outlineColor,
+    required this.textPrimary,
+    required this.textSecondary,
+  });
+
+  @override
+  State<_ThemePickerSheetContent> createState() => _ThemePickerSheetContentState();
+}
+
+class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
+  late PageController _pageController;
+  late PlayerThemeMode _selectedMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMode = widget.currentMode;
+    final initialIndex = widget.themes.indexWhere((t) => t.mode == _selectedMode);
+    _pageController = PageController(
+      viewportFraction: 0.82,
+      initialPage: initialIndex >= 0 ? initialIndex : 0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -283,11 +344,50 @@ void showThemePickerSheet(
                 style: TextStyle(
                   fontSize: AppFontSize.title,
                   fontWeight: FontWeight.w900,
-                  color: textPrimary,
+                  color: widget.textPrimary,
                 ),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
+
+            // Live Preview Carousel
+            SizedBox(
+              height: 140,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: widget.themes.length,
+                onPageChanged: (idx) {
+                  final newMode = widget.themes[idx].mode;
+                  setState(() => _selectedMode = newMode);
+                  widget.cubit.setPlayerThemeMode(newMode);
+                },
+                itemBuilder: (context, index) {
+                  final t = widget.themes[index];
+                  final isSelected = t.mode == _selectedMode;
+                  return AnimatedScale(
+                    scale: isSelected ? 1.0 : 0.92,
+                    duration: const Duration(milliseconds: 200),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedMode = t.mode);
+                        widget.cubit.setPlayerThemeMode(t.mode);
+                      },
+                      child: _ThemeMockupCard(
+                        mode: t.mode,
+                        title: t.title,
+                        isSelected: isSelected,
+                        primaryColor: widget.primaryColor,
+                        cardColor: widget.cardColor,
+                        textPrimary: widget.textPrimary,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // Theme List
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
@@ -295,20 +395,20 @@ void showThemePickerSheet(
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                itemCount: themes.length,
+                itemCount: widget.themes.length,
                 itemBuilder: (context, index) {
-                  final t = themes[index];
-                  final isSelected = t.mode == currentMode;
+                  final t = widget.themes[index];
+                  final isSelected = t.mode == _selectedMode;
                   return Container(
                     margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                     child: Material(
                       color: isSelected
-                          ? primaryColor.withValues(alpha: 0.12)
-                          : cardColor,
+                          ? widget.primaryColor.withValues(alpha: 0.12)
+                          : widget.cardColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadii.r16),
                         side: BorderSide(
-                          color: isSelected ? primaryColor : outlineColor,
+                          color: isSelected ? widget.primaryColor : widget.outlineColor,
                           width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
@@ -316,28 +416,33 @@ void showThemePickerSheet(
                         leading: _ThemePreviewThumbnail(
                           mode: t.mode,
                           isSelected: isSelected,
-                          primaryColor: primaryColor,
+                          primaryColor: widget.primaryColor,
                         ),
                         title: Text(
                           t.title,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: isSelected ? primaryColor : textPrimary,
+                            color: isSelected ? widget.primaryColor : widget.textPrimary,
                           ),
                         ),
                         subtitle: Text(
                           t.subtitle,
                           style: TextStyle(
                               fontSize: AppFontSize.label,
-                              color: textSecondary),
+                              color: widget.textSecondary),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check_circle_rounded,
-                                color: primaryColor)
+                                color: widget.primaryColor)
                             : null,
                         onTap: () {
-                          cubit.setPlayerThemeMode(t.mode);
-                          Navigator.pop(ctx);
+                          setState(() => _selectedMode = t.mode);
+                          widget.cubit.setPlayerThemeMode(t.mode);
+                          _pageController.animateToPage(
+                            index,
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutCubic,
+                          );
                         },
                       ),
                     ),
@@ -349,9 +454,209 @@ void showThemePickerSheet(
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
+
+class _ThemeMockupCard extends StatelessWidget {
+  final PlayerThemeMode mode;
+  final String title;
+  final bool isSelected;
+  final Color primaryColor;
+  final Color cardColor;
+  final Color textPrimary;
+
+  const _ThemeMockupCard({
+    required this.mode,
+    required this.title,
+    required this.isSelected,
+    required this.primaryColor,
+    required this.cardColor,
+    required this.textPrimary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(AppRadii.r16),
+        border: Border.all(
+          color: isSelected ? primaryColor : Colors.white10,
+          width: isSelected ? 2 : 1,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? primaryColor : textPrimary,
+                ),
+              ),
+              if (isSelected)
+                Icon(Icons.check_circle_rounded, size: 14, color: primaryColor),
+            ],
+          ),
+          const Spacer(),
+          Center(
+            child: _buildMockupVisual(),
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMockupVisual() {
+    switch (mode) {
+      case PlayerThemeMode.vinyl:
+        return Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black,
+            border: Border.all(color: Colors.grey.shade800, width: 2),
+          ),
+          child: Center(
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor,
+              ),
+              child: Center(
+                child: Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      case PlayerThemeMode.cassette:
+        return Container(
+          width: 80,
+          height: 50,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade900,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.5)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Icon(Icons.trip_origin_rounded, size: 16, color: primaryColor),
+              Container(width: 20, height: 10, color: Colors.grey.shade800),
+              Icon(Icons.trip_origin_rounded, size: 16, color: primaryColor),
+            ],
+          ),
+        );
+      case PlayerThemeMode.waveform:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(8, (i) {
+            final h = [15.0, 32.0, 48.0, 24.0, 40.0, 56.0, 30.0, 18.0][i];
+            return Container(
+              width: 4,
+              height: h,
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        );
+      case PlayerThemeMode.lyricsFocus:
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(width: 60, height: 4, color: Colors.white24),
+            const SizedBox(height: 4),
+            Container(width: 90, height: 6, color: primaryColor),
+            const SizedBox(height: 4),
+            Container(width: 70, height: 4, color: Colors.white24),
+          ],
+        );
+      case PlayerThemeMode.circle:
+        return Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: primaryColor.withValues(alpha: 0.2),
+            border: Border.all(color: primaryColor, width: 2),
+          ),
+          child: Icon(Icons.music_note_rounded, color: primaryColor, size: 28),
+        );
+      case PlayerThemeMode.card:
+        return Container(
+          width: 70,
+          height: 48,
+          decoration: BoxDecoration(
+            color: primaryColor.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
+          ),
+          child: const Center(
+            child: Icon(Icons.layers_rounded, color: Colors.white70, size: 22),
+          ),
+        );
+      case PlayerThemeMode.minimal:
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(width: 50, height: 3, color: primaryColor),
+            const SizedBox(width: 4),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor,
+              ),
+            ),
+          ],
+        );
+      case PlayerThemeMode.classic:
+        return Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: primaryColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+          ),
+          child: Icon(Icons.play_arrow_rounded, color: primaryColor, size: 28),
+        );
+    }
+  }
+}
+
 
 void showLanguagePickerSheet(
   BuildContext context,

@@ -9,6 +9,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/cached_artwork.dart';
@@ -107,6 +108,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
+    final isShortLandscape =
+        context.isLandscape && MediaQuery.sizeOf(context).height < 480;
+
     return Stack(
       children: [
         // 1. Dynamic Ambient Backdrop
@@ -183,156 +187,159 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
         SafeArea(
           child: Column(
             children: [
-              // Top Pull-down Handle Indicator
-              Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xxs),
-                child: Center(
-                  child: Container(
-                    width: 38,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+              // Top Pull-down Handle Indicator & Top App Bar (hidden in landscape for immersive edge-to-edge view)
+              if (!context.isLandscape) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xxs),
+                  child: Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(AppRadii.r2),
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // Top App Bar
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 28 : 20,
-                  vertical: AppSpacing.xxs,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Dismiss Button
-                    SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Material(
-                        color: Colors.white.withValues(alpha: 0.07),
-                        shape: const CircleBorder(),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            if (context.canPop()) {
-                              context.pop();
-                            } else {
-                              context.go('/');
-                            }
-                          },
-                          child: Center(
-                            child: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              semanticLabel: context.l10n.close,
-                              size: isTablet ? 26 : 24,
-                              color: p.textPrimary,
+                // Top App Bar
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 28 : 20,
+                    vertical: AppSpacing.xxs,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Dismiss Button
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.07),
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/');
+                              }
+                            },
+                            child: Center(
+                              child: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                semanticLabel: context.l10n.close,
+                                size: isTablet ? 26 : 24,
+                                color: p.textPrimary,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
 
-                    // Center: "PLAYING FROM" / Album Header
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                WaveformLogo(
-                                  size: 13,
-                                  color: state.isPlaying
-                                      ? activeColor
-                                      : p.textSecondary,
-                                  animate: state.isPlaying,
-                                ),
-                                const SizedBox(width: AppSpacing.s6),
-                                Text(
-                                  context.l10n.playingFrom.toUpperCase(),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        fontSize: AppFontSize.tiny,
-                                        letterSpacing: AppTracking.wide,
-                                        fontWeight: FontWeight.w800,
-                                        color: p.textSecondary
-                                            .withValues(alpha: 0.8),
-                                      ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.s2),
-                            Text(
-                              (song?.album != null &&
-                                      song!.album.trim().isNotEmpty)
-                                  ? song.album.trim()
-                                  : (song?.artist != null &&
-                                          song!.artist.trim().isNotEmpty)
-                                      ? song.artist.trim()
-                                      : context.l10n.navLibrary,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
-                                    color: p.textPrimary,
+                      // Center: "PLAYING FROM" / Album Header
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  WaveformLogo(
+                                    size: 13,
+                                    color: state.isPlaying
+                                        ? activeColor
+                                        : p.textSecondary,
+                                    animate: state.isPlaying,
                                   ),
-                            ),
-                          ],
+                                  const SizedBox(width: AppSpacing.s6),
+                                  Text(
+                                    context.l10n.playingFrom.toUpperCase(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          fontSize: AppFontSize.tiny,
+                                          letterSpacing: AppTracking.wide,
+                                          fontWeight: FontWeight.w800,
+                                          color: p.textSecondary
+                                              .withValues(alpha: 0.8),
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.s2),
+                              Text(
+                                (song?.album != null &&
+                                        song!.album.trim().isNotEmpty)
+                                    ? song.album.trim()
+                                    : (song?.artist != null &&
+                                            song!.artist.trim().isNotEmpty)
+                                        ? song.artist.trim()
+                                        : context.l10n.navLibrary,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
+                                      color: p.textPrimary,
+                                    ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
 
-                    // More Options Button
-                    SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Material(
-                        color: Colors.white.withValues(alpha: 0.07),
-                        shape: const CircleBorder(),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            if (song != null) {
-                              SongInfoSheet.show(context, song: song);
-                            }
-                          },
-                          child: Center(
-                            child: Icon(
-                              Icons.more_horiz_rounded,
-                              semanticLabel: context.l10n.songInfo,
-                              size: isTablet ? 24 : 22,
-                              color: p.textPrimary,
+                      // More Options Button
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Material(
+                          color: Colors.white.withValues(alpha: 0.07),
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              if (song != null) {
+                                SongInfoSheet.show(context, song: song);
+                              }
+                            },
+                            child: Center(
+                              child: Icon(
+                                Icons.more_horiz_rounded,
+                                semanticLabel: context.l10n.songInfo,
+                                size: isTablet ? 24 : 22,
+                                color: p.textPrimary,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: AppSpacing.s2),
+                const SizedBox(height: AppSpacing.s2),
+              ],
 
               // Responsive Two-Pane (Landscape / Tablet) vs Single Column (Portrait)
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isLandscape = context.isLandscape ||
-                        (context.isTwoPane || constraints.maxWidth >= 600);
+                    final isLandscape =
+                        PulsrLayoutMetrics.isPlayerSplitMode(
+                            context, constraints);
 
                     final double heightRatio =
                         (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -350,7 +357,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                         (isTablet ? 10.0 : 6.0) * heightRatio;
 
                     final double landscapeArtSize =
-                        (constraints.maxHeight - (isTablet ? 36 : 24)).clamp(160.0, isTablet ? 520.0 : 340.0);
+                        (constraints.maxHeight - (isLandscape ? 56 : 24)).clamp(160.0, isTablet ? 520.0 : 310.0);
 
                     final double pillBarWidth = math.min(
                       constraints.maxWidth - (isTablet ? 64 : 28),
@@ -363,8 +370,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                       cubit: cubit,
                       activeColor: activeColor,
                       isTablet: isTablet,
-                      barWidth: pillBarWidth,
-                      barHeight: pillBarHeight,
+                      barWidth: isLandscape ? math.min(landscapeArtSize, 320.0) : pillBarWidth,
+                      barHeight: isLandscape ? 38.0 : pillBarHeight,
                       trackIcon: Icons.music_note_rounded,
                       surfaceFillAlpha: 0.06,
                       borderAlpha: 0.12,
@@ -476,8 +483,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                     // Track Info Header: [Download/Playlist] Title/Artist [Heart Favorite]
                     final trackInfoHeader = Padding(
                       padding: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 28 : 20,
-                        vertical: AppSpacing.s2,
+                        horizontal: isTablet ? 28 : (isShortLandscape ? 8 : 20),
+                        vertical: isShortLandscape ? 0 : AppSpacing.s2,
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -487,15 +494,15 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             children: [
                               // Left Symmetrical Action: Download (stream) or Add to Playlist (local)
                               SizedBox(
-                                width: 48,
-                                height: 48,
+                                width: isShortLandscape ? 38 : 48,
+                                height: isShortLandscape ? 38 : 48,
                                 child: hasDownload
                                     ? Center(
                                         child: YtmDownloadButton(
                                           song: song,
                                           activeColor: activeColor,
                                           iconColor: p.textSecondary,
-                                          iconSize: isTablet ? 24 : 22,
+                                          iconSize: isTablet ? 24 : (isShortLandscape ? 20 : 22),
                                         ),
                                       )
                                     : Material(
@@ -513,7 +520,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                             child: Icon(
                                               Icons.playlist_add_rounded,
                                               semanticLabel: context.l10n.addToPlaylist,
-                                              size: isTablet ? 24 : 22,
+                                              size: isTablet ? 24 : (isShortLandscape ? 20 : 22),
                                               color: p.textSecondary,
                                             ),
                                           ),
@@ -524,7 +531,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               // Center: Title & Artist (Symmetric & Centered)
                               Expanded(
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isShortLandscape ? 6 : AppSpacing.s10,
+                                  ),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -532,19 +541,23 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                         text: song?.title ?? context.l10n.noTrackSelected,
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
+                                          fontSize: isTablet
+                                              ? AppFontSize.headline
+                                              : (isShortLandscape ? AppFontSize.body : AppFontSize.title),
                                           fontWeight: FontWeight.w900,
                                           color: p.textPrimary,
                                           height: 1.22,
                                           letterSpacing: AppTracking.title,
                                         ),
                                       ),
-                                      const SizedBox(height: AppSpacing.xxs),
+                                      SizedBox(height: isShortLandscape ? 1 : AppSpacing.xxs),
                                       MarqueeText(
                                         text: song?.artist ?? context.l10n.unknownArtist,
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
+                                          fontSize: isTablet
+                                              ? AppFontSize.callout
+                                              : (isShortLandscape ? AppFontSize.caption : AppFontSize.bodySmall),
                                           fontWeight: FontWeight.w600,
                                           color: p.textSecondary,
                                         ),
@@ -556,8 +569,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
                               // Right Symmetrical Action: Animated Heart Favorite Button
                               SizedBox(
-                                width: 48,
-                                height: 48,
+                                width: isShortLandscape ? 38 : 48,
+                                height: isShortLandscape ? 38 : 48,
                                 child: Material(
                                   color: Colors.white.withValues(alpha: 0.06),
                                   shape: const CircleBorder(),
@@ -569,7 +582,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                         : context.l10n.like,
                                     favoriteColor: p.favorite,
                                     inactiveColor: p.textSecondary,
-                                    iconSize: isTablet ? 24 : 22,
+                                    iconSize: isTablet ? 24 : (isShortLandscape ? 20 : 22),
                                     onTap: () {
                                       if (song != null) {
                                         cubit.toggleFavorite(song.id);
@@ -583,7 +596,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
                           // Symmetrical Audio Quality Badge
                           if (song != null) ...[
-                            const SizedBox(height: AppSpacing.xs),
+                            SizedBox(height: isShortLandscape ? 2 : AppSpacing.xs),
                             Center(
                               child: AudioQualityBadge(
                                 song: song,
@@ -604,7 +617,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                         children: [
                           trackInfoHeader,
 
-                          SizedBox(height: spacingTrackToSeek),
+                          SizedBox(height: isShortLandscape ? 2.0 : spacingTrackToSeek),
 
                           // Interactive Scrubber / Seek Bar
                           PlayerSeekBar(
@@ -617,12 +630,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             onSeek: (pos) => cubit.seek(pos),
                           ),
 
-                          SizedBox(height: spacingSeekToControls),
+                          SizedBox(height: isShortLandscape ? 2.0 : spacingSeekToControls),
 
-                          // Advanced playback bar (AB loop, bookmark, delay)
-                          const AdvancedPlaybackBar(),
-
-                          // Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
+                          // Primary Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
                           PlayerControls(
                             isPlaying: state.isPlaying,
                             isShuffle: state.isShuffle,
@@ -631,8 +641,12 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             hasNext: state.hasNextNeighbour,
                             abLoopActive: state.abLoopEnabled,
                             primaryColor: activeColor,
-                            mainButtonSize:
-                                (isTablet ? 74.0 : (isLandscape ? 58.0 : 66.0)) * heightRatio.clamp(0.85, 1.10),
+                            mainButtonSize: (isTablet
+                                    ? 74.0
+                                    : (isShortLandscape
+                                        ? 52.0
+                                        : (isLandscape ? 58.0 : 66.0))) *
+                                heightRatio.clamp(0.85, 1.10),
                             onPlayPause: () => cubit.togglePlayPause(),
                             onNext: () => cubit.next(),
                             onPrevious: () => cubit.previous(),
@@ -640,34 +654,106 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             onToggleRepeat: () => cubit.toggleRepeat(),
                           ),
 
-                          // Volume Slider (Image 3)
-                          if (includeVolume) ...[
-                            const SizedBox(height: 4),
-                            _buildVolumeSlider(
-                              context: context,
-                              cubit: cubit,
-                              p: p,
+                          if (!isShortLandscape) ...[
+                            SizedBox(height: spacingControlsToDock),
+
+                            // Secondary advanced playback bar (AB loop, bookmark, delay)
+                            const AdvancedPlaybackBar(),
+
+                            // Volume Slider (Image 3)
+                            if (includeVolume) ...[
+                              const SizedBox(height: 4),
+                              _buildVolumeSlider(
+                                context: context,
+                                cubit: cubit,
+                                p: p,
+                              ),
+                            ],
+
+                            SizedBox(height: spacingControlsToDock),
+
+                            // Floating Glass Bottom Action Dock (EQ / Output / Speed / Timer / Quran / Playlist)
+                            PlayerBottomActionDock(
+                              props: props,
+                              isTablet: isTablet,
+                              barWidth: pillBarWidth,
+                              barHeight: pillBarHeight,
+                              dockIconStyle: PlayerDockIconStyle.classic,
+                            ),
+
+                            SizedBox(height: spacingBelowDock),
+                          ] else ...[
+                            const SizedBox(height: 6),
+                            PlayerBottomActionDock(
+                              props: props,
+                              isTablet: false,
+                              barWidth: math.min(constraints.maxWidth - 24, 380.0),
+                              barHeight: 38.0,
+                              dockIconStyle: PlayerDockIconStyle.classic,
                             ),
                           ],
-
-                          SizedBox(height: spacingControlsToDock),
-
-                          // Floating Glass Bottom Action Dock (EQ / Output / Speed / Timer / Quran / Playlist)
-                          PlayerBottomActionDock(
-                            props: props,
-                            isTablet: isTablet,
-                            barWidth: pillBarWidth,
-                            barHeight: pillBarHeight,
-                            dockIconStyle: PlayerDockIconStyle.classic,
-                          ),
-
-                          SizedBox(height: spacingBelowDock),
                         ],
                       );
                     }
 
                     // â”€â”€ Landscape / Tablet Two-Pane Mode (Inspired by Images 1 & 3) â”€â”€
+                    // ── Landscape / Tablet Two-Pane Mode (Inspired by Apple Music) ──
                     if (isLandscape) {
+                      final bool isLyricsMode = state.isLyricsVisible;
+                      final bool isQueueMode = state.isQueueVisible;
+                      final bool isSplitContentMode = isLyricsMode || isQueueMode;
+
+                      final Widget leftPaneContent = isSplitContentMode
+                          ? Center(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: isTablet ? 440.0 : 380.0,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    // View Switcher Tabs at top of left pane
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                                      ),
+                                      child: viewSwitcher,
+                                    ),
+                                    // Controls directly below switcher (Cover and Volume Bar deleted in lyrics mode)
+                                    _buildSideControls(
+                                      context: context,
+                                      state: state,
+                                      cubit: cubit,
+                                      activeColor: activeColor,
+                                      p: p,
+                                      song: song,
+                                      isTablet: isTablet,
+                                      isShortLandscape: isShortLandscape,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Tabs directly above the hero cover
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                                  child: viewSwitcher,
+                                ),
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxHeight: landscapeArtSize,
+                                    maxWidth: landscapeArtSize,
+                                  ),
+                                  child: heroArtwork,
+                                ),
+                              ],
+                            );
+
                       return Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: isTablet ? 32 : 16,
@@ -676,62 +762,62 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // Left Pane: Always Large Hero Album Artwork Card
+                            // Left Pane: Artwork + Controls when in Lyrics/Queue mode, or large Hero Art when in Track mode
                             Expanded(
                               flex: 5,
                               child: Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxHeight: landscapeArtSize,
-                                    maxWidth: landscapeArtSize,
+                                child: AnimatedSwitcher(
+                                  duration: context.motionMs(260),
+                                  child: KeyedSubtree(
+                                    key: ValueKey('left_pane_${isSplitContentMode ? "split" : "art"}'),
+                                    child: leftPaneContent,
                                   ),
-                                  child: heroArtwork,
                                 ),
                               ),
                             ),
 
                             SizedBox(width: isTablet ? 32 : 16),
 
-                            // Right Pane: Switchable between Track Controls, Continue Playing Queue, or Lyrics
+                            // Right Pane: Switchable between Track Controls, Continue Playing Queue, or Lyrics (Apple Music style)
                             Expanded(
                               flex: 6,
-                              child: Column(
-                                children: [
-                                  // Switcher across the top of right pane
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2, bottom: 8),
-                                    child: viewSwitcher,
-                                  ),
-
-                                  Expanded(
-                                    child: AnimatedSwitcher(
-                                      duration: context.motionMs(260),
-                                      child: state.isLyricsVisible
-                                          ? LyricsView(
-                                              key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                                              lyrics: state.lyrics,
-                                              isLoading: state.isLoadingLyrics,
+                              child: SizedBox.expand(
+                                child: AnimatedSwitcher(
+                                  duration: context.motionMs(260),
+                                  layoutBuilder: (currentChild, previousChildren) {
+                                    return Stack(
+                                      fit: StackFit.expand,
+                                      alignment: Alignment.center,
+                                      children: <Widget>[
+                                        ...previousChildren,
+                                        if (currentChild != null) currentChild,
+                                      ],
+                                    );
+                                  },
+                                  child: state.isLyricsVisible
+                                      ? LyricsView(
+                                          key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                          lyrics: state.lyrics,
+                                          isLoading: state.isLoadingLyrics,
+                                          activeColor: activeColor,
+                                          source: state.lyricsSource,
+                                        )
+                                      : state.isQueueVisible
+                                          ? _buildContinuePlayingQueue(
+                                              key: const ValueKey('continue_playing_queue'),
+                                              context: context,
+                                              state: state,
+                                              cubit: cubit,
                                               activeColor: activeColor,
-                                              source: state.lyricsSource,
+                                              p: p,
                                             )
-                                          : state.isQueueVisible
-                                              ? _buildContinuePlayingQueue(
-                                                  key: const ValueKey('continue_playing_queue'),
-                                                  context: context,
-                                                  state: state,
-                                                  cubit: cubit,
-                                                  activeColor: activeColor,
-                                                  p: p,
-                                                )
-                                              : Center(
-                                                  key: const ValueKey('track_controls_pane'),
-                                                  child: SingleChildScrollView(
-                                                    child: buildControlsColumn(includeVolume: true),
-                                                  ),
-                                                ),
-                                    ),
-                                  ),
-                                ],
+                                          : Center(
+                                              key: const ValueKey('track_controls_pane'),
+                                              child: SingleChildScrollView(
+                                                child: buildControlsColumn(includeVolume: true),
+                                              ),
+                                            ),
+                                ),
                               ),
                             ),
                           ],
@@ -810,6 +896,141 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  // ── Apple Music-inspired Side Controls for Lyrics/Queue Two-Pane Mode ──
+  Widget _buildSideControls({
+    required BuildContext context,
+    required PlayerState state,
+    required PlayerCubit cubit,
+    required Color activeColor,
+    required PulsrPalette p,
+    required SongsTableData? song,
+    required bool isTablet,
+    required bool isShortLandscape,
+  }) {
+    final l10n = context.l10n;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Track Title & Artist marquee on the left, Favorite and More options on the right
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    MarqueeText(
+                      text: song?.title ?? l10n.noTrackSelected,
+                      style: TextStyle(
+                        fontSize: isTablet ? AppFontSize.title : (isShortLandscape ? 13.0 : 15.0),
+                        fontWeight: FontWeight.w800,
+                        color: p.textPrimary,
+                        letterSpacing: AppTracking.title,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    MarqueeText(
+                      text: (song?.artist != null && song!.artist.trim().isNotEmpty)
+                          ? song.artist.trim()
+                          : l10n.unknownArtist,
+                      style: TextStyle(
+                        fontSize: isTablet ? AppFontSize.bodySmall : (isShortLandscape ? 11.0 : 12.0),
+                        fontWeight: FontWeight.w600,
+                        color: p.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: isShortLandscape ? 32 : 36,
+                height: isShortLandscape ? 32 : 36,
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: PlayerAnimatedFavoriteButton(
+                    isFavorite: song?.isFavorite == true,
+                    semanticLabel: song?.isFavorite == true
+                        ? l10n.unlike
+                        : l10n.like,
+                    favoriteColor: p.favorite,
+                    inactiveColor: p.textSecondary,
+                    iconSize: isShortLandscape ? 18 : 20,
+                    onTap: () {
+                      if (song != null) cubit.toggleFavorite(song.id);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              SizedBox(
+                width: isShortLandscape ? 32 : 36,
+                height: isShortLandscape ? 32 : 36,
+                child: Material(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      if (song != null) SongInfoSheet.show(context, song: song);
+                    },
+                    child: Center(
+                      child: Icon(
+                        Icons.more_horiz_rounded,
+                        semanticLabel: l10n.songInfo,
+                        size: isShortLandscape ? 18 : 20,
+                        color: p.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        SizedBox(height: isShortLandscape ? 2 : 4),
+
+        // Scrubber / Seek Bar with timestamps
+        PlayerSeekBar(
+          duration: state.duration,
+          activeColor: activeColor,
+          songId: state.currentSong?.id,
+          filePath: state.currentSong?.path,
+          loopPointA: state.abPointA,
+          loopPointB: state.abPointB,
+          onSeek: (pos) => cubit.seek(pos),
+        ),
+
+        SizedBox(height: isTablet ? AppSpacing.md : AppSpacing.sm),
+
+        // Transport Controls (Shuffle, Prev, Play/Pause, Next, Repeat)
+        PlayerControls(
+          isPlaying: state.isPlaying,
+          isShuffle: state.isShuffle,
+          repeatMode: state.repeatMode,
+          hasPrevious: state.hasPreviousNeighbour,
+          hasNext: state.hasNextNeighbour,
+          abLoopActive: state.abLoopEnabled,
+          primaryColor: activeColor,
+          mainButtonSize: isTablet ? 68.0 : 54.0,
+          onPlayPause: () => cubit.togglePlayPause(),
+          onNext: () => cubit.next(),
+          onPrevious: () => cubit.previous(),
+          onToggleShuffle: () => cubit.toggleShuffle(),
+          onToggleRepeat: () => cubit.toggleRepeat(),
         ),
       ],
     );

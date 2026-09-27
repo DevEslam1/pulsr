@@ -9,6 +9,9 @@ int qualityRank(String q) {
   return i < 0 ? 1 : i;
 }
 
+/// Aggressiveness settings for adaptive quality adjustments.
+enum AdaptiveAggressiveness { conservative, balanced, aggressive }
+
 /// Pure policy: decides target quality from recent observations.
 /// Kept side-effect free so it is unit-testable; the handler applies
 /// the decision by re-resolving the stream and hot-swapping the source.
@@ -19,7 +22,19 @@ class AdaptiveQualityPolicy {
   int _consecutiveUnderruns = 0;
   int _consecutiveHealthy = 0;
 
-  AdaptiveQualityPolicy({this.underrunThreshold = 2, this.healthyThreshold = 4});
+  AdaptiveQualityPolicy({this.underrunThreshold = 2, this.healthyThreshold = 3});
+
+  factory AdaptiveQualityPolicy.withAggressiveness(
+      AdaptiveAggressiveness aggressiveness) {
+    switch (aggressiveness) {
+      case AdaptiveAggressiveness.conservative:
+        return AdaptiveQualityPolicy(underrunThreshold: 3, healthyThreshold: 4);
+      case AdaptiveAggressiveness.balanced:
+        return AdaptiveQualityPolicy(underrunThreshold: 2, healthyThreshold: 3);
+      case AdaptiveAggressiveness.aggressive:
+        return AdaptiveQualityPolicy(underrunThreshold: 1, healthyThreshold: 3);
+    }
+  }
 
   /// Returns a new quality when a switch is advised, else null.
   String? onBufferUnderrun(String current) {

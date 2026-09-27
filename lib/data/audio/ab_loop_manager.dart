@@ -74,7 +74,7 @@ class AbLoopManager {
     if (_scopeSongId != null && songId != null && songId != _scopeSongId) {
       return null;
     }
-    if (_b != null && pos >= _b!) return _a;
+    if (_b != null && pos >= _b! - const Duration(milliseconds: 50)) return _a;
     return null;
   }
 

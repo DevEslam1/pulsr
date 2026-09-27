@@ -44,9 +44,22 @@ class SleepTimerManager {
   List<Duration> _queuedDurations = [];
 
   bool get isArmed => _isArmed;
+  bool get isActive => _isArmed;
   SleepTimerMode get mode => _mode;
   Duration get remainingDuration => _remainingDuration;
   int get remainingTracks => _remainingTracks;
+
+  void startDurationTimer(
+    Duration duration, {
+    AudioPlayer Function()? playerGetter,
+    Future<void> Function()? onExpired,
+  }) {
+    startSleepTimer(
+      duration,
+      getActivePlayer: playerGetter ?? _lastPlayerGetter ?? () => throw StateError('No player available'),
+      onTimerExpired: onExpired ?? _onTimerExpiredCallback ?? () async {},
+    );
+  }
 
   Duration _calculateRemainingTracksDuration() {
     if (_remainingTracks <= 0) return Duration.zero;
@@ -258,8 +271,20 @@ class SleepTimerManager {
     await _executeExpiration(token);
   }
 
+  /// Updates remaining queue durations when the playback queue is mutated.
+  void updateQueueDurations(List<Duration> durations) {
+    _queuedDurations = List.from(durations);
+    if (_isArmed && _mode == SleepTimerMode.afterNTracks) {
+      final rem = _calculateRemainingTracksDuration();
+      _remainingDuration = rem;
+      if (!_sleepTimerRemainingSubject.isClosed) {
+        _sleepTimerRemainingSubject.add(rem);
+      }
+    }
+  }
+
   /// Notifies the sleep timer of a track completion event.
-  Future<void> onTrackCompleted() async {
+  Future<void> onTrackCompleted({List<Duration>? currentQueueDurations}) async {
     if (!_isArmed) return;
 
     if (_mode == SleepTimerMode.endOfTrack) {
@@ -267,7 +292,9 @@ class SleepTimerManager {
       await _executeExpiration(token);
     } else if (_mode == SleepTimerMode.afterNTracks) {
       _remainingTracks--;
-      if (_queuedDurations.isNotEmpty) {
+      if (currentQueueDurations != null) {
+        _queuedDurations = List.from(currentQueueDurations);
+      } else if (_queuedDurations.isNotEmpty) {
         _queuedDurations.removeAt(0);
       }
       if (_remainingTracks <= 0) {

@@ -8,6 +8,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -124,8 +125,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isLandscape = context.isLandscape ||
-                (context.isTwoPane || constraints.maxWidth >= 600);
+            final isLandscape =
+                PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
             final double heightRatio =
                 (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -439,9 +440,6 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                 SizedBox(height: spacingSeekToControls),
 
-                // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-                const AdvancedPlaybackBar(),
-
                 // Playback Controls
                 PlayerControls(
                   isPlaying: state.isPlaying,
@@ -458,6 +456,11 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   onToggleRepeat: () => cubit.toggleRepeat(),
                 ),
 
+                if (!isLandscape || constraints.maxHeight >= 480) ...[
+                  // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+                  const AdvancedPlaybackBar(),
+                ],
+
                 SizedBox(height: spacingControlsToDock),
 
                 // Floating Glass Bottom Action Dock (EQ bar)
@@ -468,33 +471,161 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             );
 
             if (isLandscape) {
+              final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+
+              final Widget circleArtwork = Center(
+                key: const ValueKey('circle_artwork_view_landscape'),
+                child: RotationTransition(
+                  turns: _rotationController,
+                  child: Container(
+                    width: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 480.0 : 300.0),
+                    height: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 480.0 : 300.0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF121212),
+                      border: Border.all(
+                        color: p.hairline.withValues(alpha: 0.6),
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: activeColor.withValues(alpha: 0.35),
+                          blurRadius: 36,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CustomPaint(
+                          size: Size(
+                            (constraints.maxHeight - 56).clamp(160.0, isTablet ? 480.0 : 300.0),
+                            (constraints.maxHeight - 56).clamp(160.0, isTablet ? 480.0 : 300.0),
+                          ),
+                          painter: _VinylGroovesPainter(),
+                        ),
+                        ClipOval(
+                          child: SizedBox(
+                            width: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 480.0 : 300.0) * 0.52,
+                            height: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 480.0 : 300.0) * 0.52,
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    remoteUrl: song.remoteArtworkUrl,
+                                    type: ArtworkType.AUDIO,
+                                    size: double.infinity,
+                                    borderRadius: 0,
+                                    highQuality: true,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black,
+                            border: Border.all(color: Colors.white24, width: 2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+
+              final Widget leftPaneContent = isSplitContentMode
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: isTablet ? 440.0 : 380.0,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                              ),
+                              child: viewSwitcher,
+                            ),
+                            controlsColumn,
+                          ],
+                        ),
+                      ),
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                          child: viewSwitcher,
+                        ),
+                        Expanded(
+                          child: circleArtwork,
+                        ),
+                      ],
+                    );
+
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 32 : 16,
+                  vertical: 4,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       flex: 5,
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(
-                              top: switcherTopPad,
-                              bottom: switcherBottomPad,
-                            ),
-                            child: viewSwitcher,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: context.motionMs(260),
+                          child: KeyedSubtree(
+                            key: ValueKey('left_pane_${isSplitContentMode ? "split" : "circle"}'),
+                            child: leftPaneContent,
                           ),
-                          Expanded(
-                            child: centerDisplay,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
+                    SizedBox(width: isTablet ? 32 : 16),
                     Expanded(
                       flex: 6,
-                      child: SingleChildScrollView(
-                        child: controlsColumn,
+                      child: SizedBox.expand(
+                        child: AnimatedSwitcher(
+                          duration: context.motionMs(260),
+                          layoutBuilder: (currentChild, previousChildren) {
+                            return Stack(
+                              fit: StackFit.expand,
+                              alignment: Alignment.center,
+                              children: <Widget>[
+                                ...previousChildren,
+                                if (currentChild != null) currentChild,
+                              ],
+                            );
+                          },
+                          child: state.isLyricsVisible
+                              ? LyricsView(
+                                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                  lyrics: state.lyrics,
+                                  isLoading: state.isLoadingLyrics,
+                                  activeColor: activeColor,
+                                  source: state.lyricsSource,
+                                )
+                              : state.isQueueVisible
+                                  ? const NowPlayingQueueView(
+                                      key: ValueKey('queue_view_circle'),
+                                    )
+                                  : Center(
+                                      key: const ValueKey('track_controls_pane'),
+                                      child: SingleChildScrollView(
+                                        child: controlsColumn,
+                                      ),
+                                    ),
+                        ),
                       ),
                     ),
                   ],

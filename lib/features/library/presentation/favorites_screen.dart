@@ -13,6 +13,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
@@ -96,20 +97,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         appBar: AppBar(
           leading: const PulsrBackButton(),
           title: _isSearchOpen
-              ? TextField(
+              ? PulsrSearchField(
                   controller: _searchController,
                   autofocus: true,
-                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodyLarge),
-                  decoration: InputDecoration(
-                    hintText: '${l10n.search}...',
-                    hintStyle: TextStyle(color: p.textTertiary),
-                    border: InputBorder.none,
-                  ),
+                  hintText: '${l10n.search}...',
                   onChanged: (v) {
-                    _searchDebounce?.cancel();
-                    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-                      if (mounted) setState(() => _searchQuery = v.trim());
-                    });
+                    if (mounted) setState(() => _searchQuery = v.trim());
+                  },
+                  onClear: () {
+                    if (mounted) setState(() => _searchQuery = '');
                   },
                 )
               : Text(

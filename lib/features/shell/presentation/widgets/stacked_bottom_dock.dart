@@ -12,6 +12,7 @@ import '../../../player/presentation/mini_player.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../../core/responsive/layout_delegate.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../bottom_nav_bar.dart';
 
 enum DockStackMode {
@@ -81,9 +82,9 @@ class StackedBottomDock extends StatefulWidget {
 class _StackedBottomDockState extends State<StackedBottomDock> {
   static const Duration _animDuration = Duration(milliseconds: 320);
   static const Curve _animCurve = Curves.easeOutCubic;
-  static const double _peekOffset = 14.0;
-  static const double _miniPlayerHeight = 84.0;
-  static const double _dockPillGap = 8.0;
+  static const double _peekOffset = PulsrLayoutMetrics.peekOffset;
+  static const double _miniPlayerHeight = PulsrLayoutMetrics.miniPlayerHeight;
+  static const double _dockPillGap = PulsrLayoutMetrics.dockPillGap;
   double _behindMiniDragDy = 0;
   double _behindNavDragDy = 0;
   double _dockDragDy = 0;
@@ -154,10 +155,8 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
       return;
     }
 
-    final isTablet = Adaptive.isTablet(context);
-    final double barHeight = isTablet ? 68.0 : 64.0;
-    final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
-    final double navBarTotalHeight = barHeight + navBarPaddingVertical;
+    final double navBarTotalHeight =
+        PulsrLayoutMetrics.navBarTotalHeight(context);
 
     final double dockHeight = computeDockHeight(
       hasSong: hasSong,
@@ -267,9 +266,8 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     final animCurve = context.motionCurve(_animCurve);
     final isTablet = Adaptive.isTablet(context);
     final double maxDockWidth = isTablet ? 640.0 : 540.0;
-    final double barHeight = isTablet ? 68.0 : 64.0;
-    final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
-    final double navBarTotalHeight = barHeight + navBarPaddingVertical;
+    final double navBarTotalHeight =
+        PulsrLayoutMetrics.navBarTotalHeight(context);
 
     return _ModalGate(
       child: BlocListener<PlayerCubit, PlayerState>(

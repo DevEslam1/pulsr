@@ -4,8 +4,8 @@ import '../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
-import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -48,156 +48,168 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
     final p = context.palette;
     final yearItem = widget.yearItem;
 
-    return PulsrPagePopScope(
-      child: Scaffold(
-        appBar: AppBar(
-          leading: const PulsrBackButton(),
-          title: Text('${yearItem.year}'),
-        ),
-      body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _useCase.watchYearSongs(yearItem.year).distinct(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const SkeletonList(
-                padding: EdgeInsets.only(top: AppSpacing.xs));
-          }
-          final loadFailed = snapshot.hasError ||
-              (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-          if (loadFailed) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: _useCase.watchYearSongs(yearItem.year).distinct(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return PulsrPagePopScope(
+            child: Scaffold(
+              appBar: AppBar(
+                leading: const PulsrBackButton(),
+                title: Text('${yearItem.year}'),
+              ),
+              body: const SkeletonList(
+                  padding: EdgeInsets.only(top: AppSpacing.xs)),
+            ),
+          );
+        }
+        final loadFailed = snapshot.hasError ||
+            (snapshot.data?.fold((l) => true, (_) => false) ?? false);
+        if (loadFailed) {
+          return PulsrPagePopScope(
+            child: Scaffold(
+              appBar: AppBar(
+                leading: const PulsrBackButton(),
+                title: Text('${yearItem.year}'),
+              ),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline_rounded,
+                          color: p.error, size: 48),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        context.l10n.couldNotLoadYear,
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.bodyLarge),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        context.l10n.libraryReadError,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.bodySmall),
+                      ),
+                      const SizedBox(height: AppSpacing.s20),
+                      FilledButton.icon(
+                        onPressed: () => setState(() {}),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(context.l10n.retry),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        final songs =
+            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+
+        return DetailScaffold(
+          titleText: '${yearItem.year}',
+          onRefresh: () async {
+            if (mounted) setState(() {});
+          },
+          hero: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: AppSpacing.md),
+              Center(
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: p.info.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: p.hairline),
+                    boxShadow: [
+                      BoxShadow(
+                          color: p.info.withValues(alpha: 0.25),
+                          blurRadius: 24,
+                          spreadRadius: -4,
+                          offset: const Offset(0, 8)),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.calendar_today_rounded,
+                    size: 44,
+                    color: p.info,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Center(
+                child: Text(
+                  '${yearItem.year}',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Center(
+                child: Text(
+                  Formatters.formatTrackCount(songs.length),
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Row(
                   children: [
-                    Icon(Icons.error_outline_rounded, color: p.error, size: 48),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(context.l10n.couldNotLoadYear,
-                      style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: AppFontSize.bodyLarge),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: songs.isNotEmpty
+                            ? () => context
+                                .read<PlayerCubit>()
+                                .playSong(songs.first, queue: songs)
+                            : null,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: Text(context.l10n.playAll),
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      context.l10n.libraryReadError,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                    ),
-                    const SizedBox(height: AppSpacing.s20),
-                    FilledButton.icon(
-                      onPressed: () => setState(() {}),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: Text(context.l10n.retry),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: songs.isNotEmpty
+                            ? () {
+                                final shuffled =
+                                    List<SongsTableData>.from(songs)..shuffle();
+                                context.read<PlayerCubit>().playSong(
+                                    shuffled.first,
+                                    queue: shuffled);
+                              }
+                            : null,
+                        icon: Icon(Icons.shuffle_rounded, color: p.accent),
+                        label: Text(context.l10n.shuffle),
+                      ),
                     ),
                   ],
                 ),
               ),
-            );
-          }
-          final songs =
-              snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-
-          return Center(
-            child: ConstrainedBox(
-              constraints: Adaptive.contentConstraints(context),
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
-                children: [
-                  const SizedBox(height: AppSpacing.md),
-                  Center(
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: p.info.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: p.hairline),
-                        boxShadow: [
-                          BoxShadow(
-                              color: p.info
-                                  .withValues(alpha: 0.25),
-                              blurRadius: 24,
-                              spreadRadius: -4,
-                              offset: const Offset(0, 8)),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.calendar_today_rounded,
-                        size: 44,
-                        color: p.info,
-                      ),
-                    ),
+              const SizedBox(height: AppSpacing.md),
+            ],
+          ),
+          body: songs.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: EmptyStateWidget(
+                    icon: Icons.music_off_rounded,
+                    title: context.l10n.browseNoTracks,
+                    subtitle: context.l10n.browseNoTracksInYear,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Center(
-                    child: Text(
-                      '${yearItem.year}',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Center(
-                    child: Text(
-                      Formatters.formatTrackCount(songs.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // Action Buttons (Play All, Shuffle)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () => context
-                                    .read<PlayerCubit>()
-                                    .playSong(songs.first, queue: songs)
-                                : null,
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: Text(context.l10n.playAll),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () {
-                                    final shuffled =
-                                        List<SongsTableData>.from(songs)
-                                          ..shuffle();
-                                    context.read<PlayerCubit>().playSong(
-                                        shuffled.first,
-                                        queue: shuffled);
-                                  }
-                                : null,
-                            icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                            label: Text(context.l10n.shuffle),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // Songs List
-                  if (songs.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: EmptyStateWidget(
-                        icon: Icons.music_off_rounded,
-                        title: context.l10n.browseNoTracks,
-                        subtitle: context.l10n.browseNoTracksInYear,
-                      ),
-                    )
-                  else
+                )
+              : Column(
+                  children: [
                     for (int i = 0; i < songs.length; i++)
                       SongTile(
                         song: songs[i],
@@ -207,15 +219,13 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                         onTap: () => context
                             .read<PlayerCubit>()
                             .playSong(songs[i], queue: songs),
-                        onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
+                        onMorePressed: () =>
+                            SongInfoSheet.show(context, song: songs[i]),
                       ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ),
-  );
-}
+                  ],
+                ),
+        );
+      },
+    );
+  }
 }

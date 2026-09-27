@@ -319,6 +319,48 @@ class CastService {
     }
   }
 
+  /// Sets the volume (0.0 to 1.0) on the active Cast device.
+  Future<bool> setVolume(double volume) async {
+    if (!_isAndroid || !_sessionStatus.connected) return false;
+    try {
+      final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
+        'setVolume',
+        {'volume': volume.clamp(0.0, 1.0)},
+      );
+      return res is Map && res['success'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Casts the entire playback queue to the receiver for continuous playback.
+  Future<CastResult> castQueue({
+    required List<Map<String, dynamic>> queueItems,
+    int startIndex = 0,
+    int startPositionMs = 0,
+    bool repeatMode = false,
+  }) async {
+    if (!_isAndroid) {
+      return const CastResult(success: false, error: 'unsupported_platform');
+    }
+    try {
+      final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
+        'castQueue',
+        {
+          'items': queueItems,
+          'startIndex': startIndex,
+          'startPositionMs': startPositionMs,
+          'repeat': repeatMode,
+        },
+      );
+      return _parseResult(res);
+    } catch (e, st) {
+      ErrorLogger.log('Cast castQueue failed',
+          error: e, stackTrace: st, category: 'Cast');
+      return const CastResult(success: false, error: 'channel_error');
+    }
+  }
+
   CastResult _parseResult(dynamic res) {
     if (res is Map) {
       return CastResult(

@@ -64,8 +64,23 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
             playable: false,
           ),
           const MediaItem(
+            id: 'downloaded',
+            title: 'Downloaded',
+            playable: false,
+          ),
+          const MediaItem(
+            id: 'browse_mood',
+            title: 'Browse by Mood',
+            playable: false,
+          ),
+          const MediaItem(
             id: 'recent',
             title: 'Recently Played',
+            playable: false,
+          ),
+          const MediaItem(
+            id: 'sound_settings',
+            title: 'Sound Settings',
             playable: false,
           ),
           if (AppConfig.ytmEnabled) ...[
@@ -155,6 +170,72 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
         _warmArtworkAsync(list);
         return list.map(_fastSongToMediaItem).toList();
 
+      case 'downloaded':
+      case 'root_downloaded':
+        final allSongsRes = await _repository.getAllSongs();
+        final allList = allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
+        final downloaded = allList
+            .where((s) => s.isDownloaded || s.source == SongSource.local)
+            .toList();
+        _warmArtworkAsync(downloaded);
+        return downloaded.map(_fastSongToMediaItem).toList();
+
+      case 'browse_mood':
+      case 'root_browse_mood':
+        return const [
+          MediaItem(
+            id: 'mood_chill',
+            title: 'Chill & Relax',
+            displaySubtitle: 'Acoustic, Ambient, Lo-Fi',
+            playable: false,
+          ),
+          MediaItem(
+            id: 'mood_workout',
+            title: 'Workout & Energy',
+            displaySubtitle: 'Electronic, Rock, High Tempo',
+            playable: false,
+          ),
+          MediaItem(
+            id: 'mood_focus',
+            title: 'Focus & Study',
+            displaySubtitle: 'Instrumental, Classical, Jazz',
+            playable: false,
+          ),
+          MediaItem(
+            id: 'mood_party',
+            title: 'Party & Upbeat',
+            displaySubtitle: 'Pop, Dance, Upbeat Rhythms',
+            playable: false,
+          ),
+        ];
+
+      case 'sound_settings':
+      case 'root_sound_settings':
+        return [
+          MediaItem(
+            id: 'action_bass_boost',
+            title: 'Bass Boost',
+            displaySubtitle: _equalizerManager.currentPreset.bassBoost > 0.05
+                ? 'Enabled'
+                : 'Disabled',
+            playable: true,
+          ),
+          MediaItem(
+            id: 'action_virtualizer',
+            title: 'Virtualizer',
+            displaySubtitle: _equalizerManager.isVirtualizerEnabled
+                ? 'Enabled'
+                : 'Disabled',
+            playable: true,
+          ),
+          MediaItem(
+            id: 'action_sleep_timer',
+            title: 'Sleep Timer (30m)',
+            displaySubtitle: _sleepTimerManager.isActive ? 'Active' : 'Off',
+            playable: true,
+          ),
+        ];
+
       default:
         if (parentMediaId.startsWith('album_')) {
           final albumId = int.tryParse(parentMediaId.substring(6));
@@ -218,6 +299,25 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
           }
         }
 
+        if (parentMediaId.startsWith('mood_')) {
+          final mood = parentMediaId.substring(5).toLowerCase();
+          final allSongsRes = await _repository.getAllSongs();
+          final allSongs = allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
+          final keywords = switch (mood) {
+            'chill' => ['chill', 'relax', 'acoustic', 'ambient', 'lofi', 'calm', 'peaceful'],
+            'workout' => ['workout', 'energy', 'power', 'gym', 'fast', 'rock', 'electronic', 'dance'],
+            'focus' => ['focus', 'study', 'instrumental', 'piano', 'classical', 'jazz', 'ambient'],
+            'party' => ['party', 'dance', 'club', 'pop', 'disco', 'house', 'hip hop', 'upbeat'],
+            _ => [mood],
+          };
+          final filtered = allSongs.where((s) {
+            final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'.toLowerCase();
+            return keywords.any((k) => text.contains(k));
+          }).toList();
+          _warmArtworkAsync(filtered);
+          return filtered.map(_fastSongToMediaItem).toList();
+        }
+
         return [];
     }
   }
@@ -236,6 +336,19 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
   @override
   Future<void> playFromMediaId(String mediaId,
       [Map<String, dynamic>? extras]) async {
+    if (mediaId == 'action_bass_boost') {
+      await _toggleBassBoost();
+      return;
+    }
+    if (mediaId == 'action_virtualizer') {
+      await _toggleVirtualizer();
+      return;
+    }
+    if (mediaId == 'action_sleep_timer') {
+      await _toggleSleepTimer30m();
+      return;
+    }
+
     final queueIndex = _songs.indexWhere(
         (s) => s.id.toString() == mediaId || s.remoteId == mediaId);
     if (queueIndex != -1) {
@@ -343,6 +456,37 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       return;
     }
 
+    if (mediaId == 'downloaded' || mediaId == 'root_downloaded') {
+      final songsRes = await _repository.getAllSongs();
+      songsRes.fold((l) => null, (songs) {
+        final downloaded = songs
+            .where((s) => s.isDownloaded || s.source == SongSource.local)
+            .toList();
+        if (downloaded.isNotEmpty) loadQueue(downloaded);
+      });
+      return;
+    }
+
+    if (mediaId.startsWith('mood_')) {
+      final mood = mediaId.substring(5).toLowerCase();
+      final songsRes = await _repository.getAllSongs();
+      songsRes.fold((l) => null, (songs) {
+        final keywords = switch (mood) {
+          'chill' => ['chill', 'relax', 'acoustic', 'ambient', 'lofi', 'calm', 'peaceful'],
+          'workout' => ['workout', 'energy', 'power', 'gym', 'fast', 'rock', 'electronic', 'dance'],
+          'focus' => ['focus', 'study', 'instrumental', 'piano', 'classical', 'jazz', 'ambient'],
+          'party' => ['party', 'dance', 'club', 'pop', 'disco', 'house', 'hip hop', 'upbeat'],
+          _ => [mood],
+        };
+        final filtered = songs.where((s) {
+          final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'.toLowerCase();
+          return keywords.any((k) => text.contains(k));
+        }).toList();
+        if (filtered.isNotEmpty) loadQueue(filtered);
+      });
+      return;
+    }
+
     if (mediaId == 'recent' ||
         mediaId == 'root_recent' ||
         mediaId == AudioService.recentRootId) {
@@ -421,6 +565,23 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     } catch (_) {
       cleanQ = query.trim();
     }
+
+    final lowerQ = cleanQ.toLowerCase();
+    if (lowerQ.contains('boost the bass') ||
+        lowerQ.contains('bass boost') ||
+        lowerQ.contains('boost bass')) {
+      await _toggleBassBoost(forceEnable: true);
+      return;
+    }
+    if (lowerQ.contains('virtualizer') || lowerQ.contains('surround sound')) {
+      await _toggleVirtualizer(forceEnable: true);
+      return;
+    }
+    if (lowerQ.contains('sleep timer')) {
+      await _toggleSleepTimer30m();
+      return;
+    }
+
     // Indexed FTS search (title/artist/album) instead of a full-library scan.
     final songsRes = await _repository
         .watchAllSongs(searchQuery: cleanQ, limit: 50)
@@ -504,6 +665,34 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
 
   // Requires: provided by the composing class (same library).
   YtmService get _ytmService;
+
+  // Requires: provided by the composing class (same library).
+  EqualizerManager get _equalizerManager;
+
+  // Requires: provided by the composing class (same library).
+  SleepTimerManager get _sleepTimerManager;
+
+  Future<void> _toggleBassBoost({bool? forceEnable}) async {
+    final current = _equalizerManager.currentPreset.bassBoost;
+    final enable = forceEnable ?? (current <= 0.05);
+    await _equalizerManager.setBassBoost(enable ? 0.6 : 0.0);
+  }
+
+  Future<void> _toggleVirtualizer({bool? forceEnable}) async {
+    final enable = forceEnable ?? !_equalizerManager.isVirtualizerEnabled;
+    await _equalizerManager.setVirtualizerEnabled(enable);
+    if (enable && _equalizerManager.virtualizerStrength <= 0.05) {
+      await _equalizerManager.setVirtualizerStrength(0.5);
+    }
+  }
+
+  Future<void> _toggleSleepTimer30m() async {
+    if (_sleepTimerManager.isActive) {
+      _sleepTimerManager.cancelSleepTimer();
+    } else {
+      _sleepTimerManager.startDurationTimer(const Duration(minutes: 30));
+    }
+  }
 
   // Requires: provided by the composing class (same library).
   Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});

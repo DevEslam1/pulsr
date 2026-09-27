@@ -7,11 +7,12 @@ import '../widgets/glass_container.dart';
 import '../widgets/pulsr_bottom_sheet.dart';
 import '../widgets/pulsr_dialog.dart';
 import 'breakpoints.dart';
+import 'pulsr_layout_metrics.dart';
 import 'responsive_values.dart';
 
 /// Adaptive modal presenter that displays:
-/// - Modal bottom sheet on [PulsrBreakpoint.compact]
-/// - Centered floating dialog on [PulsrBreakpoint.medium], [PulsrBreakpoint.expanded], and [PulsrBreakpoint.large]
+/// - Modal bottom sheet on [PulsrBreakpoint.compact] (portrait phone)
+/// - Centered floating dialog on [PulsrBreakpoint.medium], [PulsrBreakpoint.expanded], [PulsrBreakpoint.large], or phone landscape
 class PulsrResponsiveSheet {
   /// Opens an adaptive sheet/dialog based on the current screen breakpoint.
   static Future<T?> show<T>({
@@ -26,9 +27,11 @@ class PulsrResponsiveSheet {
     double? maxHeight,
   }) {
     final breakpoint = context.breakpoint;
+    final isDialogMode =
+        !breakpoint.isCompact || PulsrLayoutMetrics.shouldUseDialogForSheet(context);
 
-    if (breakpoint.isCompact) {
-      // Bottom Sheet on compact screens
+    if (!isDialogMode) {
+      // Bottom Sheet on compact portrait screens
       return PulsrSheetHelper.showPulsrSheet<T>(
         context: context,
         isDismissible: isDismissible,
@@ -41,7 +44,7 @@ class PulsrResponsiveSheet {
         ),
       );
     } else {
-      // Floating Centered Dialog on medium and larger screens
+      // Floating Centered Dialog on medium and larger screens, or phone landscape
       return PulsrDialogHelper.showCustomDialog<T>(
         context,
         barrierDismissible: isDismissible,

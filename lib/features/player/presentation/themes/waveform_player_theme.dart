@@ -8,6 +8,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -126,8 +127,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isLandscape = context.isLandscape ||
-                (context.isTwoPane || constraints.maxWidth >= 600);
+            final isLandscape =
+                PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
             final double heightRatio =
                 (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -397,9 +398,6 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 
                 SizedBox(height: spacingSeekToControls),
 
-                // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-                const AdvancedPlaybackBar(),
-
                 // Playback Controls
                 PlayerControls(
                   isPlaying: state.isPlaying,
@@ -416,6 +414,11 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   onToggleRepeat: () => cubit.toggleRepeat(),
                 ),
 
+                if (!isLandscape || constraints.maxHeight >= 480) ...[
+                  // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+                  const AdvancedPlaybackBar(),
+                ],
+
                 SizedBox(height: spacingControlsToDock),
 
                 // Floating Glass Bottom Action Dock (EQ bar)
@@ -426,34 +429,111 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
             );
 
             if (isLandscape) {
+              final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+
+              final Widget leftPaneContent = isSplitContentMode
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: isTablet ? 440.0 : 380.0,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                              ),
+                              child: viewSwitcher,
+                            ),
+                            controlsColumn,
+                          ],
+                        ),
+                      ),
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                          child: viewSwitcher,
+                        ),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 520.0 : 310.0),
+                            maxWidth: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 520.0 : 310.0),
+                          ),
+                          child: _WaveformHeroStage(
+                            key: const ValueKey('waveform_hero_stage'),
+                            song: song,
+                            activeColor: activeColor,
+                            isPlaying: state.isPlaying,
+                            isLandscape: isLandscape,
+                            isTablet: isTablet,
+                            waveController: _waveController,
+                            audioSessionId: state.audioSessionId,
+                          ),
+                        ),
+                      ],
+                    );
+
               return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 32 : 16,
+                  vertical: 4,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       flex: 5,
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(
-                              top: switcherTopPad,
-                              bottom: switcherBottomPad,
-                            ),
-                            child: viewSwitcher,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: context.motionMs(260),
+                          child: KeyedSubtree(
+                            key: ValueKey('left_pane_${isSplitContentMode ? "split" : "art"}'),
+                            child: leftPaneContent,
                           ),
-                          Expanded(
-                            child: centerDisplay,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.md),
+                    SizedBox(width: isTablet ? 32 : 16),
                     Expanded(
                       flex: 6,
-                      child: SingleChildScrollView(
-                        child: controlsColumn,
+                      child: SizedBox.expand(
+                        child: AnimatedSwitcher(
+                          duration: context.motionMs(260),
+                          layoutBuilder: (currentChild, previousChildren) {
+                            return Stack(
+                              fit: StackFit.expand,
+                              alignment: Alignment.center,
+                              children: <Widget>[
+                                ...previousChildren,
+                                if (currentChild != null) currentChild,
+                              ],
+                            );
+                          },
+                          child: state.isLyricsVisible
+                              ? LyricsView(
+                                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                  lyrics: state.lyrics,
+                                  isLoading: state.isLoadingLyrics,
+                                  activeColor: activeColor,
+                                  source: state.lyricsSource,
+                                )
+                              : state.isQueueVisible
+                                  ? const NowPlayingQueueView(
+                                      key: ValueKey('queue_view_waveform'),
+                                    )
+                                  : Center(
+                                      key: const ValueKey('track_controls_pane'),
+                                      child: SingleChildScrollView(
+                                        child: controlsColumn,
+                                      ),
+                                    ),
+                        ),
                       ),
                     ),
                   ],

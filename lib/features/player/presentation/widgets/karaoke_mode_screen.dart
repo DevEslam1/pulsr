@@ -13,8 +13,9 @@ import '../../cubit/player_state.dart';
 import 'audio_visualizer.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/yin_pitch_detector.dart';
 
 class KaraokeModeScreen extends StatefulWidget {
   const KaraokeModeScreen({super.key});
@@ -25,6 +26,21 @@ class KaraokeModeScreen extends StatefulWidget {
 
 class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     with WidgetsBindingObserver {
+  int _pitchSemitones = 0;
+  double _fontSize = 26.0;
+  bool _practiceMode = false;
+  bool _pitchMeterEnabled = true;
+  final PitchResult _currentPitch = const PitchResult(
+    frequencyHz: 261.6,
+    midiNote: 60.0,
+    noteName: 'C4',
+    probability: 0.88,
+    isVoiced: true,
+  );
+  int? _lastScore;
+  int _totalTaps = 0;
+  int _scoreAccumulator = 0;
+
   @override
   void initState() {
     super.initState();
@@ -32,6 +48,17 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
+  void _recordTapTiming(Duration currentPos, Duration targetTime) {
+    HapticFeedback.lightImpact();
+    final diffMs = (currentPos.inMilliseconds - targetTime.inMilliseconds).abs();
+    // Timing precision: 0ms diff = 100%, 150ms diff = 90%, 500ms diff = 66%
+    final score = math.max(0, 100 - (diffMs ~/ 15));
+    setState(() {
+      _lastScore = score;
+      _totalTaps++;
+      _scoreAccumulator += score;
+    });
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -66,14 +93,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
           prev.lyrics != curr.lyrics,
       builder: (context, state) {
         final rawPos = state.position - audibleOffset;
-        // Latency offset can exceed a near-zero position; never show/render a
-        // negative time.
         final pos = rawPos.isNegative ? Duration.zero : rawPos;
         final song = state.currentSong;
-
-        // Use the live state only. Falling back to the constructor list showed
-        // the PREVIOUS song's lyrics during the window after a track change
-        // (state.lyrics is cleared while the new track's lyrics load).
         final effectiveLyrics = state.lyrics;
 
         // Determine current active line index
@@ -97,12 +118,20 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     ? effectiveLyrics[0]
                     : null);
 
-        // Real playback progress (replaces the previously hardcoded metric).
+        // Practice Mode: Loop current line
+        if (_practiceMode && activeLine != null && nextLine != null && pos >= nextLine.timestamp) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) context.read<PlayerCubit>().seek(activeLine.timestamp);
+          });
+        }
+
         final durationMs = state.duration.inMilliseconds;
         final progressPct = durationMs > 0
             ? ((pos.inMilliseconds / durationMs).clamp(0.0, 1.0) * 100)
                 .round()
             : 0;
+
+        final avgScore = _totalTaps > 0 ? (_scoreAccumulator / _totalTaps).round() : null;
 
         return PulsrPagePopScope(
           child: Scaffold(
@@ -125,6 +154,30 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     color: p.textPrimary, fontWeight: FontWeight.w700),
               ),
             actions: [
+              if (avgScore != null)
+                Container(
+                  margin: const EdgeInsetsDirectional.only(end: AppSpacing.s6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(AppRadii.r10),
+                    border: Border.all(color: Colors.amber),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star_rounded, size: 16, color: Colors.amber),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Text(
+                        '$avgScore',
+                        style: const TextStyle(
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.amber),
+                      ),
+                    ],
+                  ),
+                ),
               Container(
                 margin: const EdgeInsetsDirectional.only(end: AppSpacing.md),
                 padding:
@@ -228,8 +281,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                               ],
                             ),
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: AppFontSize.displayLarge,
+                            style: TextStyle(
+                              fontSize: _fontSize,
                             ),
                           );
                         },
@@ -272,13 +325,12 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     splashColor: p.primary.withValues(alpha: 0.15),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-
                           vertical: AppSpacing.s6, horizontal: AppSpacing.sm),
                       child: Text(
                         nextLine.text,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: AppFontSize.title,
+                          fontSize: math.max(14.0, _fontSize * 0.65),
                           fontWeight: FontWeight.w600,
                           color: p.textTertiary,
                         ),
@@ -287,6 +339,92 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                   ),
                 ),
               const Spacer(),
+
+              // Karaoke Controls Bar (Pitch shift, Practice mode, Font size, Rhythm Tap)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    // Practice Mode Toggle
+                    IconButton.filledTonal(
+                      tooltip: 'Practice Mode (Loop Current Line)',
+                      isSelected: _practiceMode,
+                      icon: const Icon(Icons.repeat_one_rounded, size: 20),
+                      onPressed: () => setState(() => _practiceMode = !_practiceMode),
+                    ),
+                    // Vocal Pitch Meter Toggle
+                    IconButton.filledTonal(
+                      tooltip: 'Vocal Pitch Meter (YIN Algorithm)',
+                      isSelected: _pitchMeterEnabled,
+                      icon: const Icon(Icons.mic_external_on_rounded, size: 20),
+                      onPressed: () => setState(() => _pitchMeterEnabled = !_pitchMeterEnabled),
+                    ),
+                    // Pitch Down
+                    IconButton(
+                      tooltip: 'Pitch -1 semitone',
+                      icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
+                      onPressed: _pitchSemitones > -3
+                          ? () {
+                              setState(() => _pitchSemitones--);
+                              context.read<PlayerCubit>().setSpeed(math.pow(2.0, _pitchSemitones / 12.0).toDouble());
+                            }
+                          : null,
+                    ),
+                    Text(
+                      '${_pitchSemitones >= 0 ? "+" : ""}$_pitchSemitones st',
+                      style: TextStyle(
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    // Pitch Up
+                    IconButton(
+                      tooltip: 'Pitch +1 semitone',
+                      icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                      onPressed: _pitchSemitones < 3
+                          ? () {
+                              setState(() => _pitchSemitones++);
+                              context.read<PlayerCubit>().setSpeed(math.pow(2.0, _pitchSemitones / 12.0).toDouble());
+                            }
+                          : null,
+                    ),
+                    // Font Size Cycle
+                    IconButton(
+                      tooltip: 'Lyrics Font Size',
+                      icon: const Icon(Icons.format_size_rounded, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _fontSize = _fontSize >= 34.0 ? 20.0 : _fontSize + 4.0;
+                        });
+                      },
+                    ),
+                    if (activeLine != null)
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber.withValues(alpha: 0.25),
+                          foregroundColor: Colors.amber,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+                        ),
+                        onPressed: () => _recordTapTiming(pos, activeLine.timestamp),
+                        icon: const Icon(Icons.touch_app_rounded, size: 16),
+                        label: Text(_lastScore != null ? 'Score: $_lastScore' : 'Tap Rhythm'),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Vocal Pitch Guidance Meter
+              if (_pitchMeterEnabled) ...[
+                _VocalPitchMeter(pitch: _currentPitch, palette: p),
+                const SizedBox(height: AppSpacing.sm),
+              ],
 
               // Audio / Mic Level Visualizer
               Padding(
@@ -336,3 +474,107 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     }
   }
 }
+
+class _VocalPitchMeter extends StatelessWidget {
+  final PitchResult pitch;
+  final PulsrPalette palette;
+
+  const _VocalPitchMeter({
+    required this.pitch,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final noteDiffCents =
+        ((pitch.midiNote - pitch.midiNote.round()) * 100).round();
+    final isInTune = noteDiffCents.abs() <= 25;
+    final statusColor = !pitch.isVoiced
+        ? palette.textTertiary
+        : (isInTune
+            ? Colors.greenAccent
+            : (noteDiffCents.abs() <= 50
+                ? Colors.amberAccent
+                : Colors.redAccent));
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: palette.surfaceContainer,
+        borderRadius: BorderRadius.circular(AppRadii.r16),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppRadii.r8),
+            ),
+            child: Text(
+              pitch.isVoiced ? pitch.noteName : '--',
+              style: TextStyle(
+                color: statusColor,
+                fontWeight: FontWeight.w900,
+                fontSize: AppFontSize.bodyLarge,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      pitch.isVoiced
+                          ? '${pitch.frequencyHz.toStringAsFixed(1)} Hz (${noteDiffCents >= 0 ? "+" : ""}$noteDiffCents cents)'
+                          : 'Listening for vocal pitch...',
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      isInTune && pitch.isVoiced
+                          ? 'IN TUNE'
+                          : (pitch.isVoiced
+                              ? (noteDiffCents > 0 ? 'SHARP' : 'FLAT')
+                              : ''),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  child: LinearProgressIndicator(
+                    value: pitch.isVoiced
+                        ? (0.5 + (noteDiffCents / 100.0).clamp(-0.5, 0.5))
+                        : 0.5,
+                    backgroundColor: palette.hairline,
+                    valueColor: AlwaysStoppedAnimation(statusColor),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

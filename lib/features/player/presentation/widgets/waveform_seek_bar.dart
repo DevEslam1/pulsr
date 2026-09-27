@@ -11,6 +11,14 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../cubit/player_constants.dart';
 
+/// Visual rendering style for the waveform seek bar.
+enum WaveformVisualizerStyle {
+  mirroredBars,
+  roundedTopBars,
+  continuousEnvelope,
+  neonGlowLine,
+}
+
 /// Interactive gesture-driven waveform seek bar widget with pinch-to-zoom and chapter marker support.
 class WaveformSeekBar extends StatefulWidget {
   final Duration position;
@@ -25,6 +33,7 @@ class WaveformSeekBar extends StatefulWidget {
   final Duration? loopPointB;
   final Duration? crossfadeDuration;
   final String? semanticLabel;
+  final WaveformVisualizerStyle style;
 
   const WaveformSeekBar({
     super.key,
@@ -40,6 +49,7 @@ class WaveformSeekBar extends StatefulWidget {
     this.loopPointB,
     this.crossfadeDuration,
     this.semanticLabel,
+    this.style = WaveformVisualizerStyle.mirroredBars,
   });
 
   @override
@@ -255,6 +265,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                   zoomScale: _zoomScale,
                                   visibleStart: window.startIndex,
                                   visibleCount: window.visibleCount,
+                                  style: widget.style,
                                 ),
                               ),
                             ),
@@ -391,6 +402,7 @@ class _WaveformPainter extends CustomPainter {
   final double zoomScale;
   final int visibleStart;
   final int visibleCount;
+  final WaveformVisualizerStyle style;
 
   _WaveformPainter({
     required this.samples,
@@ -405,6 +417,7 @@ class _WaveformPainter extends CustomPainter {
     this.zoomScale = 1.0,
     this.visibleStart = 0,
     this.visibleCount = 0,
+    this.style = WaveformVisualizerStyle.mirroredBars,
   });
 
   @override
@@ -445,39 +458,99 @@ class _WaveformPainter extends CustomPainter {
       ..color = activeColor
       ..style = PaintingStyle.fill;
 
-    // 1. Render inactive waveform bars
-    for (int i = 0; i < count; i++) {
-      final double barHeight =
-          (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
-      final double x = i * (barWidth + spacing);
-      final double y = (size.height - barHeight) / 2;
-
-      final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, y, barWidth, barHeight),
-        const Radius.circular(AppRadii.r2),
-      );
-      canvas.drawRRect(rect, inactivePaint);
+    void drawWaveform(Paint paint) {
+      switch (style) {
+        case WaveformVisualizerStyle.mirroredBars:
+          for (int i = 0; i < count; i++) {
+            final double barHeight =
+                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double x = i * (barWidth + spacing);
+            final double y = (size.height - barHeight) / 2;
+            final rect = RRect.fromRectAndRadius(
+              Rect.fromLTWH(x, y, barWidth, barHeight),
+              const Radius.circular(AppRadii.r2),
+            );
+            canvas.drawRRect(rect, paint);
+          }
+          break;
+        case WaveformVisualizerStyle.roundedTopBars:
+          for (int i = 0; i < count; i++) {
+            final double barHeight =
+                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double x = i * (barWidth + spacing);
+            final double y = size.height - barHeight;
+            final rect = RRect.fromRectAndCorners(
+              Rect.fromLTWH(x, y, barWidth, barHeight),
+              topLeft: const Radius.circular(AppRadii.r4),
+              topRight: const Radius.circular(AppRadii.r4),
+            );
+            canvas.drawRRect(rect, paint);
+          }
+          break;
+        case WaveformVisualizerStyle.continuousEnvelope:
+          final topPath = Path();
+          for (int i = 0; i < count; i++) {
+            final double barHeight =
+                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double x = i * (barWidth + spacing) + barWidth / 2;
+            final double topY = (size.height - barHeight) / 2;
+            if (i == 0) {
+              topPath.moveTo(x, topY);
+            } else {
+              topPath.lineTo(x, topY);
+            }
+          }
+          final combined = Path.from(topPath);
+          combined.lineTo(size.width, size.height / 2);
+          for (int i = count - 1; i >= 0; i--) {
+            final double barHeight =
+                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double x = i * (barWidth + spacing) + barWidth / 2;
+            final double bottomY = (size.height + barHeight) / 2;
+            combined.lineTo(x, bottomY);
+          }
+          combined.close();
+          canvas.drawPath(combined, paint);
+          break;
+        case WaveformVisualizerStyle.neonGlowLine:
+          final linePath = Path();
+          for (int i = 0; i < count; i++) {
+            final double barHeight =
+                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double x = i * (barWidth + spacing) + barWidth / 2;
+            final double y = (size.height - barHeight) / 2;
+            if (i == 0) {
+              linePath.moveTo(x, y);
+            } else {
+              linePath.lineTo(x, y);
+            }
+          }
+          final glowPaint = Paint()
+            ..color = paint.color.withValues(alpha: 0.4)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0)
+            ..strokeWidth = 3.5
+            ..style = PaintingStyle.stroke;
+          canvas.drawPath(linePath, glowPaint);
+          final sharpPaint = Paint()
+            ..color = paint.color
+            ..strokeWidth = 2.0
+            ..style = PaintingStyle.stroke;
+          canvas.drawPath(linePath, sharpPaint);
+          break;
+      }
     }
 
-    // 2. Render active waveform bars clipped to current progress in visible window
+    // 1. Render inactive waveform
+    drawWaveform(inactivePaint);
+
+    // 2. Render active waveform clipped to current progress in visible window
     final double visibleProgress =
         ((progress * totalCount - startIndex) / visible).clamp(0.0, 1.0);
     if (visibleProgress > 0) {
       canvas.save();
       canvas.clipRect(
           Rect.fromLTWH(0, 0, size.width * visibleProgress, size.height));
-      for (int i = 0; i < count; i++) {
-        final double barHeight =
-            (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
-        final double x = i * (barWidth + spacing);
-        final double y = (size.height - barHeight) / 2;
-
-        final rect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y, barWidth, barHeight),
-          const Radius.circular(AppRadii.r2),
-        );
-        canvas.drawRRect(rect, activePaint);
-      }
+      drawWaveform(activePaint);
       canvas.restore();
     }
 

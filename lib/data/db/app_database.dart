@@ -1,4 +1,5 @@
 // lib/data/db/app_database.dart
+import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:injectable/injectable.dart';
@@ -6,6 +7,7 @@ import '../../core/utils/error_logger.dart';
 import 'tables.dart';
 
 export 'tables.dart' show SongSource;
+export 'database_health_check.dart';
 
 part 'app_database.g.dart';
 
@@ -37,9 +39,32 @@ class AppDatabase extends _$AppDatabase {
 
   /// Best-effort FTS repair: recreates the index tables/triggers and rebuilds.
   /// Retries up to [_ftsRepairMaxAttempts] times with backoff, so a transient
+  Completer<bool>? _ftsRepairInProgress;
+
   /// failure no longer leaves the index dead for the whole session. Returns
-  /// true on success. Pass [force] for the manual Settings action.
+  /// true on success. Pass [force] for the manual Settings action. Synchronized
+  /// with a Completer gate so concurrent callers share the active repair (M-10).
   Future<bool> repairFtsIndex({bool force = false}) async {
+    if (_ftsRepairInProgress != null) {
+      return _ftsRepairInProgress!.future;
+    }
+    final completer = Completer<bool>();
+    _ftsRepairInProgress = completer;
+    try {
+      final result = await _executeRepairFtsIndex(force: force);
+      if (!completer.isCompleted) completer.complete(result);
+      return result;
+    } catch (e, st) {
+      ErrorLogger.log('FTS repair failed',
+          error: e, stackTrace: st, category: 'Database');
+      if (!completer.isCompleted) completer.complete(false);
+      return false;
+    } finally {
+      _ftsRepairInProgress = null;
+    }
+  }
+
+  Future<bool> _executeRepairFtsIndex({bool force = false}) async {
     final now = DateTime.now();
     if (force ||
         (_lastFtsRepairTime != null &&
@@ -151,13 +176,17 @@ class AppDatabase extends _$AppDatabase {
   /// Integrity + hot-path indexes (v11). All IF NOT EXISTS so re-runs are
   /// free. UNIQUEs enforce at the DB level what was previously only an
   /// app-side read-then-insert race (dup paths, dup playlist members).
+  /// Wrapped in a SAVEPOINT transaction for atomic migration safety (C-04).
   static Future<void> _createV11Constraints(
-      Future<void> Function(String) executeSql) async {
-    // The UNIQUE index below cannot be created over pre-existing duplicate
-    // local rows (the very duplicates the scanner's dedup SQL removes) and a
-    // failure here aborts the whole upgrade, leaving the DB unopenable. Sweep
-    // duplicates — and any rows left dangling — before indexing.
+      Future<void> Function(String) executeSql, {AppDatabase? db}) async {
+    // Add index on lower(path) first to make dedup queries orders of magnitude faster
+    await executeSql(
+      "CREATE INDEX IF NOT EXISTS idx_songs_lower_path ON songs (lower(path)) WHERE source = 'local' AND path != '';",
+    );
+
     try {
+      await executeSql('SAVEPOINT v11_migration;');
+
       // Collapse duplicate local rows for the exact (path, cue window) the
       // UNIQUE index below covers. Grouping by lower(path) also dedups
       // case-variant paths. Runs before the index so a legacy duplicate can
@@ -206,29 +235,45 @@ class AppDatabase extends _$AppDatabase {
           'DELETE FROM queue_items WHERE song_id NOT IN (SELECT id FROM songs);');
       await executeSql(
           'DELETE FROM play_history WHERE song_id NOT IN (SELECT id FROM songs);');
-    } catch (_) {}
-    // Local file rows: one row per (lowercased path, cue window). YouTube
-    // sentinel rows (ytmusic://) are excluded — many share a path prefix.
-    await executeSql(
-      "CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_cue ON songs (path, ifnull(cue_start_ms, -1)) WHERE source = 'local';",
-    );
-    // One membership per (playlist, song); insertOrIgnore turns a race into
-    // a no-op instead of a duplicate row.
-    await executeSql(
-      'CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_entries_unique ON playlist_entries (playlist_id, song_id);',
-    );
-    await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_songs_uri ON songs (uri);');
-    await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_songs_cue ON songs (cue_file, cue_start_ms);');
-    await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_songs_pending_dl ON songs (pending_download_path);');
-    await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_playlists_name ON playlists (name);');
-    await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_songs_title_nocase ON songs (title COLLATE NOCASE);');
-    await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_songs_artist_nocase ON songs (artist COLLATE NOCASE);');
+
+      // Local file rows: one row per (lowercased path, cue window). YouTube
+      // sentinel rows (ytmusic://) are excluded — many share a path prefix.
+      await executeSql(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_path_cue ON songs (path, ifnull(cue_start_ms, -1)) WHERE source = 'local';",
+      );
+      // One membership per (playlist, song); insertOrIgnore turns a race into
+      // a no-op instead of a duplicate row.
+      await executeSql(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_entries_unique ON playlist_entries (playlist_id, song_id);',
+      );
+      await executeSql(
+          'CREATE INDEX IF NOT EXISTS idx_songs_uri ON songs (uri);');
+      await executeSql(
+          'CREATE INDEX IF NOT EXISTS idx_songs_cue ON songs (cue_file, cue_start_ms);');
+      await executeSql(
+          'CREATE INDEX IF NOT EXISTS idx_songs_pending_dl ON songs (pending_download_path);');
+      await executeSql(
+          'CREATE INDEX IF NOT EXISTS idx_playlists_name ON playlists (name);');
+      await executeSql(
+          'CREATE INDEX IF NOT EXISTS idx_songs_title_nocase ON songs (title COLLATE NOCASE);');
+      await executeSql(
+          'CREATE INDEX IF NOT EXISTS idx_songs_artist_nocase ON songs (artist COLLATE NOCASE);');
+
+      await executeSql('RELEASE SAVEPOINT v11_migration;');
+    } catch (e, st) {
+      try {
+        await executeSql('ROLLBACK TO SAVEPOINT v11_migration;');
+        await executeSql('RELEASE SAVEPOINT v11_migration;');
+      } catch (_) {}
+      AppDatabase.ftsRebuildFailed = true;
+      ErrorLogger.log(
+        'V11 constraint migration failed and was rolled back',
+        error: e,
+        stackTrace: st,
+        category: 'Database',
+      );
+      rethrow;
+    }
   }
 
   @override
@@ -237,7 +282,7 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
-          await _createV11Constraints(customStatement);
+          await _createV11Constraints(customStatement, db: this);
           await _createFtsTable(customStatement);
         },
         onUpgrade: (Migrator m, int from, int to) async {
@@ -333,7 +378,7 @@ class AppDatabase extends _$AppDatabase {
             }
           }
           if (from < 11) {
-            await _createV11Constraints(customStatement);
+            await _createV11Constraints(customStatement, db: this);
             // Legacy seeds/clients wrote epoch 0 into DateTime columns;
             // cloud sync compares these against server timestamps, so
             // backfill 1970 rows to now rather than syncing bogus dates.

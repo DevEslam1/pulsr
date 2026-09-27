@@ -18,6 +18,7 @@ import '../../cubit/player_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import 'player_theme.dart';
 import 'theme_registry.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 
 class CustomThemeBuilderScreen extends StatefulWidget {
   const CustomThemeBuilderScreen({super.key});
@@ -213,47 +214,50 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             ),
           ],
         ),
-        body: ListView(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
-          children: [
-            // Live Theme Preview Controls & Card
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: PulsrLayoutMetrics.contentConstraints(context),
+            child: ListView(
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
               children: [
-                Text(
-                  context.l10n.livePreview,
-                  style: TextStyle(
-                    fontSize: AppFontSize.callout,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: () =>
-                      setState(() => _showPlayerPreview = !_showPlayerPreview),
-                  icon: Icon(
-                    _showPlayerPreview
-                        ? Icons.view_compact_rounded
-                        : Icons.play_circle_outline_rounded,
-                    size: 18,
-                    color: Color(_accentColor),
-                  ),
-                  label: Text(
-                    _showPlayerPreview ? 'Compact View' : 'Now Playing View',
-                    style: TextStyle(
-                      color: Color(_accentColor),
-                      fontWeight: FontWeight.w700,
-                      fontSize: AppFontSize.bodySmall,
+                // Live Theme Preview Controls & Card
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      context.l10n.livePreview,
+                      style: TextStyle(
+                        fontSize: AppFontSize.callout,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
                     ),
-                  ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          setState(() => _showPlayerPreview = !_showPlayerPreview),
+                      icon: Icon(
+                        _showPlayerPreview
+                            ? Icons.view_compact_rounded
+                            : Icons.play_circle_outline_rounded,
+                        size: 18,
+                        color: Color(_accentColor),
+                      ),
+                      label: Text(
+                        _showPlayerPreview ? 'Compact View' : 'Now Playing View',
+                        style: TextStyle(
+                          color: Color(_accentColor),
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.bodySmall,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            if (_showPlayerPreview)
-              Container(
-                height: 340,
-                clipBehavior: Clip.antiAlias,
+                const SizedBox(height: AppSpacing.xs),
+                if (_showPlayerPreview)
+                  Container(
+                    height: (MediaQuery.sizeOf(context).height * 0.42).clamp(200.0, 340.0),
+                    clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: p.bg,
                   borderRadius: BorderRadius.circular(_cornerRadius),
@@ -462,6 +466,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 }

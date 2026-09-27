@@ -8,6 +8,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -133,8 +134,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isLandscape = context.isLandscape ||
-            (context.isTwoPane || constraints.maxWidth >= 600);
+        final isLandscape =
+            PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
         // Dynamic vertical spacing ratio for balanced, centered content distribution
         final double heightRatio =
@@ -655,9 +656,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
             SizedBox(height: spacingSeekToControls),
 
-            // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-            const AdvancedPlaybackBar(),
-
             // Playback Controls
             PlayerControls(
               isPlaying: state.isPlaying,
@@ -674,6 +672,11 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               onToggleRepeat: () => cubit.toggleRepeat(),
             ),
 
+            if (!isLandscape || constraints.maxHeight >= 480) ...[
+              // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+              const AdvancedPlaybackBar(),
+            ],
+
             SizedBox(height: spacingControlsToDock),
 
             // Floating Glass Bottom Action Dock (EQ bar)
@@ -684,34 +687,210 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         );
 
         if (isLandscape) {
+          final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+
+          final Widget leftPaneContent = isSplitContentMode
+              ? Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isTablet ? 440.0 : 380.0,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                          ),
+                          child: viewSwitcher,
+                        ),
+                        // Track Info Header: Title/Artist, Favorite, More
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    MarqueeText(
+                                      text: song?.title ?? context.l10n.noTrackSelected,
+                                      style: TextStyle(
+                                        fontSize: isTablet ? AppFontSize.headline : 16.0,
+                                        fontWeight: FontWeight.w800,
+                                        color: p.textPrimary,
+                                        letterSpacing: AppTracking.title,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    MarqueeText(
+                                      text: (song?.artist != null && song!.artist.trim().isNotEmpty)
+                                          ? song.artist.trim()
+                                          : context.l10n.unknownArtist,
+                                      style: TextStyle(
+                                        fontSize: isTablet ? AppFontSize.body : 13.0,
+                                        fontWeight: FontWeight.w600,
+                                        color: p.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 38,
+                                height: 38,
+                                child: Material(
+                                  color: Colors.white.withValues(alpha: 0.06),
+                                  shape: const CircleBorder(),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: PlayerAnimatedFavoriteButton(
+                                    isFavorite: song?.isFavorite == true,
+                                    semanticLabel: song?.isFavorite == true
+                                        ? context.l10n.unlike
+                                        : context.l10n.like,
+                                    favoriteColor: p.favorite,
+                                    inactiveColor: p.textSecondary,
+                                    iconSize: 20,
+                                    onTap: () {
+                                      if (song != null) cubit.toggleFavorite(song.id);
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              SizedBox(
+                                width: 38,
+                                height: 38,
+                                child: Material(
+                                  color: Colors.white.withValues(alpha: 0.06),
+                                  shape: const CircleBorder(),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () {
+                                      if (song != null) SongInfoSheet.show(context, song: song);
+                                    },
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.more_horiz_rounded,
+                                        semanticLabel: context.l10n.songInfo,
+                                        size: 20,
+                                        color: p.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: isTablet ? AppSpacing.md : AppSpacing.sm),
+                        // Seek Bar
+                        PlayerSeekBar(
+                          duration: state.duration,
+                          activeColor: activeColor,
+                          songId: song?.id,
+                          filePath: song?.path,
+                          loopPointA: state.abPointA,
+                          loopPointB: state.abPointB,
+                          onSeek: (pos) => cubit.seek(pos),
+                        ),
+                        SizedBox(height: isTablet ? AppSpacing.md : AppSpacing.sm),
+                        // Playback Controls
+                        PlayerControls(
+                          isPlaying: state.isPlaying,
+                          isShuffle: state.isShuffle,
+                          repeatMode: state.repeatMode,
+                          hasPrevious: state.hasPreviousNeighbour,
+                          hasNext: state.hasNextNeighbour,
+                          primaryColor: activeColor,
+                          mainButtonSize: isTablet ? 68.0 : 54.0,
+                          onPlayPause: () => cubit.togglePlayPause(),
+                          onNext: () => cubit.next(),
+                          onPrevious: () => cubit.previous(),
+                          onToggleShuffle: () => cubit.toggleShuffle(),
+                          onToggleRepeat: () => cubit.toggleRepeat(),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                      child: viewSwitcher,
+                    ),
+                    Expanded(
+                      child: Center(
+                        key: const ValueKey('turntable_view'),
+                        child: turntableDeck,
+                      ),
+                    ),
+                  ],
+                );
+
           return SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+              padding: EdgeInsets.symmetric(
+                horizontal: isTablet ? 32 : 16,
+                vertical: 4,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     flex: 5,
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            top: switcherTopPad,
-                            bottom: switcherBottomPad,
-                          ),
-                          child: viewSwitcher,
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: context.motionMs(260),
+                        child: KeyedSubtree(
+                          key: ValueKey('left_pane_${isSplitContentMode ? "split" : "deck"}'),
+                          child: leftPaneContent,
                         ),
-                        Expanded(
-                          child: centerDisplay,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.md),
+                  SizedBox(width: isTablet ? 32 : 16),
                   Expanded(
                     flex: 6,
-                    child: SingleChildScrollView(
-                      child: controlsColumn,
+                    child: SizedBox.expand(
+                      child: AnimatedSwitcher(
+                        duration: context.motionMs(260),
+                        layoutBuilder: (currentChild, previousChildren) {
+                          return Stack(
+                            fit: StackFit.expand,
+                            alignment: Alignment.center,
+                            children: <Widget>[
+                              ...previousChildren,
+                              if (currentChild != null) currentChild,
+                            ],
+                          );
+                        },
+                        child: state.isLyricsVisible
+                            ? LyricsView(
+                                key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                lyrics: state.lyrics,
+                                isLoading: state.isLoadingLyrics,
+                                activeColor: activeColor,
+                                source: state.lyricsSource,
+                              )
+                            : state.isQueueVisible
+                                ? const NowPlayingQueueView(
+                                    key: ValueKey('queue_view'),
+                                  )
+                                : Center(
+                                    key: const ValueKey('track_controls_pane'),
+                                    child: SingleChildScrollView(
+                                      child: controlsColumn,
+                                    ),
+                                  ),
+                      ),
                     ),
                   ),
                 ],

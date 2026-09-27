@@ -528,7 +528,35 @@ class CrossfadeManager {
       return o;
     });
     final oldArmed = await _armNativeCurve(active, oldCurve, segmentMs);
+    if (oldArmed) {
+      _outgoingWithArmedCurve = active;
+      _nativeCurveArmedOnOutgoing = true;
+    }
 
+    var newArmed = false;
+    if (oldArmed) {
+      // Complementary curve for incoming player: for each sample point,
+      // the incoming curve is the sum-safe complement (1 - G) * sumSafe,
+      // which is evaluated by evaluateSumSafeGainPair's second element.
+      final newCurve = List<double>.generate(points, (i) {
+        final (_, n) = evaluateSumSafeGainPair(i / (points - 1),
+            isRepeatOne: isRepeatOne);
+        return n;
+      });
+      newArmed = await _armNativeCurve(inactive, newCurve, segmentMs);
+      if (newArmed) {
+        try {
+          await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+          _incomingWithArmedCurve = inactive;
+          _nativeCurveArmedOnIncoming = true;
+        } catch (_) {
+          newArmed = false;
+          _clearNativeCurve(inactive);
+        }
+      }
+    }
+
+    double lastFraction = 0.0;
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       if (_fadeId != fadeId) {
@@ -539,18 +567,24 @@ class CrossfadeManager {
       }
       final elapsed = stopwatch.elapsedMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
+
+      // Track timer jitter: if fraction jumps > 0.05 (5%) between ticks, increment glitch counter
+      if ((fraction - lastFraction) > 0.05) {
+        crossfadeGlitchCount++;
+      }
+      lastFraction = fraction;
+
       final (oldGain, newGain) = evaluateSumSafeGainPair(fraction,
           isRepeatOne: isRepeatOne);
       try {
-        // A native-armed outgoing keeps its base volume and ramps inside the
-        // sink; only the non-armed side (and always the incoming side) is
-        // stepped. Gains are 0→1 scaled by the ReplayGain-compensated peaks;
-        // the sum-safe pair bounds oldGain+newGain <= 1 so the AudioFlinger
-        // mix of both players cannot exceed full scale.
+        // If native sink curves are active, sink multiplies per-sample.
+        // If fallback (not armed), step volume via Dart timer.
         if (!oldArmed) {
           active.setVolume((oldGain * fromActiveVol).clamp(0.0, 1.0));
         }
-        inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
+        if (!newArmed) {
+          inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
+        }
       } catch (e, st) {
         ErrorLogger.log(
           'Error adjusting volume during crossfade',
@@ -569,7 +603,16 @@ class CrossfadeManager {
           active.setVolume(0.0);
           inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
         } catch (_) {}
-        if (oldArmed) _clearNativeCurve(active);
+        if (oldArmed) {
+          _clearNativeCurve(active);
+          _outgoingWithArmedCurve = null;
+          _nativeCurveArmedOnOutgoing = false;
+        }
+        if (newArmed) {
+          _clearNativeCurve(inactive);
+          _incomingWithArmedCurve = null;
+          _nativeCurveArmedOnIncoming = false;
+        }
         t.cancel();
         _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();
@@ -579,14 +622,46 @@ class CrossfadeManager {
     return completer.future;
   }
 
+  /// Total count of crossfade timer jitter glitches detected (>5% fraction jump between 10ms ticks).
+  int crossfadeGlitchCount = 0;
+
+  bool _nativeCurveArmedOnOutgoing = false;
+  AudioPlayer? _outgoingWithArmedCurve;
+
+  /// Whether a native hardware/sink gain curve is currently armed on the outgoing player.
+  bool get isNativeCurveArmedOnOutgoing => _nativeCurveArmedOnOutgoing;
+
+  bool _nativeCurveArmedOnIncoming = false;
+  AudioPlayer? _incomingWithArmedCurve;
+
+  /// Whether a native hardware/sink gain curve is currently armed on the incoming player.
+  bool get isNativeCurveArmedOnIncoming => _nativeCurveArmedOnIncoming;
+
   /// Cancels any active crossfade safely and resets player states.
   Future<void> cancel(
     AudioPlayer inactivePlayer,
     AudioPlayer activePlayer, {
     double restoreVolume = 1.0,
   }) async {
+    // Clear any armed native gain curves BEFORE restoring volumes: a
+    // mid-fade curve would otherwise multiply the restored volume down to
+    // its held gain and leave the player audibly quiet after a cancel.
+    // Always clear regardless of isCrossfading state (M-04).
+    _clearNativeCurve(inactivePlayer);
+    _clearNativeCurve(activePlayer);
+    if (_outgoingWithArmedCurve != null) {
+      _clearNativeCurve(_outgoingWithArmedCurve!);
+      _outgoingWithArmedCurve = null;
+    }
+    if (_incomingWithArmedCurve != null) {
+      _clearNativeCurve(_incomingWithArmedCurve!);
+      _incomingWithArmedCurve = null;
+    }
+    _nativeCurveArmedOnOutgoing = false;
+    _nativeCurveArmedOnIncoming = false;
+
     final hadActiveFade =
-        isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null;
+        isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null || _activeFadeCompleters.isNotEmpty;
     if (!hadActiveFade) return;
 
     _fadeId++; // Invalidate any in-progress fade timers
@@ -596,7 +671,7 @@ class CrossfadeManager {
     _activeTimers.clear();
     // The cancelled timers can no longer complete their fade futures; resolve
     // them here so an awaited fadeVolume/crossfadeVolumes (and the mutex held
-    // across it) does not hang forever.
+    // across it) does not hang forever. Local reference & clear before iterating (C-02).
     _completeActiveFades();
     _fadeTimer?.cancel();
     _fadeTimer = null;
@@ -604,11 +679,6 @@ class CrossfadeManager {
     pendingIndex = null;
 
     try {
-      // Clear any armed native gain curves BEFORE restoring volumes: a
-      // mid-fade curve would otherwise multiply the restored volume down to
-      // its held gain and leave the player audibly quiet after a cancel.
-      _clearNativeCurve(inactivePlayer);
-      _clearNativeCurve(activePlayer);
       await inactivePlayer.stop();
       await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
       await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
@@ -671,6 +741,17 @@ class CrossfadeManager {
   /// Disposes active timers and resources.
   void dispose() {
     _fadeId++;
+    // Clear any native gain curves on players before tearing down timers (M-04)
+    if (_outgoingWithArmedCurve != null) {
+      _clearNativeCurve(_outgoingWithArmedCurve!);
+      _outgoingWithArmedCurve = null;
+      _nativeCurveArmedOnOutgoing = false;
+    }
+    if (_incomingWithArmedCurve != null) {
+      _clearNativeCurve(_incomingWithArmedCurve!);
+      _incomingWithArmedCurve = null;
+      _nativeCurveArmedOnIncoming = false;
+    }
     for (final t in _activeTimers) {
       t.cancel();
     }
@@ -688,13 +769,17 @@ class CrossfadeManager {
   }
 
   /// Completes every in-flight fade completer whose driving timer was just
-  /// cancelled. Iterates a copy because each completion triggers a
+  /// cancelled. Iterates a snapshot because each completion triggers a
   /// `whenComplete` that removes the entry from [_activeFadeCompleters].
+  /// Clears the list before iterating and guards with `!c.isCompleted` (C-02).
   void _completeActiveFades() {
     if (_activeFadeCompleters.isEmpty) return;
-    for (final c in List.of(_activeFadeCompleters)) {
-      if (!c.isCompleted) c.complete();
-    }
+    final toComplete = List<Completer<void>>.of(_activeFadeCompleters);
     _activeFadeCompleters.clear();
+    for (final c in toComplete) {
+      if (!c.isCompleted) {
+        c.complete();
+      }
+    }
   }
 }

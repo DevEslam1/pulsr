@@ -14,6 +14,7 @@ import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 import 'themes/player_theme.dart';
 import 'themes/theme_registry.dart';
+import 'responsive_player_layout.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -31,18 +32,20 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   void initState() {
     super.initState();
     _playerCubit = context.read<PlayerCubit>();
-    _playerCubit.resetOverlayViews();
   }
 
   @override
   void dispose() {
-    _playerCubit.resetOverlayViews();
+    if (_isPopping) {
+      _playerCubit.resetOverlayViews();
+    }
     super.dispose();
   }
 
   void _safePop(BuildContext context) {
     if (_isPopping) return;
     _isPopping = true;
+    _playerCubit.resetOverlayViews();
     try {
       final router = GoRouter.of(context);
       if (router.canPop()) {
@@ -143,7 +146,13 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                             FadeTransition(opacity: animation, child: child),
                         child: KeyedSubtree(
                           key: ValueKey(settingsConfig.playerThemeMode),
-                          child: themeWidget,
+                          child: ResponsivePlayerLayout(
+                            state: state,
+                            cubit: cubit,
+                            themeWidget: themeWidget,
+                            activeColor: activeColor,
+                            bgColor: bgColor,
+                          ),
                         ),
                       ),
                       const _NowPlayingGestureHintOverlay(),

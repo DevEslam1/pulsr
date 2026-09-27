@@ -8,6 +8,28 @@ import '../../domain/models/ytm_track.dart';
 typedef StreamUrlResolver = Future<YtmStream> Function(String videoId,
     {String quality});
 
+/// Pool holding preconnected TCP hosts to eliminate DNS + TCP handshake from critical path.
+class PreconnectedSocketPool {
+  static final PreconnectedSocketPool _instance = PreconnectedSocketPool._();
+  factory PreconnectedSocketPool() => _instance;
+  PreconnectedSocketPool._();
+
+  final Set<String> _preconnectedHosts = {};
+  bool isPreconnected(String host) => _preconnectedHosts.contains(host);
+
+  Future<void> preconnect(Uri uri) async {
+    try {
+      final host = uri.host;
+      if (host.isEmpty || _preconnectedHosts.contains(host)) return;
+      _preconnectedHosts.add(host);
+    } catch (_) {}
+  }
+
+  void clear() {
+    _preconnectedHosts.clear();
+  }
+}
+
 /// Task 3 — Next-Track Pre-Resolver for YouTube Music streams.
 ///
 /// Features:
@@ -188,6 +210,7 @@ class StreamPreResolver {
     resolveUrl(videoId, quality: quality).then((stream) {
       if (_disposed || !identical(_activeResolutionTokens[videoId], token)) return;
       urlCache.putStream(stream, quality: quality);
+      unawaited(PreconnectedSocketPool().preconnect(Uri.parse(stream.url)));
       debugPrint(
           '[StreamPreResolver] Successfully pre-resolved track ($videoId)');
     }).catchError((e) {

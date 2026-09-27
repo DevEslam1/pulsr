@@ -318,6 +318,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     });
                   },
                   onChangeCancel: () {
+                    if (_tapSeekPending && _tapSeekRatio != null) {
+                      widget.onSeek(Duration(milliseconds: _tapSeekRatio!.round()));
+                    }
                     setState(() {
                       _dragValue = null;
                       _tapSeekPending = false;

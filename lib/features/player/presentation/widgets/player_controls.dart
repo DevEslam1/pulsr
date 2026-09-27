@@ -64,10 +64,14 @@ class PlayerControls extends StatelessWidget {
       textDirection: TextDirection.ltr,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
             // Shuffle Button with active indicator
             Semantics(
               label: shuffleLabel,
@@ -257,6 +261,7 @@ class PlayerControls extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

@@ -37,6 +37,9 @@ class EqualizerManager {
   final Map<int, double> _pendingBandGains = {};
   final _effectsLock =
       AsyncLock(); // Serializes concurrent effect state changes
+  SharedPreferences? _cachedPrefs;
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
 
   /// Per-effect truthful status: a key is present only while the most recent
   /// native apply attempt was rejected (unsupported capability, build failure,
@@ -58,11 +61,13 @@ class EqualizerManager {
     if (current.containsKey(effectKey)) return; // already known; no log spam
     final next = Map<String, String>.from(current)..[effectKey] = 'notApplied';
     effectStatusNotifier.value = Map.unmodifiable(next);
-    ErrorLogger.log(
-      'Effect "$effectKey" reported it could not be applied by the audio engine '
-      '(unsupported, build failure, or unavailable session)',
-      category: 'EqualizerManager',
-    );
+    if (!_isDisposed) {
+      ErrorLogger.log(
+        'Effect "$effectKey" reported it could not be applied by the audio engine '
+        '(unsupported, build failure, or unavailable session)',
+        category: 'EqualizerManager',
+      );
+    }
   }
 
   EqPreset currentPreset = EqPreset.defaultPresets.first;
@@ -267,6 +272,7 @@ class EqualizerManager {
   }
 
   Future<void> init() async {
+    _cachedPrefs = await SharedPreferences.getInstance();
     await _effectsChannel.init();
     await _effectsLock.lock(() => _restorePreferences());
   }
@@ -277,7 +283,7 @@ class EqualizerManager {
 
   Future<void> _restorePreferences() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       isEnabled = prefs.getBool(PrefsKeys.eqEnabled) ?? false;
       // Band-count migration: prefer the explicit count key; fall back to the
       // legacy boolean (true => 32) so existing installs keep their mode.
@@ -860,12 +866,14 @@ class EqualizerManager {
       }
       _syncPipeline();
     } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to restore equalizer preferences',
-        error: e,
-        stackTrace: st,
-        category: 'EqualizerManager',
-      );
+      if (!_isDisposed) {
+        ErrorLogger.log(
+          'Failed to restore equalizer preferences',
+          error: e,
+          stackTrace: st,
+          category: 'EqualizerManager',
+        );
+      }
     }
   }
 
@@ -878,109 +886,112 @@ class EqualizerManager {
     await _effectsLock.lock(() => _performSavePreferences());
   }
 
+  Map<String, dynamic> _buildSavePreferencesMap() {
+    return <String, dynamic>{
+      PrefsKeys.eqEnabled: isEnabled,
+      PrefsKeys.eq32BandMode: is32BandMode,
+      PrefsKeys.eqBandCount: eqBandCount,
+      PrefsKeys.eqPresetName: currentPreset.name,
+      PrefsKeys.eqGains: json.encode(currentPreset.gains),
+      PrefsKeys.eqCustomFrequencies: json.encode(customFrequencies),
+      PrefsKeys.eqCustom32Frequencies: json.encode(custom32Frequencies),
+      PrefsKeys.eqCustom64Frequencies: json.encode(custom64Frequencies),
+      PrefsKeys.eqBassBoost: currentPreset.bassBoost,
+      PrefsKeys.eqPreamp: preampDb,
+      PrefsKeys.eqVolumeBoost: volumeBoost,
+      PrefsKeys.eqVirtualizerEnabled: isVirtualizerEnabled,
+      PrefsKeys.eqVirtualizerStrength: virtualizerStrength,
+      PrefsKeys.eqDynamicsPreset: dynamicsPreset.name,
+      PrefsKeys.eqDynamicsEnabled: isDynamicsEnabled,
+      PrefsKeys.eqDynamicsBypassed: _isDynamicsBypassed,
+      PrefsKeys.eqSpatializerEnabled: isSpatializerEnabled,
+      PrefsKeys.crossfeedEnabled: isCrossfeedEnabled,
+      PrefsKeys.crossfeedDelayUs: crossfeedDelayUs,
+      PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
+      PrefsKeys.crossfeedFcut: crossfeedFcut,
+      PrefsKeys.crossfeedMode: crossfeedMode,
+      PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
+      PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
+      PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
+      PrefsKeys.lookaheadLimiterLookaheadMs: limiterLookaheadMs,
+      // Only written once the user edits the compressor, so a fresh install
+      // never has these keys and keeps the native brickwall defaults.
+      if (_hasStoredCompressorParams) ...{
+        PrefsKeys.compressorRatio: compressorRatio,
+        PrefsKeys.compressorAttackMs: compressorAttackMs,
+        PrefsKeys.compressorMakeupGainDb: compressorMakeupGainDb,
+      },
+      PrefsKeys.convolutionReverbEnabled: isReverbEnabled,
+      PrefsKeys.convolutionReverbPreset: reverbPreset,
+      PrefsKeys.convolutionReverbWetDry: reverbWetDry,
+      PrefsKeys.convolutionReverbPredelayMs: reverbPredelayMs,
+      PrefsKeys.convolutionReverbDamping: reverbDamping,
+      PrefsKeys.stereoBalance: stereoBalance,
+      PrefsKeys.monoMix: monoMix,
+      PrefsKeys.sincResamplerEnabled: isSincResamplerEnabled,
+      PrefsKeys.saturationEnabled: isSaturationEnabled,
+      PrefsKeys.saturationDrive: saturationDrive,
+      PrefsKeys.saturationMix: saturationMix,
+      PrefsKeys.saturationTilt: saturationTilt,
+      PrefsKeys.saturationMode: saturationMode,
+      PrefsKeys.saturationMultiband: saturationMultiband,
+      PrefsKeys.stereoWidthEnabled: isStereoWidthEnabled,
+      PrefsKeys.stereoWidth: stereoWidth,
+      PrefsKeys.stereoWidthMultiband: stereoWidthMultiband,
+      PrefsKeys.stereoWidthLow: stereoWidthLow,
+      PrefsKeys.stereoWidthMid: stereoWidthMid,
+      PrefsKeys.stereoWidthHigh: stereoWidthHigh,
+      PrefsKeys.stereoWidthLowCrossoverHz: stereoWidthLowCrossoverHz,
+      PrefsKeys.stereoWidthHighCrossoverHz: stereoWidthHighCrossoverHz,
+      PrefsKeys.loudnessContourEnabled: isLoudnessContourEnabled,
+      PrefsKeys.loudnessContourIntensity: loudnessContourIntensity,
+      PrefsKeys.subCrossoverEnabled: isSubCrossoverEnabled,
+      PrefsKeys.subCrossoverCornerHz: subCrossoverCornerHz,
+      PrefsKeys.subCrossoverSlopeDbPerOct: subCrossoverSlopeDbPerOct,
+      PrefsKeys.subCrossoverGain: subCrossoverGain,
+      PrefsKeys.subCrossoverBassMono: subCrossoverBassMono,
+      PrefsKeys.subCrossoverAntiPop: subCrossoverAntiPop,
+      PrefsKeys.dynamicEqEnabled: isDynamicEqEnabled,
+      PrefsKeys.dynamicEqBands: json.encode(
+        dynamicEqBands.map((b) => b.toJson()).toList(),
+      ),
+      PrefsKeys.reverbCrossChannel: reverbCrossChannel,
+      PrefsKeys.multibandCompressorEnabled: isMultibandCompressorEnabled,
+      PrefsKeys.multibandCompressorF0: multibandCompressorF0,
+      PrefsKeys.multibandCompressorF1: multibandCompressorF1,
+      PrefsKeys.multibandCompressorF2: multibandCompressorF2,
+      PrefsKeys.multibandCompressorBands: json.encode(
+        multibandCompressorBands.map((b) => b.toJson()).toList(),
+      ),
+      PrefsKeys.dynamicBassEnabled: isDynamicBassEnabled,
+      PrefsKeys.dynamicBassStrength: dynamicBassStrength,
+      PrefsKeys.dynamicBassXLow: dynamicBassXLow,
+      PrefsKeys.dynamicBassXHigh: dynamicBassXHigh,
+      PrefsKeys.dynamicBassYLow: dynamicBassYLow,
+      PrefsKeys.dynamicBassYHigh: dynamicBassYHigh,
+      PrefsKeys.dynamicBassSideGainLow: dynamicBassSideGainLow,
+      PrefsKeys.dynamicBassSideGainHigh: dynamicBassSideGainHigh,
+      PrefsKeys.dynamicBassPreset: dynamicBassPreset,
+      PrefsKeys.viperDdcEnabled: isViperDdcEnabled,
+      PrefsKeys.viperDdcProfileName: viperDdcProfileName,
+      PrefsKeys.viperDdcContent: viperDdcContent,
+      PrefsKeys.arbitraryEqEnabled: isArbitraryEqEnabled,
+      PrefsKeys.arbitraryEqString: arbitraryEqString,
+      PrefsKeys.arbitraryEqLinearPhase: arbitraryEqLinearPhase,
+      PrefsKeys.liveProgEnabled: isLiveProgEnabled,
+      PrefsKeys.liveProgCode: liveProgCode,
+      PrefsKeys.liveProgSliders: encodeLiveProgSliders(liveProgSliders),
+      PrefsKeys.dspPreference: dspPreference,
+      PrefsKeys.ditherEnabled: isDitherEnabled,
+      PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
+    };
+  }
+
   Future<void> _performSavePreferences() async {
+    if (_isDisposed) return;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      // Atomic write pattern: collect all changes, then commit in single transaction
-      // This prevents partial updates if app crashes mid-write.
-      final batch = <String, dynamic>{
-        PrefsKeys.eqEnabled: isEnabled,
-        PrefsKeys.eq32BandMode: is32BandMode,
-        PrefsKeys.eqBandCount: eqBandCount,
-        PrefsKeys.eqPresetName: currentPreset.name,
-        PrefsKeys.eqGains: json.encode(currentPreset.gains),
-        PrefsKeys.eqCustomFrequencies: json.encode(customFrequencies),
-        PrefsKeys.eqCustom32Frequencies: json.encode(custom32Frequencies),
-        PrefsKeys.eqCustom64Frequencies: json.encode(custom64Frequencies),
-        PrefsKeys.eqBassBoost: currentPreset.bassBoost,
-        PrefsKeys.eqPreamp: preampDb,
-        PrefsKeys.eqVolumeBoost: volumeBoost,
-        PrefsKeys.eqVirtualizerEnabled: isVirtualizerEnabled,
-        PrefsKeys.eqVirtualizerStrength: virtualizerStrength,
-        PrefsKeys.eqDynamicsPreset: dynamicsPreset.name,
-        PrefsKeys.eqDynamicsEnabled: isDynamicsEnabled,
-        PrefsKeys.eqDynamicsBypassed: _isDynamicsBypassed,
-        PrefsKeys.eqSpatializerEnabled: isSpatializerEnabled,
-        PrefsKeys.crossfeedEnabled: isCrossfeedEnabled,
-        PrefsKeys.crossfeedDelayUs: crossfeedDelayUs,
-        PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
-        PrefsKeys.crossfeedFcut: crossfeedFcut,
-        PrefsKeys.crossfeedMode: crossfeedMode,
-        PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
-        PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
-        PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
-        PrefsKeys.lookaheadLimiterLookaheadMs: limiterLookaheadMs,
-        // Only written once the user edits the compressor, so a fresh install
-        // never has these keys and keeps the native brickwall defaults.
-        if (_hasStoredCompressorParams) ...{
-          PrefsKeys.compressorRatio: compressorRatio,
-          PrefsKeys.compressorAttackMs: compressorAttackMs,
-          PrefsKeys.compressorMakeupGainDb: compressorMakeupGainDb,
-        },
-        PrefsKeys.convolutionReverbEnabled: isReverbEnabled,
-        PrefsKeys.convolutionReverbPreset: reverbPreset,
-        PrefsKeys.convolutionReverbWetDry: reverbWetDry,
-        PrefsKeys.convolutionReverbPredelayMs: reverbPredelayMs,
-        PrefsKeys.convolutionReverbDamping: reverbDamping,
-        PrefsKeys.stereoBalance: stereoBalance,
-        PrefsKeys.monoMix: monoMix,
-        PrefsKeys.sincResamplerEnabled: isSincResamplerEnabled,
-        PrefsKeys.saturationEnabled: isSaturationEnabled,
-        PrefsKeys.saturationDrive: saturationDrive,
-        PrefsKeys.saturationMix: saturationMix,
-        PrefsKeys.saturationTilt: saturationTilt,
-        PrefsKeys.saturationMode: saturationMode,
-        PrefsKeys.saturationMultiband: saturationMultiband,
-        PrefsKeys.stereoWidthEnabled: isStereoWidthEnabled,
-        PrefsKeys.stereoWidth: stereoWidth,
-        PrefsKeys.stereoWidthMultiband: stereoWidthMultiband,
-        PrefsKeys.stereoWidthLow: stereoWidthLow,
-        PrefsKeys.stereoWidthMid: stereoWidthMid,
-        PrefsKeys.stereoWidthHigh: stereoWidthHigh,
-        PrefsKeys.stereoWidthLowCrossoverHz: stereoWidthLowCrossoverHz,
-        PrefsKeys.stereoWidthHighCrossoverHz: stereoWidthHighCrossoverHz,
-        PrefsKeys.loudnessContourEnabled: isLoudnessContourEnabled,
-        PrefsKeys.loudnessContourIntensity: loudnessContourIntensity,
-        PrefsKeys.subCrossoverEnabled: isSubCrossoverEnabled,
-        PrefsKeys.subCrossoverCornerHz: subCrossoverCornerHz,
-        PrefsKeys.subCrossoverSlopeDbPerOct: subCrossoverSlopeDbPerOct,
-        PrefsKeys.subCrossoverGain: subCrossoverGain,
-        PrefsKeys.subCrossoverBassMono: subCrossoverBassMono,
-        PrefsKeys.subCrossoverAntiPop: subCrossoverAntiPop,
-        PrefsKeys.dynamicEqEnabled: isDynamicEqEnabled,
-        PrefsKeys.dynamicEqBands: json.encode(
-          dynamicEqBands.map((b) => b.toJson()).toList(),
-        ),
-        PrefsKeys.reverbCrossChannel: reverbCrossChannel,
-        PrefsKeys.multibandCompressorEnabled: isMultibandCompressorEnabled,
-        PrefsKeys.multibandCompressorF0: multibandCompressorF0,
-        PrefsKeys.multibandCompressorF1: multibandCompressorF1,
-        PrefsKeys.multibandCompressorF2: multibandCompressorF2,
-        PrefsKeys.multibandCompressorBands: json.encode(
-          multibandCompressorBands.map((b) => b.toJson()).toList(),
-        ),
-        PrefsKeys.dynamicBassEnabled: isDynamicBassEnabled,
-        PrefsKeys.dynamicBassStrength: dynamicBassStrength,
-        PrefsKeys.dynamicBassXLow: dynamicBassXLow,
-        PrefsKeys.dynamicBassXHigh: dynamicBassXHigh,
-        PrefsKeys.dynamicBassYLow: dynamicBassYLow,
-        PrefsKeys.dynamicBassYHigh: dynamicBassYHigh,
-        PrefsKeys.dynamicBassSideGainLow: dynamicBassSideGainLow,
-        PrefsKeys.dynamicBassSideGainHigh: dynamicBassSideGainHigh,
-        PrefsKeys.dynamicBassPreset: dynamicBassPreset,
-        PrefsKeys.viperDdcEnabled: isViperDdcEnabled,
-        PrefsKeys.viperDdcProfileName: viperDdcProfileName,
-        PrefsKeys.viperDdcContent: viperDdcContent,
-        PrefsKeys.arbitraryEqEnabled: isArbitraryEqEnabled,
-        PrefsKeys.arbitraryEqString: arbitraryEqString,
-        PrefsKeys.arbitraryEqLinearPhase: arbitraryEqLinearPhase,
-        PrefsKeys.liveProgEnabled: isLiveProgEnabled,
-        PrefsKeys.liveProgCode: liveProgCode,
-        PrefsKeys.liveProgSliders: encodeLiveProgSliders(liveProgSliders),
-        PrefsKeys.dspPreference: dspPreference,
-        PrefsKeys.ditherEnabled: isDitherEnabled,
-        PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
-      };
+      final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
+      final batch = _buildSavePreferencesMap();
 
       // Atomic commit: concurrent write pattern
       await Future.wait(batch.entries.map((entry) {
@@ -1005,13 +1016,42 @@ class EqualizerManager {
         await prefs.remove(PrefsKeys.eqHeadphoneProfileId);
       }
     } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to save equalizer preferences',
-        error: e,
-        stackTrace: st,
-        category: 'EqualizerManager',
-      );
+      if (!_isDisposed) {
+        ErrorLogger.log(
+          'Failed to save equalizer preferences',
+          error: e,
+          stackTrace: st,
+          category: 'EqualizerManager',
+        );
+      }
     }
+  }
+
+  void _performSavePreferencesSync() {
+    final prefs = _cachedPrefs;
+    if (prefs == null || _isDegradedForPower) return;
+    try {
+      final batch = _buildSavePreferencesMap();
+      for (final entry in batch.entries) {
+        if (entry.value is bool) {
+          unawaited(prefs.setBool(entry.key, entry.value as bool));
+        } else if (entry.value is double) {
+          unawaited(prefs.setDouble(entry.key, entry.value as double));
+        } else if (entry.value is int) {
+          unawaited(prefs.setInt(entry.key, entry.value as int));
+        } else if (entry.value is String) {
+          unawaited(prefs.setString(entry.key, entry.value as String));
+        }
+      }
+      if (selectedHeadphoneProfile != null) {
+        unawaited(prefs.setString(
+          PrefsKeys.eqHeadphoneProfileId,
+          selectedHeadphoneProfile!.id,
+        ));
+      } else {
+        unawaited(prefs.remove(PrefsKeys.eqHeadphoneProfileId));
+      }
+    } catch (_) {}
   }
 
   /// Switches the active band plan to [count] bands (10, 32 or 64),
@@ -1028,6 +1068,7 @@ class EqualizerManager {
     final int oldBandCount = eqBandCount;
     eqBandCount = count;
     final targetFreqs = activeFrequencies;
+    _pendingBandGains.removeWhere((k, _) => k < 0 || k >= targetFreqs.length);
     
     final Map<int, List<double>> updatedBandsMap = Map<int, List<double>>.from(currentPreset.bandsMap);
     final interpolated = EqPreset.interpolateGains(
@@ -1173,6 +1214,7 @@ class EqualizerManager {
     if (pending.isEmpty) return;
     await _effectsLock.lock(() async {
       final targetFreqs = activeFrequencies;
+      _pendingBandGains.removeWhere((k, _) => k < 0 || k >= targetFreqs.length);
       // Guard against mode-switch race: drop stale indices instead of RangeError.
       final valid = Map<int, double>.fromEntries(
         pending.entries.where((e) => e.key >= 0 && e.key < targetFreqs.length),
@@ -1906,11 +1948,25 @@ class EqualizerManager {
     _syncPipeline();
   }
 
+  bool autoLoudnessContour = true;
+  bool _autoLoudnessEngaged = false;
+  double autoLoudnessLowThreshold = 0.3;
+  double autoLoudnessHighThreshold = 0.5;
+
   /// Pushes the current volume-stage value to the engine so the loudness
-  /// contour follows the listening level. Called by AudioHandler on volume
-  /// changes and applied on session reattach.
+  /// contour follows the listening level. Automatically toggles loudness contour
+  /// on when volume drops below 0.3 and off when it rises above 0.5.
   Future<void> updateLoudnessVolume(double volumeLinear) async {
     loudnessVolumeLinear = volumeLinear.clamp(0.0, 1.0);
+    if (autoLoudnessContour) {
+      if (loudnessVolumeLinear <= autoLoudnessLowThreshold && !isLoudnessContourEnabled) {
+        _autoLoudnessEngaged = true;
+        await setLoudnessContour(true, intensity: 0.6);
+      } else if (loudnessVolumeLinear >= autoLoudnessHighThreshold && _autoLoudnessEngaged) {
+        _autoLoudnessEngaged = false;
+        await setLoudnessContour(false);
+      }
+    }
     if (PlatformCapabilities.isAndroid && isLoudnessContourEnabled) {
       await _effectsChannel.setLoudnessContourParams(
         loudnessContourIntensity,
@@ -2696,10 +2752,53 @@ class EqualizerManager {
     if (isDynamicsEnabled && !_isDynamicsBypassed) {
       await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
     }
+
+    if (isReverbEnabled || isViperDdcEnabled || isArbitraryEqEnabled) {
+      await _effectsChannel.sendWarmupBuffer(durationMs: 100);
+    }
+
+    // Readback verification to catch parameter drift
+    try {
+      final verified = await _effectsChannel.verifyState();
+      if (verified != null) {
+        bool matches = true;
+        if (verified.containsKey('eqEnabled') && verified['eqEnabled'] != isEnabled) {
+          matches = false;
+        }
+        if (verified.containsKey('preampDb') && verified['preampDb'] is num) {
+          final diff = ((verified['preampDb'] as num).toDouble() - preampDb).abs();
+          if (diff > 1e-4) matches = false;
+        }
+        if (!matches) {
+          // Re-push once
+          await _effectsChannel.setEqEnabled(isEnabled);
+          await _effectsChannel.setEqPreamp(preampDb);
+          final recheck = await _effectsChannel.verifyState();
+          if (recheck != null) {
+            final recheckPreamp = (recheck['preampDb'] as num?)?.toDouble() ?? preampDb;
+            if ((recheckPreamp - preampDb).abs() > 1e-4 || recheck['eqEnabled'] != isEnabled) {
+              ErrorLogger.log(
+                'DSP parameter readback verification mismatch after retry',
+                category: 'EqualizerManager',
+              );
+            }
+          }
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'DSP readback verification error',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+    }
+
     unawaited(_effectsChannel.getAutoDegradedStages());
   }
 
   void dispose() {
+    _isDisposed = true;
     // Flush pending work instead of dropping it: disposing mid-drag
     // otherwise loses the last ~60ms of slider movement and ~350ms of prefs.
     if (_pendingBandGains.isNotEmpty) {
@@ -2711,7 +2810,7 @@ class EqualizerManager {
     _saveDebounce = null;
     _bandGainDebounce?.cancel();
     _bandGainDebounce = null;
-    unawaited(_savePreferences());
+    _performSavePreferencesSync();
     try {
       effectStatusNotifier.dispose();
     } catch (_) {}

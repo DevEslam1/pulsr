@@ -16,8 +16,10 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/responsive/breakpoints.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
+import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/pulsr_slider.dart';
 import '../../../core/widgets/pulsr_switch.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
@@ -178,10 +180,12 @@ class _SettingsScreenState extends State<SettingsScreen>
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
 
-        final isTabletView =
-            (context.breakpoint >= PulsrBreakpoint.medium &&
+        final isLandscapePhone =
+            context.isLandscape && MediaQuery.sizeOf(context).height < 500;
+        final isTabletView = !isLandscapePhone &&
+            ((context.breakpoint >= PulsrBreakpoint.medium &&
                     (context.isLandscape || Adaptive.widthOf(context) >= 700)) ||
-                context.isTwoPane;
+                context.isTwoPane);
         final effectiveCategoryId =
             (isTabletView && _selectedCategoryId == 'all')
                 ? 'audio'
@@ -248,53 +252,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: AppSpacing.sm),
           // Search Box
-          Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(
-                color: _searchQuery.isNotEmpty
-                    ? p.accent.withValues(alpha: 0.55)
-                    : p.hairline,
-                width: _searchQuery.isNotEmpty ? 1.5 : 1.0,
-              ),
-            ),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(
-                color: p.textPrimary,
-                fontSize: AppFontSize.body,
-                fontWeight: FontWeight.w600,
-              ),
-              decoration: InputDecoration(
-                hintText: context.l10n.settingsSearchPlaceholder,
-                hintStyle: TextStyle(
-                  color: p.textTertiary,
-                  fontSize: AppFontSize.bodySmall,
-                  fontWeight: FontWeight.w400,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: _searchQuery.isNotEmpty ? p.accent : p.textTertiary,
-                  size: 20,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear_rounded,
-                            color: p.textSecondary, size: 18),
-                        tooltip: context.l10n.clear,
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              ),
-            ),
+          PulsrSearchField(
+            controller: _searchController,
+            hintText: context.l10n.settingsSearchPlaceholder,
+            onClear: () {
+              if (mounted) setState(() => _searchQuery = '');
+            },
           ),
         ],
       ),
@@ -408,7 +371,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     ];
 
     return SizedBox(
-      height: 38,
+      height: AppSpacing.s38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -505,7 +468,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     AppSpacing.s14,
                     AppSpacing.xxs,
                     AppSpacing.s14,
-                    140 + MediaQuery.paddingOf(context).bottom,
+                    PulsrLayoutMetrics.scrollBottom(context),
                   ),
                   physics: const BouncingScrollPhysics(),
                   itemCount: categories.length,
@@ -545,8 +508,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                         child: Row(
                           children: [
                             Container(
-                              width: 38,
-                              height: 38,
+                              width: AppSpacing.s38,
+                              height: AppSpacing.s38,
                               decoration: BoxDecoration(
                                 color: cat.tintColor.withValues(
                                     alpha: isSelected ? 0.22 : 0.12),
@@ -608,11 +571,13 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
         ),
 
-        // Vertical hairline divider
+        // Vertical hairline divider and foldable hinge
         Container(
           width: 1,
           color: p.hairline,
         ),
+        if (context.hasFoldableHinge && (context.foldableHinge?.bounds.width ?? 0) > 0)
+          SizedBox(width: context.foldableHinge!.bounds.width),
 
         // Right Detail Pane
         Expanded(
@@ -677,52 +642,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: AppSpacing.sm),
           // Search Box
-          Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(
-                color: _searchQuery.isNotEmpty
-                    ? p.accent.withValues(alpha: 0.5)
-                    : p.hairline,
-              ),
-            ),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(
-                color: p.textPrimary,
-                fontSize: AppFontSize.bodySmall,
-                fontWeight: FontWeight.w600,
-              ),
-              decoration: InputDecoration(
-                hintText: context.l10n.settingsSearchPlaceholder,
-                hintStyle: TextStyle(
-                  color: p.textTertiary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w400,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: _searchQuery.isNotEmpty ? p.accent : p.textTertiary,
-                  size: 18,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear_rounded,
-                            color: p.textSecondary, size: 16),
-                        tooltip: context.l10n.clear,
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-              ),
-            ),
+          PulsrSearchField(
+            controller: _searchController,
+            hintText: context.l10n.settingsSearchPlaceholder,
+            onClear: () {
+              if (mounted) setState(() => _searchQuery = '');
+            },
           ),
         ],
       ),
@@ -740,7 +665,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       (c) => c.id == activeCatId,
       orElse: () => categories.first,
     );
-    final bottomInset = 140 + MediaQuery.paddingOf(context).bottom;
+    final bottomInset = PulsrLayoutMetrics.scrollBottom(context);
 
     return AnimatedSwitcher(
       duration: context.motionMs(220),
@@ -791,7 +716,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   ) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+        constraints: PulsrLayoutMetrics.contentConstraints(context),
         child: Column(
           children: [
             _buildTopHeader(context),
@@ -813,10 +738,92 @@ class _SettingsScreenState extends State<SettingsScreen>
     SettingsState state,
     SettingsCubit cubit,
   ) {
-    final bottomInset = 140 + MediaQuery.paddingOf(context).bottom;
+    final bottomInset = PulsrLayoutMetrics.scrollBottom(context);
     final horizontalPad = Adaptive.pagePadding(context);
 
     if (_selectedCategoryId == 'all') {
+      if (context.isLandscape && !Adaptive.isTablet(context)) {
+        return ListView(
+          controller: _scrollController,
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsetsDirectional.only(
+            bottom: bottomInset,
+            top: AppSpacing.md,
+            start: horizontalPad,
+            end: horizontalPad,
+          ),
+          children: [
+            if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
+              const SettingsHeroCard(),
+            _experienceModeCard(context),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildSuperSection(
+                    context,
+                    title: 'Sound & Playback',
+                    icon: Icons.graphic_eq_rounded,
+                    isExpanded: _soundPlaybackExpanded,
+                    onToggle: () => setState(
+                        () => _soundPlaybackExpanded = !_soundPlaybackExpanded),
+                    children: [
+                      ..._buildCategoryWidgets(context, 'audio', state, cubit),
+                      ..._buildCategoryWidgets(
+                          context, 'playback', state, cubit),
+                      if (state.isProfessional)
+                        ..._buildCategoryWidgets(
+                            context, 'profiles', state, cubit),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _buildSuperSection(
+                        context,
+                        title: 'Appearance & Gestures',
+                        icon: Icons.palette_outlined,
+                        isExpanded: _appearanceGesturesExpanded,
+                        onToggle: () => setState(() =>
+                            _appearanceGesturesExpanded =
+                                !_appearanceGesturesExpanded),
+                        children: [
+                          ..._buildCategoryWidgets(
+                              context, 'appearance', state, cubit),
+                          ..._buildCategoryWidgets(
+                              context, 'gestures', state, cubit),
+                        ],
+                      ),
+                      _buildSuperSection(
+                        context,
+                        title: 'System & Privacy',
+                        icon: Icons.settings_suggest_rounded,
+                        isExpanded: _systemPrivacyExpanded,
+                        onToggle: () => setState(() =>
+                            _systemPrivacyExpanded = !_systemPrivacyExpanded),
+                        children: [
+                          ..._buildCategoryWidgets(
+                              context, 'library', state, cubit),
+                          ..._buildCategoryWidgets(
+                              context, 'online', state, cubit),
+                          ..._buildCategoryWidgets(
+                              context, 'storage', state, cubit),
+                          _buildPrivacyBackupSection(context),
+                          ..._buildCategoryWidgets(
+                              context, 'about', state, cubit),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      }
       return ListView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),

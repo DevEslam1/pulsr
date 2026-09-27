@@ -33,6 +33,7 @@ class PlaybackStateCoordinator {
   }
 
   void _initSaveTimer() {
+    _saveTimer?.cancel();
     _saveTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (_disposed) return;
       if (_positionDirty) {
@@ -68,12 +69,14 @@ class PlaybackStateCoordinator {
 
   /// Marks position as needing persistence on next 2s periodic timer tick.
   void markPositionDirty() {
+    if (_disposed) return;
     _positionDirty = true;
   }
 
   bool get isPositionDirty => _positionDirty;
 
   void triggerSaveIfDirty() {
+    if (_disposed) return;
     if (_positionDirty) {
       _positionDirty = false;
       onSavePositionRequested();
@@ -84,7 +87,11 @@ class PlaybackStateCoordinator {
     _disposed = true;
     _saveTimer?.cancel();
     _saveTimer = null;
-    _positionSubject.close();
-    _highRatePositionSubject.close();
+    if (!_positionSubject.isClosed) {
+      _positionSubject.close();
+    }
+    if (!_highRatePositionSubject.isClosed) {
+      _highRatePositionSubject.close();
+    }
   }
 }

@@ -65,6 +65,34 @@ class YtmResolvingSource extends StreamAudioSource {
   /// Optional explicit URL cache instance (used in tests).
   final YtmUrlCache? urlCache;
 
+  /// Retries on 5xx errors with exponential backoff (1s, 2s, 4s) up to 3 attempts.
+  static Future<T> retryWithBackoff<T>(
+    Future<T> Function() operation, {
+    int maxAttempts = 3,
+    Duration initialDelay = const Duration(seconds: 1),
+  }) async {
+    int attempt = 0;
+    var delay = initialDelay;
+    while (true) {
+      attempt++;
+      try {
+        return await operation();
+      } catch (e) {
+        final errStr = e.toString();
+        final is5xx = errStr.contains('500') ||
+            errStr.contains('502') ||
+            errStr.contains('503') ||
+            errStr.contains('504') ||
+            (e is HttpException && e.message.contains('5'));
+        if (attempt >= maxAttempts || !is5xx) {
+          rethrow;
+        }
+        await Future.delayed(delay);
+        delay *= 2;
+      }
+    }
+  }
+
   String? userAgent;
   String? cookies;
 
@@ -349,7 +377,7 @@ class YtmResolvingSource extends StreamAudioSource {
       try {
         _latency?.markStage(PlaybackStage.pluginEntered);
       } catch (_) {}
-      url = await resolve(forceRefresh: skipCache);
+      url = await retryWithBackoff(() => resolve(forceRefresh: skipCache));
       try {
         _latency?.markStage(PlaybackStage.urlObtained);
       } catch (_) {}
@@ -362,7 +390,7 @@ class YtmResolvingSource extends StreamAudioSource {
       // query form left path-form URLs with a null expiry, and with it
       // `_isExpiringSoon()` answers false forever and the proactive re-resolve
       // never fires — the URL simply dies mid-track instead.
-      final stamp = YtmStream.expiryFromUrl(url);
+      final stamp = YtmStream.expiryFromUrl(url!);
       if (stamp != null) {
         _resolvedExpiresAt = DateTime.fromMillisecondsSinceEpoch(stamp);
       }
@@ -377,7 +405,8 @@ class YtmResolvingSource extends StreamAudioSource {
       );
     }
 
-    final cacheFile = await _cacheFileFor(videoId, url, quality);
+    final resolvedUrl = url;
+    final cacheFile = await _cacheFileFor(videoId, resolvedUrl, quality);
     final isNativeClient = effectiveUa != null &&
         (effectiveUa.contains('com.google.android') ||
             effectiveUa.contains('com.google.ios') ||
@@ -395,7 +424,7 @@ class YtmResolvingSource extends StreamAudioSource {
       // look unlike the web player it claims to be.
       if (effectiveCookies != null &&
           effectiveCookies.isNotEmpty &&
-          _cookiesBelongOn(url))
+          _cookiesBelongOn(resolvedUrl))
         'Cookie': effectiveCookies,
       // Native clients (e.g. ANDROID_VR, IOS_MUSIC) stream from googlevideo CDN
       // without a web Referer. Sending 'https://music.youtube.com/' with a native
@@ -407,30 +436,35 @@ class YtmResolvingSource extends StreamAudioSource {
     // Serialize creation per cache path so two sources for the same videoId
     // never start writing the same file at exactly the same time.
     final pathKey = cacheFile.path;
-    // Loop until we own the creation lock for this path.
+    _cleanStalePathCreationLocks();
+
     late final Completer<void> ownedCompleter;
-    while (true) {
-      final completer = Completer<void>();
-      final previous =
-          _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
-
-      if (identical(previous, completer.future)) {
-        // We own the lock.
-        ownedCompleter = completer;
-        break;
-      }
-      // Another creation is in progress; wait for it then re-check.
-      try {
-        await previous;
-      } catch (_) {}
-      final existing = _inner;
-      if (existing != null) return existing;
-      // _inner still null — loop and re-compete for the lock.
-    }
-
+    var lockAcquired = false;
     try {
+      while (true) {
+        final completer = Completer<void>();
+        final entry = _pathCreationLocks.putIfAbsent(
+          pathKey,
+          () => _PathLockEntry(completer.future, DateTime.now()),
+        );
+
+        if (identical(entry.future, completer.future)) {
+          // We own the lock.
+          ownedCompleter = completer;
+          lockAcquired = true;
+          break;
+        }
+        // Another creation is in progress; wait for it then re-check.
+        try {
+          await entry.future.timeout(const Duration(seconds: 60));
+        } catch (_) {}
+        final existing = _inner;
+        if (existing != null) return existing;
+        // _inner still null — loop and re-compete for the lock.
+      }
+
       final inner = LockCachingAudioSource(
-        Uri.parse(url),
+        Uri.parse(resolvedUrl),
         headers: headers,
         cacheFile: cacheFile,
       );
@@ -448,7 +482,7 @@ class YtmResolvingSource extends StreamAudioSource {
       _pending = null;
       rethrow;
     } finally {
-      if (!ownedCompleter.isCompleted) {
+      if (lockAcquired && !ownedCompleter.isCompleted) {
         ownedCompleter.complete();
       }
       _pathCreationLocks.remove(pathKey);
@@ -498,8 +532,17 @@ class YtmResolvingSource extends StreamAudioSource {
     }
   }
 
-  static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
-      LinkedHashMap<String, Future<void>>();
+  static final LinkedHashMap<String, _PathLockEntry> _pathCreationLocks =
+      LinkedHashMap<String, _PathLockEntry>();
+
+  static void _cleanStalePathCreationLocks() {
+    final now = DateTime.now();
+    _pathCreationLocks.removeWhere((_, entry) =>
+        now.difference(entry.createdAt) > const Duration(seconds: 60));
+    while (_pathCreationLocks.length > 200) {
+      _pathCreationLocks.remove(_pathCreationLocks.keys.first);
+    }
+  }
 
   static Future<File> _cacheFileFor(
       String videoId, String url, String quality) async {
@@ -517,4 +560,10 @@ class YtmResolvingSource extends StreamAudioSource {
     return File(
         p.join(dir.path, YtmCacheManager.cacheFileName(hash, quality, ext)));
   }
+}
+
+class _PathLockEntry {
+  final Future<void> future;
+  final DateTime createdAt;
+  _PathLockEntry(this.future, this.createdAt);
 }

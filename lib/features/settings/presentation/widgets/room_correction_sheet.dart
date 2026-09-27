@@ -46,8 +46,7 @@ class _SweepSource extends StreamAudioSource {
   }
 }
 
-enum _RcPhase { idle, measuring, analyzing, result }
-
+enum _RcPhase { idle, measuring, analyzing, nextPointPrompt, result }
 
 /// Phase 5: room-correction wizard. Plays a stepped-sine sweep through the
 /// active output device, records it with the mic, fits a Room Correction EQ
@@ -82,6 +81,33 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   String? _error;
   bool _mergeWithHeadphone = false;
 
+  // Multi-point measurement mode (Center, 1m Left, 1m Right)
+  bool _multiPointMode = true;
+  int _currentPoint = 0;
+  final List<List<double>> _pointResponses = [];
+  final List<double> _snrValues = [];
+  double? _snrDb;
+
+  static const List<String> _pointNames = [
+    'Listening Position (Center)',
+    '1 meter Left',
+    '1 meter Right',
+  ];
+
+  Color get _snrColor {
+    final snr = _snrDb ?? 20.0;
+    if (snr >= 25) return AppColors.emeraldDeep;
+    if (snr >= 16) return Colors.teal;
+    return Colors.amber;
+  }
+
+  String get _snrLabel {
+    final snr = _snrDb ?? 20.0;
+    if (snr >= 25) return 'Excellent';
+    if (snr >= 16) return 'Good';
+    return 'Moderate Noise';
+  }
+
   @override
   void dispose() {
     _progressTimer?.cancel();
@@ -114,11 +140,45 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       setState(() {
         _phase = _RcPhase.idle;
         _progress = 0.0;
+        _currentPoint = 0;
+        _pointResponses.clear();
+        _snrValues.clear();
       });
     }
   }
 
+  static double _calculateSnr(Int16List pcm) {
+    if (pcm.isEmpty) return 20.0;
+    const windowSize = 1024;
+    double maxWindowRms = 0.0;
+    double minWindowRms = double.infinity;
+
+    for (int i = 0; i + windowSize <= pcm.length; i += windowSize) {
+      double sumSq = 0.0;
+      for (int j = 0; j < windowSize; j++) {
+        final sample = pcm[i + j].toDouble();
+        sumSq += sample * sample;
+      }
+      final rms = math.sqrt(sumSq / windowSize);
+      if (rms > maxWindowRms) maxWindowRms = rms;
+      if (rms > 0 && rms < minWindowRms) minWindowRms = rms;
+    }
+
+    if (minWindowRms <= 0 || minWindowRms == double.infinity) minWindowRms = 1.0;
+    if (maxWindowRms <= minWindowRms) return 10.0;
+
+    final snr = 20 * (math.log(maxWindowRms / minWindowRms) / math.ln10);
+    return snr.clamp(5.0, 50.0);
+  }
+
   Future<void> _start() async {
+    _currentPoint = 0;
+    _pointResponses.clear();
+    _snrValues.clear();
+    await _measureCurrentPoint();
+  }
+
+  Future<void> _measureCurrentPoint() async {
     setState(() {
       _error = null;
       _phase = _RcPhase.measuring;
@@ -224,13 +284,18 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       if (response.length < tones.length ~/ 2) {
         throw StateError('capture too short');
       }
-      final gains = RoomCorrectionService.fitCorrection(response, tones);
-      if (!mounted) return;
-      setState(() {
-        _responseDb = response;
-        _gains = gains;
-        _phase = _RcPhase.result;
-      });
+
+      final snr = _calculateSnr(pcm);
+      _snrValues.add(snr);
+      _pointResponses.add(response);
+
+      if (_multiPointMode && _currentPoint < 2) {
+        _currentPoint++;
+        if (!mounted) return;
+        setState(() => _phase = _RcPhase.nextPointPrompt);
+      } else {
+        _finishMeasurements(tones);
+      }
     } catch (e, st) {
       ErrorLogger.log('Room correction failed', error: e, stackTrace: st, category: 'RoomCorrection');
       _progressTimer?.cancel();
@@ -251,6 +316,37 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         } catch (_) {}
       }
     }
+  }
+
+  void _finishMeasurements(List<double> tones) {
+    if (_pointResponses.isEmpty) return;
+
+    // Average the measurements across all recorded points
+    final avgResponse = List.filled(tones.length, 0.0);
+    for (int i = 0; i < tones.length; i++) {
+      double sum = 0.0;
+      int count = 0;
+      for (final resp in _pointResponses) {
+        if (i < resp.length) {
+          sum += resp[i];
+          count++;
+        }
+      }
+      avgResponse[i] = count > 0 ? (sum / count) : 0.0;
+    }
+
+    final gains = RoomCorrectionService.fitCorrection(avgResponse, tones);
+    final avgSnr = _snrValues.isNotEmpty
+        ? (_snrValues.reduce((a, b) => a + b) / _snrValues.length)
+        : 20.0;
+
+    if (!mounted) return;
+    setState(() {
+      _snrDb = avgSnr;
+      _responseDb = avgResponse;
+      _gains = gains;
+      _phase = _RcPhase.result;
+    });
   }
 
   Future<void> _apply() async {
@@ -424,6 +520,48 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.spatial_audio_off_rounded, color: p.accent, size: 20),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '3-Point Room Averaging',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: AppFontSize.bodySmall,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Measures Center, 1m Left, and 1m Right for robust correction',
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      color: p.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _multiPointMode,
+                              activeTrackColor: p.accent,
+                              onChanged: (v) => setState(() => _multiPointMode = v),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: AppSpacing.s18),
                       SizedBox(
                         width: double.infinity,
@@ -438,7 +576,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ),
                           icon: const Icon(Icons.graphic_eq_rounded, size: 20),
                           label: Text(
-                            l10n.rcStart,
+                            _multiPointMode
+                                ? 'Start 3-Point Calibration'
+                                : l10n.rcStart,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700, fontSize: AppFontSize.callout),
                           ),
@@ -452,13 +592,26 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           children: [
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              l10n.rcMeasuring,
+                              _multiPointMode
+                                  ? 'Measuring ${_pointNames[_currentPoint]}'
+                                  : l10n.rcMeasuring,
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: AppFontSize.body,
                               ),
                             ),
+                            if (_multiPointMode) ...[
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                'Point ${_currentPoint + 1} of 3',
+                                style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: AppSpacing.s14),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(AppRadii.r6),
@@ -481,14 +634,102 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ],
                         ),
                       ),
-                    ] else ...[
-                      Text(
-                        l10n.rcResult,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: AppFontSize.body,
+                    ] else if (_phase == _RcPhase.nextPointPrompt) ...[
+                      Center(
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: p.accentContainer,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.arrow_forward_rounded, color: p.accent, size: 24),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Position ${_currentPoint + 1} of 3',
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.body,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              'Move your device to: ${_pointNames[_currentPoint]}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: p.accent,
+                                  foregroundColor: p.onAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                                label: Text('Measure Position ${_currentPoint + 1}'),
+                                onPressed: _measureCurrentPoint,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            TextButton(
+                              onPressed: () {
+                                final tones = RoomCorrectionService.tonePlan();
+                                _finishMeasurements(tones);
+                              },
+                              child: Text('Finish with current measurements (${_pointResponses.length}/3)'),
+                            ),
+                          ],
                         ),
+                      ),
+                    ] else ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            l10n.rcResult,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppFontSize.body,
+                            ),
+                          ),
+                          if (_snrDb != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _snrColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(AppRadii.r8),
+                                border: Border.all(color: _snrColor.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle_outline_rounded, size: 14, color: _snrColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'SNR: ${_snrDb!.toStringAsFixed(1)} dB ($_snrLabel)',
+                                    style: TextStyle(
+                                      color: _snrColor,
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: AppSpacing.s10),
                       Container(
@@ -504,10 +745,30 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           painter: _ResponsePainter(
                             response: _responseDb ?? const [],
                             gains: _gains ?? const [],
+                            pointResponses: _pointResponses,
                           ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
+                      if (_pointResponses.length > 1) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(width: 10, height: 3, color: const Color(0xFF4FC3F7)),
+                            const SizedBox(width: 4),
+                            Text('Center', style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            const SizedBox(width: 8),
+                            Container(width: 10, height: 3, color: const Color(0xFF81C784)),
+                            const SizedBox(width: 4),
+                            Text('Left', style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            const SizedBox(width: 8),
+                            Container(width: 10, height: 3, color: const Color(0xFFFFB74D)),
+                            const SizedBox(width: 4),
+                            Text('Right', style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                      ],
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -612,12 +873,18 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   }
 }
 
-/// Simple side-by-side bars: measured response (top, normalized) and the
-/// fitted correction gains (bottom, clamped to +/-15 dB).
+/// Side-by-side bars: measured response (top, normalized) and fitted correction gains
+/// (bottom, clamped to +/-15 dB), with overlaid multi-point lines.
 class _ResponsePainter extends CustomPainter {
   final List<double> response;
   final List<double> gains;
-  _ResponsePainter({required this.response, required this.gains});
+  final List<List<double>> pointResponses;
+
+  _ResponsePainter({
+    required this.response,
+    required this.gains,
+    this.pointResponses = const [],
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -630,14 +897,46 @@ class _ResponsePainter extends CustomPainter {
       ..color = const Color(0x33888888)
       ..strokeWidth = 1;
     canvas.drawLine(Offset(0, mid), Offset(size.width, mid), gridPaint);
+
+    // If multi-point measurements exist, draw individual point curves
+    if (pointResponses.length > 1) {
+      final pointColors = [
+        const Color(0xAA4FC3F7), // Center: light blue
+        const Color(0xAA81C784), // Left: light green
+        const Color(0xAAFFB74D), // Right: light amber
+      ];
+      for (int pIdx = 0; pIdx < pointResponses.length; pIdx++) {
+        final pts = pointResponses[pIdx];
+        final pPaint = Paint()
+          ..color = pointColors[pIdx % pointColors.length]
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke;
+        final path = Path();
+        for (int i = 0; i < pts.length; i++) {
+          final x = i * barW + barW / 2;
+          final r = (pts[i] / maxAbs).clamp(-1.0, 1.0);
+          final y = mid - (r * (size.height / 2 - 6));
+          if (i == 0) {
+            path.moveTo(x, y);
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+        canvas.drawPath(path, pPaint);
+      }
+    }
+
+    // Draw average response bars
     for (var i = 0; i < response.length; i++) {
       final r = (response[i] / maxAbs).clamp(-1.0, 1.0);
       final h = r * (size.height / 2 - 4);
       canvas.drawRect(
         Rect.fromLTRB(i * barW + 1, mid - h, (i + 1) * barW - 1, mid),
-        Paint()..color = AppColors.ldacViolet,
+        Paint()..color = AppColors.ldacViolet.withValues(alpha: 0.85),
       );
     }
+
+    // Draw fitted gains
     for (var i = 0; i < fit.length; i++) {
       final g = (gains[i] / 15.0).clamp(-1.0, 1.0);
       final h = g * (size.height / 2 - 4);
@@ -650,5 +949,7 @@ class _ResponsePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ResponsePainter old) =>
-      old.response != response || old.gains != gains;
+      old.response != response ||
+      old.gains != gains ||
+      old.pointResponses != pointResponses;
 }

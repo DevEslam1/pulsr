@@ -2165,4 +2165,36 @@ class AudioEffectsChannel {
       return const {};
     }
   }
+
+  /// Verifies active DSP effect parameters against native hardware state.
+  Future<Map<String, dynamic>?> verifyState() async {
+    if (!_isAndroid) return null;
+    try {
+      return await _channel
+          .invokeMapMethod<String, dynamic>('verifyState')
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'verifyState failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return null;
+    }
+  }
+
+  /// Sends a silent buffer through the DSP pipeline to warm up complex filters (e.g. convolver)
+  /// before unmuting, preventing audible pops/clicks.
+  Future<bool> sendWarmupBuffer({int durationMs = 100}) async {
+    if (!_isAndroid) return true;
+    try {
+      final res = await _channel
+          .invokeMethod<bool>('sendWarmupBuffer', {'durationMs': durationMs})
+          .timeout(const Duration(seconds: 2));
+      return res ?? true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

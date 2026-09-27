@@ -43,21 +43,22 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../core/responsive/responsive_values.dart';
 import '../../../core/responsive/adaptive_grid.dart';
+import '../../../core/responsive/pulsr_responsive_tokens.dart';
 
 /// Scales a fixed two-line card title box (34px at the default text size) with
 /// the user's Dynamic Type setting so large text never clips. Pixel-identical
 /// at the 1.0x scale.
 double _scaledTitleBoxHeight(BuildContext context) {
-  final base = Adaptive.isTablet(context) ? 38.0 : 34.0;
+  final base = Adaptive.isTablet(context) ? AppSpacing.s38 : 34.0;
   return MediaQuery.textScalerOf(context).scale(base).clamp(base, 78.0);
 }
 
 /// Grows a fixed-height horizontal card carousel just enough to fit scaled
 /// two-line titles. Pixel-identical at the 1.0x scale.
 double _scaledCarouselHeight(BuildContext context, bool isTablet) {
-  final base = isTablet ? 38.0 : 34.0;
+  final base = isTablet ? AppSpacing.s38 : 34.0;
   final delta =
-      (MediaQuery.textScalerOf(context).scale(base) - base).clamp(0.0, 44.0);
+      (MediaQuery.textScalerOf(context).scale(base) - base).clamp(0.0, AppSpacing.s44);
   return (isTablet ? 232.0 : 212.0) + delta;
 }
 
@@ -631,34 +632,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   }
 
   Widget _buildQuickActionsRow(BuildContext context, List<Widget> cards) {
-    final isNarrow = MediaQuery.sizeOf(context).width < 360;
-    if (isNarrow && cards.length == 3) {
-      return Column(
-        children: [
-          Row(
-            children: [
-              cards[0],
-              const SizedBox(width: AppSpacing.s10),
-              cards[1],
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s10),
-          Row(
-            children: [
-              cards[2],
-            ],
-          ),
-        ],
-      );
-    }
-    return Row(
-      children: [
-        for (int i = 0; i < cards.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppSpacing.s10),
-          cards[i],
-        ],
-      ],
-    );
+    return QuickActionsRow(cards: cards);
   }
 
   Widget _buildLocalView(
@@ -1273,14 +1247,70 @@ class _TrendingCard extends StatelessWidget {
   }
 }
 
-class _QuickCard extends StatelessWidget {
+class QuickActionsRow extends StatelessWidget {
+  final List<Widget> cards;
+
+  const QuickActionsRow({super.key, required this.cards});
+
+  @override
+  Widget build(BuildContext context) {
+    final vp = PulsrViewport.of(context);
+    if (vp.isShortHeight) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: [
+            for (int i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(width: AppSpacing.s10),
+              SizedBox(width: 140, child: cards[i]),
+            ],
+          ],
+        ),
+      );
+    }
+    final isNarrow = vp.width < 360;
+    if (isNarrow && cards.length == 3) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: cards[0]),
+              const SizedBox(width: AppSpacing.s10),
+              Expanded(child: cards[1]),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          Row(
+            children: [
+              Expanded(child: cards[2]),
+              const SizedBox(width: AppSpacing.s10),
+              const Expanded(child: SizedBox.shrink()),
+            ],
+          ),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        for (int i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.s10),
+          Expanded(child: cards[i]),
+        ],
+      ],
+    );
+  }
+}
+
+class QuickCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
 
-  const _QuickCard({
+  const QuickCard({
+    super.key,
     required this.title,
     required this.subtitle,
     required this.icon,
@@ -1293,72 +1323,72 @@ class _QuickCard extends StatelessWidget {
     final p = context.palette;
     final isCompact = MediaQuery.sizeOf(context).width < 380;
 
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.r18),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadii.r18),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.r18),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isCompact ? 10 : 12,
-              vertical: isCompact ? 10 : 12,
-            ),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  color.withValues(alpha: 0.16),
-                  color.withValues(alpha: 0.03)
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r18),
-              border: Border.all(color: p.hairline),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: EdgeInsets.all(isCompact ? 6 : 7),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: isCompact ? 17 : 19),
-                ),
-                SizedBox(height: isCompact ? 8 : 10),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: isCompact ? AppFontSize.label : AppFontSize.bodySmall,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s2),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: isCompact ? AppFontSize.tiny : AppFontSize.caption,
-                  ),
-                ),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isCompact ? 10 : 12,
+            vertical: isCompact ? 10 : 12,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                color.withValues(alpha: 0.16),
+                color.withValues(alpha: 0.03)
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadii.r18),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.all(isCompact ? 6 : 7),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: isCompact ? 17 : 19),
+              ),
+              SizedBox(height: isCompact ? 8 : 10),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: isCompact ? AppFontSize.label : AppFontSize.bodySmall,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: isCompact ? AppFontSize.tiny : AppFontSize.caption,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+typedef _QuickCard = QuickCard;
 
 class _QuickDiscoveryHeader extends StatelessWidget {
   const _QuickDiscoveryHeader();

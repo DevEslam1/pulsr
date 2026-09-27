@@ -1,6 +1,8 @@
+// lib/core/responsive/adaptive_grid.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'breakpoints.dart';
+import 'pulsr_responsive_tokens.dart';
 
 /// Semantic types of content grids in Pulsr.
 enum GridType {
@@ -29,9 +31,10 @@ class PulsrAdaptiveGrid {
     GridType type = GridType.albums,
     int? customMinItemWidth,
   }) {
-    final breakpoint = PulsrBreakpoint.of(context);
-    final isLandscape = PulsrBreakpoint.isLandscape(context);
-    final width = MediaQuery.sizeOf(context).width;
+    final vp = PulsrViewport.of(context);
+    final breakpoint = vp.sizeClass;
+    final isLandscape = vp.isLandscape;
+    final width = vp.width;
 
     switch (type) {
       case GridType.albums:
@@ -41,13 +44,10 @@ class PulsrAdaptiveGrid {
           case PulsrBreakpoint.compact:
             return isLandscape ? 3 : 2;
           case PulsrBreakpoint.medium:
-            // Medium width (600 - 839)
             return isLandscape ? 4 : 3;
           case PulsrBreakpoint.expanded:
-            // Expanded width (840 - 1199)
             return isLandscape ? 5 : 4;
           case PulsrBreakpoint.large:
-            // Large width (1200+)
             final calculated = (width / (customMinItemWidth ?? minCardWidth)).floor();
             return calculated.clamp(6, 8);
         }
@@ -66,6 +66,42 @@ class PulsrAdaptiveGrid {
     }
   }
 
+  /// Target-item-width based dynamic column resolver.
+  static int columnsFor(
+    BuildContext context, {
+    required double minItemWidth,
+    required double spacing,
+    double? maxColumns,
+  }) {
+    final vp = PulsrViewport.of(context);
+    final availableWidth = math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2);
+    int cols = (availableWidth / (minItemWidth + spacing)).floor();
+    if (maxColumns != null) cols = cols.clamp(1, maxColumns.toInt());
+    return cols.clamp(1, 12);
+  }
+
+  // ── Presets ──────────────────────────────────────────────────────────────
+
+  /// Album grid preset (min width 150, spacing 14).
+  static int albumGrid(BuildContext context) =>
+      columnsFor(context, minItemWidth: 150.0, spacing: 14.0);
+
+  /// Artist circle grid preset (min width 130, spacing 14).
+  static int artistGrid(BuildContext context) =>
+      columnsFor(context, minItemWidth: 130.0, spacing: 14.0);
+
+  /// Song list card grid preset (min width 280, spacing 4).
+  static int songGrid(BuildContext context) =>
+      columnsFor(context, minItemWidth: 280.0, spacing: 4.0);
+
+  /// Category card grid preset (min width 160, spacing 12).
+  static int categoryGrid(BuildContext context) =>
+      columnsFor(context, minItemWidth: 160.0, spacing: 12.0);
+
+  /// Playlist card grid preset (min width 170, spacing 14).
+  static int playlistGrid(BuildContext context) =>
+      columnsFor(context, minItemWidth: 170.0, spacing: 14.0);
+
   /// Calculates columns specifically for song lists.
   static int songColumns(BuildContext context) =>
       columns(context, type: GridType.songs);
@@ -76,38 +112,38 @@ class PulsrAdaptiveGrid {
     required double minItemWidth,
     int minColumns = 1,
     int maxColumns = 8,
-    double horizontalPadding = 32.0,
+    double? horizontalPadding,
   }) {
-    final width = math.min(
-      MediaQuery.sizeOf(context).width,
-      maxContentWidth,
-    );
-    final usableWidth = math.max(0.0, width - horizontalPadding);
+    final vp = PulsrViewport.of(context);
+    final pad = horizontalPadding ?? (vp.pagePadding * 2);
+    final width = math.min(vp.width, vp.contentMaxWidth);
+    final usableWidth = math.max(0.0, width - pad);
     final count = (usableWidth / minItemWidth).floor();
     return count.clamp(minColumns, maxColumns);
   }
 }
 
-/// A container that constrains content to a readable maximum width (1200dp)
+/// A container that constrains content to a readable maximum width
 /// and centers it on large displays.
 class PulsrContentConstraint extends StatelessWidget {
   final Widget child;
-  final double maxWidth;
+  final double? maxWidth;
   final AlignmentGeometry alignment;
 
   const PulsrContentConstraint({
     super.key,
     required this.child,
-    this.maxWidth = PulsrAdaptiveGrid.maxContentWidth,
+    this.maxWidth,
     this.alignment = Alignment.topCenter,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveMaxWidth = maxWidth ?? PulsrViewport.of(context).contentMaxWidth;
     return Align(
       alignment: alignment,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
+        constraints: BoxConstraints(maxWidth: effectiveMaxWidth),
         child: child,
       ),
     );

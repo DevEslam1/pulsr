@@ -28,7 +28,10 @@ abstract class AppSpacing {
   static const double s18 = 18;
   static const double s20 = 20;
   static const double s28 = 28;
+  static const double s38 = 38;
   static const double s40 = 40;
+  static const double s44 = 44;
+  static const double s56 = 56;
   static const double s64 = 64;
 
   /// Canonical minimum interactive touch target dimension per Material & WCAG guidelines.

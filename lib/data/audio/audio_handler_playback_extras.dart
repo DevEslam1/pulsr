@@ -97,6 +97,9 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         prefs.getString('setting_streaming_quality') ?? 'high';
     try {
       await prefs.setString('adaptive_runtime_quality', newQuality);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add('Quality adjusted to ${newQuality.toUpperCase()} for smooth playback');
+      }
       final song = currentSong;
       if (song != null &&
           song.source == SongSource.youtube &&
@@ -409,4 +412,5 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   // Requires: provided by the composing class (same library).
   bool get _gaplessMode;
   bool get _gaplessLoaded;
+  StreamController<String> get _errorSubject;
 }

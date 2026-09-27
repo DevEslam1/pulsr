@@ -595,8 +595,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setDialogState) => PulsrDialog(
             title: context.l10n.customBandFreqs(initial.length),
-            content: SizedBox(
-              width: 340,
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

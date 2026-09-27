@@ -55,8 +55,12 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
               Adaptive.pagePadding(context), 160),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount:
-                PulsrAdaptiveGrid.columns(context, type: GridType.songs),
+            crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(
+              context,
+              minItemWidth: 160,
+              minColumns: 2,
+              maxColumns: 6,
+            ),
             crossAxisSpacing: 14,
             mainAxisSpacing: 18,
             childAspectRatio: 0.76,

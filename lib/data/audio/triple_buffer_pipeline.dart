@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mutex/mutex.dart';
 import '../db/app_database.dart';
 import '../../core/utils/error_logger.dart';
+import 'playback_analytics.dart';
 
 enum PlayerClaim { none, crossfade, prefetch }
 
@@ -13,6 +16,7 @@ class TripleBufferPipeline {
   final AudioPlayer Function() getActivePlayer;
   final AudioPlayer Function() getInactivePlayer;
   final AudioPlayer? prefetchPlayer;
+  final PlaybackAnalytics? analytics;
 
   final Future<AudioSource> Function(SongsTableData song, MediaItem tag)
       resolveAudioSource;
@@ -40,10 +44,29 @@ class TripleBufferPipeline {
   int? get preloadedSongId => _preloadedSongId;
   AudioSource? _preloadedSource;
   AudioSource? get preloadedSource => _preloadedSource;
+  Uint8List? preloadedHeaderBytes;
+
+  final Map<int, DateTime> _preloadFailedExpiry = {};
+
+  bool isPreloadBlacklisted(int songId) {
+    final expiry = _preloadFailedExpiry[songId];
+    if (expiry == null) return false;
+    if (DateTime.now().isAfter(expiry)) {
+      _preloadFailedExpiry.remove(songId);
+      return false;
+    }
+    return true;
+  }
+
+  void recordPreloadFailure(int songId) {
+    _preloadFailedExpiry[songId] =
+        DateTime.now().add(const Duration(seconds: 30));
+  }
 
   void clearPreload() {
     _preloadedSongId = null;
     _preloadedSource = null;
+    preloadedHeaderBytes = null;
   }
 
   Future<bool> claimInactive(PlayerClaim claim) async {
@@ -66,44 +89,80 @@ class TripleBufferPipeline {
     required this.getActivePlayer,
     required this.getInactivePlayer,
     this.prefetchPlayer,
+    this.analytics,
     this.isLoadStillValid,
     this.getGeneration,
     required this.resolveAudioSource,
     required this.songToMediaItem,
   });
 
-  /// Preloads the next track into inactive player so crossfade starts with zero buffering delay.
+  /// Preloads the next track into inactive player with 1 retry on failure
+  /// and 30-second blacklisting on repeated failure.
   Future<void> preloadNext(SongsTableData nextSong) async {
+    if (isPreloadBlacklisted(nextSong.id)) return;
     try {
       if (!await claimInactive(PlayerClaim.prefetch)) return;
+      var success = await _attemptPreload(nextSong);
+      if (!success) {
+        // Retry once after 2 seconds
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (isLoadStillValid != null && !isLoadStillValid!()) {
+          return;
+        }
+        success = await _attemptPreload(nextSong);
+        if (!success) {
+          _preloadFailedExpiry[nextSong.id] =
+              DateTime.now().add(const Duration(seconds: 30));
+          analytics?.recordPreloadFailure();
+          return;
+        }
+      }
+      _preloadFailedExpiry.remove(nextSong.id);
+      analytics?.recordPreloadSuccess();
+    } finally {
+      releaseInactive(PlayerClaim.prefetch);
+    }
+  }
+
+  Future<bool> _attemptPreload(SongsTableData nextSong) async {
+    try {
       final scheduledGen = getGeneration?.call();
       final tag = songToMediaItem(nextSong);
       final source = await resolveAudioSource(nextSong, tag);
       // The await above can outlast the track that scheduled this preload;
       // never touch a player that is no longer the inactive one.
       if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
-        releaseInactive(PlayerClaim.prefetch);
-        return;
+        return false;
       }
       if (isLoadStillValid != null && !isLoadStillValid!()) {
-        releaseInactive(PlayerClaim.prefetch);
-        return;
+        return false;
       }
-      // Re-acquire the inactive player reference AFTER the async gap — the
-      // active/inactive players may have swapped during URL resolution.
       final inactivePlayer = getInactivePlayer();
       if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
-        releaseInactive(PlayerClaim.prefetch);
-        return;
+        return false;
       }
       await inactivePlayer.setAudioSource(source, preload: true);
       _preloadedSongId = nextSong.id;
       _preloadedSource = source;
+      if (nextSong.path.isNotEmpty && !nextSong.path.startsWith('http')) {
+        try {
+          final file = File(nextSong.path);
+          if (file.existsSync()) {
+            final raf = file.openSync(mode: FileMode.read);
+            try {
+              final len = file.lengthSync();
+              preloadedHeaderBytes = raf.readSync(len < 65536 ? len : 65536);
+            } finally {
+              raf.closeSync();
+            }
+          }
+        } catch (_) {}
+      }
+      return true;
     } catch (e) {
       clearPreload();
-      ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');
-    } finally {
-      releaseInactive(PlayerClaim.prefetch);
+      ErrorLogger.log('Preload attempt failed', error: e, category: 'TripleBuffer');
+      return false;
     }
   }
 

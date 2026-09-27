@@ -194,7 +194,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
         if (!controller.hasClients || !controller.position.hasContentDimensions) {
           // B-4 & H-04: Limit recursive post-frame callbacks to avoid infinite loops if unattached.
           // On final retry failure, force _lastKnownIndex = safeIndex so subsequent track changes diff correctly.
-          if (retryCount < 3) {
+          if (retryCount < 5) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted && !_controllerDisposed) {
                 _syncPageController(targetIndex, queueLength, retryCount: retryCount + 1);
@@ -202,6 +202,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
             });
           } else {
             _lastKnownIndex = safeIndex;
+            Future.delayed(const Duration(seconds: 1), () {
+              if (mounted && !_controllerDisposed) {
+                _syncPageController(targetIndex, queueLength, retryCount: 0);
+              }
+            });
           }
           return;
         }
@@ -536,7 +541,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                                       id: item.id,
                                                       remoteArtworkUrl:
                                                           item.remoteArtworkUrl,
-                                                      size: 46,
+                                                      size: artworkSize,
                                                       isPlaying: state.isPlaying &&
                                                           isCurrent,
                                                     )

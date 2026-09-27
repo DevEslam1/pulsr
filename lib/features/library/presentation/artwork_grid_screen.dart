@@ -66,7 +66,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final maxCols = context.isTablet ? 8.0 : 5.0;
+    final maxCols = context.isTablet ? 8.0 : 6.0;
     const minCols = 2.0;
 
     return PulsrPagePopScope(

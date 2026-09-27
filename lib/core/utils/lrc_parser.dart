@@ -19,6 +19,12 @@ class LrcParser {
   /// Parses raw LRC string content into a sorted list of `LyricsLine`.
   static List<LyricsLine> parse(String lrcContent,
       {LyricsSource source = LyricsSource.none}) {
+    return parseWithMetadata(lrcContent, source: source).lines;
+  }
+
+  /// Parses raw LRC string content with extended metadata tags ([ar:], [ti:], [by:], [offset:]).
+  static LyricsResult parseWithMetadata(String lrcContent,
+      {LyricsSource source = LyricsSource.none}) {
     // Strip UTF-8 BOM if present
     var content = lrcContent;
     if (content.isNotEmpty && content.codeUnitAt(0) == 0xFEFF) {
@@ -26,30 +32,31 @@ class LrcParser {
     }
     final lines = content.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
+    final Map<String, String> metadata = {};
 
-    // Check for [offset:+/-ms] tag
+    // Check for [offset:+/-ms] tag and other metadata
     int offsetMs = 0;
-    final RegExp offsetExp =
-        RegExp(r'\[offset:\s*([+-]?\d+)\s*\]', caseSensitive: false);
+    final RegExp metaExp = RegExp(
+        r'^\s*\[(ar|ti|al|by|offset|length):([^\]]*)\]',
+        caseSensitive: false);
+
     for (final line in lines) {
-      final offsetMatch = offsetExp.firstMatch(line);
-      if (offsetMatch != null) {
-        offsetMs = int.tryParse(offsetMatch.group(1) ?? '0') ?? 0;
-        break;
+      final trimmed = line.trim();
+      final metaMatch = metaExp.firstMatch(trimmed);
+      if (metaMatch != null) {
+        final key = metaMatch.group(1)!.toLowerCase();
+        final value = metaMatch.group(2)!.trim();
+        metadata[key] = value;
+        if (key == 'offset') {
+          offsetMs = int.tryParse(value) ?? 0;
+        }
       }
     }
 
-    // Match tags like [01:23.45] / [-00:02.50] / [01:23.456] / [01:23.4] / [01:23] / [120:00.00]
-    // Also handle comma and colon fraction separators used by some editors:
-    // [01:23,45] and [01:23:45].
     final RegExp timeExp =
         RegExp(r'\[(-)?(\d{1,3}):(\d{2})(?:[.,:](\d{1,3}))?\]');
     final RegExp wordTagExp =
         RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
-    // Metadata tags to ignore (artist, title, album, etc.)
-    final RegExp metaExp = RegExp(
-        r'^\s*\[(ar|ti|al|by|offset|length):',
-        caseSensitive: false);
 
     for (final rawLine in lines) {
       final line = rawLine.trim();
@@ -59,9 +66,15 @@ class LrcParser {
       final matches = timeExp.allMatches(line).toList();
       if (matches.isEmpty) continue;
 
-      // The lyric text is everything after the last timestamp tag, stripped of karaoke tags
       final lastMatch = matches.last;
-      final text = line.substring(lastMatch.end).replaceAll(wordTagExp, '').trim();
+      final rawTextAfterTags = line.substring(lastMatch.end);
+      final text = rawTextAfterTags.replaceAll(wordTagExp, '').trim();
+
+      final isVocal = text.isNotEmpty &&
+          text != '♪' &&
+          text != '•••' &&
+          text != '...' &&
+          !text.toLowerCase().contains('instrumental');
 
       for (final match in matches) {
         final isNegative = match.group(1) == '-';
@@ -79,13 +92,84 @@ class LrcParser {
         if (totalMs < 0) totalMs = 0;
         final totalDuration = Duration(milliseconds: totalMs);
 
-        result.add(
-            LyricsLine(timestamp: totalDuration, text: text, source: source));
+        final words = _parseWordTimestamps(rawTextAfterTags, totalMs, offsetMs);
+
+        result.add(LyricsLine(
+          timestamp: totalDuration,
+          text: text,
+          source: source,
+          words: words,
+          isVocal: isVocal,
+        ));
       }
     }
 
     result.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    return result;
+
+    // Combine bilingual lines with matching timestamps
+    final List<LyricsLine> merged = [];
+    for (int i = 0; i < result.length; i++) {
+      final cur = result[i];
+      if (merged.isNotEmpty &&
+          (cur.timestamp.inMilliseconds - merged.last.timestamp.inMilliseconds).abs() <= 50 &&
+          merged.last.translation == null &&
+          cur.text != merged.last.text) {
+        merged[merged.length - 1] = merged.last.copyWith(translation: cur.text);
+      } else {
+        merged.add(cur);
+      }
+    }
+
+    return LyricsResult(lines: merged, source: source, metadata: metadata);
+  }
+
+  static List<WordTimestamp> _parseWordTimestamps(
+    String rawLine,
+    int lineStartMs,
+    int offsetMs,
+  ) {
+    final wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
+    final matches = wordTagExp.allMatches(rawLine).toList();
+    if (matches.isEmpty) return const [];
+
+    int parseTime(String tag) {
+      final clean = tag.replaceAll(RegExp(r'[<>]'), '');
+      final parts = clean.split(':');
+      if (parts.length == 2) {
+        final min = int.tryParse(parts[0]) ?? 0;
+        final secParts = parts[1].split(RegExp(r'[.,]'));
+        final sec = int.tryParse(secParts[0]) ?? 0;
+        final frac = secParts.length > 1
+            ? (int.tryParse(secParts[1].padRight(3, '0').substring(0, 3)) ?? 0)
+            : 0;
+        final total = min * 60000 + sec * 1000 + frac + offsetMs;
+        return total < 0 ? 0 : total;
+      }
+      return lineStartMs;
+    }
+
+    final words = <WordTimestamp>[];
+    for (int i = 0; i < matches.length; i++) {
+      final curMatch = matches[i];
+      final startMs = parseTime(curMatch.group(0)!);
+      final textStart = curMatch.end;
+      final textEnd =
+          (i + 1 < matches.length) ? matches[i + 1].start : rawLine.length;
+      final word = rawLine.substring(textStart, textEnd).trim();
+
+      final endMs = (i + 1 < matches.length)
+          ? parseTime(matches[i + 1].group(0)!)
+          : (startMs + 350);
+
+      if (word.isNotEmpty) {
+        words.add(WordTimestamp(
+          word: word,
+          startMs: startMs,
+          endMs: endMs > startMs ? endMs : startMs + 50,
+        ));
+      }
+    }
+    return words;
   }
 
   /// Formats a list of [LyricsLine] into a valid LRC formatted string.

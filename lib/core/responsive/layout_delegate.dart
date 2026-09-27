@@ -170,4 +170,5 @@ class PulsrLayoutDelegate {
 
 extension PulsrLayoutDelegateContextX on BuildContext {
   PulsrLayoutDelegate get layoutDelegate => PulsrLayoutDelegate.of(this);
+  bool get isSideInspectorAvailable => layoutDelegate.showSideInspector;
 }

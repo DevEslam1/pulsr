@@ -22,4 +22,16 @@ class ConnectivityGuard {
       return true;
     }
   }
+
+  /// Returns true if the device is exclusively on a metered cellular connection.
+  static Future<bool> isMeteredConnection() async {
+    try {
+      final results = await _connectivity.checkConnectivity();
+      return results.contains(ConnectivityResult.mobile) &&
+          !results.contains(ConnectivityResult.wifi) &&
+          !results.contains(ConnectivityResult.ethernet);
+    } catch (_) {
+      return false;
+    }
+  }
 }

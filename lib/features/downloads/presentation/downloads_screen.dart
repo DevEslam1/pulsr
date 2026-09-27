@@ -23,6 +23,7 @@ import 'widgets/storage_stats_header.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 
 enum DownloadFilter { all, downloading, completed, failed }
 
@@ -454,7 +455,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     cubit.refreshStorageStats(),
                   ]);
                 },
-                child: content,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: PulsrLayoutMetrics.contentConstraints(context),
+                    child: content,
+                  ),
+                ),
               );
             },
           ),

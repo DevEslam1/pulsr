@@ -186,6 +186,11 @@ class PlaybackVolumeController {
       }
       stepIndex++;
       final current = (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
+      if (_isDisposed) {
+        timer.cancel();
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
       try {
         await player.setVolume(current);
       } catch (_) {
@@ -220,9 +225,9 @@ class PlaybackVolumeController {
 
   /// Lifecycle teardown hook (Prompt 1.3).
   void dispose() {
-    _isDisposed = true;
     _transitionTimer?.cancel();
     _transitionTimer = null;
+    _isDisposed = true;
     if (_transitionCompleter != null && !_transitionCompleter!.isCompleted) {
       _transitionCompleter!.complete();
     }

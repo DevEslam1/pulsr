@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/utils/adaptive.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
@@ -16,6 +16,8 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import '../../../../core/responsive/pulsr_responsive_tokens.dart';
+import '../../../../core/responsive/breakpoints.dart';
 
 /// Computed responsive metrics used across player themes.
 class PlayerThemeMetrics {
@@ -31,6 +33,13 @@ class PlayerThemeMetrics {
   final double switcherBottomPad;
   final double pillBarWidth;
   final double pillBarHeight;
+  final double artworkSize;
+  final double controlSize;
+  final double seekBarHeight;
+  final double titleFontSize;
+  final bool isSplitMode;
+  final bool isCompactHeight;
+  final double contentPadding;
 
   const PlayerThemeMetrics({
     required this.constraints,
@@ -45,18 +54,29 @@ class PlayerThemeMetrics {
     required this.switcherBottomPad,
     required this.pillBarWidth,
     required this.pillBarHeight,
+    this.artworkSize = 240.0,
+    this.controlSize = 64.0,
+    this.seekBarHeight = 36.0,
+    this.titleFontSize = 20.0,
+    this.isSplitMode = false,
+    this.isCompactHeight = false,
+    this.contentPadding = 20.0,
   });
 
   factory PlayerThemeMetrics.calculate(
     BuildContext context,
     BoxConstraints constraints,
   ) {
-    final isTablet = context.isTablet;
-    final isLandscape = context.isLandscape ||
-        (context.isTwoPane || constraints.maxWidth >= 600);
+    final vp = PulsrViewport.of(context);
+    final isTablet = vp.isTablet;
+    final isSplitMode = PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
+    final isLandscape = isSplitMode;
+    final isCompactHeight = constraints.maxHeight < 500.0 || vp.isShortHeight;
 
-    final double heightRatio =
-        (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
+    final double heightRatio = isCompactHeight
+        ? 0.85
+        : (isTablet ? 1.05 : (constraints.maxHeight / 700.0).clamp(0.8, 1.18));
+
     final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
     final double spacingSeekToControls = (isTablet ? 12.0 : 8.0) * heightRatio;
     final double spacingControlsToDock = (isTablet ? 12.0 : 8.0) * heightRatio;
@@ -69,6 +89,25 @@ class PlayerThemeMetrics {
       isTablet ? 440.0 : 336.0,
     );
     final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+
+    final double controlSize = switch (vp.sizeClass) {
+      PulsrBreakpoint.compact => isCompactHeight ? 52.0 : 58.0,
+      PulsrBreakpoint.medium => 64.0,
+      PulsrBreakpoint.expanded => 68.0,
+      PulsrBreakpoint.large => 74.0,
+    };
+
+    final double seekBarHeight = isTablet ? 40.0 : 32.0;
+    final double titleFontSize = isTablet ? 24.0 : 20.0;
+    final double contentPadding = vp.pagePadding;
+
+    final double maxArt = isSplitMode
+        ? (isCompactHeight ? 260.0 : 380.0)
+        : (isTablet ? 560.0 : 420.0);
+    final double rawArt = isSplitMode
+        ? math.min(constraints.maxWidth * 0.45, constraints.maxHeight - 48.0)
+        : math.min(constraints.maxWidth - (contentPadding * 2), constraints.maxHeight * 0.45);
+    final double artworkSize = rawArt.clamp(140.0, maxArt);
 
     return PlayerThemeMetrics(
       constraints: constraints,
@@ -83,6 +122,13 @@ class PlayerThemeMetrics {
       switcherBottomPad: switcherBottomPad,
       pillBarWidth: pillBarWidth,
       pillBarHeight: pillBarHeight,
+      artworkSize: artworkSize,
+      controlSize: controlSize,
+      seekBarHeight: seekBarHeight,
+      titleFontSize: titleFontSize,
+      isSplitMode: isSplitMode,
+      isCompactHeight: isCompactHeight,
+      contentPadding: contentPadding,
     );
   }
 

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/responsive/layout_delegate.dart';
+import '../../../core/responsive/pulsr_hinge_gap.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_modal_tracker.dart';
@@ -266,6 +267,7 @@ class _AppShellState extends State<AppShell> {
                   : null,
               isSideInspectorOpen: _isSideInspectorOpen,
             ),
+            const PulsrHingeGap.horizontal(),
 
             // Main Content Area with Bottom Docked Player Bar
             Expanded(

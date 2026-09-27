@@ -11,6 +11,7 @@ import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../core/errors/failures.dart';
@@ -124,9 +125,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final isTablet = Adaptive.isTablet(context);
     final album = widget.album;
 
-    final isLandscape = context.isLandscape;
-    final expandedHeight = isTablet ? 340.0 : (isLandscape ? 230.0 : 300.0);
-    final artworkSize = isTablet ? 220.0 : (isLandscape ? 120.0 : 180.0);
+    final expandedHeight = isTablet
+        ? (MediaQuery.sizeOf(context).height * 0.40).clamp(280.0, 380.0)
+        : PulsrLayoutMetrics.heroHeight(context);
+    final artworkSize = (expandedHeight * 0.55).clamp(120.0, 220.0);
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -144,7 +146,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
             return Center(
               child: ConstrainedBox(
-                constraints: Adaptive.contentConstraints(context),
+                constraints: PulsrLayoutMetrics.contentConstraints(context),
                 child: RefreshIndicator(
                   color: p.accent,
                   backgroundColor: p.surfaceContainer,

@@ -279,6 +279,23 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           await completer.future.timeout(const Duration(seconds: 5));
         } catch (_) {}
       }
+      final filePath = task?.filePath;
+      if (filePath != null) {
+        try {
+          final f = File(filePath);
+          if (await f.exists()) {
+            final len1 = await f.length();
+            await Future<void>.delayed(const Duration(milliseconds: 500));
+            if (await f.exists()) {
+              final len2 = await f.length();
+              if (len2 > len1) {
+                // File is still being actively written, wait additional grace period
+                await Future<void>.delayed(const Duration(seconds: 5));
+              }
+            }
+          }
+        } catch (_) {}
+      }
       _activeVideoIds.remove(videoId);
       _activeCompleters.remove(videoId);
     }

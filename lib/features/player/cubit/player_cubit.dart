@@ -595,6 +595,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   Future<void> persistQueueSlotsNow() => queueController.persistQueueSlotsNow();
   Future<void> saveDspSnapshot() => _audioHandler.saveDspSnapshotForCurrent();
+  Future<void> setSpeed(double speed) => _audioHandler.setSpeed(speed);
 
   @override
   Future<void> close() async {

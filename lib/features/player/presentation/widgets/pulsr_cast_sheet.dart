@@ -165,6 +165,44 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
     }
   }
 
+  double _castVolume = 1.0;
+
+  Future<void> _castCurrentQueue() async {
+    if (_busy) return;
+    HapticFeedback.mediumImpact();
+    final playerState = context.read<PlayerCubit>().state;
+    final queue = playerState.queue;
+    if (queue.isEmpty) {
+      if (playerState.currentSong != null) {
+        await _castCurrentSong();
+      } else {
+        _showToast(context.l10n.settingsNothingToCast);
+      }
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final items = queue.map((s) => <String, dynamic>{
+        'path': s.path,
+        'title': s.title,
+        'artist': s.artist,
+        'album': s.album,
+        'artwork': s.remoteArtworkUrl ?? s.artworkUri,
+        'mime': _mimeFor(s.path),
+      }).toList();
+      final result = await _service.castQueue(
+        queueItems: items,
+        startIndex: playerState.currentIndex.clamp(0, queue.length - 1),
+        startPositionMs: playerState.position.inMilliseconds,
+      );
+      _showToast(result.success
+          ? 'Casting queue to ${_session.deviceName ?? "device"}'
+          : (result.error ?? 'Queue cast failed'));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _castCurrentSong() async {
     if (_busy) return;
     HapticFeedback.mediumImpact();
@@ -429,6 +467,41 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: p.textPrimary,
+                          side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                        ),
+                        onPressed: _busy ? null : _castCurrentQueue,
+                        icon: const Icon(Icons.queue_music_rounded, size: 18),
+                        label: const Text('Cast Entire Queue',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Icon(Icons.volume_down_rounded, size: 18, color: p.textSecondary),
+                        Expanded(
+                          child: Slider(
+                            value: _castVolume,
+                            activeColor: p.accent,
+                            onChanged: (v) {
+                              setState(() => _castVolume = v);
+                              _service.setVolume(v);
+                            },
+                          ),
+                        ),
+                        Icon(Icons.volume_up_rounded, size: 18, color: p.textSecondary),
+                      ],
                     ),
                   ],
                 ),

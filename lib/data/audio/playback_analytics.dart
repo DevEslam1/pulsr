@@ -47,4 +47,21 @@ class PlaybackAnalytics {
       onReduceQualityRequested?.call();
     }
   }
+
+  int _preloadSuccessCount = 0;
+  int _preloadFailureCount = 0;
+
+  void recordPreloadSuccess() {
+    _preloadSuccessCount++;
+  }
+
+  void recordPreloadFailure() {
+    _preloadFailureCount++;
+  }
+
+  double get preloadSuccessRate {
+    final total = _preloadSuccessCount + _preloadFailureCount;
+    if (total == 0) return 1.0;
+    return _preloadSuccessCount / total;
+  }
 }

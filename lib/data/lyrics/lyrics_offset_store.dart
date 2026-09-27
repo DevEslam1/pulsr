@@ -12,12 +12,23 @@ class LyricsOffsetStore {
   static const String _indexKey = 'lyrics_offset_index_v1';
   static const int maxEntries = 500;
 
-  int _hash(String path) {
+  String _hash(String path) {
+    var h1 = 0x811c9dc5;
+    var h2 = 5381;
+    for (var i = 0; i < path.length; i++) {
+      final code = path.codeUnitAt(i);
+      h1 = ((h1 ^ code) * 0x01000193) & 0x7fffffff;
+      h2 = (((h2 << 5) + h2) + code) & 0x7fffffff;
+    }
+    return '${path.length}_${h1.toRadixString(16)}_${h2.toRadixString(16)}';
+  }
+
+  String _legacyKey(String path) {
     var h = 0;
     for (var i = 0; i < path.length; i++) {
       h = (h * 31 + path.codeUnitAt(i)) & 0x7fffffff;
     }
-    return h;
+    return '$_prefix$h';
   }
 
   String _key(String path) => '$_prefix${_hash(path)}';
@@ -26,10 +37,25 @@ class LyricsOffsetStore {
     if (path.isEmpty) return 0;
     try {
       final prefs = await SharedPreferences.getInstance();
+      final key = _key(path);
       // Collision guard: the hash key may belong to a different path.
-      final owner = prefs.getString('${_key(path)}$_pathSuffix');
+      final owner = prefs.getString('$key$_pathSuffix');
+      if (owner == path) {
+        return prefs.getInt(key) ?? 0;
+      }
+      // Check legacy key for migration
+      final legKey = _legacyKey(path);
+      final legOwner = prefs.getString('$legKey$_pathSuffix');
+      if (legOwner == path) {
+        final val = prefs.getInt(legKey) ?? 0;
+        await prefs.setInt(key, val);
+        await prefs.setString('$key$_pathSuffix', path);
+        await prefs.remove(legKey);
+        await prefs.remove('$legKey$_pathSuffix');
+        return val;
+      }
       if (owner != null && owner != path) return 0;
-      return prefs.getInt(_key(path)) ?? 0;
+      return prefs.getInt(key) ?? 0;
     } catch (e, st) {
       ErrorLogger.log('Lyrics offset read failed',
           error: e, stackTrace: st, category: 'Lyrics');

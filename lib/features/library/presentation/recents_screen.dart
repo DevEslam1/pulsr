@@ -7,10 +7,10 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/staggered_list_item.dart';
 import '../../../data/db/app_database.dart';
@@ -172,54 +172,16 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   child: Column(
                     children: [
                       // Search bar
-                      GlassContainer(
-                        blur: 16,
-                        opacity: p.isDark ? 0.9 : 0.95,
-                        borderRadius: AppRadii.full,
-                        color: p.surfaceContainer,
-                        border: Border.all(color: p.hairline, width: 1),
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                        child: Row(
-                          children: [
-                            Icon(Icons.search_rounded,
-                                color: p.textSecondary, size: 20),
-                            const SizedBox(width: AppSpacing.s10),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: (val) {
-                                  _searchDebounce?.cancel();
-                                  _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-                                    if (mounted) setState(() => _searchQuery = val);
-                                  });
-                                },
-                                style: TextStyle(
-                                    color: p.textPrimary, fontSize: AppFontSize.body),
-                                decoration: InputDecoration(
-                                  hintText:
-                                      '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
-                                  hintStyle: TextStyle(
-                                      color: p.textTertiary, fontSize: AppFontSize.bodySmall),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding:
-                                      const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                                ),
-                              ),
-                            ),
-                            if (_searchQuery.isNotEmpty)
-                                IconButton(
-                                  icon: Icon(Icons.close_rounded,
-                                      color: p.textSecondary, size: 18),
-                                  tooltip: context.l10n.clear,
-                                  onPressed: () {
-                                  _searchDebounce?.cancel();
-                                  _searchController.clear();
-                                  setState(() => _searchQuery = '');
-                                },
-                              ),
-                          ],
-                        ),
+                      PulsrSearchField(
+                        controller: _searchController,
+                        hintText:
+                            '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
+                        onChanged: (val) {
+                          if (mounted) setState(() => _searchQuery = val);
+                        },
+                        onClear: () {
+                          if (mounted) setState(() => _searchQuery = '');
+                        },
                       ),
                       const SizedBox(height: AppSpacing.s14),
                       // Action buttons: Play All & Shuffle

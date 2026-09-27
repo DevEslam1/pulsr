@@ -1569,11 +1569,21 @@ class MusicRepository implements IMusicRepository {
 
       for (final container in containers) {
         final cuePath = _siblingCuePath(container.path);
-        if (cuePath.isEmpty) continue;
-        final cueFile = File(cuePath);
-        if (!await cueFile.exists()) continue;
-        final chapters = await CueParser.findAndParseCue(container.path);
-        if (chapters.isEmpty) continue;
+        String? effectiveCuePath;
+        List<ChapterInfo> chapters = const [];
+
+        if (cuePath.isNotEmpty && await File(cuePath).exists()) {
+          chapters = await CueParser.findAndParseCue(container.path);
+          effectiveCuePath = cuePath;
+        } else {
+          final embedded = await CueParser.extractEmbeddedCueSheet(container.path);
+          if (embedded != null && embedded.isNotEmpty) {
+            chapters = CueParser.parse(embedded);
+            effectiveCuePath = 'embedded://${container.path}';
+          }
+        }
+
+        if (chapters.isEmpty || effectiveCuePath == null) continue;
         // Only whole-file album sheets are expanded. Multi-file sheets map
         // chapters onto several source files; expanding the wrong window on
         // this one file would fabricate playback, so skip them.
@@ -1583,7 +1593,7 @@ class MusicRepository implements IMusicRepository {
             .toSet();
         if (fileNames.length > 1) continue;
         // The cue must reference this audio file, not an unrelated sibling.
-        if (fileNames.isNotEmpty) {
+        if (fileNames.isNotEmpty && !effectiveCuePath.startsWith('embedded://')) {
           final referenced = fileNames.first;
           final audioName =
               container.path.replaceAll('\\', '/').split('/').last.toLowerCase();
@@ -1592,13 +1602,13 @@ class MusicRepository implements IMusicRepository {
         final virtual = buildCueExpansion(
           container: container,
           chapters: chapters,
-          cuePath: cuePath,
+          cuePath: effectiveCuePath,
         );
         if (virtual.isEmpty) continue;
         companions.addAll(virtual);
         newIdsByPath[container.path] =
             virtual.map((c) => c.id.value).toList();
-        coverByContainerId[container.id] = cuePath;
+        coverByContainerId[container.id] = effectiveCuePath;
         coveredPaths.add(container.path);
         expanded += virtual.length;
       }

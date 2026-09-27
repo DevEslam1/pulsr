@@ -11,6 +11,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -159,7 +160,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
 
           return Center(
             child: ConstrainedBox(
-              constraints: Adaptive.contentConstraints(context),
+              constraints: PulsrLayoutMetrics.contentConstraints(context),
               child: ListView(
                 padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                 children: [
@@ -311,7 +312,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     if (parts.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      height: 38,
+      height: PulsrLayoutMetrics.fieldHeight(context) * 0.85,
       margin: EdgeInsets.symmetric(
         horizontal: Adaptive.pagePadding(context),
         vertical: AppSpacing.xxs,

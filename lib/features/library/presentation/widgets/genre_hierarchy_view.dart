@@ -6,6 +6,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/pulsr_search_field.dart';
 import '../../../../domain/models/genre_item.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -182,49 +183,17 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: TextField(
+          child: PulsrSearchField(
             controller: _searchController,
-            onChanged: (val) =>
-                setState(() => _searchQuery = val.trim().toLowerCase()),
-            style: TextStyle(
-                color: p.textPrimary, fontSize: AppFontSize.bodySmall),
-            decoration: InputDecoration(
-              hintText: context.l10n.searchPlaceholder,
-              hintStyle: TextStyle(
-                  color: p.textTertiary, fontSize: AppFontSize.bodySmall),
-              prefixIcon:
-                  Icon(Icons.search_rounded, size: 20, color: p.textTertiary),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18),
-                      color: p.textSecondary,
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
-                      ),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: p.surfaceCard,
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
-                borderSide: BorderSide(color: p.hairline),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
-                borderSide: BorderSide(color: p.hairline),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
-                borderSide: BorderSide(color: p.primary, width: 1.5),
-              ),
-            ),
+            hintText: context.l10n.searchPlaceholder,
+            onChanged: (val) {
+              if (mounted) {
+                setState(() => _searchQuery = val.trim().toLowerCase());
+              }
+            },
+            onClear: () {
+              if (mounted) setState(() => _searchQuery = '');
+            },
           ),
         ),
         if (widget.genres.isEmpty)

@@ -2,6 +2,8 @@
 part of 'audio_handler.dart';
 
 mixin PulsrAudioQueueEngine on BaseAudioHandler {
+  Future<Map<String, dynamic>?> _readCrashPositionRecovery();
+
   Future<void> restoreLastPlaybackSession() async {
     try {
       if (_userPlaybackInitiated ||
@@ -95,6 +97,23 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
             // resume does not silently restart the track from 0.
             savedPositionMs =
                 item.positionMs > 0 ? item.positionMs : song.lastPositionMs;
+            try {
+              final crashSnapshot = await PositionCrashGuard.readSnapshot();
+              if (crashSnapshot != null && crashSnapshot.songId == item.songId) {
+                final preferCrash = await PositionCrashGuard.shouldPreferCrashGuard(savedPositionMs);
+                if (preferCrash || crashSnapshot.positionMs > savedPositionMs) {
+                  savedPositionMs = crashSnapshot.positionMs;
+                }
+              } else {
+                final recovery = await _readCrashPositionRecovery();
+                if (recovery != null && recovery['songId'] == item.songId) {
+                  final recPos = (recovery['positionMs'] as num?)?.toInt() ?? 0;
+                  if (recPos > savedPositionMs) {
+                    savedPositionMs = recPos;
+                  }
+                }
+              }
+            } catch (_) {}
           }
         }
       }
@@ -442,14 +461,17 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
         // Clear the native gain curve BEFORE stop() while the player is still
         // active on the platform channel, then allow the pipeline to drain before stop.
+        // Re-read outgoing player reference in case of mid-delay skip or swap (M-05).
+        final outgoing = _inactivePlayer;
         try {
-          await active.dspClearGainCurve();
+          await outgoing.dspClearGainCurve();
         } catch (_) {}
         await Future.delayed(const Duration(milliseconds: 80));
+        final outgoingAfterDelay = _inactivePlayer;
         try {
-          await active.stop();
+          await outgoingAfterDelay.stop();
         } catch (_) {}
-        await active.setVolume(_volume);
+        await outgoingAfterDelay.setVolume(_volume);
         // FIX-#5: During crossfade the outgoing player is manually stopped, so
         // ProcessingState.completed never fires.  Notify the sleep timer here
         // so track-count-based timers decrement correctly.
@@ -566,30 +588,18 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       else if (hasNext)
         MediaControl.skipToNext,
       if (activeSong != null)
-        MediaControl.custom(
-          androidIcon: activeSong.isFavorite
-              ? 'drawable/ic_favorite'
-              : 'drawable/ic_favorite_border',
-          label: activeSong.isFavorite ? 'Unfavorite' : 'Favorite',
-          name: 'toggleFavorite',
-        ),
+        activeSong.isFavorite
+            ? PulsrAudioHandler.controlFavorite
+            : PulsrAudioHandler.controlUnfavorite,
       if (hasPrevious || hasNext) ...[
-        MediaControl.custom(
-          androidIcon: _activePlayer.shuffleModeEnabled
-              ? 'drawable/ic_shuffle_on'
-              : 'drawable/ic_shuffle',
-          label: 'Shuffle',
-          name: 'toggleShuffle',
-        ),
-        MediaControl.custom(
-          androidIcon: _activePlayer.loopMode == LoopMode.one
-              ? 'drawable/ic_repeat_one'
-              : (_activePlayer.loopMode == LoopMode.all
-                  ? 'drawable/ic_repeat_all'
-                  : 'drawable/ic_repeat'),
-          label: 'Repeat',
-          name: 'cycleRepeat',
-        ),
+        _activePlayer.shuffleModeEnabled
+            ? PulsrAudioHandler.controlShuffleOn
+            : PulsrAudioHandler.controlShuffleOff,
+        _activePlayer.loopMode == LoopMode.one
+            ? PulsrAudioHandler.controlRepeatOne
+            : (_activePlayer.loopMode == LoopMode.all
+                ? PulsrAudioHandler.controlRepeatAll
+                : PulsrAudioHandler.controlRepeatOff),
       ],
     ];
     final processingState = const {
@@ -987,6 +997,24 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     }
 
     final sources = _buildAudioSources(songsSnapshot);
+    if (targetIndex >= 0 && targetIndex < sources.length) {
+      final firstSong = songsSnapshot[targetIndex];
+      if (firstSong.source != SongSource.youtube && !PulsrAudioHandler._isStreamUrl(firstSong.path)) {
+        try {
+          final measuredTrim = GaplessTrimHandler.readHeaderGaplessTrimSync(firstSong.path);
+          if (measuredTrim != null && measuredTrim.preSkip.inMilliseconds > 2) {
+            final currentSrc = sources[targetIndex];
+            if (currentSrc is UriAudioSource && currentSrc is! ClippingAudioSource) {
+              sources[targetIndex] = ClippingAudioSource(
+                start: measuredTrim.preSkip,
+                child: currentSrc,
+                tag: PulsrAudioHandler._songToMediaItem(firstSong),
+              );
+            }
+          }
+        } catch (_) {}
+      }
+    }
 
     // Pre-resolve the target online URL BEFORE stopping current playback:
     // a YouTube resolve can take seconds, and stopping first turns that into
@@ -1194,12 +1222,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     if (_isManualSkip) {
       _isManualSkip = false;
       _rapidGaplessChangeCount = 0;
-      // Do NOT zero _consecutiveFailures here. Error-driven skips also call
-      // skipToNext(), which sets _isManualSkip, so clearing the budget on every
-      // such advance made the "stop after N failed tracks" guards in
-      // _handleStreamResolutionError / _failCurrentPlayback unreachable and a
-      // dead queue skipped forever. Healthy playback clears it via the position
-      // listener (pos > 2s, ready).
+      // Decay consecutive failure counter by 1 on manual skip (M-02) so user interaction
+      // rewards the failure budget without totally erasing error-tracking.
+      if (_consecutiveFailures > 0) {
+        _consecutiveFailures--;
+      }
     } else {
       final now = DateTime.now();
       if (_lastGaplessChangeTime != null &&

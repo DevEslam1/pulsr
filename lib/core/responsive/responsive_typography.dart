@@ -121,4 +121,7 @@ class PulsrTextScaleScope extends StatelessWidget {
 extension ResponsiveTypographyExtension on BuildContext {
   PulsrResponsiveTypography get typography =>
       PulsrResponsiveTypography(breakpoint);
+
+  PulsrResponsiveTypography get responsiveTypography =>
+      PulsrResponsiveTypography(breakpoint);
 }

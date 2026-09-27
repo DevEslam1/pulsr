@@ -5,6 +5,7 @@ import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 import '../performance/gpu_budget.dart';
+import 'pulsr_dialog.dart';
 import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -17,6 +18,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 /// - Responsive width clamping on tablet & desktop (`maxWidth: 580`)
 /// - Frosted translucent backdrop blur and hairline border
 /// - Edge-to-edge safe area handling
+/// - Automatically adapts to centered dialog when in landscape on short phone screens
 class PulsrSheetHelper {
   /// Opens a unified modal bottom sheet with automatic mini player dock tracking.
   static Future<T?> showPulsrSheet<T>({
@@ -30,6 +32,50 @@ class PulsrSheetHelper {
     bool showDragHandle = true,
     bool wrapWithContainer = true,
   }) {
+    final size = MediaQuery.sizeOf(context);
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    // Landscape phone: present as centered dialog to avoid bottom sheet clipping/distortion
+    if (isLandscape && size.height < 480) {
+      return PulsrDialogHelper.showCustomDialog<T>(
+        context,
+        useRootNavigator: useRootNavigator,
+        barrierDismissible: isDismissible,
+        builder: (ctx) {
+          final built = builder(ctx);
+          final inner = (!wrapWithContainer || built is PulsrBottomSheetContainer)
+              ? built
+              : PulsrBottomSheetContainer(
+                  showDragHandle: false,
+                  child: built,
+                );
+          return Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 520,
+                maxHeight: size.height * 0.88,
+              ),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
+                ),
+                child: ClipRRect(
+                  borderRadius: AppRadii.dialogRadius,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: inner,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     PulsrModalTracker.push();
     final p = context.palette;
 
@@ -192,7 +238,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                             const SizedBox(height: AppSpacing.s10),
                             Center(
                               child: Container(
-                                width: 38,
+                                width: AppSpacing.s38,
                                 height: 4.5,
                                 decoration: BoxDecoration(
                                   color: (p.isDark ? Colors.white : Colors.black)

@@ -7,6 +7,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
@@ -78,7 +79,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: Adaptive.contentConstraints(context),
+            constraints: PulsrLayoutMetrics.contentConstraints(context),
             child: RefreshIndicator(
               color: p.accent,
               backgroundColor: p.surfaceContainer,
