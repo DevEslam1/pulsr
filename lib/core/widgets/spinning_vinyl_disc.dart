@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../motion/pulsr_motion.dart';
 import '../widgets/cached_artwork.dart';
 
 /// An animated vinyl record disc that smoothly rotates when [isPlaying] is true
@@ -39,19 +40,27 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
       vsync: this,
       duration: widget.rotationPeriod,
     );
-    if (widget.isPlaying) {
+  }
+
+  void _syncAnimation() {
+    final shouldSpin = widget.isPlaying && context.motionEnabled;
+    if (shouldSpin && !_controller.isAnimating) {
       _controller.repeat();
+    } else if (!shouldSpin && _controller.isAnimating) {
+      _controller.stop();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimation();
   }
 
   @override
   void didUpdateWidget(covariant SpinningVinylDisc oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isPlaying && !_controller.isAnimating) {
-      _controller.repeat();
-    } else if (!widget.isPlaying && _controller.isAnimating) {
-      _controller.stop();
-    }
+    _syncAnimation();
   }
 
   @override

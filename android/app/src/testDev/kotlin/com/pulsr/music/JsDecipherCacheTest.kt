@@ -85,9 +85,8 @@ class JsDecipherCacheTest {
             cache.decipherSignature("abc", "unknown_player")
         }
 
+        // B-42: Empty step list passes through signature gracefully (consistent with decipherN)
         cache.putRules("empty_player", emptyList())
-        assertThrows(UndecipherableSignatureException::class.java) {
-            cache.decipherSignature("abc", "empty_player")
-        }
+        assertEquals("abc", cache.decipherSignature("abc", "empty_player"))
     }
 }

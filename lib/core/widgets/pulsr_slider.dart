@@ -81,6 +81,7 @@ class _PulsrSliderState extends State<PulsrSlider>
   }
 
   bool get _isTesting =>
+      const bool.fromEnvironment('FLUTTER_TEST') ||
       WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   @override
@@ -111,6 +112,11 @@ class _PulsrSliderState extends State<PulsrSlider>
   @override
   void didUpdateWidget(PulsrSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.min != oldWidget.min ||
+        widget.max != oldWidget.max ||
+        widget.divisions != oldWidget.divisions) {
+      _lastDivisionTick = null;
+    }
     _syncWave();
   }
 
@@ -158,6 +164,7 @@ class _PulsrSliderState extends State<PulsrSlider>
     _expandController.reverse();
     final val = _tapSeekPending ? _tapSeekValue : _calculateValue(dx, width);
     _tapSeekPending = false;
+    _lastDivisionTick = null;
     widget.onChangeEnd?.call(val);
   }
 
@@ -167,75 +174,133 @@ class _PulsrSliderState extends State<PulsrSlider>
     _onDragStart(dx, width);
   }
 
+  bool _isFocused = false;
+  bool _isHovered = false;
+
+  void _stepValue(double multiplier) {
+    final range = widget.max - widget.min;
+    if (range <= 0) return;
+    final step = (widget.divisions != null && widget.divisions! > 0)
+        ? (range / widget.divisions!)
+        : (range / 20.0);
+    final target = (widget.value + (step * multiplier)).clamp(widget.min, widget.max);
+    HapticFeedback.selectionClick();
+    widget.onChanged(target);
+    widget.onChangeEnd?.call(target);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final range = widget.max - widget.min;
     final t = range <= 0 ? 0.0 : ((widget.value - widget.min) / range).clamp(0.0, 1.0);
 
-    return Semantics(
-      label: widget.semanticLabel,
-      slider: true,
-      child: SizedBox(
-        height: widget.height,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (d) => _onTapDown(d.localPosition.dx, width),
-              onTapUp: (d) => _onDragEnd(d.localPosition.dx, width),
-              onTapCancel: () {
-                _tapSeekPending = false;
-                setState(() => _isDragging = false);
-                _expandController.reverse();
-              },
-              onHorizontalDragStart: (d) {
-                _tapSeekPending = false;
-                _onDragStart(d.localPosition.dx, width);
-              },
-              onHorizontalDragUpdate: (d) =>
-                  _onDragUpdate(d.localPosition.dx, width),
-              onHorizontalDragEnd: (d) =>
-                  _onDragEnd(d.localPosition.dx, width),
-              onHorizontalDragCancel: () {
-                _tapSeekPending = false;
-                setState(() => _isDragging = false);
-                _expandController.reverse();
-                widget.onChangeCancel?.call();
-              },
-              child: RepaintBoundary(
-                child: AnimatedBuilder(
-                  animation: Listenable.merge([_expandAnimation, _waveController]),
-                  builder: (context, _) {
-                    return CustomPaint(
-                      painter: _PulsrSliderPainter(
-                        t: t,
-                        expandFactor: _expandAnimation.value,
-                        wavePhase: widget.animateWave
-                            ? _waveController.value * 2 * pi
-                            : 0.0,
-                        isWavy: widget.isWavy,
-                        inactiveColor: widget.inactiveColor ??
-                            (p.isDark ? Colors.white : Colors.black)
-                                .withValues(alpha: 0.12),
-                        activeColor: widget.activeColor ?? p.accent,
-                        thumbColor: widget.thumbColor ??
-                            (p.isDark ? Colors.white : p.accent),
-                        glowColor: p.glow,
-                      ),
-                      size: Size.infinite,
-                    );
-                  },
-                ),
-              ),
-            );
+    return FocusableActionDetector(
+      onFocusChange: (focused) => setState(() => _isFocused = focused),
+      onShowHoverHighlight: (hovered) => setState(() => _isHovered = hovered),
+      shortcuts: <ShortcutActivator, Intent>{
+        LogicalKeySet(LogicalKeyboardKey.arrowRight): const _SliderStepIntent(1),
+        LogicalKeySet(LogicalKeyboardKey.arrowUp): const _SliderStepIntent(1),
+        LogicalKeySet(LogicalKeyboardKey.arrowLeft): const _SliderStepIntent(-1),
+        LogicalKeySet(LogicalKeyboardKey.arrowDown): const _SliderStepIntent(-1),
+        LogicalKeySet(LogicalKeyboardKey.pageUp): const _SliderStepIntent(4),
+        LogicalKeySet(LogicalKeyboardKey.pageDown): const _SliderStepIntent(-4),
+      },
+      actions: <Type, Action<Intent>>{
+        _SliderStepIntent: CallbackAction<_SliderStepIntent>(
+          onInvoke: (intent) {
+            _stepValue(intent.steps.toDouble());
+            return null;
           },
+        ),
+      },
+      child: Semantics(
+        label: widget.semanticLabel,
+        slider: true,
+        value: '${(t * 100).round()}%',
+        increasedValue: 'Increase',
+        decreasedValue: 'Decrease',
+        onIncrease: () => _stepValue(1),
+        onDecrease: () => _stepValue(-1),
+        child: Container(
+          decoration: _isFocused
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: (widget.activeColor ?? p.accent).withValues(alpha: 0.6),
+                    width: 1.5,
+                  ),
+                )
+              : null,
+          height: widget.height,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (d) => _onTapDown(d.localPosition.dx, width),
+                onTapUp: (d) => _onDragEnd(d.localPosition.dx, width),
+                onTapCancel: () {
+                  _tapSeekPending = false;
+                  _lastDivisionTick = null;
+                  setState(() => _isDragging = false);
+                  _expandController.reverse();
+                },
+                onHorizontalDragStart: (d) {
+                  _tapSeekPending = false;
+                  _onDragStart(d.localPosition.dx, width);
+                },
+                onHorizontalDragUpdate: (d) =>
+                    _onDragUpdate(d.localPosition.dx, width),
+                onHorizontalDragEnd: (d) =>
+                    _onDragEnd(d.localPosition.dx, width),
+                onHorizontalDragCancel: () {
+                  _tapSeekPending = false;
+                  _lastDivisionTick = null;
+                  setState(() => _isDragging = false);
+                  _expandController.reverse();
+                  widget.onChangeCancel?.call();
+                },
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_expandAnimation, _waveController]),
+                    builder: (context, _) {
+                      return CustomPaint(
+                        painter: _PulsrSliderPainter(
+                          t: t,
+                          expandFactor: _isFocused || _isHovered
+                              ? max(0.4, _expandAnimation.value)
+                              : _expandAnimation.value,
+                          wavePhase: widget.animateWave
+                              ? _waveController.value * 2 * pi
+                              : 0.0,
+                          isWavy: widget.isWavy,
+                          inactiveColor: widget.inactiveColor ??
+                              (p.isDark ? Colors.white : Colors.black)
+                                  .withValues(alpha: 0.12),
+                          activeColor: widget.activeColor ?? p.accent,
+                          thumbColor: widget.thumbColor ??
+                              (p.isDark ? Colors.white : p.accent),
+                          glowColor: p.glow,
+                        ),
+                        size: Size.infinite,
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
   }
+}
+
+class _SliderStepIntent extends Intent {
+  final int steps;
+  const _SliderStepIntent(this.steps);
 }
 
 class _PulsrSliderPainter extends CustomPainter {

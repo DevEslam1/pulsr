@@ -26,6 +26,28 @@ class WaveformService {
   final LinkedHashMap<String, List<double>> _memCache = LinkedHashMap();
   Directory? _cacheDir;
 
+  /// Returns cached or instant synthetic waveform samples synchronously (0ms latency),
+  /// guaranteeing immediate display on frame 1 without flashing a fallback bar.
+  List<double> getInstantWaveform({
+    required int songId,
+    String? filePath,
+    int count = 60,
+  }) {
+    final memKey = '${songId}_$count';
+    final cached = _memCache[memKey];
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
+
+    final instant = WaveformGenerator().generateWaveformSync(
+      songId: songId,
+      filePath: filePath,
+      count: count,
+    );
+    _putMem(memKey, instant);
+    return instant;
+  }
+
   Future<List<double>> getWaveform({
     required int songId,
     String? filePath,
@@ -42,7 +64,7 @@ class WaveformService {
     if (_isLocalFile(filePath)) {
       samples = await _loadFromDiskOrDecode(filePath!, count);
     }
-    samples ??= await WaveformGenerator().generateWaveform(
+    samples ??= WaveformGenerator().generateWaveformSync(
       songId: songId,
       filePath: filePath,
       count: count,

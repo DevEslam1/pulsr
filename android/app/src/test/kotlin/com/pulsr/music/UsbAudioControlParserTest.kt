@@ -130,4 +130,19 @@ class UsbAudioControlParserTest {
             assertNotNull(res) // Must gracefully return a result object without uncaught exception
         }
     }
+
+    @Test
+    fun parsesFormatTypeIII() {
+        val configWithFormatTypeIII = byteArrayOf(
+            // AudioStreaming interface #1
+            9, 0x04, 0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00,
+            // Class-specific AS interface descriptor: FORMAT_TYPE (0x02), formatType = 0x03 (Type III IEC61937),
+            // bNrChannels = 2, bSubFrameSize = 2, bBitResolution = 16, bSamFreqType = 1 (discrete frequency)
+            11, 0x24, 0x02, 0x03, 0x02, 0x02, 0x10, 0x01,
+            // 48000 Hz = 0x00BB80 -> 0x80, 0xBB, 0x00
+            0x80.toByte(), 0xBB.toByte(), 0x00,
+        )
+        val result = UsbAudioControlParser.parse(configWithFormatTypeIII)
+        assertEquals(listOf(48000), result.supportedRates)
+    }
 }

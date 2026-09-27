@@ -5,6 +5,12 @@ import '../constants/app_radii.dart';
 import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
 
+enum GlassTier {
+  standard,
+  liquid,
+  solid,
+}
+
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double blur;
@@ -14,6 +20,7 @@ class GlassContainer extends StatelessWidget {
   final Border? border;
   final EdgeInsetsGeometry? padding;
   final Color? color;
+  final GlassTier tier;
 
   /// When false, no [BackdropFilter] is used — the container renders a
   /// tinted translucent surface, avoiding a GPU-expensive blur pass on
@@ -35,6 +42,7 @@ class GlassContainer extends StatelessWidget {
   const GlassContainer({
     super.key,
     required this.child,
+    this.tier = GlassTier.standard,
     this.blur = 12.0,
     this.opacity = 0.78,
     this.borderRadius,
@@ -46,7 +54,7 @@ class GlassContainer extends StatelessWidget {
     this.enableBlur = true,
     this.specularHighlight = false,
     this.tintFactor,
-  }) : isLiquid = false;
+  }) : isLiquid = tier == GlassTier.liquid;
 
   /// Factory constructor configured for iOS 26/27 refractive Liquid Glass.
   /// Uses a higher blur sigma (24.0), specular top hairline, and squircle curvature.
@@ -64,7 +72,26 @@ class GlassContainer extends StatelessWidget {
     this.enableBlur = true,
     this.specularHighlight = true,
     this.tintFactor,
-  }) : isLiquid = true;
+  })  : tier = GlassTier.liquid,
+        isLiquid = true;
+
+  /// Solid non-blurred surface tier avoiding backdrop filter passes entirely.
+  const GlassContainer.solid({
+    super.key,
+    required this.child,
+    this.opacity = 1.0,
+    this.borderRadius,
+    this.shape,
+    this.border,
+    this.padding,
+    this.color,
+    this.boxShadow,
+    this.tintFactor,
+  })  : tier = GlassTier.solid,
+        blur = 0.0,
+        enableBlur = false,
+        specularHighlight = false,
+        isLiquid = false;
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +187,9 @@ class GlassContainer extends StatelessWidget {
       );
     }
 
-    if (!enableBlur || GpuBudget.isEnabled) {
+    // When blur is explicitly disabled or GPU-saving budget mode is active,
+    // skip the expensive BackdropFilter pass.
+    if (!enableBlur || GpuBudget.isGpuSaverActive) {
       return clipped;
     }
 

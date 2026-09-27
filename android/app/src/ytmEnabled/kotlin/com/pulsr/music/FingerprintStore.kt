@@ -21,11 +21,10 @@ internal object FingerprintStore {
     private const val KEY_HL = "ytm_hl"
     private const val KEY_GL = "ytm_gl"
 
-    // The whole YTM surface pins one region: the sign-in WebView's
-    // anti-fingerprint script hardcodes Africa/Cairo and Cairo coordinates, and
-    // the Dart Innertube contexts send the same pair. A native fingerprint that
-    // disagrees with those is a stronger bot signal than a "wrong" but coherent
-    // one, so this is the single source of truth rather than four literals.
+    // Regional coherence: Innertube requests use the device's actual default locale
+    // (hl/gl) for language and country context, avoiding synthetic mismatch against
+    // the user's real network environment. This serves as the single source of truth
+    // across native Android client payloads.
     val DEFAULT_HL: String
         get() = java.util.Locale.getDefault().language.ifBlank { "en" }.lowercase()
     val DEFAULT_GL: String

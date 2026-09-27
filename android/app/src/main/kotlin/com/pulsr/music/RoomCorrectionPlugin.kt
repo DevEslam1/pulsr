@@ -111,7 +111,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             currentSampleRate = sampleRate
             record.startRecording()
             captureThread = Thread {
-                val buf = ByteArray(4096)
+                val buf = ByteArray(8192)
                 var overrunCount = 0
                 while (capturing.get() && !Thread.currentThread().isInterrupted) {
                     val n = try {

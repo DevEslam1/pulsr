@@ -25,6 +25,7 @@ class PulsrSegmentedControl extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
   final EdgeInsetsGeometry? margin;
+  final bool slidingIndicator;
 
   const PulsrSegmentedControl({
     super.key,
@@ -32,12 +33,124 @@ class PulsrSegmentedControl extends StatelessWidget {
     required this.selectedIndex,
     required this.onChanged,
     this.margin,
+    this.slidingIndicator = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     if (segments.length < 2) return const SizedBox.shrink();
+
+    final clampedIndex = selectedIndex.clamp(0, segments.length - 1);
+
+    if (slidingIndicator) {
+      return Container(
+        margin: margin,
+        padding: const EdgeInsets.all(AppSpacing.xxs),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: BorderRadius.circular(AppRadii.r16),
+          border: Border.all(color: p.hairline),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final innerWidth = constraints.maxWidth;
+            final segmentWidth = innerWidth / segments.length;
+
+            return Stack(
+              children: [
+                // Sliding indicator pill
+                AnimatedPositioned(
+                  duration: context.motionMs(240),
+                  curve: context.motionCurve(Curves.easeOutCubic),
+                  left: clampedIndex * segmentWidth,
+                  top: 0,
+                  bottom: 0,
+                  width: segmentWidth,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: p.accentContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      border: Border.all(
+                        color: p.accent.withValues(alpha: 0.40),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: p.accent.withValues(alpha: 0.18),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Segments row
+                Row(
+                  children: [
+                    for (var i = 0; i < segments.length; i++)
+                      Expanded(
+                        child: Semantics(
+                          selected: clampedIndex == i,
+                          button: true,
+                          label: segments[i].label,
+                          excludeSemantics: true,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              if (clampedIndex != i) {
+                                HapticFeedback.selectionClick();
+                                onChanged(i);
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs,
+                                vertical: AppSpacing.s10,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    segments[i].icon,
+                                    size: 16,
+                                    color: clampedIndex == i
+                                        ? p.accent
+                                        : p.textSecondary,
+                                  ),
+                                  const SizedBox(width: AppSpacing.s6),
+                                  Flexible(
+                                    child: Text(
+                                      segments[i].count != null
+                                          ? '${segments[i].label} (${segments[i].count})'
+                                          : segments[i].label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.bodySmall,
+                                        fontWeight: clampedIndex == i
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: clampedIndex == i
+                                            ? p.accent
+                                            : p.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
 
     return Container(
       margin: margin,

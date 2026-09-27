@@ -52,8 +52,16 @@ internal class ClientWinnerStore(context: Context) {
         }
     }
 
+    @Volatile private var cachedNetworkClass: String? = null
+    @Volatile private var lastNetworkQueryTimeMs: Long = 0L
+
     fun getCurrentNetworkClass(): String {
-        return try {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val cached = cachedNetworkClass
+        if (cached != null && (now - lastNetworkQueryTimeMs) < 5_000L) {
+            return cached
+        }
+        val result = try {
             val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
                 ?: return "unknown"
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
@@ -74,6 +82,9 @@ internal class ClientWinnerStore(context: Context) {
         } catch (_: Throwable) {
             "unknown"
         }
+        cachedNetworkClass = result
+        lastNetworkQueryTimeMs = now
+        return result
     }
 
     fun buildDimensionKey(trackType: String, hourBucket: Int? = null, networkClass: String? = null): String {
@@ -178,11 +189,23 @@ internal class ClientWinnerStore(context: Context) {
      */
     @Synchronized
     fun clearWinner(trackType: String = TRACK_TYPE_MUSIC) {
-        prefs.edit()
-            .remove(KEY_PREFIX_WINNER + trackType)
-            .remove(KEY_PREFIX_FAILURES + trackType)
-            .remove(KEY_PREFIX_RECORDED_AT + trackType)
-            .apply()
+        val editor = prefs.edit()
+        val exactWinner = KEY_PREFIX_WINNER + trackType
+        val exactFailures = KEY_PREFIX_FAILURES + trackType
+        val exactRecordedAt = KEY_PREFIX_RECORDED_AT + trackType
+
+        val prefixWinner = KEY_PREFIX_WINNER + trackType + "_"
+        val prefixFailures = KEY_PREFIX_FAILURES + trackType + "_"
+        val prefixRecordedAt = KEY_PREFIX_RECORDED_AT + trackType + "_"
+
+        editor.remove(exactWinner).remove(exactFailures).remove(exactRecordedAt)
+
+        for (k in prefs.all.keys) {
+            if (k.startsWith(prefixWinner) || k.startsWith(prefixFailures) || k.startsWith(prefixRecordedAt)) {
+                editor.remove(k)
+            }
+        }
+        editor.apply()
     }
 
     /**

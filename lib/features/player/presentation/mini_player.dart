@@ -728,7 +728,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
 
   void _syncWave() {
     final isTest = const bool.fromEnvironment('FLUTTER_TEST') ||
-        (WidgetsBinding.instance is! WidgetsFlutterBinding);
+        WidgetsBinding.instance.runtimeType.toString().contains('Test');
     final shouldAnimate = _isAppActive &&
         widget.isPlaying &&
         context.motionEnabled &&

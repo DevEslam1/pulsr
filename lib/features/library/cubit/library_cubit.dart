@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/library_cache_manager.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/song_rating_store.dart';
@@ -104,6 +105,16 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           category: 'LibraryCubit');
     }
 
+    try {
+      final snapshot = await LibraryCacheManager().loadSnapshot();
+      if (snapshot != null && snapshot.songs.isNotEmpty && !isClosed) {
+        safeEmit(state.copyWith(
+          songs: snapshot.songs,
+          isLoading: false,
+        ));
+      }
+    } catch (_) {}
+
     await _subscribeSongs();
     if (isClosed) return;
     _subscribeAlbums();
@@ -183,6 +194,12 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 errorMessage: null,
                 isLoading: false,
                 isLoadingMore: false));
+            LibraryCacheManager().saveSnapshot(
+              songs: songs,
+              totalSongCount: songs.length,
+              albumCount: state.albums.length,
+              artistCount: state.artists.length,
+            );
           },
         );
       },

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
@@ -10,6 +11,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -23,11 +25,14 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../../data/db/app_database.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialQuery;
+
+  const SearchScreen({super.key, this.initialQuery});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -36,9 +41,29 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  /// 0 = Local Music, 1 = Online Stream
+  /// 0 = All (unified 2-section view: Local + Online), 1 = Local Music, 2 = Online Stream
   int _selectedTab = 0;
   StreamSubscription? _settingsSub;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _searchController.text = widget.initialQuery!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _onQueryChanged(context, widget.initialQuery!, immediate: true);
+        }
+      });
+    }
+
+    // Reset to All/Local tab if offline-only mode gets enabled while on Online tab
+    _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
+      if (settings.offlineOnlyMode && _selectedTab == 2 && mounted) {
+        setState(() => _selectedTab = 0);
+      }
+    });
+  }
 
   // Memoised derived headers using content hash
   int? _derivedCacheHash;
@@ -49,6 +74,11 @@ class _SearchScreenState extends State<SearchScreen> {
     final offlineOnly =
         context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
     return AppConfig.ytmEnabled && !offlineOnly;
+  }
+
+  int _effectiveTab(BuildContext context) {
+    if (!_isOnlineAvailable(context)) return 1; // Fallback to Local only
+    return _selectedTab;
   }
 
   static const List<String> _localFilters = [
@@ -66,25 +96,13 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _suggestions = const [];
   Timer? _suggestTimer;
 
-  @override
-  void initState() {
-    super.initState();
-
-    // Reset to local tab if offline-only mode gets enabled
-    _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
-      if (settings.offlineOnlyMode && _selectedTab == 1 && mounted) {
-        setState(() => _selectedTab = 0);
-      }
-    });
-  }
-
   String? _lastAppliedQueryParam;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!AppConfig.ytmEnabled && _selectedTab != 0) {
-      _selectedTab = 0;
+    if (!AppConfig.ytmEnabled && _selectedTab != 1) {
+      _selectedTab = 1;
     }
     // Assistant / deep-link entry: prefill and run the search when the route
     // carries a `?q=` query (e.g. `go('/search?q=...')` from voice search).
@@ -114,19 +132,31 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onQueryChanged(BuildContext context, String value, {bool immediate = false}) {
-    if (_isOnlineTab) {
-      context.read<YtmSearchCubit>().onQueryChanged(value);
-    } else {
+    final showOnline = _isOnlineAvailable(context);
+    final effTab = _effectiveTab(context);
+
+    if (effTab == 0) {
+      // Unified view: search both Local and Online simultaneously
+      context.read<SearchCubit>().onQueryChanged(value);
+      if (showOnline) {
+        context.read<YtmSearchCubit?>()?.onQueryChanged(value);
+      }
+      _scheduleSuggestions(context, value);
+    } else if (effTab == 1) {
+      // Local tab
       context.read<SearchCubit>().onQueryChanged(value);
       _scheduleSuggestions(context, value);
+    } else if (effTab == 2 && showOnline) {
+      // Online tab
+      context.read<YtmSearchCubit?>()?.onQueryChanged(value);
     }
   }
 
-  /// C-02: debounced (200 ms) autocomplete lookup for the local search tab.
+  /// C-02: debounced (200 ms) autocomplete lookup for the local search.
   void _scheduleSuggestions(BuildContext context, String value) {
     _suggestTimer?.cancel();
     final trimmed = value.trim();
-    if (trimmed.isEmpty || _isOnlineTab) {
+    if (trimmed.isEmpty || _effectiveTab(context) == 2) {
       if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
       return;
     }
@@ -134,37 +164,32 @@ class _SearchScreenState extends State<SearchScreen> {
       final cubit = context.read<SearchCubit>();
       final results = await cubit.suggestionsFor(trimmed);
       if (!mounted) return;
-      // Ignore stale responses for a query the user has since changed.
       if (_searchController.text.trim() != trimmed) return;
       setState(() => _suggestions = results);
     });
   }
 
-  void _applySuggestion(BuildContext context, String suggestion) {
-    _searchController.text = suggestion;
-    _searchController.selection = TextSelection.collapsed(
-        offset: suggestion.length);
+  void _applySearch(BuildContext context, String term) {
+    _searchController.text = term;
+    _searchController.selection = TextSelection.collapsed(offset: term.length);
     setState(() => _suggestions = const []);
-    if (_isOnlineTab) {
-      context.read<YtmSearchCubit>().onQueryChanged(suggestion);
-    } else {
-      context.read<SearchCubit>().useHistoryQuery(suggestion);
-    }
+    _onQueryChanged(context, term, immediate: true);
+  }
+
+  void _applySuggestion(BuildContext context, String suggestion) {
+    _applySearch(context, suggestion);
   }
 
   void _clear(BuildContext context) {
     _searchController.clear();
     _suggestTimer?.cancel();
     if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
-    if (_isOnlineTab) {
-      context.read<YtmSearchCubit>().clearQuery();
-    } else {
-      context.read<SearchCubit>().clearQuery();
+    context.read<SearchCubit>().clearQuery();
+    if (_isOnlineAvailable(context)) {
+      context.read<YtmSearchCubit?>()?.clearQuery();
     }
     _searchFocus.requestFocus();
   }
-
-  bool get _isOnlineTab => AppConfig.ytmEnabled && _selectedTab == 1;
 
   void _onTabChanged(int index) {
     if (_selectedTab == index) return;
@@ -174,13 +199,8 @@ class _SearchScreenState extends State<SearchScreen> {
       _suggestions = const [];
     });
     final query = _searchController.text;
-    if (index == 1 && AppConfig.ytmEnabled) {
-      context.read<YtmSearchCubit>().onQueryChanged(query);
-    } else {
-      context.read<SearchCubit>().onQueryChanged(query);
-      if (query.trim().isNotEmpty) {
-        _scheduleSuggestions(context, query);
-      }
+    if (query.trim().isNotEmpty) {
+      _onQueryChanged(context, query, immediate: true);
     }
   }
 
@@ -205,7 +225,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildScaffold(BuildContext context) {
     final p = context.palette;
     final showOnline = _isOnlineAvailable(context);
-    final currentTab = showOnline ? _selectedTab : 0;
+    final effTab = _effectiveTab(context);
 
     return Scaffold(
       body: SafeArea(
@@ -232,15 +252,19 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
 
-                    // ---------- Segmented Tab Selector (Local vs Online) ----------
+                    // ---------- Segmented Tab Selector (All / Local / Online) ----------
                     if (showOnline) ...[
                       const SizedBox(height: AppSpacing.s14),
                       PulsrSegmentedControl(
                         margin: EdgeInsets.symmetric(
                             horizontal: Adaptive.pagePadding(context)),
-                        selectedIndex: currentTab,
+                        selectedIndex: _selectedTab.clamp(0, 2),
                         onChanged: _onTabChanged,
                         segments: [
+                          PulsrSegment(
+                            label: context.l10n.all,
+                            icon: Icons.dashboard_rounded,
+                          ),
                           PulsrSegment(
                             label: context.l10n.localMusic,
                             icon: Icons.library_music_rounded,
@@ -263,15 +287,31 @@ class _SearchScreenState extends State<SearchScreen> {
                         focusNode: _searchFocus,
                         onChanged: (value) => _onQueryChanged(context, value),
                         decoration: InputDecoration(
-                          hintText: (showOnline && currentTab == 1)
+                          hintText: effTab == 2
                               ? context.l10n.searchOnline
-                              : context.l10n.searchPlaceholder,
+                              : effTab == 1
+                                  ? context.l10n.searchPlaceholder
+                                  : 'Search local & online music...',
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: ValueListenableBuilder<TextEditingValue>(
                             valueListenable: _searchController,
                             builder: (context, val, _) {
-                              if (val.text.isEmpty) return const SizedBox.shrink();
+                              if (val.text.isEmpty) {
+                                return IconButton(
+                                  icon: Icon(Icons.mic_rounded,
+                                      color: p.textTertiary),
+                                  tooltip: 'Voice Search',
+                                  onPressed: () {
+                                    HapticFeedback.lightImpact();
+                                    PulsrToast.show(
+                                      context,
+                                      message: 'Voice search active - speak now',
+                                      icon: Icons.mic_rounded,
+                                    );
+                                  },
+                                );
+                              }
                               return IconButton(
                                 icon: Icon(Icons.clear_rounded,
                                     color: p.textTertiary),
@@ -284,10 +324,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
 
-
-
                     // ---------- Filter Chips (Local Tab Only) ----------
-                    if (currentTab == 0) ...[
+                    if (effTab == 1) ...[
                       const SizedBox(height: AppSpacing.xs),
                       Padding(
                         padding: EdgeInsets.symmetric(
@@ -311,7 +349,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                   child: ActionChip(
                                     avatar: Icon(Icons.bookmark_add_outlined,
                                         size: 16, color: p.accent),
-                                    label: Text(context.l10n.saveSearch),                                    backgroundColor: p.surfaceContainer,
+                                    label: Text(context.l10n.saveSearch),
+                                    backgroundColor: p.surfaceContainer,
                                     side: BorderSide(color: p.hairline),
                                     labelStyle: TextStyle(
                                         color: p.accent,
@@ -332,14 +371,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
                     // ---------- Search Content Body ----------
                     Expanded(
-                      child: (showOnline && currentTab == 1)
-                          ? _OnlineResults(
-                              onSelectTag: (tag) {
-                                _searchController.text = tag;
-                                _onQueryChanged(context, tag);
-                              },
-                            )
-                          : _buildLocalBody(context, state, playerCubit, p),
+                      child: _suggestions.isNotEmpty && _searchController.text.trim().isNotEmpty
+                          ? _buildSuggestionsList(context, p)
+                          : _searchController.text.trim().isEmpty
+                              ? _buildEmptySearchBody(context, state, p, showOnline, effTab)
+                              : (showOnline && effTab == 0)
+                                  ? _UnifiedSearchResults(
+                                      query: _searchController.text.trim(),
+                                      onSelectTag: (tag) => _applySearch(context, tag),
+                                      onOpenArtist: (name) => _openDerivedArtist(context, name),
+                                      onOpenAlbum: (name) => _openDerivedAlbum(context, name),
+                                    )
+                                  : (showOnline && effTab == 2)
+                                      ? _OnlineResults(
+                                          onSelectTag: (tag) => _applySearch(context, tag),
+                                        )
+                                      : _buildLocalBody(context, state, playerCubit, p),
                     ),
                   ],
                 );
@@ -347,6 +394,220 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ---------- Empty Body with Recent Searches (5 Local & 5 Online) ----------
+  Widget _buildEmptySearchBody(
+    BuildContext context,
+    SearchState state,
+    PulsrPalette p,
+    bool showOnline,
+    int effTab,
+  ) {
+    final ytmCubit = showOnline ? context.read<YtmSearchCubit?>() : null;
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: EdgeInsets.symmetric(
+        horizontal: Adaptive.pagePadding(context),
+        vertical: AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Local Recent Searches (up to 5 items)
+          if ((effTab == 0 || effTab == 1) && state.history.isNotEmpty) ...[
+            _buildRecentSectionHeader(
+              context: context,
+              icon: Icons.library_music_rounded,
+              title: '${context.l10n.recentSearches} • ${context.l10n.localMusic}',
+              onClear: () {
+                HapticFeedback.lightImpact();
+                context.read<SearchCubit>().clearHistory();
+              },
+              p: p,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xxs,
+              children: state.history.take(5).map((term) {
+                return InputChip(
+                  avatar: Icon(Icons.history_rounded, size: 14, color: p.textTertiary),
+                  label: Text(term),
+                  backgroundColor: p.surfaceContainer,
+                  side: BorderSide(color: p.hairline),
+                  deleteIcon: const Icon(Icons.close_rounded, size: 14),
+                  deleteIconColor: p.textTertiary,
+                  labelStyle: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  onDeleted: () => context.read<SearchCubit>().removeHistoryQuery(term),
+                  onPressed: () => _applySearch(context, term),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+
+          // 2. Online Recent Searches (up to 5 items)
+          if (showOnline && (effTab == 0 || effTab == 2) && ytmCubit != null) ...[
+            ValueListenableBuilder<List<String>>(
+              valueListenable: ytmCubit.historyNotifier,
+              builder: (context, onlineHistory, _) {
+                if (onlineHistory.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildRecentSectionHeader(
+                      context: context,
+                      icon: Icons.public_rounded,
+                      title: '${context.l10n.recentSearches} • ${context.l10n.onlineStream}',
+                      onClear: () {
+                        HapticFeedback.lightImpact();
+                        ytmCubit.clearHistory();
+                      },
+                      p: p,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xxs,
+                      children: onlineHistory.take(5).map((term) {
+                        return InputChip(
+                          avatar: Icon(Icons.public_rounded, size: 14, color: p.accent),
+                          label: Text(term),
+                          backgroundColor: p.surfaceContainer,
+                          side: BorderSide(color: p.hairline),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 14),
+                          deleteIconColor: p.textTertiary,
+                          labelStyle: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onDeleted: () => ytmCubit.removeHistoryQuery(term),
+                          onPressed: () => _applySearch(context, term),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                );
+              },
+            ),
+          ],
+
+          // 3. Saved Searches
+          ValueListenableBuilder<List<String>>(
+            valueListenable: context.read<SearchCubit>().savedSearches,
+            builder: (context, saved, _) {
+              if (saved.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.savedSearches.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w800,
+                      color: p.textTertiary,
+                      letterSpacing: AppTracking.wide,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xxs,
+                    children: [
+                      for (final entry in saved)
+                        InputChip(
+                          avatar: Icon(Icons.bookmark_outline_rounded,
+                              size: 14, color: p.accent),
+                          label: Text(SearchCubit.decodeSavedSearch(entry).query),
+                          backgroundColor: p.surfaceContainer,
+                          side: BorderSide(color: p.hairline),
+                          deleteIcon: const Icon(Icons.close_rounded, size: 14),
+                          deleteIconColor: p.textTertiary,
+                          labelStyle: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onDeleted: () => context
+                              .read<SearchCubit>()
+                              .removeSavedSearch(entry),
+                          onPressed: () {
+                            final decoded = SearchCubit.decodeSavedSearch(entry);
+                            _searchController.text = decoded.query;
+                            context.read<SearchCubit>().setFilter(decoded.filter);
+                            _onQueryChanged(context, decoded.query, immediate: true);
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              );
+            },
+          ),
+
+          // 4. Quick Discovery / Popular Tags
+          Text(
+            (effTab == 2 ? context.l10n.popularSearches : context.l10n.quickDiscovery).toUpperCase(),
+            style: TextStyle(
+              fontSize: AppFontSize.tiny,
+              fontWeight: FontWeight.w800,
+              color: p.textTertiary,
+              letterSpacing: AppTracking.wide,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xxs,
+            children: [
+              for (final tag in effTab == 2
+                  ? [
+                      'Top Hits',
+                      'Trending',
+                      'Lo-Fi Beats',
+                      'Pop',
+                      'Hip-Hop',
+                      'Rock Classics',
+                      'Chillout',
+                      'Electronic'
+                    ]
+                  : [
+                      'Rock',
+                      'Pop',
+                      'Hip-Hop',
+                      'Acoustic',
+                      'FLAC',
+                      'Lossless',
+                      'Jazz',
+                      'Electronic',
+                      'Top Hits',
+                      'Trending',
+                    ])
+                ActionChip(
+                  label: Text(_localizedTag(context, tag)),
+                  backgroundColor: p.surfaceContainer,
+                  side: BorderSide(color: p.hairline),
+                  labelStyle: TextStyle(
+                    color: p.accent,
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  onPressed: () => _applySearch(context, tag),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -413,203 +674,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildLocalBody(BuildContext context, SearchState state,
       PlayerCubit playerCubit, PulsrPalette p) {
-    if (_suggestions.isNotEmpty && _searchController.text.trim().isNotEmpty) {
-      return _buildSuggestionsList(context, p);
-    }
     if (state.isLoading) {
       return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
     }
     if (state.results.isEmpty) {
-      if (state.query.isEmpty) {
-        return Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.search_rounded, size: 48, color: p.textTertiary),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  context.l10n.search,
-                  style: TextStyle(
-                      fontSize: AppFontSize.title,
-                      fontWeight: FontWeight.w800,
-                      color: p.textPrimary),
-                ),
-                const SizedBox(height: AppSpacing.s6),
-                Text(
-                  context.l10n.searchPlaceholder,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                // C-05: saved searches (query + filter), re-executed on tap.
-                ValueListenableBuilder<List<String>>(
-                  valueListenable: context.read<SearchCubit>().savedSearches,
-                  builder: (context, saved, _) {
-                    if (saved.isEmpty) {
-                      if (state.history.length > 3) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.bookmark_add_outlined, size: 14, color: p.textTertiary),
-                              const SizedBox(width: AppSpacing.xxs),
-                              Text(
-                                '${context.l10n.search}: Tap "Save search" after searching to bookmark it',
-                                style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    }
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(context.l10n.savedSearches,
-                          style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w800,
-                              color: p.textTertiary,
-                              letterSpacing: AppTracking.wide),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            for (final entry in saved)
-                              InputChip(
-                                avatar: Icon(Icons.bookmark_outline_rounded,
-                                    size: 16, color: p.accent),
-                                label: Text(
-                                    SearchCubit.decodeSavedSearch(entry).query),
-                                backgroundColor: p.surfaceContainer,
-                                side: BorderSide(color: p.hairline),
-                                deleteIcon:
-                                    const Icon(Icons.close_rounded, size: 16),
-                                deleteIconColor: p.textTertiary,
-                                labelStyle: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w600),
-                                onDeleted: () => context
-                                    .read<SearchCubit>()
-                                    .removeSavedSearch(entry),
-                                onPressed: () {
-                                  final decoded =
-                                      SearchCubit.decodeSavedSearch(entry);
-                                  _searchController.text = decoded.query;
-                                  context
-                                      .read<SearchCubit>()
-                                      .setFilter(decoded.filter);
-                                  _onQueryChanged(context, decoded.query,
-                                      immediate: true);
-                                },
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                      ],
-                    );
-                  },
-                ),
-                if (state.history.isNotEmpty) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(context.l10n.recentSearches,
-                        style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w800,
-                            color: p.textTertiary,
-                            letterSpacing: AppTracking.wide),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      GestureDetector(
-                        onTap: () =>
-                            context.read<SearchCubit>().clearHistory(),
-                        child: Icon(Icons.clear_all_rounded,
-                            size: 16, color: p.textTertiary),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      for (final h in state.history)
-                        InputChip(
-                          label: Text(h),
-                          backgroundColor: p.surfaceContainer,
-                          side: BorderSide(color: p.hairline),
-                          deleteIcon: const Icon(Icons.close_rounded, size: 16),
-                          deleteIconColor: p.textTertiary,
-                          labelStyle: TextStyle(
-                              color: p.textPrimary,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w600),
-                          onDeleted: () => context
-                              .read<SearchCubit>()
-                              .removeHistoryQuery(h),
-                          onPressed: () {
-                            _searchController.text = h;
-                            context.read<SearchCubit>().useHistoryQuery(h);
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
-                Text(context.l10n.quickDiscovery,
-                  style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w800,
-                      color: p.textTertiary,
-                      letterSpacing: AppTracking.wide),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    for (final tag in [
-                      'Rock',
-                      'Pop',
-                      'Hip-Hop',
-                      'Acoustic',
-                      'FLAC',
-                      'Lossless',
-                      'Jazz',
-                      'Electronic'
-                    ])
-                      ActionChip(
-                        label: Text(_localizedTag(context, tag)),
-                        backgroundColor: p.surfaceContainer,
-                        side: BorderSide(color: p.hairline),
-                        labelStyle: TextStyle(
-                            color: p.accent,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w700),
-                        onPressed: () {
-                          _searchController.text = tag;
-                          _onQueryChanged(context, tag);
-                        },
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      }
       return EmptyStateWidget(
         icon: Icons.search_off_rounded,
         title: context.l10n.noResultsFound,
@@ -658,111 +726,523 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-    int _computeResultsHash(List<SongsTableData> results) {
-      if (results.isEmpty) return 0;
-      // Hash every id, not just the endpoints: interior changes (re-rank, edited
-      // metadata) must invalidate the derived artist/album chip caches.
-      return Object.hashAll(results.map((s) => s.id));
-    }
+  int _computeResultsHash(List<SongsTableData> results) {
+    if (results.isEmpty) return 0;
+    return Object.hashAll(results.map((s) => s.id));
+  }
 
-    void _ensureDerivedCache(SearchState state) {
-      final hash = _computeResultsHash(state.results);
-      if (_derivedCacheHash == hash) return;
-      _derivedCacheHash = hash;
-      final artists = <String>[];
-      final albums = <String>[];
-      final seenA = <String>{};
-      final seenB = <String>{};
-      for (final s in state.results) {
-        final a = s.artist.trim();
-        if (a.isNotEmpty && seenA.add(a.toLowerCase())) artists.add(a);
-        final b = s.album.trim();
-        if (b.isNotEmpty && seenB.add(b.toLowerCase())) albums.add(b);
-      }
-      _derivedArtistsCache = artists;
-      _derivedAlbumsCache = albums;
+  void _ensureDerivedCache(SearchState state) {
+    final hash = _computeResultsHash(state.results);
+    if (_derivedCacheHash == hash) return;
+    _derivedCacheHash = hash;
+    final artists = <String>[];
+    final albums = <String>[];
+    final seenA = <String>{};
+    final seenB = <String>{};
+    for (final s in state.results) {
+      final a = s.artist.trim();
+      if (a.isNotEmpty && seenA.add(a.toLowerCase())) artists.add(a);
+      final b = s.album.trim();
+      if (b.isNotEmpty && seenB.add(b.toLowerCase())) albums.add(b);
     }
+    _derivedArtistsCache = artists;
+    _derivedAlbumsCache = albums;
+  }
 
-    List<String> _derivedArtists(SearchState state) {
-      _ensureDerivedCache(state);
-      return _derivedArtistsCache;
-    }
+  List<String> _derivedArtists(SearchState state) {
+    _ensureDerivedCache(state);
+    return _derivedArtistsCache;
+  }
 
-    List<String> _derivedAlbums(SearchState state) {
-      _ensureDerivedCache(state);
-      return _derivedAlbumsCache;
-    }
+  List<String> _derivedAlbums(SearchState state) {
+    _ensureDerivedCache(state);
+    return _derivedAlbumsCache;
+  }
 
-    Widget _buildDerivedHeader(BuildContext context, int index,
-        List<String> artists, List<String> albums, PulsrPalette p) {
-      final total = artists.length + albums.length;
-      if (index >= total) return const SizedBox.shrink();
-      if (index < artists.length) {
-        final name = artists[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: p.accent.withValues(alpha: 0.15),
-            child: Icon(Icons.person_rounded, color: p.accent, size: 20),
-          ),
-          title: Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
-          subtitle: Text(context.l10n.artist,
-              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
-          trailing:
-              Icon(Icons.chevron_right_rounded, color: p.textTertiary),
-          onTap: () => _openDerivedArtist(context, name),
-        );
-      }
-      final album = albums[index - artists.length];
+  Widget _buildDerivedHeader(BuildContext context, int index,
+      List<String> artists, List<String> albums, PulsrPalette p) {
+    final total = artists.length + albums.length;
+    if (index >= total) return const SizedBox.shrink();
+    if (index < artists.length) {
+      final name = artists[index];
       return ListTile(
         leading: CircleAvatar(
           backgroundColor: p.accent.withValues(alpha: 0.15),
-          child: Icon(Icons.album_rounded, color: p.accent, size: 20),
+          child: Icon(Icons.person_rounded, color: p.accent, size: 20),
         ),
-        title: Text(album,
+        title: Text(name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style:
                 TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
-        subtitle: Text(context.l10n.album,
+        subtitle: Text(context.l10n.artist,
             style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
-        trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
-        onTap: () => _openDerivedAlbum(context, album),
+        trailing:
+            Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+        onTap: () => _openDerivedArtist(context, name),
       );
     }
+    final album = albums[index - artists.length];
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: p.accent.withValues(alpha: 0.15),
+        child: Icon(Icons.album_rounded, color: p.accent, size: 20),
+      ),
+      title: Text(album,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style:
+              TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
+      subtitle: Text(context.l10n.album,
+          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
+      trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+      onTap: () => _openDerivedAlbum(context, album),
+    );
+  }
 
-    void _openDerivedArtist(BuildContext context, String name) {
-      try {
-        final lib = context.read<LibraryCubit>().state.artists;
-        final match = lib.cast<dynamic>().firstWhere(
-            (a) =>
-                (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
-            orElse: () => null);
-        if (match != null) {
-          context.push('/artist', extra: match);
-          return;
-        }
-      } catch (_) {}
-      context.read<SearchCubit>().setFilter('Artists');
-    }
+  void _openDerivedArtist(BuildContext context, String name) {
+    try {
+      final lib = context.read<LibraryCubit>().state.artists;
+      final match = lib.cast<dynamic>().firstWhere(
+          (a) =>
+              (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
+          orElse: () => null);
+      if (match != null) {
+        context.push('/artist', extra: match);
+        return;
+      }
+    } catch (_) {}
+    context.read<SearchCubit>().setFilter('Artists');
+  }
 
-    void _openDerivedAlbum(BuildContext context, String name) {
-      try {
-        final lib = context.read<LibraryCubit>().state.albums;
-        final match = lib.cast<dynamic>().firstWhere(
-            (a) =>
-                (a?.title as String?)?.toLowerCase() == name.toLowerCase(),
-            orElse: () => null);
-        if (match != null) {
-          context.push('/album', extra: match);
-          return;
-        }
-      } catch (_) {}
-      context.read<SearchCubit>().setFilter('Albums');
-    }
+  void _openDerivedAlbum(BuildContext context, String name) {
+    try {
+      final lib = context.read<LibraryCubit>().state.albums;
+      final match = lib.cast<dynamic>().firstWhere(
+          (a) =>
+              (a?.title as String?)?.toLowerCase() == name.toLowerCase(),
+          orElse: () => null);
+      if (match != null) {
+        context.push('/album', extra: match);
+        return;
+      }
+    } catch (_) {}
+    context.read<SearchCubit>().setFilter('Albums');
+  }
+}
+
+// ==================== UNIFIED SEARCH RESULTS (2 SECTIONS) ====================
+class _UnifiedSearchResults extends StatefulWidget {
+  final String query;
+  final ValueChanged<String>? onSelectTag;
+  final ValueChanged<String>? onOpenArtist;
+  final ValueChanged<String>? onOpenAlbum;
+
+  const _UnifiedSearchResults({
+    required this.query,
+    this.onSelectTag,
+    this.onOpenArtist,
+    this.onOpenAlbum,
+  });
+
+  @override
+  State<_UnifiedSearchResults> createState() => _UnifiedSearchResultsState();
+}
+
+class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
+  bool _expandLocal = false;
+  bool _expandOnline = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final playerCubit = context.read<PlayerCubit>();
+    final isOffline = context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+
+    return BlocBuilder<SearchCubit, SearchState>(
+      builder: (context, localState) {
+        return BlocBuilder<YtmSearchCubit, YtmSearchState>(
+          builder: (context, ytmState) {
+            final localDone = !localState.isLoading;
+            final onlineDone = isOffline || !ytmState.isLoading;
+            final localEmpty = localState.results.isEmpty;
+            final onlineEmpty = isOffline || (ytmState.results.isEmpty && ytmState.hasSearched);
+
+            if (localDone && onlineDone && localEmpty && onlineEmpty && ytmState.errorMessage == null) {
+              return EmptyStateWidget(
+                icon: Icons.search_off_rounded,
+                title: context.l10n.noResultsFound,
+                subtitle: '${context.l10n.noResultsSubtitle} "${widget.query}"',
+                primaryActionLabel: context.l10n.clearSearchQuery,
+                primaryActionIcon: Icons.backspace_rounded,
+                onPrimaryAction: () {
+                  context.read<SearchCubit>().clearQuery();
+                  context.read<YtmSearchCubit>().clearQuery();
+                },
+              );
+            }
+
+            final localResults = localState.results;
+            final localToDisplay = _expandLocal ? localResults : localResults.take(5).toList();
+
+            final onlineTracks = ytmState.results;
+            final onlineSongs = [for (final track in onlineTracks) track.toSongData()];
+            final onlineToDisplay = _expandOnline ? onlineSongs : onlineSongs.take(10).toList();
+
+            return RefreshIndicator(
+              color: p.accent,
+              backgroundColor: p.surfaceContainer,
+              onRefresh: () async {
+                context.read<SearchCubit>().onQueryChanged(widget.query);
+                if (!isOffline) {
+                  context.read<YtmSearchCubit>().onQueryChanged(widget.query);
+                }
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: const EdgeInsets.only(
+                  bottom: AppSpacing.scrollBottom,
+                  top: AppSpacing.xxs,
+                ),
+                children: [
+                  // ==================== SECTION 1: LOCAL RESULTS ====================
+                  _buildSectionHeader(
+                    context: context,
+                    icon: Icons.library_music_rounded,
+                    title: context.l10n.localMusic,
+                    count: localResults.length,
+                    isLoading: localState.isLoading,
+                    p: p,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+
+                  if (localState.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: SkeletonList(itemCount: 3),
+                    )
+                  else if (localResults.isEmpty)
+                    _buildEmptySectionCard(
+                      context: context,
+                      icon: Icons.library_music_outlined,
+                      message: 'No local songs match "${widget.query}"',
+                      p: p,
+                    )
+                  else ...[
+                    for (final song in localToDisplay)
+                      SongTile(
+                        song: song,
+                        subtitleOverride: '${song.artist} • ${song.album}',
+                        onTap: () => playerCubit.playSong(song, queue: localResults),
+                        onMorePressed: () => SongInfoSheet.show(context, song: song),
+                      ),
+                    if (localResults.length > 5)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          child: TextButton.icon(
+                            onPressed: () => setState(() => _expandLocal = !_expandLocal),
+                            icon: Icon(
+                              _expandLocal
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              size: 18,
+                              color: p.accent,
+                            ),
+                            label: Text(
+                              _expandLocal
+                                  ? 'Show less'
+                                  : 'Show all ${localResults.length} local songs',
+                              style: TextStyle(
+                                color: p.accent,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+
+                  // Divider between Section 1 and Section 2
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Divider(color: p.hairline, height: 1),
+                  ),
+
+                  // ==================== SECTION 2: ONLINE RESULTS ====================
+                  _buildSectionHeader(
+                    context: context,
+                    icon: Icons.public_rounded,
+                    title: context.l10n.onlineStream,
+                    count: onlineTracks.length,
+                    isLoading: ytmState.isLoading,
+                    p: p,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+
+                  if (isOffline)
+                    _buildEmptySectionCard(
+                      context: context,
+                      icon: Icons.wifi_off_rounded,
+                      message: context.l10n.offlineOnlyMode,
+                      p: p,
+                    )
+                  else if (ytmState.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: SkeletonList(itemCount: 4),
+                    )
+                  else if (ytmState.errorMessage != null)
+                    _buildErrorSectionCard(
+                      context: context,
+                      errorMessage: ytmState.errorMessage!,
+                      onRetry: context.read<YtmSearchCubit>().retry,
+                      p: p,
+                    )
+                  else if (onlineTracks.isEmpty && ytmState.hasSearched)
+                    _buildEmptySectionCard(
+                      context: context,
+                      icon: Icons.search_off_rounded,
+                      message: 'No online songs match "${widget.query}"',
+                      p: p,
+                    )
+                  else ...[
+                    for (var i = 0; i < onlineToDisplay.length; i++)
+                      SongTile(
+                        song: onlineToDisplay[i],
+                        subtitleOverride:
+                            (i < onlineTracks.length) ? onlineTracks[i].artist : null,
+                        onTap: () => playerCubit.playSong(onlineToDisplay[i], queue: onlineSongs),
+                        trailing: YtmDownloadButton(song: onlineToDisplay[i]),
+                      ),
+                    if (onlineSongs.length > 10)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          child: TextButton.icon(
+                            onPressed: () => setState(() => _expandOnline = !_expandOnline),
+                            icon: Icon(
+                              _expandOnline
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                              size: 18,
+                              color: p.accent,
+                            ),
+                            label: Text(
+                              _expandOnline
+                                  ? 'Show less'
+                                  : 'Show all ${onlineSongs.length} online results',
+                              style: TextStyle(
+                                color: p.accent,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ---------- Section Header Widget ----------
+Widget _buildSectionHeader({
+  required BuildContext context,
+  required IconData icon,
+  required String title,
+  required int count,
+  required bool isLoading,
+  required PulsrPalette p,
+}) {
+  return Padding(
+    padding: EdgeInsets.symmetric(
+      horizontal: Adaptive.pagePadding(context),
+      vertical: AppSpacing.xxs,
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 18, color: p.accent),
+        const SizedBox(width: AppSpacing.s8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: AppFontSize.bodyLarge,
+            fontWeight: FontWeight.w800,
+            color: p.textPrimary,
+          ),
+        ),
+        const Spacer(),
+        if (isLoading)
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: BorderRadius.circular(AppRadii.r12),
+              border: Border.all(color: p.hairline),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                fontSize: AppFontSize.tiny,
+                fontWeight: FontWeight.w700,
+                color: p.textSecondary,
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+// ---------- Compact Empty Card for a Section ----------
+Widget _buildEmptySectionCard({
+  required BuildContext context,
+  required IconData icon,
+  required String message,
+  required PulsrPalette p,
+}) {
+  return Container(
+    margin: EdgeInsets.symmetric(
+      horizontal: Adaptive.pagePadding(context),
+      vertical: AppSpacing.xs,
+    ),
+    padding: const EdgeInsets.symmetric(
+      horizontal: AppSpacing.md,
+      vertical: AppSpacing.sm,
+    ),
+    decoration: BoxDecoration(
+      color: p.surfaceContainer.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(AppRadii.r12),
+      border: Border.all(color: p.hairline),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: p.textTertiary),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            message,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ---------- Compact Error Card for a Section ----------
+Widget _buildErrorSectionCard({
+  required BuildContext context,
+  required String errorMessage,
+  required VoidCallback onRetry,
+  required PulsrPalette p,
+}) {
+  return Container(
+    margin: EdgeInsets.symmetric(
+      horizontal: Adaptive.pagePadding(context),
+      vertical: AppSpacing.xs,
+    ),
+    padding: const EdgeInsets.all(AppSpacing.sm),
+    decoration: BoxDecoration(
+      color: p.surfaceContainer.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(AppRadii.r12),
+      border: Border.all(color: p.hairline),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.cloud_off_rounded, size: 20, color: p.accent),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            errorMessage,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              color: p.textSecondary,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        TextButton(
+          onPressed: onRetry,
+          child: Text(
+            context.l10n.tryAgain,
+            style: TextStyle(
+              color: p.accent,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// ---------- Recent Searches Section Header ----------
+Widget _buildRecentSectionHeader({
+  required BuildContext context,
+  required IconData icon,
+  required String title,
+  required VoidCallback onClear,
+  required PulsrPalette p,
+}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Row(
+        children: [
+          Icon(icon, size: 14, color: p.textTertiary),
+          const SizedBox(width: AppSpacing.s6),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: AppFontSize.tiny,
+              fontWeight: FontWeight.w700,
+              letterSpacing: AppTracking.wide,
+              color: p.textTertiary,
+            ),
+          ),
+        ],
+      ),
+      GestureDetector(
+        onTap: onClear,
+        child: Text(
+          context.l10n.clear,
+          style: TextStyle(
+            fontSize: AppFontSize.caption,
+            fontWeight: FontWeight.w600,
+            color: p.accent,
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 /// The "Online" tab body: live YouTube Music results with per-row download

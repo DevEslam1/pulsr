@@ -22,6 +22,9 @@ enum DockStackMode {
 
   /// Stacked: BottomNavBar is in front, MiniPlayer is stacked behind it.
   navBarOnTop,
+
+  /// System: MiniPlayer docks to a floating native media pill style above the nav bar.
+  system,
 }
 
 /// Hides the dock (mini player + nav bar) while any dialog or bottom sheet
@@ -77,7 +80,9 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   static const Curve _animCurve = Curves.easeOutCubic;
   static const double _peekOffset = 14.0;
   static const double _miniPlayerHeight = 84.0;
-  double _behindDragDy = 0;
+  static const double _dockPillGap = 8.0;
+  double _behindMiniDragDy = 0;
+  double _behindNavDragDy = 0;
   double _dockDragDy = 0;
 
   double? _lastReportedHeight;
@@ -125,10 +130,13 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     required double navBarTotalHeight,
   }) {
     if (!hasSong) return navBarTotalHeight;
+    if (mode == DockStackMode.system) {
+      return navBarTotalHeight + _miniPlayerHeight + 4.0;
+    }
     final isStacked = mode != DockStackMode.defaultLayout;
     final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
     return !isStacked
-        ? (navBarTotalHeight + _miniPlayerHeight)
+        ? (navBarTotalHeight + _dockPillGap + _miniPlayerHeight)
         : (isNavBarOnTop
             ? (_peekOffset + _miniPlayerHeight)
             : (navBarTotalHeight + _peekOffset));
@@ -220,6 +228,9 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   void _handleSwipeDown() {
     switch (widget.mode) {
       case DockStackMode.defaultLayout:
+        _setMode(DockStackMode.system);
+        break;
+      case DockStackMode.system:
         _setMode(DockStackMode.miniPlayerOnTop);
         break;
       case DockStackMode.miniPlayerOnTop:
@@ -292,8 +303,16 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
         switch (mode) {
           case DockStackMode.defaultLayout:
-            miniPlayerBottom = navBarTotalHeight;
+            miniPlayerBottom = navBarTotalHeight + _dockPillGap;
             miniPlayerScale = 1.0;
+            miniPlayerOpacity = 1.0;
+            navBarBottom = 0.0;
+            navBarScale = 1.0;
+            navBarOpacity = 1.0;
+            break;
+          case DockStackMode.system:
+            miniPlayerBottom = navBarTotalHeight + 4.0;
+            miniPlayerScale = 0.98;
             miniPlayerOpacity = 1.0;
             navBarBottom = 0.0;
             navBarScale = 1.0;
@@ -350,22 +369,45 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           );
         }
 
-        Widget wrapBehindCard(Widget child, DockStackMode targetMode) {
+        Widget wrapBehindCard(Widget child, DockStackMode targetMode, {required bool isMini}) {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => _setMode(targetMode),
-            onVerticalDragStart: (_) => _behindDragDy = 0,
-            onVerticalDragUpdate: (d) => _behindDragDy += d.delta.dy,
+            onVerticalDragStart: (_) {
+              if (isMini) {
+                _behindMiniDragDy = 0;
+              } else {
+                _behindNavDragDy = 0;
+              }
+            },
+            onVerticalDragUpdate: (d) {
+              if (isMini) {
+                _behindMiniDragDy += d.delta.dy;
+              } else {
+                _behindNavDragDy += d.delta.dy;
+              }
+            },
             onVerticalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
-              if (_behindDragDy > 40 || v > 120) {
+              final dragDy = isMini ? _behindMiniDragDy : _behindNavDragDy;
+              if (dragDy > 40 || v > 120) {
                 _handleSwipeDown();
-              } else if (_behindDragDy < -40 || v < -120) {
+              } else if (dragDy < -40 || v < -120) {
                 _handleSwipeUp();
               }
-              _behindDragDy = 0;
+              if (isMini) {
+                _behindMiniDragDy = 0;
+              } else {
+                _behindNavDragDy = 0;
+              }
             },
-            onVerticalDragCancel: () => _behindDragDy = 0,
+            onVerticalDragCancel: () {
+              if (isMini) {
+                _behindMiniDragDy = 0;
+              } else {
+                _behindNavDragDy = 0;
+              }
+            },
             child: AbsorbPointer(child: child),
           );
         }
@@ -374,6 +416,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           miniPlayerWidget = wrapBehindCard(
             miniPlayerWidget,
             DockStackMode.miniPlayerOnTop,
+            isMini: true,
           );
         }
 
@@ -422,6 +465,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           navBarWidget = wrapBehindCard(
             navBarWidget,
             DockStackMode.navBarOnTop,
+            isMini: false,
           );
         }
 

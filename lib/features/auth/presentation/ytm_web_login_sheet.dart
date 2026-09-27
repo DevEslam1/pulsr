@@ -554,7 +554,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
-    unawaited(_bootstrapSettings());
+    unawaited(_bootstrapSettings().catchError((error, stackTrace) {
+      if (!mounted) return;
+      ErrorLogger.log('Failed to bootstrap WebView settings',
+          error: error, stackTrace: stackTrace, category: 'YtmWebLoginSheet');
+      if (mounted) {
+        setState(() {
+          _settings = YtmWebLoginSheet.buildDefaultSettings(
+              userAgent: EmbeddedBrowserUa.mobile);
+        });
+        _scheduleNextAuthPoll();
+      }
+    }));
   }
 
   /// Resolves the coherent runtime identity, then builds the WebView settings.
@@ -564,23 +575,34 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// (see the `_settings == null` gate in [build]), so the very first navigation
   /// — the sign-in page — already carries the coherent UA.
   Future<void> _bootstrapSettings() async {
-    _resolvedUserAgent = await _resolveUserAgent();
-    if (!mounted) return;
+    try {
+      _resolvedUserAgent = await _resolveUserAgent();
+      if (!mounted) return;
 
-    final initialUa = _uaIdentityOverride != null
-        ? _uaFor(_uaIdentityOverride!)
-        : _resolvedUserAgent;
+      final initialUa = _uaIdentityOverride != null
+          ? _uaFor(_uaIdentityOverride!)
+          : _resolvedUserAgent;
 
-    _settings = YtmWebLoginSheet.buildDefaultSettings(userAgent: initialUa);
+      _settings = YtmWebLoginSheet.buildDefaultSettings(userAgent: initialUa);
 
-    _hintTimer = Timer(const Duration(seconds: 30), () {
-      if (_disposed || !mounted || _webViewGone || _isLoggedIn || widget.isBrowseMode) return;
-      setState(() => _showHint = true);
-    });
+      _hintTimer = Timer(const Duration(seconds: 30), () {
+        if (_disposed || !mounted || _webViewGone || _isLoggedIn || widget.isBrowseMode) return;
+        setState(() => _showHint = true);
+      });
 
-    _pollIntervalSeconds = 2;
-    _scheduleNextAuthPoll();
-    if (mounted) setState(() {});
+      _pollIntervalSeconds = 2;
+      _scheduleNextAuthPoll();
+      if (mounted) setState(() {});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to bootstrap WebView settings in _bootstrapSettings',
+          error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      if (!mounted) return;
+      setState(() {
+        _settings = YtmWebLoginSheet.buildDefaultSettings(
+            userAgent: EmbeddedBrowserUa.mobile);
+      });
+      _scheduleNextAuthPoll();
+    }
   }
 
   /// Derives a coherent Chrome-on-Android UA from the device's real System

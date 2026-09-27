@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 /// A widget that displays text normally when it fits within the parent bounds,
@@ -9,7 +9,9 @@ class MarqueeText extends StatefulWidget {
   final TextAlign textAlign;
   final Duration pauseDuration;
   final double velocity; // pixels per second
+  final double? scrollSpeed; // optional explicit speed
   final double blankSpace;
+  final bool pauseOnHover;
 
   const MarqueeText({
     super.key,
@@ -18,7 +20,9 @@ class MarqueeText extends StatefulWidget {
     this.textAlign = TextAlign.center,
     this.pauseDuration = const Duration(seconds: 2),
     this.velocity = 30.0,
+    this.scrollSpeed,
     this.blankSpace = 48.0,
+    this.pauseOnHover = true,
   });
 
   @override
@@ -29,6 +33,9 @@ class _MarqueeTextState extends State<MarqueeText> {
   late final ScrollController _scrollController;
   Timer? _scrollTimer;
   bool _isScrolling = false;
+  bool _isHovered = false;
+
+  double get _effectiveVelocity => widget.scrollSpeed ?? widget.velocity;
 
   @override
   void initState() {
@@ -54,10 +61,33 @@ class _MarqueeTextState extends State<MarqueeText> {
     super.dispose();
   }
 
+  Completer<void>? _unhoverCompleter;
+
+  Future<void> _waitUntilUnhovered() async {
+    if (!_isHovered || !mounted || !_isScrolling) return;
+    _unhoverCompleter ??= Completer<void>();
+    await _unhoverCompleter!.future;
+  }
+
+  void _setHovered(bool hovered) {
+    if (_isHovered == hovered) return;
+    _isHovered = hovered;
+    if (!hovered) {
+      if (_unhoverCompleter != null && !_unhoverCompleter!.isCompleted) {
+        _unhoverCompleter!.complete();
+      }
+      _unhoverCompleter = null;
+    }
+  }
+
   void _stopScrolling() {
     _scrollTimer?.cancel();
     _scrollTimer = null;
     _isScrolling = false;
+    if (_unhoverCompleter != null && !_unhoverCompleter!.isCompleted) {
+      _unhoverCompleter!.complete();
+    }
+    _unhoverCompleter = null;
   }
 
   void _startScrolling(double maxScroll) {
@@ -70,8 +100,12 @@ class _MarqueeTextState extends State<MarqueeText> {
       _scrollTimer = Timer(widget.pauseDuration, () async {
         if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
 
+        // If hovered on desktop/tablet, wait until unhovered event-driven
+        await _waitUntilUnhovered();
+        if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
+
         final duration = Duration(
-          milliseconds: ((maxScroll / widget.velocity) * 1000).toInt(),
+          milliseconds: ((maxScroll / _effectiveVelocity) * 1000).toInt(),
         );
 
         try {
@@ -84,7 +118,14 @@ class _MarqueeTextState extends State<MarqueeText> {
           if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
 
           _scrollTimer = Timer(widget.pauseDuration, () async {
-            if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
+            if (!mounted || !_isScrolling || !_scrollController.hasClients) {
+              return;
+            }
+
+            await _waitUntilUnhovered();
+            if (!mounted || !_isScrolling || !_scrollController.hasClients) {
+              return;
+            }
 
             try {
               await _scrollController.animateTo(
@@ -137,7 +178,7 @@ class _MarqueeTextState extends State<MarqueeText> {
           }
         });
 
-        return SizedBox(
+        Widget marquee = SizedBox(
           width: availableWidth,
           child: SingleChildScrollView(
             controller: _scrollController,
@@ -156,6 +197,16 @@ class _MarqueeTextState extends State<MarqueeText> {
             ),
           ),
         );
+
+        if (widget.pauseOnHover) {
+          marquee = MouseRegion(
+            onEnter: (_) => _setHovered(true),
+            onExit: (_) => _setHovered(false),
+            child: marquee,
+          );
+        }
+
+        return marquee;
       },
     );
   }

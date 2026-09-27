@@ -19,6 +19,7 @@ import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
+import '../widgets/audio_visualizer.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/advanced_playback_bar.dart';
@@ -216,6 +217,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             isLandscape: isLandscape,
                             isTablet: isTablet,
                             waveController: _waveController,
+                            audioSessionId: state.audioSessionId,
                           ),
               ),
             );
@@ -651,6 +653,7 @@ class _WaveformHeroStage extends StatelessWidget {
   final bool isLandscape;
   final bool isTablet;
   final AnimationController waveController;
+  final int? audioSessionId;
 
   const _WaveformHeroStage({
     super.key,
@@ -660,6 +663,7 @@ class _WaveformHeroStage extends StatelessWidget {
     required this.isLandscape,
     required this.isTablet,
     required this.waveController,
+    this.audioSessionId,
   });
 
   @override
@@ -683,6 +687,21 @@ class _WaveformHeroStage extends StatelessWidget {
         return Stack(
           alignment: Alignment.center,
           children: [
+            // 0. Live FFT Visualizer Waveform Layer
+            Positioned.fill(
+              child: Opacity(
+                opacity: isPlaying ? 0.65 : 0.25,
+                child: AudioVisualizer(
+                  style: VisualizerStyle.wave,
+                  color: activeColor,
+                  isPlaying: isPlaying,
+                  audioSessionId: audioSessionId,
+                  trackId: song?.id,
+                  trackPath: song?.path,
+                ),
+              ),
+            ),
+
             // 1. Concentric Sonic Pulse Rings expanding from center
             Positioned.fill(
               child: AnimatedBuilder(

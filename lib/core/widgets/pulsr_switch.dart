@@ -7,6 +7,11 @@ import 'pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+enum PulsrSwitchSize {
+  small,
+  medium,
+}
+
 /// A unified, flagship-grade tactile toggle inspired by Apple iOS & Material 3.
 ///
 /// Features:
@@ -22,6 +27,7 @@ class PulsrSwitch extends StatefulWidget {
   final Color? activeTrackColor;
   final Color? inactiveTrackColor;
   final Color? thumbColor;
+  final PulsrSwitchSize size;
   final double width;
   final double height;
 
@@ -33,9 +39,25 @@ class PulsrSwitch extends StatefulWidget {
     this.activeTrackColor,
     this.inactiveTrackColor,
     this.thumbColor,
-    this.width = 48.0,
-    this.height = 28.0,
-  });
+    this.size = PulsrSwitchSize.medium,
+    double? width,
+    double? height,
+  })  : width = width ?? (size == PulsrSwitchSize.small ? 38.0 : 48.0),
+        height = height ?? (size == PulsrSwitchSize.small ? 22.0 : 28.0);
+
+  const PulsrSwitch.small({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.activeColor,
+    this.activeTrackColor,
+    this.inactiveTrackColor,
+    this.thumbColor,
+    double? width,
+    double? height,
+  })  : size = PulsrSwitchSize.small,
+        width = width ?? 38.0,
+        height = height ?? 22.0;
 
   @override
   State<PulsrSwitch> createState() => _PulsrSwitchState();

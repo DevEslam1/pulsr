@@ -1,4 +1,4 @@
-// lib/features/queue/presentation/queue_screen.dart
+import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -215,6 +215,30 @@ class QueueScreen extends StatelessWidget {
                   vertical: AppSpacing.xs,
                 ).copyWith(bottom: AppSpacing.scrollBottom),
                 itemCount: queue.length,
+                onReorderStart: (index) {
+                  HapticFeedback.mediumImpact();
+                },
+                proxyDecorator: (child, index, animation) {
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      final animValue = Curves.easeInOut.transform(animation.value);
+                      final elevation = lerpDouble(0, 10, animValue)!;
+                      final scale = lerpDouble(1.0, 1.025, animValue)!;
+                      return Transform.scale(
+                        scale: scale,
+                        child: Material(
+                          elevation: elevation,
+                          color: Colors.transparent,
+                          shadowColor: p.accent.withValues(alpha: 0.35),
+                          borderRadius: AppRadii.cardRadius,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: child,
+                  );
+                },
                 onReorderItem: (oldIdx, newIdx) {
                   if (oldIdx == newIdx) return;
                   context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx);

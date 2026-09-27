@@ -1,7 +1,10 @@
 // lib/features/folder_detail/presentation/folder_detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fpdart/fpdart.dart' hide State;
+import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -125,8 +128,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _useCase.watchFolderSongs(folder.path).distinct(),
+      body: Column(
+        children: [
+          _buildBreadcrumbs(context, p, folder.path),
+          Expanded(
+            child: StreamBuilder<Result<List<SongsTableData>>>(
+              stream: _useCase.watchFolderSongs(folder.path).distinct(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
@@ -292,6 +299,78 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         },
       ),
     ),
-  );
-}
+  ],
+),
+      ),
+    );
+  }
+
+  Widget _buildBreadcrumbs(BuildContext context, PulsrPalette p, String fullPath) {
+    final cleanPath = fullPath.replaceAll('\\', '/');
+    final parts = cleanPath.split('/').where((s) => s.isNotEmpty).toList();
+    if (parts.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      height: 38,
+      margin: EdgeInsets.symmetric(
+        horizontal: Adaptive.pagePadding(context),
+        vertical: AppSpacing.xxs,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
+        border: Border.all(color: p.hairline.withValues(alpha: 0.4)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: parts.length,
+        separatorBuilder: (_, __) => Icon(
+          Icons.chevron_right_rounded,
+          size: 16,
+          color: p.textTertiary,
+        ),
+        itemBuilder: (context, index) {
+          final isLast = index == parts.length - 1;
+          final name = parts[index];
+          final subPath = '/${parts.sublist(0, index + 1).join('/')}';
+
+          return Center(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadii.r6),
+              onTap: isLast
+                  ? null
+                  : () {
+                      HapticFeedback.selectionClick();
+                      context.push(
+                        '/folder',
+                        extra: FolderItem(
+                          path: subPath,
+                          name: name,
+                          songCount: 0,
+                          isExcluded: false,
+                        ),
+                      );
+                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: AppSpacing.s2,
+                ),
+                child: Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: isLast ? FontWeight.w700 : FontWeight.w500,
+                    color: isLast ? p.accent : p.textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }

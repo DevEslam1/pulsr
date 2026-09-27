@@ -246,6 +246,8 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                         val of = codec.outputFormat
                         if (of.containsKey(MediaFormat.KEY_PCM_ENCODING)) pcmEncoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channelCount = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
+                        channelAcc = 0.0
+                        channelIndex = 0
                     }
                 }
             }

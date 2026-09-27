@@ -22,9 +22,14 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   // FIX-C7: Latch to prevent concurrent bot-block retries
   bool _botRetryInFlight = false;
 
+  final ValueNotifier<List<String>> historyNotifier =
+      ValueNotifier<List<String>>(const []);
+
   YtmSearchCubit({required YtmService service})
       : _service = service,
-        super(const YtmSearchState());
+        super(const YtmSearchState()) {
+    _loadHistory();
+  }
 
   static const _historyKey = 'ytm_search_history';
   static const _maxHistory = 20;
@@ -35,6 +40,14 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   /// Gap between successive speculative warms, so a cold query never stacks
   /// several full multi-engine chains on the native thread pool at once.
   static const Duration _warmStagger = Duration(milliseconds: 400);
+
+  void _loadHistory() {
+    unawaited(getSearchHistory().then((list) {
+      if (!isClosed) {
+        historyNotifier.value = List.unmodifiable(list.take(10));
+      }
+    }).catchError((_) {}));
+  }
 
   Future<List<String>> getSearchHistory() async {
     try {
@@ -53,13 +66,31 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_historyKey) ?? [];
-      list.remove(q);
+      list.removeWhere((item) => item.toLowerCase() == q.toLowerCase());
       list.insert(0, q);
       if (list.length > _maxHistory) list.removeRange(_maxHistory, list.length);
       await prefs.setStringList(_historyKey, list);
+      if (!isClosed) {
+        historyNotifier.value = List.unmodifiable(list.take(10));
+      }
     } catch (e, st) {
       // FIX-A05: Log failure to save history
       ErrorLogger.log('Failed to save query to search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+    }
+  }
+
+  Future<void> removeHistoryQuery(String query) async {
+    final q = query.trim().toLowerCase();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_historyKey) ?? [];
+      list.removeWhere((e) => e.toLowerCase() == q);
+      await prefs.setStringList(_historyKey, list);
+      if (!isClosed) {
+        historyNotifier.value = List.unmodifiable(list.take(10));
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to remove query from search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
     }
   }
 
@@ -67,6 +98,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_historyKey);
+      if (!isClosed) {
+        historyNotifier.value = const [];
+      }
     } catch (e, st) {
       // FIX-A05: Log failure to clear history
       ErrorLogger.log('Failed to clear search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
@@ -263,6 +297,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     // H-04: Invalidate any in-flight search so its late network completion
     // cannot still be doing work for a dead cubit.
     _generation++;
+    historyNotifier.value = const [];
+    historyNotifier.dispose();
     return super.close();
   }
 }

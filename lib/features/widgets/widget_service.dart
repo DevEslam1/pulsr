@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -51,18 +52,44 @@ class WidgetService {
 
   int? _lastSavedArtworkSongId;
 
+  static const String _contentVersionKey = 'widget_content_version';
+  bool _versionInitialized = false;
+  static bool _hasPrunedArtworkThisSession = false;
+
   /// Monotonic counter bumped whenever non-progress content changes (track,
   /// favourite/shuffle/repeat state, queue preview, artwork). Persisted as
-  /// `contentVersion` and compared by the Kotlin provider against the value it
-  /// last rendered in full, so the ~1/s progress tick can be recognised as such
-  /// without an Intent extra that home_widget cannot carry (C-4).
+  /// `contentVersion` in SharedPreferences and HomeWidget so it survives app restarts.
   int _contentVersion = 0;
 
+  Future<void> _ensureContentVersionLoaded() async {
+    if (_versionInitialized) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _contentVersion = prefs.getInt(_contentVersionKey) ?? 0;
+      _versionInitialized = true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load widget content version',
+          error: e, stackTrace: st, category: 'WidgetService');
+      _versionInitialized = true;
+    }
+  }
+
   Future<void> _bumpContentVersion() async {
+    await _ensureContentVersionLoaded();
     _contentVersion += 1;
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_contentVersionKey, _contentVersion);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist widget content version to prefs',
+          error: e, stackTrace: st, category: 'WidgetService');
+    }
+    try {
       await HomeWidget.saveWidgetData<int>('contentVersion', _contentVersion);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist widget content version to HomeWidget',
+          error: e, stackTrace: st, category: 'WidgetService');
+    }
   }
 
   /// Whether an artwork resolve is currently in-flight (to avoid stacking).
@@ -410,8 +437,11 @@ class WidgetService {
         final oldestKey = _roundedArtworkCache.keys.first;
         _roundedArtworkCache.remove(oldestKey);
       }
-      // Opportunistically prune old widget temp files (older than 7 days)
-      unawaited(_pruneOldWidgetArtwork(dir));
+      // Opportunistically prune old widget temp files at most once per session (L-6)
+      if (!_hasPrunedArtworkThisSession) {
+        _hasPrunedArtworkThisSession = true;
+        unawaited(_pruneOldWidgetArtwork(dir));
+      }
       return cachedFile.path;
     } catch (e, st) {
       ErrorLogger.log('Failed to resolve artwork path for widget',

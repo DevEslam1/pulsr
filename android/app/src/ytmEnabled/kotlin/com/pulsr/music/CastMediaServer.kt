@@ -11,7 +11,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class ServedFile(val path: String, val mime: String, val timestampMs: Long)
+data class ServedFile(val path: String, val mime: String, @Volatile var timestampMs: Long)
 
 /**
  * Minimal local HTTP server used to expose one local audio file to a Cast
@@ -23,6 +23,22 @@ class CastMediaServer {
     companion object {
         private const val TAG = "CastMediaServer"
         private const val EVICTION_TTL_MS = 5 * 60 * 1000L
+
+        private fun logD(tag: String, msg: String) {
+            try {
+                Log.d(tag, msg)
+            } catch (_: Throwable) {
+                println("[$tag] $msg")
+            }
+        }
+
+        private fun logW(tag: String, msg: String) {
+            try {
+                Log.w(tag, msg)
+            } catch (_: Throwable) {
+                System.err.println("[$tag] $msg")
+            }
+        }
     }
 
     private var serverSocket: ServerSocket? = null
@@ -31,8 +47,9 @@ class CastMediaServer {
 
     private val servedFiles = java.util.concurrent.ConcurrentHashMap<String, ServedFile>()
     private val prebufferCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
-    @Volatile private var servingPath: String? = null
-    @Volatile private var servingMime: String = "application/octet-stream"
+    private data class LegacyMedia(val path: String, val mime: String)
+    @Volatile private var legacyMedia: LegacyMedia? = null
+    @Volatile private var currentlyServingToken: String? = null
     @Volatile private var port: Int = 0
 
     val isRunning: Boolean get() = running.get()
@@ -50,7 +67,7 @@ class CastMediaServer {
             }
             true
         } catch (e: Exception) {
-            Log.w(TAG, "start failed: ${e.message}")
+            logW(TAG, "start failed: ${e.message}")
             false
         }
     }
@@ -60,7 +77,8 @@ class CastMediaServer {
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
         thread = null
-        servingPath = null
+        legacyMedia = null
+        currentlyServingToken = null
         servedFiles.clear()
         prebufferCache.clear()
     }
@@ -75,10 +93,12 @@ class CastMediaServer {
         if (!start()) return null
 
         val now = System.currentTimeMillis()
+        val activeToken = currentlyServingToken
         val it = servedFiles.entries.iterator()
         while (it.hasNext()) {
             val entry = it.next()
-            if (now - entry.value.timestampMs > EVICTION_TTL_MS) {
+            // B-04: Never evict the currently active token
+            if (entry.key != activeToken && (now - entry.value.timestampMs > EVICTION_TTL_MS)) {
                 prebufferCache.remove(entry.key)
                 it.remove()
             }
@@ -87,8 +107,7 @@ class CastMediaServer {
         val resolvedMime = mime?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
         val token = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
         servedFiles[token] = ServedFile(f.absolutePath, resolvedMime, now)
-        servingPath = f.absolutePath
-        servingMime = resolvedMime
+        legacyMedia = LegacyMedia(f.absolutePath, resolvedMime)
         val host = localIpv4() ?: return null
         return "http://$host:$port/media/$token"
     }
@@ -103,14 +122,25 @@ class CastMediaServer {
         try {
             val f = File(path)
             if (f.exists() && f.isFile) {
+                // Enforce max 4 prebuffer entries to prevent unbound native memory growth
+                val maxPrebufferEntries = 4
+                while (prebufferCache.size >= maxPrebufferEntries) {
+                    val oldestKey = servedFiles.entries.minByOrNull { it.value.timestampMs }?.key
+                        ?: prebufferCache.keys().toList().firstOrNull()
+                    if (oldestKey != null) {
+                        prebufferCache.remove(oldestKey)
+                    } else {
+                        break
+                    }
+                }
                 val prebufSize = minOf(f.length(), 256 * 1024L).toInt()
                 val bytes = ByteArray(prebufSize)
                 f.inputStream().use { it.read(bytes, 0, prebufSize) }
                 prebufferCache[token] = bytes
-                Log.d(TAG, "Pre-buffered $prebufSize bytes for gapless Cast playback: $token")
+                logD(TAG, "Pre-buffered $prebufSize bytes for gapless Cast playback: $token")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Pre-buffering failed non-fatally for $path: ${e.message}")
+            logW(TAG, "Pre-buffering failed non-fatally for $path: ${e.message}")
         }
         return url
     }
@@ -125,7 +155,7 @@ class CastMediaServer {
             try {
                 handle(socket)
             } catch (e: Exception) {
-                Log.w(TAG, "handle failed: ${e.message}")
+                logW(TAG, "handle failed: ${e.message}")
             } finally {
                 try { socket.close() } catch (_: Exception) {}
             }
@@ -157,23 +187,26 @@ class CastMediaServer {
         val target = parts[1].substringBefore("?")
         val resolvedFile: File?
         val resolvedMime: String
+        val legacy = legacyMedia
         if (target.startsWith("/media/")) {
             val token = target.removePrefix("/media/").trimEnd('/')
             val served = servedFiles[token]
             if (served != null) {
+                served.timestampMs = System.currentTimeMillis()
+                currentlyServingToken = token
                 resolvedFile = File(served.path)
                 resolvedMime = served.mime
             } else {
                 resolvedFile = null
-                resolvedMime = servingMime
+                resolvedMime = legacy?.mime ?: "application/octet-stream"
             }
         } else if (target == "/media") {
-            val path = servingPath
+            val path = legacy?.path
             resolvedFile = if (path != null) File(path) else null
-            resolvedMime = servingMime
+            resolvedMime = legacy?.mime ?: "application/octet-stream"
         } else {
             resolvedFile = null
-            resolvedMime = servingMime
+            resolvedMime = legacy?.mime ?: "application/octet-stream"
         }
 
         if (resolvedFile == null || !resolvedFile.exists()) {

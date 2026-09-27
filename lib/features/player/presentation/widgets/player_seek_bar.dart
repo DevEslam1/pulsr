@@ -95,6 +95,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
 
     // Check if Waveform Seek Bar is enabled in settings and song ID is available
     if (waveformEnabled && effectiveSongId != null) {
+      final instantSamples = WaveformService.instance.getInstantWaveform(
+        songId: effectiveSongId,
+        filePath: effectiveFilePath,
+      );
+
       _cachedWaveformFuture ??= WaveformService.instance.getWaveform(
         songId: effectiveSongId,
         filePath: effectiveFilePath,
@@ -103,14 +108,19 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       return _withUpNext(
         FutureBuilder<List<double>>(
           key: ValueKey(effectiveSongId),
+          initialData: instantSamples,
           future: _cachedWaveformFuture,
           builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+            final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
+                ? snapshot.data!
+                : instantSamples;
+
+            if (samples.isNotEmpty) {
               return _withPosition((position) => WaveformSeekBar(
                     position: position,
                     duration: widget.duration,
                     onSeek: widget.onSeek,
-                    samples: snapshot.data!,
+                    samples: samples,
                     activeColor: widget.activeColor,
                     semanticLabel: widget.semanticLabel,
                     loopPointA: widget.loopPointA,
@@ -258,8 +268,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     clampDuration(currentDuration + const Duration(seconds: 10))),
                 onDecrease: () => widget.onSeek(
                     clampDuration(currentDuration - const Duration(seconds: 10))),
-                child: PulsrSlider(
-                  value: effectiveValue,
+                child: RepaintBoundary(
+                  child: PulsrSlider(
+                    value: effectiveValue,
                   min: 0.0,
                   max: maxDuration > 0 ? maxDuration : 1.0,
                   height: 32,
@@ -302,6 +313,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   },
                 ),
               ),
+            ),
               const SizedBox(height: AppSpacing.s2),
               // Timestamps
               RepaintBoundary(

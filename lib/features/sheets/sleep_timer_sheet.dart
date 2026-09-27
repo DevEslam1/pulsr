@@ -8,6 +8,7 @@ import '../player/cubit/player_state.dart';
 import '../../data/audio/sleep_timer_manager.dart';
 
 import '../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../core/widgets/pulsr_dialog.dart';
 import '../../core/widgets/pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -307,8 +308,8 @@ class SleepTimerSheet extends StatelessWidget {
     final controller = TextEditingController();
     final p = context.palette;
     String? errorText;
-    return showDialog<int>(
-      context: context,
+    return PulsrDialogHelper.showCustomDialog<int>(
+      context,
       useRootNavigator: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(

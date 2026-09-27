@@ -17,27 +17,11 @@ class InnertubeResilienceHardeningTest {
 
     @Test
     fun testSignalPriorityPreservesLowerPrioritySignalsWhenStartedNull() {
-        fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
-            YtmBlockSignal.Interrupted             -> 9
-            YtmBlockSignal.BotChallenge            -> 8
-            YtmBlockSignal.PoTokenInvalid          -> 7
-            YtmBlockSignal.RateLimited             -> 6
-            YtmBlockSignal.IpBlocked               -> 5
-            YtmBlockSignal.SignatureDecipherFailed -> 4
-            YtmBlockSignal.SabrEnforced            -> 3
-            YtmBlockSignal.SignInRequired          -> 2
-            YtmBlockSignal.ClientDeprecated        -> 2
-            YtmBlockSignal.GeoBlocked              -> 2
-            YtmBlockSignal.VideoGone               -> 1
-            YtmBlockSignal.NetworkUnavailable      -> 0
-            null                                   -> -1
-        }
-
         val lastSignalRef = AtomicReference<YtmBlockSignal?>(null)
         fun updateBestSignal(newSignal: YtmBlockSignal?) {
             if (newSignal == null) return
             lastSignalRef.updateAndGet { current ->
-                if (signalPriority(newSignal) > signalPriority(current)) newSignal else current
+                if (InnertubeClient.signalPriority(newSignal) > InnertubeClient.signalPriority(current)) newSignal else current
             }
         }
 

@@ -60,6 +60,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             isDaemon = true
         }
     })
+    private val pendingResults = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<MethodChannel.Result, Boolean>())
 
     companion object {
         private const val TAG = "YtmExtractorPlugin"
@@ -138,8 +139,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             }
 
-            // Proxy rotation changes egress -> re-mint tokens
-            ProxyPool.setOnPathChangeListener { label -> EgressSignals.onEgressChanged?.invoke(label) }
+            // Proxy rotation changes egress -> re-mint tokens with normalized egress ID (B-03)
+            ProxyPool.setOnPathChangeListener { label ->
+                val vpnActive = runCatching {
+                    plugin.context?.let { CellularFailoverHelper.isVpnActive(it) } ?: false
+                }.getOrDefault(false)
+                val normalizedId = EgressTracker.egressId(label, vpnActive, isCellular = false)
+                EgressSignals.notify(normalizedId)
+            }
             EgressSignals.onEgressChanged = { id -> PoTokenManager.onEgressChanged(id) }
             return plugin
         }
@@ -550,6 +557,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
             return
         }
+        pendingResults.add(result)
         try {
             executor.execute {
                 try {
@@ -558,16 +566,18 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     }
                     val value = work()
                     mainHandler.post {
-                        try {
-                            result.success(value)
-                        } catch (t: Throwable) {
-                            Log.e(TAG, "Failed to encode MethodChannel result: ${t.message}", t)
-                            runCatching {
-                                result.error(
-                                    "YTM_ENCODE_ERROR",
-                                    "Native result could not be encoded: ${t.message}",
-                                    mapOf("type" to (value?.javaClass?.name ?: "null")),
-                                )
+                        if (pendingResults.remove(result)) {
+                            try {
+                                result.success(value)
+                            } catch (t: Throwable) {
+                                Log.e(TAG, "Failed to encode MethodChannel result: ${t.message}", t)
+                                runCatching {
+                                    result.error(
+                                        "YTM_ENCODE_ERROR",
+                                        "Native result could not be encoded: ${t.message}",
+                                        mapOf("type" to (value?.javaClass?.name ?: "null")),
+                                    )
+                                }
                             }
                         }
                     }
@@ -579,11 +589,17 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     } else {
                         null
                     }
-                    mainHandler.post { runCatching { result.error(code, e.message, details) } }
+                    mainHandler.post {
+                        if (pendingResults.remove(result)) {
+                            runCatching { result.error(code, e.message, details) }
+                        }
+                    }
                 }
             }
         } catch (_: java.util.concurrent.RejectedExecutionException) {
-            result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
+            if (pendingResults.remove(result)) {
+                result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
+            }
         }
     }
 
@@ -1957,6 +1973,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             extractorReady = false
             pendingCountry = null
             pendingLang = null
+        }
+        val drained = mutableListOf<MethodChannel.Result>()
+        synchronized(pendingResults) {
+            drained.addAll(pendingResults)
+            pendingResults.clear()
+        }
+        mainHandler.post {
+            for (res in drained) {
+                runCatching { res.error("YTM_SHUTDOWN", "YTM extractor was shut down", null) }
+            }
         }
         try {
             executor.shutdownNow()

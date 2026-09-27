@@ -38,15 +38,22 @@ class _RecentsScreenState extends State<RecentsScreen> {
   Timer? _searchDebounce;
   static const int _persistedHistoryLimit = 100;
   static const int _maxHistoryLimit = 500;
+  static const String _showLessLabel = 'Show less';
   int _historyLimit = _persistedHistoryLimit;
   bool _hasMore = true;
   bool _userExpanded = false;
   late final GetSongsUseCase _getSongsUseCase;
+  late Stream<dynamic> _recentStream;
+
+  void _updateStream() {
+    _recentStream = _getSongsUseCase.watchRecentlyPlayed(limit: _historyLimit);
+  }
 
   @override
   void initState() {
     super.initState();
     _getSongsUseCase = getIt<GetSongsUseCase>();
+    _updateStream();
   }
 
   @override
@@ -114,7 +121,8 @@ class _RecentsScreenState extends State<RecentsScreen> {
         ],
       ),
       body: StreamBuilder(
-        stream: _getSongsUseCase.watchRecentlyPlayed(limit: _historyLimit),
+        key: ValueKey(_historyLimit),
+        stream: _recentStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
             return const SkeletonList();
@@ -416,6 +424,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                 setState(() {
                                   _userExpanded = true;
                                   _historyLimit = (_historyLimit + 100).clamp(_persistedHistoryLimit, _maxHistoryLimit);
+                                  _updateStream();
                                 });
                               },
                             ),
@@ -424,12 +433,13 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               const SizedBox(width: AppSpacing.sm),
                             TextButton.icon(
                               icon: const Icon(Icons.expand_less_rounded),
-                              label: const Text('Show less'),
+                              label: const Text(_showLessLabel),
                               onPressed: () {
                                 setState(() {
                                   _userExpanded = false;
                                   _historyLimit = _persistedHistoryLimit;
                                   _hasMore = true;
+                                  _updateStream();
                                 });
                               },
                             ),

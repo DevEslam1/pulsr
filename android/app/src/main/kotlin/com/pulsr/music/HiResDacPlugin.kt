@@ -1173,7 +1173,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val hasDsd128Carrier = rates.contains(352800)
         val hasDsd256Carrier = rates.contains(705600)
         val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
-        val devKey = "${usbDac.productName ?: "usb_dac"}_${usbDac.id}"
+        val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            usbDac.address.takeIf { it.isNotBlank() } ?: "default"
+        } else {
+            "default"
+        }
+        val devKey = "${usbDac.productName ?: "usb_dac"}_$address"
         val explicitlyVerified = prefs.getBoolean("dop_verified_$devKey", false)
         val dopVerified = explicitlyVerified || (isUac2 && (hasDsd64Carrier || hasDsd128Carrier || hasDsd256Carrier))
 
@@ -1204,7 +1209,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val hasCarrier = rates.contains(176400) || rates.contains(352800) || rates.contains(705600)
         val verified = isUac2 && hasCarrier
         val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
-        val devKey = "${usbDac.productName ?: "usb_dac"}_${usbDac.id}"
+        val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            usbDac.address.takeIf { it.isNotBlank() } ?: "default"
+        } else {
+            "default"
+        }
+        val devKey = "${usbDac.productName ?: "usb_dac"}_$address"
         prefs.edit().putBoolean("dop_verified_$devKey", verified).apply()
         return mapOf(
             "success" to verified,

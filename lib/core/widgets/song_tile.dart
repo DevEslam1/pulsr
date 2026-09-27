@@ -30,6 +30,7 @@ class SongTile extends StatelessWidget {
   final Widget? trailing;
   final bool? isDownloaded;
   final Color? backgroundColor;
+  final bool dense;
 
   const SongTile({
     super.key,
@@ -45,14 +46,16 @@ class SongTile extends StatelessWidget {
     this.trailing,
     this.isDownloaded,
     this.backgroundColor,
+    this.dense = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final isCompact = MediaQuery.sizeOf(context).width < 360;
+    final baseArtwork = dense ? 44.0 : artworkSize;
     final effectiveArtworkSize =
-        isCompact ? (artworkSize * 0.88).clamp(42.0, 52.0) : artworkSize;
+        isCompact ? (baseArtwork * 0.88).clamp(40.0, 52.0) : baseArtwork;
 
     final isDownloadedTrack = isDownloaded ??
         (song.isDownloaded == true ||
@@ -90,9 +93,11 @@ class SongTile extends StatelessWidget {
                   onTap: onTap,
                   onLongPress: onLongPress,
                   child: Container(
-                  constraints: const BoxConstraints(minHeight: 56),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                  constraints: BoxConstraints(minHeight: dense ? 48 : 56),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s10,
+                    vertical: dense ? AppSpacing.s2 : AppSpacing.s6,
+                  ),
                   child: Row(
                     children: [
                       if (index != null)

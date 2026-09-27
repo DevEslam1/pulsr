@@ -47,6 +47,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   List<String> _history = const [];
   bool _historyLoaded = false;
   bool _historyLoading = false;
+  bool _historyLoadFailed = false;
   bool _historyRefreshPending = false;
   int _historyRetryCount = 0;
 
@@ -70,6 +71,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         setState(() {
           _history = items;
           _historyLoaded = true;
+          _historyLoadFailed = false;
         });
       }
     } catch (e, st) {
@@ -79,6 +81,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
         setState(() {
           _history = _history.isNotEmpty ? _history : const [];
           _historyLoaded = true;
+          _historyLoadFailed = _history.isEmpty;
         });
       }
     } finally {
@@ -177,9 +180,17 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     }
     if (_history.isEmpty) {
       return EmptyStateWidget(
-        icon: Icons.travel_explore_rounded,
-        title: context.l10n.searchYtm,
+        icon: _historyLoadFailed
+            ? Icons.sync_problem_rounded
+            : Icons.travel_explore_rounded,
+        title: _historyLoadFailed
+            ? context.l10n.browseSearchFailed
+            : context.l10n.searchYtm,
         subtitle: context.l10n.browseYtmSearchScreenDesc,
+        primaryActionLabel: _historyLoadFailed ? context.l10n.tryAgain : null,
+        primaryActionIcon:
+            _historyLoadFailed ? Icons.refresh_rounded : null,
+        onPrimaryAction: _historyLoadFailed ? _refreshHistory : null,
       );
     }
     return ListView(

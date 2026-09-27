@@ -211,4 +211,30 @@ class YtmBlockSignalTest {
 
         assertEquals(YtmBlockSignal.RateLimited, YtmBlockSignal.parse(500, ""))
     }
+
+    @Test
+    fun testSignalPriorityOrdering() {
+        fun priority(s: YtmBlockSignal): Int = when (s) {
+            YtmBlockSignal.Interrupted -> 9
+            YtmBlockSignal.BotChallenge -> 8
+            YtmBlockSignal.PoTokenInvalid -> 7
+            YtmBlockSignal.RateLimited -> 6
+            YtmBlockSignal.IpBlocked -> 5
+            YtmBlockSignal.SignatureDecipherFailed -> 4
+            YtmBlockSignal.SabrEnforced -> 3
+            YtmBlockSignal.SignInRequired, YtmBlockSignal.ClientDeprecated, YtmBlockSignal.GeoBlocked -> 2
+            YtmBlockSignal.VideoGone -> 1
+            YtmBlockSignal.NetworkUnavailable -> 0
+        }
+
+        assertTrue(priority(YtmBlockSignal.Interrupted) > priority(YtmBlockSignal.BotChallenge))
+        assertTrue(priority(YtmBlockSignal.BotChallenge) > priority(YtmBlockSignal.PoTokenInvalid))
+        assertTrue(priority(YtmBlockSignal.PoTokenInvalid) > priority(YtmBlockSignal.RateLimited))
+        assertTrue(priority(YtmBlockSignal.RateLimited) > priority(YtmBlockSignal.IpBlocked))
+        assertTrue(priority(YtmBlockSignal.IpBlocked) > priority(YtmBlockSignal.SignatureDecipherFailed))
+        assertTrue(priority(YtmBlockSignal.SignatureDecipherFailed) > priority(YtmBlockSignal.SabrEnforced))
+        assertTrue(priority(YtmBlockSignal.SabrEnforced) > priority(YtmBlockSignal.SignInRequired))
+        assertTrue(priority(YtmBlockSignal.SignInRequired) > priority(YtmBlockSignal.VideoGone))
+        assertTrue(priority(YtmBlockSignal.VideoGone) > priority(YtmBlockSignal.NetworkUnavailable))
+    }
 }

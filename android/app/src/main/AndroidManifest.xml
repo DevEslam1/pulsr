@@ -197,5 +197,7 @@
         <package android:name="com.simplecity.amp_scrobbler" />
         <package android:name="net.jjc1138.android.scrobbler" />
         <package android:name="com.softartstudio.scrobble" />
+        <package android:name="com.arn.scrobble" />
+        <package android:name="com.theodhi.scrobbler" />
     </queries>
 </manifest>

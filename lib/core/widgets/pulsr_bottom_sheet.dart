@@ -65,6 +65,8 @@ class _PulsrBottomSheetScope extends InheritedWidget {
 /// A responsive, frosted-glass container wrapper for all bottom sheets.
 /// Automatically clamps width on tablet and desktop, adds top squircle corners,
 /// top drag handle pill, and edge-to-edge safe area padding.
+typedef PulsrBottomSheet = PulsrBottomSheetContainer;
+
 class PulsrBottomSheetContainer extends StatelessWidget {
   final Widget child;
   final bool showDragHandle;

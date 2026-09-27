@@ -1245,10 +1245,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md),
-                          child: Column(
-                            children: [
+                          child: LayoutBuilder(
+                            builder: (context, cardConstraints) {
+                              final isWide = cardConstraints.maxWidth >= 560;
                               // 1. Equalizer (EQ) Toggle Card
-                              Material(
+                              final eqCard = Material(
                                 color: Colors.transparent,
                                 child: Ink(
                                   decoration: BoxDecoration(
@@ -1439,11 +1440,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: AppSpacing.s6),
+                              );
 
                               // 2. DSP & Spatial Effects Toggle Card
-                              Material(
+                              final dspCard = Material(
                                 color: Colors.transparent,
                                 child: Ink(
                                   decoration: BoxDecoration(
@@ -1632,8 +1632,25 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              );
+
+                              if (isWide) {
+                                return Row(
+                                  children: [
+                                    Expanded(child: eqCard),
+                                    const SizedBox(width: AppSpacing.s8),
+                                    Expanded(child: dspCard),
+                                  ],
+                                );
+                              }
+                              return Column(
+                                children: [
+                                  eqCard,
+                                  const SizedBox(height: AppSpacing.s6),
+                                  dspCard,
+                                ],
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: AppSpacing.s6),
@@ -2155,142 +2172,147 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ),
             ),
           // Presets Carousel & Actions Header
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 36,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    itemCount: EqPreset.defaultPresets.length,
-                    itemBuilder: (context, index) {
-                      final presetItem = EqPreset.defaultPresets[index];
-                      final isSelected =
-                          state.selectedHeadphoneProfile == null &&
-                              preset.name == presetItem.name;
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.xs),
-                        child: ChoiceChip(
-                          label: Text(presetItem.name),
-                          selected: isSelected,
-                          selectedColor: p.accent.withValues(alpha: 0.22),
-                          backgroundColor: p.surfaceContainer,
-                          side: BorderSide(
-                            color: isSelected
-                                ? p.accent.withValues(alpha: 0.5)
-                                : p.hairline,
-                          ),
-                          labelStyle: TextStyle(
-                            color: isSelected ? p.accent : p.textSecondary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: AppFontSize.label,
-                          ),
-                          onSelected: dspBlocked != null
-                              ? null
-                              : (_) {
-                                  if (!state.isEqEnabled) {
-                                    cubit.setEqualizerEnabled(true);
-                                  }
-                                  cubit.applyPreset(presetItem);
-                                },
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              // A/B Comparison Toggle
-              IgnorePointer(
-                ignoring: dspBlocked != null,
-                child: Opacity(
-                  opacity: dspBlocked != null ? 0.45 : 1.0,
-                  child: GestureDetector(
-                    onTapDown: (_) {
-                      _abCompareTimer?.cancel();
-                      setState(() => _isAbComparing = true);
-                      cubit.startAbComparison();
-                      _abCompareTimer = Timer(const Duration(seconds: 10), () {
-                        if (mounted) {
-                          setState(() => _isAbComparing = false);
-                        }
-                        cubit.endAbComparison();
-                      });
-                    },
-                    onTapUp: (_) {
-                      _abCompareTimer?.cancel();
-                      _abCompareTimer = null;
-                      setState(() => _isAbComparing = false);
-                      cubit.endAbComparison();
-                    },
-                    onTapCancel: () {
-                      _abCompareTimer?.cancel();
-                      _abCompareTimer = null;
-                      setState(() => _isAbComparing = false);
-                      cubit.endAbComparison();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
-                      decoration: BoxDecoration(
-                        color: _isAbComparing ? p.accent : p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
-                        border: Border.all(
-                            color: _isAbComparing ? p.accent : p.hairline),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 460;
+              return Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 36,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
+                        itemCount: EqPreset.defaultPresets.length,
+                        itemBuilder: (context, index) {
+                          final presetItem = EqPreset.defaultPresets[index];
+                          final isSelected =
+                              state.selectedHeadphoneProfile == null &&
+                                  preset.name == presetItem.name;
+                          return Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                                end: AppSpacing.xs),
+                            child: ChoiceChip(
+                              label: Text(presetItem.name),
+                              selected: isSelected,
+                              selectedColor: p.accent.withValues(alpha: 0.22),
+                              backgroundColor: p.surfaceContainer,
+                              side: BorderSide(
+                                color: isSelected
+                                    ? p.accent.withValues(alpha: 0.5)
+                                    : p.hairline,
+                              ),
+                              labelStyle: TextStyle(
+                                color: isSelected ? p.accent : p.textSecondary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.label,
+                              ),
+                              onSelected: dspBlocked != null
+                                  ? null
+                                  : (_) {
+                                      if (!state.isEqEnabled) {
+                                        cubit.setEqualizerEnabled(true);
+                                      }
+                                      cubit.applyPreset(presetItem);
+                                    },
+                            ),
+                          );
+                        },
                       ),
-                      child: Text(
-                        context.l10n.abFlat,
-                        style: TextStyle(
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w700,
-                          color: _isAbComparing ? p.onAccent : p.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  // A/B Comparison Toggle
+                  IgnorePointer(
+                    ignoring: dspBlocked != null,
+                    child: Opacity(
+                      opacity: dspBlocked != null ? 0.45 : 1.0,
+                      child: GestureDetector(
+                        onTapDown: (_) {
+                          _abCompareTimer?.cancel();
+                          setState(() => _isAbComparing = true);
+                          cubit.startAbComparison();
+                          _abCompareTimer =
+                              Timer(const Duration(seconds: 10), () {
+                            if (mounted) {
+                              setState(() => _isAbComparing = false);
+                            }
+                            cubit.endAbComparison();
+                          });
+                        },
+                        onTapUp: (_) {
+                          _abCompareTimer?.cancel();
+                          _abCompareTimer = null;
+                          setState(() => _isAbComparing = false);
+                          cubit.endAbComparison();
+                        },
+                        onTapCancel: () {
+                          _abCompareTimer?.cancel();
+                          _abCompareTimer = null;
+                          setState(() => _isAbComparing = false);
+                          cubit.endAbComparison();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s8,
+                              vertical: AppSpacing.xs),
+                          decoration: BoxDecoration(
+                            color:
+                                _isAbComparing ? p.accent : p.surfaceContainer,
+                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            border: Border.all(
+                                color: _isAbComparing ? p.accent : p.hairline),
+                          ),
+                          child: Text(
+                            context.l10n.abFlat,
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  _isAbComparing ? p.onAccent : p.textSecondary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s6),
-              // Reset to Flat button
-              TextButton.icon(
-                onPressed:
-                    dspBlocked != null ? null : () => cubit.resetToFlat(),
-                icon: Icon(Icons.restore_rounded,
-                    size: 16, color: p.textSecondary),
-                label: Text(context.l10n.reset,
-                    style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        color: p.textSecondary,
-                        fontWeight: FontWeight.w600)),
-                style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xxs),
-              // Save Custom Preset button
-              TextButton.icon(
-                onPressed: dspBlocked != null
-                    ? null
-                    : () => _showSaveCustomPresetDialog(cubit, state),
-                icon:
-                    Icon(Icons.bookmark_add_rounded, size: 16, color: p.accent),
-                label: Text(context.l10n.save,
-                    style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        color: p.accent,
-                        fontWeight: FontWeight.w700)),
-                style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ],
+                  const SizedBox(width: AppSpacing.xxs),
+                  // Save Custom Preset button
+                  if (isCompact)
+                    IconButton(
+                      tooltip: context.l10n.saveCustomEqPreset,
+                      onPressed: dspBlocked != null
+                          ? null
+                          : () => _showSaveCustomPresetDialog(cubit, state),
+                      icon: Icon(Icons.bookmark_add_rounded,
+                          size: 18, color: p.accent),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.all(AppSpacing.xxs),
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: dspBlocked != null
+                          ? null
+                          : () => _showSaveCustomPresetDialog(cubit, state),
+                      icon: Icon(Icons.bookmark_add_rounded,
+                          size: 16, color: p.accent),
+                      label: Text(context.l10n.save,
+                          style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              color: p.accent,
+                              fontWeight: FontWeight.w700)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.s10),
 
@@ -2693,10 +2715,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           ),
           const SizedBox(height: AppSpacing.s14),
 
-          // F-32: 10 / 32 / 64-band mode toggle + custom frequency editor.
+          // F-32: 10 / 32 / 64-band mode toggle + custom frequency editor & reset actions.
+          // Anchored, jitter-free responsive toolbar:
+          // The Reset EQ and Edit Frequency actions are firmly pinned to the right edge via Spacer,
+          // with no dynamic-width flexible item between them.
           LayoutBuilder(
             builder: (context, constraints) {
-              final showLabels = constraints.maxWidth >= 520;
+              final isWide = constraints.maxWidth >= 480;
+              final canFitBadge = constraints.maxWidth >= 540;
               return Row(
                 children: [
                   Text(
@@ -2756,87 +2782,128 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       ],
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
-                        border: Border.all(color: p.accent.withValues(alpha: 0.25)),
-                      ),
-                      child: Text(
-                        state.eqPreset.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.w700,
-                          color: p.accent,
+                  if (canFitBadge) ...[
+                    const SizedBox(width: AppSpacing.xs),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+                        decoration: BoxDecoration(
+                          color: p.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          border: Border.all(color: p.accent.withValues(alpha: 0.25)),
+                        ),
+                        child: Text(
+                          state.eqPreset.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.tiny,
+                            fontWeight: FontWeight.w700,
+                            color: p.accent,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  if (showLabels) ...[
-                    TextButton.icon(
-                      onPressed:
-                          dspBlocked != null ? null : () => cubit.resetEqualizer(),
-                      icon: Icon(Icons.restart_alt_rounded,
-                          size: 16, color: p.textSecondary),
-                      label: Text(context.l10n.resetToFlat,
-                          style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              color: p.textSecondary,
-                              fontWeight: FontWeight.w600)),
-                      style: TextButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: dspBlocked != null
-                          ? null
-                          : () => _showCustomFrequencyEditor(cubit, state),
-                      icon: Icon(Icons.tune_rounded, size: 16, color: p.accent),
-                      label: Text(context.l10n.frequencies,
-                          style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              color: p.accent,
-                              fontWeight: FontWeight.w700)),
-                      style: TextButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ] else ...[
-                    IconButton(
-                      tooltip: context.l10n.resetToFlat,
-                      onPressed:
-                          dspBlocked != null ? null : () => cubit.resetEqualizer(),
-                      icon: Icon(Icons.restart_alt_rounded,
-                          size: 18, color: p.textSecondary),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      constraints: const BoxConstraints(
-                          minWidth: 32, minHeight: 32),
-                    ),
-                    IconButton(
-                      tooltip: context.l10n.frequencies,
-                      onPressed: dspBlocked != null
-                          ? null
-                          : () => _showCustomFrequencyEditor(cubit, state),
-                      icon: Icon(Icons.tune_rounded,
-                          size: 18, color: p.accent),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      constraints: const BoxConstraints(
-                          minWidth: 32, minHeight: 32),
-                    ),
                   ],
+                  const Spacer(),
+                  // Anchored actions: Reset EQ & Edit Frequency
+                  // Firmly pinned to the right edge via Spacer with no unbounded flex neighbor.
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Tooltip(
+                        message: context.l10n.resetToFlat,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          onTap: dspBlocked != null
+                              ? null
+                              : () {
+                                  HapticFeedback.selectionClick();
+                                  cubit.resetToFlat();
+                                },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isWide ? AppSpacing.s8 : AppSpacing.s6,
+                              vertical: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.surfaceContainer,
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              border: Border.all(color: p.hairline),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.restart_alt_rounded,
+                                  size: 16,
+                                  color: p.textSecondary,
+                                ),
+                                if (isWide) ...[
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  Text(
+                                    context.l10n.resetToFlat,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      color: p.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Tooltip(
+                        message: context.l10n.frequencies,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          onTap: dspBlocked != null
+                              ? null
+                              : () {
+                                  HapticFeedback.lightImpact();
+                                  _showCustomFrequencyEditor(cubit, state);
+                                },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isWide ? AppSpacing.s8 : AppSpacing.s6,
+                              vertical: AppSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.tune_rounded,
+                                  size: 16,
+                                  color: p.accent,
+                                ),
+                                if (isWide) ...[
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  Text(
+                                    context.l10n.frequencies,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      color: p.accent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               );
             },
@@ -2844,7 +2911,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           const SizedBox(height: AppSpacing.xs),
 
           // Equalizer band sliders — 10-band ISO, 32-band 1/3-octave or
-          // 64-band log-spaced. Non-10 plans render in a horizontal scroll.
+          // 64-band log-spaced. Responsive layout with smooth horizontal scroll
+          // when band count exceeds viewport or on compact devices.
           Container(
             padding: const EdgeInsets.symmetric(
                 vertical: AppSpacing.md, horizontal: AppSpacing.s6),
@@ -2853,15 +2921,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               borderRadius: AppRadii.cardRadius,
               border: Border.all(color: p.hairline),
             ),
-            child: Builder(
-              builder: (context) {
+            child: LayoutBuilder(
+              builder: (context, constraints) {
                 final bandCount = _activeBandCount(state);
                 final frequencies = _activeFrequencies(state);
-                final compact = bandCount > 10;
+                const minBandWidth = 38.0;
+                final fitsWithoutScroll = bandCount <= 10 &&
+                    constraints.maxWidth >= bandCount * minBandWidth;
 
-                Widget buildSliders(List<double>? gains) {
+                Widget buildSliders() {
                   return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: fitsWithoutScroll
+                        ? MainAxisAlignment.spaceEvenly
+                        : MainAxisAlignment.start,
                     children: List.generate(bandCount, (index) {
                       final control = _buildBandControl(
                         index: index,
@@ -2876,24 +2948,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         errorColor: p.error,
                         state: state,
                         cubit: cubit,
-                        gain: gains != null && index < gains.length
-                            ? gains[index]
-                            : null,
                       );
-                      return compact
-                          ? SizedBox(width: AppSpacing.s40, child: control)
-                          : Expanded(child: control);
+                      return fitsWithoutScroll
+                          ? Expanded(child: control)
+                          : SizedBox(width: minBandWidth + 2.0, child: control);
                     }),
                   );
                 }
 
-                if (!compact) return buildSliders(null);
+                if (fitsWithoutScroll) return buildSliders();
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: BlocSelector<PlayerCubit, PlayerState, List<double>>(
-                    selector: (s) => s.eqPreset.gains,
-                    builder: (context, gains) => buildSliders(gains),
-                  ),
+                  physics: const BouncingScrollPhysics(),
+                  child: buildSliders(),
                 );
               },
             ),
@@ -6746,54 +6813,66 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(color: p.hairline),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildDeviceTypeChip(
-            label: context.l10n.dspHeadset,
-            icon: Icons.headphones_rounded,
-            isActive: isWired,
-            p: p,
-            onTap: () {
-              if (state.currentSong != null) {
-                AudioQualitySheet.show(context, state.currentSong!, p.accent);
-              }
-            },
-          ),
-          _buildDeviceTypeChip(
-            label: context.l10n.dspSpeaker,
-            icon: Icons.volume_up_rounded,
-            isActive: isSpeaker,
-            p: p,
-            onTap: () {
-              if (state.currentSong != null) {
-                AudioQualitySheet.show(context, state.currentSong!, p.accent);
-              }
-            },
-          ),
-          _buildDeviceTypeChip(
-            label: 'Bluetooth',
-            icon: Icons.bluetooth_audio_rounded,
-            isActive: isBt,
-            p: p,
-            onTap: () {
-              if (state.currentSong != null) {
-                AudioQualitySheet.show(context, state.currentSong!, p.accent);
-              }
-            },
-          ),
-          _buildDeviceTypeChip(
-            label: 'USB DAC',
-            icon: Icons.album_rounded,
-            isActive: isUsb,
-            p: p,
-            onTap: () {
-              if (state.currentSong != null) {
-                AudioQualitySheet.show(context, state.currentSong!, p.accent);
-              }
-            },
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final row = Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildDeviceTypeChip(
+                label: context.l10n.dspHeadset,
+                icon: Icons.headphones_rounded,
+                isActive: isWired,
+                p: p,
+                onTap: () {
+                  if (state.currentSong != null) {
+                    AudioQualitySheet.show(
+                        context, state.currentSong!, p.accent);
+                  }
+                },
+              ),
+              _buildDeviceTypeChip(
+                label: context.l10n.dspSpeaker,
+                icon: Icons.volume_up_rounded,
+                isActive: isSpeaker,
+                p: p,
+                onTap: () {
+                  if (state.currentSong != null) {
+                    AudioQualitySheet.show(
+                        context, state.currentSong!, p.accent);
+                  }
+                },
+              ),
+              _buildDeviceTypeChip(
+                label: 'Bluetooth',
+                icon: Icons.bluetooth_audio_rounded,
+                isActive: isBt,
+                p: p,
+                onTap: () {
+                  if (state.currentSong != null) {
+                    AudioQualitySheet.show(
+                        context, state.currentSong!, p.accent);
+                  }
+                },
+              ),
+              _buildDeviceTypeChip(
+                label: 'USB DAC',
+                icon: Icons.album_rounded,
+                isActive: isUsb,
+                p: p,
+                onTap: () {
+                  if (state.currentSong != null) {
+                    AudioQualitySheet.show(
+                        context, state.currentSong!, p.accent);
+                  }
+                },
+              ),
+            ],
+          );
+          if (constraints.maxWidth < 360) {
+            return FittedBox(fit: BoxFit.scaleDown, child: row);
+          }
+          return row;
+        },
       ),
     );
   }

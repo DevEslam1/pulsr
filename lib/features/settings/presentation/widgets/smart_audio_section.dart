@@ -36,6 +36,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
   SmartAudioMode _mode = SmartAudioMode.auto;
   String? _deviceName;
   String? _matchedProfileName;
+  String? _lastAppliedProfileName;
   String? _deviceDetectionError;
   bool _isLoading = false;
 
@@ -51,8 +52,18 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       final mode = await _service.getMode();
       String? deviceName;
       String? matchedName;
+      String? lastProfileName;
       String? detectionError;
       try {
+        final links = await _service.getAutoEqLinks();
+        if (links.isNotEmpty) {
+          final lastLink = links.values.last;
+          final repo = HeadphoneProfilesRepository();
+          await repo.loadProfiles();
+          lastProfileName =
+              repo.getProfileById(lastLink.profileId)?.name ?? lastLink.deviceLabel;
+        }
+
         final info = getIt.isRegistered<HiResAudioService>()
             ? getIt<HiResAudioService>().currentOutputInfo
             : null;
@@ -76,6 +87,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
         _mode = mode;
         _deviceName = deviceName;
         _matchedProfileName = matchedName;
+        _lastAppliedProfileName = lastProfileName;
         _deviceDetectionError = detectionError;
       });
     } catch (e, st) {
@@ -103,12 +115,33 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-          child: Text(
-            l10n.smartAudioSubtitle,
-            style: TextStyle(
-              color: p.textSecondary,
-              fontSize: AppFontSize.label,
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.smartAudioSubtitle,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                  ),
+                ),
+              ),
+              if ((_matchedProfileName ?? _lastAppliedProfileName) != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  _matchedProfileName != null
+                      ? 'Profile: $_matchedProfileName'
+                      : 'Last profile: $_lastAppliedProfileName',
+                  style: TextStyle(
+                    color: p.accent,
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         SizedBox(
@@ -304,7 +337,9 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    context.l10n.noDevicesSeen,
+                    _lastAppliedProfileName != null
+                        ? '${context.l10n.noDevicesSeen} • Last profile: $_lastAppliedProfileName'
+                        : context.l10n.noDevicesSeen,
                     style: TextStyle(
                       fontSize: AppFontSize.caption,
                       color: p.textTertiary,

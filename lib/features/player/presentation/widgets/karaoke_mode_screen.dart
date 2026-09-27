@@ -1,4 +1,5 @@
 // lib/features/player/presentation/widgets/karaoke_mode_screen.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -182,20 +183,56 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                       padding: const EdgeInsets.symmetric(
 
                           vertical: AppSpacing.xs, horizontal: AppSpacing.sm),
-                      child: Text(
-                        activeLine.text,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: AppFontSize.displayLarge,
-                          fontWeight: FontWeight.w900,
-                          color: p.primary,
-                          shadows: [
-                            Shadow(
-                              color: p.primary.withValues(alpha: 0.8),
-                              blurRadius: 28,
+                      child: Builder(
+                        builder: (_) {
+                          final lineStart = activeLine.timestamp.inMilliseconds;
+                          final lineEnd = (nextLine?.timestamp ??
+                                  (activeLine.timestamp +
+                                      const Duration(seconds: 4)))
+                              .inMilliseconds;
+                          final lineDuration =
+                              math.max(1, lineEnd - lineStart);
+                          final currentProgress =
+                              ((pos.inMilliseconds - lineStart) / lineDuration)
+                                  .clamp(0.0, 1.0);
+                          final words = activeLine.text.split(' ');
+                          final highlightedCount =
+                              (currentProgress * words.length).ceil();
+
+                          return Text.rich(
+                            TextSpan(
+                              children: [
+                                for (int i = 0; i < words.length; i++) ...[
+                                  TextSpan(
+                                    text: words[i] +
+                                        (i < words.length - 1 ? ' ' : ''),
+                                    style: TextStyle(
+                                      color: i < highlightedCount
+                                          ? p.primary
+                                          : p.primary.withValues(alpha: 0.38),
+                                      fontWeight: i < highlightedCount
+                                          ? FontWeight.w900
+                                          : FontWeight.w700,
+                                      shadows: i < highlightedCount
+                                          ? [
+                                              Shadow(
+                                                color: p.primary
+                                                    .withValues(alpha: 0.8),
+                                                blurRadius: 28,
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
-                        ),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: AppFontSize.displayLarge,
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),

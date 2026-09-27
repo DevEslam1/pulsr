@@ -196,8 +196,12 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     }
   }
 
+  bool get _isTesting =>
+      const bool.fromEnvironment('FLUTTER_TEST') ||
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
+
   void _startAnimation() {
-    if (!context.motionEnabled) {
+    if (!context.motionEnabled || _isTesting) {
       _stopAnimation();
       return;
     }

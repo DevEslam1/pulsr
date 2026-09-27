@@ -13,7 +13,11 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../cubit/player_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
+import 'player_theme.dart';
+import 'theme_registry.dart';
 
 class CustomThemeBuilderScreen extends StatefulWidget {
   const CustomThemeBuilderScreen({super.key});
@@ -28,6 +32,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
   double _cornerRadius = 24.0;
   bool _glowEnabled = true;
   bool _initializedFromSettings = false;
+  bool _showPlayerPreview = false;
 
   @override
   void didChangeDependencies() {
@@ -211,94 +216,176 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         body: ListView(
           padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
           children: [
-            // Live Theme Preview Card
-            Container(
-              height: 220,
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.darkSurface,
-                borderRadius: BorderRadius.circular(_cornerRadius),
-                border: Border.all(
-                    color: Color(_accentColor).withValues(alpha: 0.4),
-                    width: 1.5),
-                boxShadow: [
-                  if (_glowEnabled)
-                    BoxShadow(
-                      color: Color(_accentColor).withValues(alpha: 0.25),
-                      blurRadius: 30,
-                      spreadRadius: 2,
+            // Live Theme Preview Controls & Card
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  context.l10n.livePreview,
+                  style: TextStyle(
+                    fontSize: AppFontSize.callout,
+                    fontWeight: FontWeight.w700,
+                    color: p.textPrimary,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _showPlayerPreview = !_showPlayerPreview),
+                  icon: Icon(
+                    _showPlayerPreview
+                        ? Icons.view_compact_rounded
+                        : Icons.play_circle_outline_rounded,
+                    size: 18,
+                    color: Color(_accentColor),
+                  ),
+                  label: Text(
+                    _showPlayerPreview ? 'Compact View' : 'Now Playing View',
+                    style: TextStyle(
+                      color: Color(_accentColor),
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppFontSize.bodySmall,
                     ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Color(_accentColor).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(_cornerRadius / 2),
-                        ),
-                        child: Icon(Icons.music_note_rounded,
-                            color: Color(_accentColor), size: 32),
-                      ),
-                      const SizedBox(width: AppSpacing.s14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(context.l10n.livePreview,
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.bodyLarge,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: AppSpacing.s2),
-                            Text(
-                              context.l10n.dspPulsrAudiophileEdition,
-                              style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: AppFontSize.label),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ),
-                  const Spacer(),
-                  LinearProgressIndicator(
-                    value: 0.65,
-                    backgroundColor: Colors.white12,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(_accentColor)),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.skip_previous_rounded,
-                          color: Colors.white, size: 28),
-                      const SizedBox(width: AppSpacing.lg),
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.s10),
-                        decoration: BoxDecoration(
-                          color: Color(_accentColor),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.black, size: 28),
-                      ),
-                      const SizedBox(width: AppSpacing.lg),
-                      const Icon(Icons.skip_next_rounded,
-                          color: Colors.white, size: 28),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+            const SizedBox(height: AppSpacing.xs),
+            if (_showPlayerPreview)
+              Container(
+                height: 340,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: p.bg,
+                  borderRadius: BorderRadius.circular(_cornerRadius),
+                  border: Border.all(
+                    color: Color(_accentColor).withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    if (_glowEnabled)
+                      BoxShadow(
+                        color: Color(_accentColor).withValues(alpha: 0.25),
+                        blurRadius: 30,
+                        spreadRadius: 2,
+                      ),
+                  ],
+                ),
+                child: Builder(
+                  builder: (ctx) {
+                    try {
+                      final playerCubit = ctx.watch<PlayerCubit>();
+                      final props = PlayerThemeProps(
+                        state: playerCubit.state,
+                        cubit: playerCubit,
+                        activeColor: Color(_accentColor),
+                        bgColor: p.bg,
+                      );
+                      return ThemeRegistry.preview(
+                        PlayerThemeMode.classic,
+                        props,
+                        scale: 0.52,
+                      );
+                    } catch (_) {
+                      return Center(
+                        child: Text(
+                          context.l10n.livePreview,
+                          style: TextStyle(color: p.textSecondary),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              )
+            else
+              Container(
+                height: 220,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.darkSurface,
+                  borderRadius: BorderRadius.circular(_cornerRadius),
+                  border: Border.all(
+                      color: Color(_accentColor).withValues(alpha: 0.4),
+                      width: 1.5),
+                  boxShadow: [
+                    if (_glowEnabled)
+                      BoxShadow(
+                        color: Color(_accentColor).withValues(alpha: 0.25),
+                        blurRadius: 30,
+                        spreadRadius: 2,
+                      ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: Color(_accentColor).withValues(alpha: 0.2),
+                            borderRadius:
+                                BorderRadius.circular(_cornerRadius / 2),
+                          ),
+                          child: Icon(Icons.music_note_rounded,
+                              color: Color(_accentColor), size: 32),
+                        ),
+                        const SizedBox(width: AppSpacing.s14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                context.l10n.livePreview,
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.bodyLarge,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: AppSpacing.s2),
+                              Text(
+                                context.l10n.dspPulsrAudiophileEdition,
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: AppFontSize.label),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    LinearProgressIndicator(
+                      value: 0.65,
+                      backgroundColor: Colors.white12,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(_accentColor)),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.skip_previous_rounded,
+                            color: Colors.white, size: 28),
+                        const SizedBox(width: AppSpacing.lg),
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.s10),
+                          decoration: BoxDecoration(
+                            color: Color(_accentColor),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded,
+                              color: Colors.black, size: 28),
+                        ),
+                        const SizedBox(width: AppSpacing.lg),
+                        const Icon(Icons.skip_next_rounded,
+                            color: Colors.white, size: 28),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: AppSpacing.lg),
 
             Text(context.l10n.accentPalette,

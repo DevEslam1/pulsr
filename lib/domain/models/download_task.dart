@@ -50,6 +50,9 @@ class DownloadTask {
   /// track. Null until [status] reaches [DownloadStatus.complete].
   final int? localSongId;
 
+  /// Byte size of the downloaded audio file once complete.
+  final int? fileSize;
+
   const DownloadTask({
     required this.id,
     required this.videoId,
@@ -67,6 +70,7 @@ class DownloadTask {
     this.artworkUrl,
     this.sourceSongId,
     this.localSongId,
+    this.fileSize,
   });
 
   DownloadTask copyWith({
@@ -86,6 +90,7 @@ class DownloadTask {
     String? artworkUrl,
     int? sourceSongId,
     int? localSongId,
+    int? fileSize,
     bool clearError = false, // FIX-A09: support clearing error via copyWith
   }) {
     return DownloadTask(
@@ -105,6 +110,7 @@ class DownloadTask {
       artworkUrl: artworkUrl ?? this.artworkUrl,
       sourceSongId: sourceSongId ?? this.sourceSongId,
       localSongId: localSongId ?? this.localSongId,
+      fileSize: fileSize ?? this.fileSize,
     );
   }
 
@@ -126,6 +132,7 @@ class DownloadTask {
       'artworkUrl': artworkUrl,
       'sourceSongId': sourceSongId,
       'localSongId': localSongId,
+      'fileSize': fileSize,
     };
   }
 
@@ -152,6 +159,7 @@ class DownloadTask {
       artworkUrl: json['artworkUrl'] as String?,
       sourceSongId: (json['sourceSongId'] as num?)?.toInt(),
       localSongId: (json['localSongId'] as num?)?.toInt(),
+      fileSize: (json['fileSize'] as num?)?.toInt(),
     );
   }
 
@@ -167,11 +175,12 @@ class DownloadTask {
           filePath == other.filePath &&
           error == other.error &&
           sourceSongId == other.sourceSongId &&
-          localSongId == other.localSongId;
+          localSongId == other.localSongId &&
+          fileSize == other.fileSize;
 
   @override
   int get hashCode => Object.hash(
-      id, videoId, status, progress, filePath, error, sourceSongId, localSongId);
+      id, videoId, status, progress, filePath, error, sourceSongId, localSongId, fileSize);
 }
 
 class StorageStats {

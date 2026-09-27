@@ -27,6 +27,7 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
   int _start = 19;
   int _end = 6;
   bool _loaded = false;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -44,9 +45,15 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
         _start = start;
         _end = end;
         _loaded = true;
+        _loadFailed = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _loaded = true);
+      if (mounted) {
+        setState(() {
+          _loaded = true;
+          _loadFailed = true;
+        });
+      }
     }
   }
 
@@ -63,7 +70,44 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    if (!_loaded) return const SizedBox.shrink();
+    if (!_loaded) {
+      return const SizedBox(
+        height: 48,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    if (_loadFailed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline_rounded, size: 18, color: p.error),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                context.l10n.themeScheduleTitle,
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() => _loaded = false);
+                _load();
+              },
+              child: Text(context.l10n.retry),
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.sm),
       child: Column(

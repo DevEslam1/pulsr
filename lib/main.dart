@@ -20,6 +20,7 @@ import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
 import 'core/services/artwork_cache_manager.dart';
+import 'core/services/settings_cache.dart';
 import 'core/services/automation_trigger_service.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
@@ -105,6 +106,12 @@ Future<void> main() async {
       ),
     );
   };
+
+  // Initialize in-memory SettingsCache and ArtworkCacheManager
+  try {
+    await SettingsCache().init();
+    await ArtworkCacheManager().init();
+  } catch (_) {}
 
   // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
   try {

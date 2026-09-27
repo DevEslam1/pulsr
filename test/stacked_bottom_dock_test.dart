@@ -146,7 +146,12 @@ void main() {
     expect(find.byType(PulsrBottomNavBar), findsOneWidget);
     expect(currentMode, equals(DockStackMode.defaultLayout));
 
-    // 1. Swipe down -> should transition to miniPlayerOnTop
+    // 1. Swipe down -> should transition to system mode
+    await tester.fling(find.text('Test Track'), const Offset(0, 300), 1000.0);
+    await tester.pumpAndSettle();
+    expect(currentMode, equals(DockStackMode.system));
+
+    // 2. Swipe down -> should transition to miniPlayerOnTop
     await tester.fling(find.text('Test Track'), const Offset(0, 300), 1000.0);
     await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.miniPlayerOnTop));

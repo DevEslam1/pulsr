@@ -20,8 +20,17 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       color: p.accent,
       backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
-      child: isGrid
-          ? GridView.builder(
+      child: AnimatedSwitcher(
+        duration: context.motion(const Duration(milliseconds: 240)),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+        child: isGrid
+            ? GridView.builder(
+                key: const ValueKey('albums_grid'),
               physics: const AlwaysScrollableScrollPhysics(),
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
@@ -77,6 +86,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               },
             )
           : ListView.builder(
+              key: const ValueKey('albums_list'),
               physics: const AlwaysScrollableScrollPhysics(),
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
@@ -119,6 +129,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                 ));
               },
             ),
+      ),
     );
   }
 
@@ -139,8 +150,17 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       color: p.accent,
       backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
-      child: isGrid
-          ? GridView.builder(
+      child: AnimatedSwitcher(
+        duration: context.motion(const Duration(milliseconds: 240)),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+        child: isGrid
+            ? GridView.builder(
+                key: const ValueKey('artists_grid_view'),
               physics: const AlwaysScrollableScrollPhysics(),
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
@@ -190,6 +210,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               },
             )
           : ListView.builder(
+              key: const ValueKey('artists_list_view'),
               physics: const AlwaysScrollableScrollPhysics(),
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
@@ -233,6 +254,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                 ));
               },
             ),
+      ),
     );
   }
 

@@ -39,6 +39,25 @@ class ThemeRegistry {
     return ClassicPlayerTheme(props: props);
   }
 
+  /// Renders a theme at scaled proportion for use in theme picker grids and previews.
+  static Widget preview(
+    PlayerThemeMode mode,
+    PlayerThemeProps props, {
+    double scale = 0.4,
+  }) {
+    return IgnorePointer(
+      child: Transform.scale(
+        scale: scale,
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: 360,
+          height: 640,
+          child: build(mode, props),
+        ),
+      ),
+    );
+  }
+
   /// Allows registering custom or mock theme builders (e.g. for testing).
   @visibleForTesting
   static void register(PlayerThemeMode mode, PlayerThemeBuilder builder) {

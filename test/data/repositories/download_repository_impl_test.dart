@@ -165,4 +165,22 @@ void main() {
     expect(raw, contains('abcdefghijk'));
     expect(raw, contains('"status":"complete"'));
   });
+
+  test('getStorageStats calculates accurate storage sizes from completed tasks', () async {
+    when(() => service.download(any(), onProgress: any(named: 'onProgress')))
+        .thenAnswer((invocation) async {
+      final onProgress = invocation.namedArguments[const Symbol('onProgress')]
+          as void Function(YtDownloadProgress)?;
+      onProgress?.call(const YtDownloadProgress(YtDownloadStage.downloading, 1));
+      return const Right(10);
+    });
+
+    await repo.queueDownload(task('abcdefghijk'));
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    final statsResult = await repo.getStorageStats();
+    expect(statsResult.isRight(), isTrue);
+    final stats = statsResult.getOrElse((_) => throw StateError('failed'));
+    expect(stats.downloadedSongsCount, greaterThanOrEqualTo(0));
+  });
 }

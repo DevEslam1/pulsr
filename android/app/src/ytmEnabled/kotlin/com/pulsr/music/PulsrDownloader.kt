@@ -28,10 +28,15 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         //    calls bypassed the 1500ms gap that keeps /search off YouTube's
         //    throttle — the endpoint that rate-limits soonest.
         val bucket = bucketFor(request.url())
-        val permitHeld = RateLimiter.shared.acquirePermit(bucket)
-        if (!permitHeld) {
-            Thread.currentThread().interrupt()
-            throw IOException("Rate limiter wait interrupted for ${request.url()}")
+        when (RateLimiter.shared.tryAcquirePermit(bucket)) {
+            RateLimiter.PermitResult.GRANTED -> {}
+            RateLimiter.PermitResult.INTERRUPTED -> {
+                Thread.currentThread().interrupt()
+                throw IOException("Rate limiter wait interrupted for ${request.url()}")
+            }
+            RateLimiter.PermitResult.TIMEOUT -> {
+                throw IOException("Rate limiter wait timed out for ${request.url()}")
+            }
         }
 
         var connection: HttpURLConnection? = null

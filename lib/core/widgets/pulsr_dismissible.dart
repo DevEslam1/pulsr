@@ -41,6 +41,7 @@ class PulsrDismissible extends StatefulWidget {
   final Duration confirmTimeout;
   final bool showToast;
   final double middleRatio;
+  final VoidCallback? swipeSound;
 
   const PulsrDismissible({
     super.key,
@@ -57,6 +58,7 @@ class PulsrDismissible extends StatefulWidget {
     this.confirmTimeout = const Duration(milliseconds: 3500),
     this.showToast = false,
     this.middleRatio = 0.50,
+    this.swipeSound,
   });
 
   /// Helper to build an action background with consistent padding, shape, and icons.
@@ -255,8 +257,12 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
 
     HapticFeedback.lightImpact();
 
-    if (_activeOpenState != null && _activeOpenState != this) {
-      _activeOpenState?._close();
+    final active = _activeOpenState;
+    if (active != null && active != this) {
+      _activeOpenState = null;
+      if (active.mounted) {
+        active._close();
+      }
     }
     _activeOpenState = this;
 
@@ -315,6 +321,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
     }
 
     HapticFeedback.mediumImpact();
+    widget.swipeSound?.call();
 
     if (widget.showToast && mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -359,8 +366,12 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
     _pendingTimer?.cancel();
     _pendingTimer = null;
 
-    if (_activeOpenState != null && _activeOpenState != this) {
-      _activeOpenState?._close();
+    final active = _activeOpenState;
+    if (active != null && active != this) {
+      _activeOpenState = null;
+      if (active.mounted) {
+        active._close();
+      }
     }
 
     _dragStartOffset = _offsetController.value;

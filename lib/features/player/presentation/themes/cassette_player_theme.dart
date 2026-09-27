@@ -53,8 +53,14 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _spoolController.duration = context.motionMs(4000);
+    _updateSpoolSpeed();
     _syncSpool();
+  }
+
+  void _updateSpoolSpeed() {
+    final speed = widget.props.state.playbackSpeed.clamp(0.25, 4.0);
+    final baseDurationMs = (4000 / speed).round();
+    _spoolController.duration = context.motionMs(baseDurationMs);
   }
 
   void _syncSpool() {
@@ -73,6 +79,12 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   @override
   void didUpdateWidget(covariant CassettePlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.props.state.playbackSpeed != oldWidget.props.state.playbackSpeed) {
+      _updateSpoolSpeed();
+      if (_spoolController.isAnimating) {
+        _spoolController.repeat();
+      }
+    }
     _syncSpool();
   }
 

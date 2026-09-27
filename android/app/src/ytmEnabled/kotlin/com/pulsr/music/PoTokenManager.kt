@@ -142,7 +142,7 @@ object PoTokenManager {
         val ctx = appContext ?: return
         if (standbyGenerator?.isExpired() == false || webViewBroken) return
         val currentVisitor = visitorData
-        managerScope.launch(Dispatchers.Main) {
+        managerScope.launch(Dispatchers.IO) {
             try {
                 if (webViewBroken) return@launch
                 val standby = PoTokenWebView.newPoTokenGenerator(ctx)

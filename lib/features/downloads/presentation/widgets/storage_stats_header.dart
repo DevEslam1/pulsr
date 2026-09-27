@@ -1,6 +1,7 @@
 // lib/features/downloads/presentation/widgets/storage_stats_header.dart
 import 'package:flutter/material.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -15,24 +16,12 @@ class StorageStatsHeader extends StatelessWidget {
     required this.stats,
   });
 
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var i = 0;
-    double d = bytes.toDouble();
-    while (d >= 1024.0 && i < suffixes.length - 1) {
-      d /= 1024.0;
-      i++;
-    }
-    return '${d.toStringAsFixed(i == 0 ? 0 : 1)} ${suffixes[i]}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = AppLocalizations.of(context)!;
-    final usedStr = _formatBytes(stats.usedBytes);
-    final freeStr = _formatBytes(stats.freeBytes);
+    final usedStr = Formatters.formatBytes(stats.usedBytes);
+    final freeStr = Formatters.formatBytes(stats.freeBytes);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),

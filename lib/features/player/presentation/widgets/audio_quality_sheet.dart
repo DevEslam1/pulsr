@@ -33,6 +33,8 @@ class AudioQualitySheet extends StatelessWidget {
     required this.activeColor,
   });
 
+  static const String _downloadsMatchStreamLabel = 'Downloads match stream';
+
   static void show(
     BuildContext context,
     SongsTableData song,
@@ -198,7 +200,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Downloads match stream',
+                          _downloadsMatchStreamLabel,
                           style: TextStyle(
                             fontSize: AppFontSize.tiny,
                             color: activeColor,

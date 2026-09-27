@@ -1,10 +1,12 @@
-// lib/features/settings/presentation/widgets/storage_cache_section.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/artwork_cache_manager.dart';
 import '../../../../core/services/ytm_cache_manager.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
@@ -27,6 +29,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
     with WidgetsBindingObserver {
   int _artCacheSizeBytes = 0;
   int _streamCacheSizeBytes = 0;
+  int _lyricsCacheSizeBytes = 0;
+  int _tempCacheSizeBytes = 0;
   bool _isLoading = true;
 
   YtmCacheManager? get _ytmCacheManager =>
@@ -59,10 +63,40 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
     final cacheManager = _ytmCacheManager;
     final streamSize =
         cacheManager == null ? 0 : await cacheManager.getCacheSizeBytes();
+    int lyricsSize = 0;
+    int tempSize = 0;
+    try {
+      final tempDir = await getTemporaryDirectory();
+      if (await tempDir.exists()) {
+        await for (final entity
+            in tempDir.list(recursive: true, followLinks: false)) {
+          if (entity is File) {
+            try {
+              final len = await entity.length();
+              final path = entity.path.toLowerCase();
+              if (path.endsWith('.lrc') || path.contains('lyrics')) {
+                lyricsSize += len;
+              } else if (!path.contains('artwork') && !path.contains('ytm')) {
+                tempSize += len;
+              }
+            } catch (e, st) {
+              ErrorLogger.log('Storage file length check failed',
+                  error: e, stackTrace: st, category: 'Storage');
+            }
+          }
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Storage tempDir scan failed',
+          error: e, stackTrace: st, category: 'Storage');
+    }
+
     if (mounted) {
       setState(() {
         _artCacheSizeBytes = artSize;
         _streamCacheSizeBytes = streamSize;
+        _lyricsCacheSizeBytes = lyricsSize;
+        _tempCacheSizeBytes = tempSize;
         _isLoading = false;
       });
     }
@@ -74,6 +108,141 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  Widget _buildLegendItem({
+    required Color color,
+    required String label,
+    required BuildContext context,
+  }) {
+    final p = context.palette;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.s6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: AppFontSize.caption,
+            color: p.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBreakdownBar(BuildContext context) {
+    final p = context.palette;
+    final totalBytes = _artCacheSizeBytes +
+        _streamCacheSizeBytes +
+        _lyricsCacheSizeBytes +
+        _tempCacheSizeBytes;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: p.surfaceContainerHigh.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(AppRadii.r16),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Storage Breakdown",
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: AppFontSize.body,
+                  color: p.textPrimary,
+                ),
+              ),
+              Text(
+                _isLoading ? '...' : _formatSize(totalBytes),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: AppFontSize.label,
+                  color: p.accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.r6),
+            child: SizedBox(
+              height: 10,
+              child: totalBytes == 0 || _isLoading
+                  ? Container(color: p.surfaceContainerHigh)
+                  : Row(
+                      children: [
+                        if (_artCacheSizeBytes > 0)
+                          Expanded(
+                            flex: _artCacheSizeBytes,
+                            child: Container(color: p.accent),
+                          ),
+                        if (_streamCacheSizeBytes > 0)
+                          Expanded(
+                            flex: _streamCacheSizeBytes,
+                            child: Container(color: p.error),
+                          ),
+                        if (_lyricsCacheSizeBytes > 0)
+                          Expanded(
+                            flex: _lyricsCacheSizeBytes,
+                            child: Container(color: const Color(0xFF9C27B0)),
+                          ),
+                        if (_tempCacheSizeBytes > 0)
+                          Expanded(
+                            flex: _tempCacheSizeBytes,
+                            child: Container(color: p.textTertiary),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _buildLegendItem(
+                color: p.accent,
+                label: 'Artwork: ${_formatSize(_artCacheSizeBytes)}',
+                context: context,
+              ),
+              if (AppConfig.ytmEnabled && _streamCacheSizeBytes > 0)
+                _buildLegendItem(
+                  color: p.error,
+                  label: 'Streams: ${_formatSize(_streamCacheSizeBytes)}',
+                  context: context,
+                ),
+              _buildLegendItem(
+                color: const Color(0xFF9C27B0),
+                label: 'Lyrics: ${_formatSize(_lyricsCacheSizeBytes)}',
+                context: context,
+              ),
+              _buildLegendItem(
+                color: p.textTertiary,
+                label: 'Cache / DB: ${_formatSize(_tempCacheSizeBytes)}',
+                context: context,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -82,6 +251,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
 
     return Column(
       children: [
+        _buildBreakdownBar(context),
         ListTile(
           contentPadding:
               const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),

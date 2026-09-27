@@ -338,23 +338,51 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadii.r6),
-                    ),
-                    child: Text(
-                      r.category.toUpperCase(),
-                      style: TextStyle(
-                        color: p.accent,
-                        fontSize: AppFontSize.tiny,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: AppTracking.medium,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                        decoration: BoxDecoration(
+                          color: p.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadii.r6),
+                        ),
+                        child: Text(
+                          r.category.toUpperCase(),
+                          style: TextStyle(
+                            color: p.accent,
+                            fontSize: AppFontSize.tiny,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: AppTracking.medium,
+                          ),
+                        ),
                       ),
-                    ),
+                      if (r.pro) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [p.accent, p.accent.withValues(alpha: 0.7)],
+                            ),
+                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                          ),
+                          child: Text(
+                            "PRO",
+                            style: TextStyle(
+                              color: p.onAccent,
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: AppTracking.wide,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   _buildHighlightedText(
                     r.title,
@@ -386,7 +414,9 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                   Icon(Icons.chevron_right_rounded,
                       color: p.textTertiary, size: 20),
               onTap: () {
-                final catId = _mapCategoryNameToId(r.category, context);
+                final catId = r.categoryId.isNotEmpty
+                    ? r.categoryId
+                    : _mapCategoryNameToId(r.category, context);
                 r.onTap?.call();
                 if (mounted) {
                   setState(() {
@@ -421,7 +451,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
 
   List<_SearchItem>? _memoizedSearchEntries;
   Locale? _memoizedSearchLocale;
-  bool? _memoizedSearchPro;
+  SettingsState? _memoizedSearchState;
 
   List<_SearchItem> _getSearchableEntries(
     BuildContext context,
@@ -431,13 +461,14 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     final currentLocale = Localizations.localeOf(context);
     if (_memoizedSearchEntries != null &&
         _memoizedSearchLocale == currentLocale &&
-        _memoizedSearchPro == state.isProfessional) {
+        _memoizedSearchState == state) {
       return _memoizedSearchEntries!;
     }
     _memoizedSearchLocale = currentLocale;
-    _memoizedSearchPro = state.isProfessional;
+    _memoizedSearchState = state;
     return _memoizedSearchEntries = [
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchThemeModeTitle,
         subtitle: context.l10n.settingsSearchThemeModeSubtitle,
@@ -449,6 +480,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchAccentColorTitle,
         subtitle: context.l10n.settingsSearchAccentColorSubtitle,
@@ -468,6 +500,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsAutoDarkModeTitle,
         subtitle: context.l10n.settingsAutoDarkModeSubtitle,
@@ -480,6 +513,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => cubit.setAutoThemeByTime(!state.autoThemeByTime),
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchHighContrastTitle,
         subtitle: context.l10n.settingsHighContrastSubtitle,
@@ -492,6 +526,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => cubit.setHighContrast(!state.highContrast),
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsReduceMotionTitle,
         subtitle: context.l10n.settingsReduceMotionSubtitle,
@@ -504,6 +539,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => cubit.setReduceMotion(!state.reduceMotion),
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchNowPlayingThemeTitle,
         subtitle: getThemeModeTitle(state.playerThemeMode, context.l10n),
@@ -521,6 +557,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             showThemePickerSheet(context, cubit, state.playerThemeMode),
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchVisualizerStyleTitle,
         subtitle: getVisualizerStyleTitle(state.visualizerStyle, context.l10n),
@@ -530,6 +567,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             context, cubit, state.visualizerStyle),
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.colorSource,
         subtitle: getColorSourceTitle(state.themeColorSource, context.l10n),
@@ -539,6 +577,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             showColorSourcePickerSheet(context, cubit, state.themeColorSource),
       ),
       _SearchItem(
+        categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.language,
         subtitle: getLanguageTitle(state.languageCode, context.l10n),
@@ -548,6 +587,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             showLanguagePickerSheet(context, cubit, state.languageCode),
       ),
       _SearchItem(
+        categoryId: 'audio',
         category: context.l10n.settingsSearchCategoryAudio,
         title: context.l10n.equalizerAndSoundEffects,
         subtitle: context.l10n.settingsSearchEqualizerSubtitle,
@@ -571,6 +611,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'audio',
         category: context.l10n.settingsSearchCategoryAudio,
         title: context.l10n.settingsSearchBitPerfectTitle,
         subtitle: context.l10n.settingsSearchBitPerfectSubtitle,
@@ -583,6 +624,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'playback',
         category: context.l10n.playback,
         title: context.l10n.settingsSearchCrossfadeTitle,
         subtitle: context.l10n.settingsSearchCrossfadeSubtitle,
@@ -594,6 +636,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'playback',
         category: context.l10n.playback,
         title: context.l10n.sleepTimer,
         subtitle: context.l10n.settingsSearchSleepTimerSubtitle,
@@ -602,6 +645,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => SleepTimerSheet.show(context),
       ),
       _SearchItem(
+        categoryId: 'gestures',
         category: context.l10n.gestures,
         title: context.l10n.settingsSearchSwipeTitle,
         subtitle: context.l10n.settingsSearchSwipeSubtitle,
@@ -613,6 +657,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'library',
         category: context.l10n.navLibrary,
         title: context.l10n.settingsSearchRescanTitle,
         subtitle: context.l10n.settingsSearchRescanSubtitle,
@@ -621,6 +666,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => cubit.rescanLibrary(),
       ),
       _SearchItem(
+        categoryId: 'library',
         category: context.l10n.navLibrary,
         title: context.l10n.settingsRebuildSearchIndexTitle,
         subtitle: context.l10n.settingsRebuildSearchIndexSubtitle,
@@ -629,6 +675,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => cubit.rebuildSearchIndex(),
       ),
       _SearchItem(
+        categoryId: 'library',
         category: context.l10n.navLibrary,
         title: context.l10n.hiddenAndExcludedFolders,
         subtitle: context.l10n.settingsSearchHiddenFoldersSubtitle,
@@ -637,6 +684,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => context.push('/hidden-folders'),
       ),
       _SearchItem(
+        categoryId: 'library',
         category: context.l10n.navLibrary,
         title: context.l10n.shortAudioFilter,
         subtitle: context.l10n.ignoreFilesUnder(state.minDurationSec),
@@ -646,6 +694,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             _showDurationFilterDialog(context, cubit, state.minDurationSec),
       ),
       _SearchItem(
+        categoryId: 'online',
         category: context.l10n.settingsSearchCategoryNetwork,
         title: context.l10n.proxySettings,
         subtitle: context.l10n.settingsSearchProxySubtitle,
@@ -655,6 +704,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => context.push('/proxy-settings'),
       ),
       _SearchItem(
+        categoryId: 'online',
         category: context.l10n.settingsSearchCategoryNetwork,
         title: context.l10n.settingsSearchQualityTitle,
         subtitle: context.l10n.settingsSearchQualitySubtitle,
@@ -668,6 +718,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         ),
       ),
       _SearchItem(
+        categoryId: 'storage',
         category: context.l10n.settingsSearchCategoryStorage,
         title: context.l10n.settingsSearchCacheTitle,
         subtitle: context.l10n.settingsSearchCacheSubtitle,
@@ -679,6 +730,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         },
       ),
       _SearchItem(
+        categoryId: 'privacy',
         category: context.l10n.settingsSearchCategoryPrivacy,
         title: context.l10n.settingsScrobblingTitle,
         subtitle: context.l10n.settingsSearchScrobblingSubtitle,
@@ -687,6 +739,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => showScrobblerSettingsModal(context),
       ),
       _SearchItem(
+        categoryId: 'privacy',
         category: context.l10n.settingsSearchCategoryPrivacy,
         title: context.l10n.settingsSearchPrivacyTitle,
         subtitle: context.l10n.settingsSearchPrivacySubtitle,
@@ -695,6 +748,7 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         onTap: () => showPrivacyGuaranteeSheet(context),
       ),
       _SearchItem(
+        categoryId: 'about',
         category: context.l10n.settingsSearchCategoryAbout,
         title: context.l10n.about,
         subtitle: context.l10n.settingsSearchAboutSubtitle(AppConfig.appVersion),

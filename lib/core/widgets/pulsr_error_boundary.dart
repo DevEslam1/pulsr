@@ -1,7 +1,14 @@
 // lib/core/widgets/pulsr_error_boundary.dart
 import 'package:flutter/material.dart';
+import '../theme/aura_theme.dart';
 import '../utils/error_logger.dart';
-import 'empty_state_widget.dart';
+import 'pulsr_empty_state.dart';
+
+enum ErrorSeverity {
+  info,
+  warning,
+  critical,
+}
 
 typedef ErrorBoundaryBuilder = Widget Function(
     BuildContext context, Object error, VoidCallback retry);
@@ -16,6 +23,7 @@ class PulsrErrorBoundary extends StatefulWidget {
   final String? fallbackSubtitle;
   final ErrorBoundaryBuilder? errorBuilder;
   final VoidCallback? onRetry;
+  final ErrorSeverity severity;
 
   const PulsrErrorBoundary({
     super.key,
@@ -26,6 +34,7 @@ class PulsrErrorBoundary extends StatefulWidget {
     this.fallbackSubtitle,
     this.errorBuilder,
     this.onRetry,
+    this.severity = ErrorSeverity.critical,
   }) : assert(child != null || builder != null,
             'Either child or builder must be provided');
 
@@ -57,8 +66,29 @@ class _PulsrErrorBoundaryState extends State<PulsrErrorBoundary> {
     if (widget.errorBuilder != null) {
       return widget.errorBuilder!(context, error, _retry);
     }
-    return EmptyStateWidget(
-      icon: Icons.error_outline_rounded,
+
+    final p = context.palette;
+    final IconData effectiveIcon;
+    final Color effectiveColor;
+
+    switch (widget.severity) {
+      case ErrorSeverity.info:
+        effectiveIcon = Icons.info_outline_rounded;
+        effectiveColor = p.info;
+        break;
+      case ErrorSeverity.warning:
+        effectiveIcon = Icons.warning_amber_rounded;
+        effectiveColor = p.warning;
+        break;
+      case ErrorSeverity.critical:
+        effectiveIcon = Icons.error_outline_rounded;
+        effectiveColor = p.error;
+        break;
+    }
+
+    return PulsrEmptyState(
+      icon: effectiveIcon,
+      iconColor: effectiveColor,
       title: widget.fallbackTitle ?? 'Something went wrong',
       subtitle: widget.fallbackSubtitle ??
           'An unexpected error occurred while displaying this content.',

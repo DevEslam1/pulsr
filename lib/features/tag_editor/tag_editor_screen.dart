@@ -8,6 +8,7 @@ import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/widgets/pulsr_back_button.dart';
 import '../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../core/widgets/pulsr_dialog.dart';
 import '../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
@@ -62,20 +63,18 @@ class _TagEditorViewState extends State<_TagEditorView> {
       if (checkpoint != null && checkpoint.isNotEmpty && mounted) {
         await prefs.remove(TagEditorCubit.batchCheckpointKey);
         if (!mounted) return;
-        showDialog<void>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(context.l10n.partialBatchDetected),
-            content: Text(
-              '${checkpoint.length} file(s) were not updated due to an interrupted batch.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(context.l10n.ok),
-              ),
-            ],
+        PulsrDialogHelper.showPulsrDialog<void>(
+          context,
+          title: Text(context.l10n.partialBatchDetected),
+          content: Text(
+            '${checkpoint.length} file(s) were not updated due to an interrupted batch.',
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(context.l10n.ok),
+            ),
+          ],
         );
       }
     } catch (_) {}

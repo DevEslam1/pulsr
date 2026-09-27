@@ -1506,19 +1506,54 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return null;
     try {
-      final List<dynamic>? res = await _channel
-          .invokeListMethod<dynamic>('decodeDsd', {
-            'dsdL': dsdL,
-            'dsdR': dsdR,
-            'byteCount': dsdL.length,
-            'dsdRate': dsdRate,
-            'targetSampleRate': targetSampleRate,
-            'bitOrder': bitOrder,
-          })
-          .timeout(const Duration(seconds: 10));
-      if (res != null) {
-        return res.map((e) => (e as num).toDouble()).toList();
+      final int totalBytes = dsdL.length;
+      if (totalBytes != dsdR.length) return null;
+      if (totalBytes == 0) return <double>[];
+
+      const int maxChunkBytes = 64 * 1024; // 64 KB chunking prevents UI thread stalls
+      if (totalBytes <= maxChunkBytes) {
+        final List<dynamic>? res = await _channel
+            .invokeListMethod<dynamic>('decodeDsd', {
+              'dsdL': dsdL,
+              'dsdR': dsdR,
+              'byteCount': totalBytes,
+              'dsdRate': dsdRate,
+              'targetSampleRate': targetSampleRate,
+              'bitOrder': bitOrder,
+            })
+            .timeout(const Duration(seconds: 10));
+        if (res != null) {
+          return res.map((e) => (e as num).toDouble()).toList();
+        }
+        return null;
       }
+
+      // Chunked decoding
+      final List<double> resultPcm = <double>[];
+      int offset = 0;
+      while (offset < totalBytes) {
+        final int chunkSize = (totalBytes - offset).clamp(0, maxChunkBytes);
+        final Uint8List chunkL = Uint8List.sublistView(dsdL, offset, offset + chunkSize);
+        final Uint8List chunkR = Uint8List.sublistView(dsdR, offset, offset + chunkSize);
+
+        final List<dynamic>? res = await _channel
+            .invokeListMethod<dynamic>('decodeDsd', {
+              'dsdL': chunkL,
+              'dsdR': chunkR,
+              'byteCount': chunkSize,
+              'dsdRate': dsdRate,
+              'targetSampleRate': targetSampleRate,
+              'bitOrder': bitOrder,
+            })
+            .timeout(const Duration(seconds: 10));
+
+        if (res == null) return null;
+        for (final dynamic sample in res) {
+          resultPcm.add((sample as num).toDouble());
+        }
+        offset += chunkSize;
+      }
+      return resultPcm;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to decode DSD stream',

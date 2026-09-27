@@ -404,9 +404,10 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(resolvedMimeType), null)
             return dest.absolutePath
         } catch (e: Exception) {
+            android.util.Log.w("YtDownloadPlugin", "MediaStore insert threw; falling back to scanner and preserving file at ${dest.absolutePath}", e)
             try { insertedUri?.let { resolver.delete(it, null, null) } } catch (_: Exception) {}
-            try { if (dest.exists()) dest.delete() } catch (_: Exception) {}
-            throw e
+            MediaScannerConnection.scanFile(context, arrayOf(dest.absolutePath), arrayOf(resolvedMimeType), null)
+            return dest.absolutePath
         }
     }
 }

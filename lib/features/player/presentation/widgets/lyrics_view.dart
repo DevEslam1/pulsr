@@ -136,9 +136,16 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _updateProgress(Duration position) {
+    if (!mounted || !_isSynced || widget.lyrics.isEmpty) return;
     final manualOffset = Duration(milliseconds: _manualOffsetMs);
     final effective = (position - _audibleOffset - manualOffset);
-    _lyricController.setProgress(effective.isNegative ? Duration.zero : effective);
+    try {
+      _lyricController
+          .setProgress(effective.isNegative ? Duration.zero : effective);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set lyrics progress',
+          error: e, stackTrace: st, category: 'Lyrics');
+    }
   }
 
   /// Loads the persisted per-file offset when the current song changes.

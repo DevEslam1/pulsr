@@ -232,7 +232,7 @@ class UsbExclusivePlugin(
                     val parsed = parseViaRawDescriptors(conn)
                     val descriptorRates = parsed?.supportedRates ?: emptyList()
                     val merged = (nativeRates + descriptorRates).distinct().sorted()
-                    result.success(if (merged.isNotEmpty()) merged else listOf(44100, 48000, 88200, 96000, 176400, 192000))
+                    result.success(merged)
                 }
                 else -> result.notImplemented()
             }
@@ -709,9 +709,14 @@ class UsbExclusivePlugin(
         iface ?: return failure("streaming_interface_not_found")
 
         // Force-claim detaches Android's kernel audio driver from this
-        // interface so the exclusive endpoint is ours.
-        val claimed = try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
-        if (!claimed) return failure("claim_failed")
+        // interface so the exclusive endpoint is ours. If already claimed from a gapless switch,
+        // preserve the claim.
+        val alreadyClaimed = (claimedStreamingInterface != null && claimedStreamingInterface == iface)
+        val claimed = if (alreadyClaimed) true else try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
+        if (!claimed) {
+            claimedStreamingInterface = null
+            return failure("claim_failed")
+        }
 
         val mainHandler = Handler(Looper.getMainLooper())
         val watchdog = Runnable {

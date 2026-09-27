@@ -31,7 +31,14 @@ class PulsrBottomNavBar extends StatefulWidget {
 
 class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
   double _dragDy = 0;
-  double _visualDy = 0;
+  final ValueNotifier<double> _visualDyNotifier = ValueNotifier<double>(0.0);
+  int _lastDragUpdateMs = 0;
+
+  @override
+  void dispose() {
+    _visualDyNotifier.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,12 +69,18 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
             constraints: BoxConstraints(maxWidth: maxBarWidth),
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-              onVerticalDragStart: (_) => _dragDy = 0,
+              onVerticalDragStart: (_) {
+                _dragDy = 0;
+                _lastDragUpdateMs = 0;
+              },
               onVerticalDragUpdate: (d) {
                 _dragDy += d.delta.dy;
+                final now = DateTime.now().millisecondsSinceEpoch;
+                if (now - _lastDragUpdateMs < 16) return;
+                _lastDragUpdateMs = now;
                 final target = (_dragDy * 0.20).clamp(-8.0, 8.0);
-                if ((target - _visualDy).abs() > 0.5) {
-                  setState(() => _visualDy = target);
+                if ((target - _visualDyNotifier.value).abs() > 0.5) {
+                  _visualDyNotifier.value = target;
                 }
               },
               onVerticalDragEnd: (d) {
@@ -78,21 +91,23 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                   widget.onSwipeUp?.call();
                 }
                 _dragDy = 0;
-                if (_visualDy != 0) {
-                  setState(() => _visualDy = 0);
-                }
+                _visualDyNotifier.value = 0;
               },
               onVerticalDragCancel: () {
                 _dragDy = 0;
-                if (_visualDy != 0) {
-                  setState(() => _visualDy = 0);
-                }
+                _visualDyNotifier.value = 0;
               },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                curve: Curves.easeOutCubic,
-                transform: Matrix4.translationValues(0, _visualDy, 0),
-                height: barHeight,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _visualDyNotifier,
+                builder: (context, visualDy, child) {
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    curve: Curves.easeOutCubic,
+                    transform: Matrix4.translationValues(0, visualDy, 0),
+                    height: barHeight,
+                    child: child,
+                  );
+                },
                 child: Container(
                   height: barHeight,
                   decoration: BoxDecoration(

@@ -11,6 +11,24 @@ import '../utils/adaptive.dart';
 import 'pulsr_dock_tracker.dart';
 import 'pulsr_modal_tracker.dart';
 
+enum PulsrToastPosition {
+  aboveDock,
+  center,
+  top,
+}
+
+class PulsrToastAction {
+  final String label;
+  final VoidCallback onPressed;
+  final IconData? icon;
+
+  const PulsrToastAction({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+  });
+}
+
 /// Modern, floating SnackBar notification styled in Pulsr's signature glass aesthetic,
 /// matching the mini player and bottom dock layout.
 ///
@@ -30,7 +48,7 @@ class PulsrToast {
     }
   }
 
-  /// Displays a floating SnackBar positioned above the mini player.
+  /// Displays a floating SnackBar positioned above the mini player or top/center.
   static void show(
     BuildContext context, {
     required String message,
@@ -41,6 +59,8 @@ class PulsrToast {
     bool isSuccess = false,
     String? actionLabel,
     VoidCallback? onActionPressed,
+    PulsrToastAction? action,
+    PulsrToastPosition position = PulsrToastPosition.aboveDock,
     VoidCallback? onDismiss,
     double? bottomOffset,
   }) {
@@ -68,6 +88,13 @@ class PulsrToast {
     if (overlayState == null) return;
     final p = context.palette;
 
+    final effectiveAction = action ??
+        ((actionLabel != null && onActionPressed != null)
+            ? PulsrToastAction(label: actionLabel, onPressed: onActionPressed)
+            : (actionLabel != null
+                ? PulsrToastAction(label: actionLabel, onPressed: () {})
+                : null));
+
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (ctx) => _ToastWidget(
@@ -77,8 +104,8 @@ class PulsrToast {
         icon: icon,
         isError: isError,
         isSuccess: isSuccess,
-        actionLabel: actionLabel,
-        onActionPressed: onActionPressed,
+        action: effectiveAction,
+        position: position,
         palette: p,
         customBottomOffset: bottomOffset,
         duration: duration,
@@ -118,8 +145,8 @@ class _ToastWidget extends StatefulWidget {
   final IconData? icon;
   final bool isError;
   final bool isSuccess;
-  final String? actionLabel;
-  final VoidCallback? onActionPressed;
+  final PulsrToastAction? action;
+  final PulsrToastPosition position;
   final PulsrPalette palette;
   final double? customBottomOffset;
   final Duration duration;
@@ -133,8 +160,8 @@ class _ToastWidget extends StatefulWidget {
     this.icon,
     required this.isError,
     required this.isSuccess,
-    this.actionLabel,
-    this.onActionPressed,
+    this.action,
+    this.position = PulsrToastPosition.aboveDock,
     required this.palette,
     this.customBottomOffset,
     required this.duration,
@@ -169,8 +196,14 @@ class _ToastWidgetState extends State<_ToastWidget>
       curve: Curves.easeOutCubic,
     );
 
+    final initialOffset = widget.position == PulsrToastPosition.top
+        ? const Offset(0.0, -0.40)
+        : (widget.position == PulsrToastPosition.center
+            ? const Offset(0.0, 0.15)
+            : const Offset(0.0, 0.40));
+
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.40),
+      begin: initialOffset,
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animController,
@@ -293,17 +326,41 @@ class _ToastWidgetState extends State<_ToastWidget>
       ]),
       builder: (context, _) {
         final bottomOffset = _calculateBottomOffset(context);
+        final Alignment alignment;
+        final EdgeInsetsDirectional padding;
 
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: AnimatedPadding(
-            duration: context.motionMs(260),
-            curve: Curves.easeOutCubic,
-            padding: EdgeInsetsDirectional.only(
+        switch (widget.position) {
+          case PulsrToastPosition.top:
+            alignment = Alignment.topCenter;
+            padding = EdgeInsetsDirectional.only(
+              top: (MediaQuery.maybeOf(context)?.padding.top ?? 24.0) + 16.0,
+              start: isTablet ? 24.0 : 14.0,
+              end: isTablet ? 24.0 : 14.0,
+            );
+            break;
+          case PulsrToastPosition.center:
+            alignment = Alignment.center;
+            padding = EdgeInsetsDirectional.only(
+              start: isTablet ? 24.0 : 14.0,
+              end: isTablet ? 24.0 : 14.0,
+            );
+            break;
+          case PulsrToastPosition.aboveDock:
+            alignment = Alignment.bottomCenter;
+            padding = EdgeInsetsDirectional.only(
               bottom: bottomOffset,
               start: isTablet ? 24.0 : 14.0,
               end: isTablet ? 24.0 : 14.0,
-            ),
+            );
+            break;
+        }
+
+        return Align(
+          alignment: alignment,
+          child: AnimatedPadding(
+            duration: context.motionMs(260),
+            curve: Curves.easeOutCubic,
+            padding: padding,
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxDockWidth),
               child: FadeTransition(
@@ -446,13 +503,13 @@ class _ToastWidgetState extends State<_ToastWidget>
                                   ),
 
                                   // Optional Action Button
-                                  if (widget.actionLabel != null) ...[
+                                  if (widget.action != null) ...[
                                     const SizedBox(width: 8),
                                     GestureDetector(
                                       behavior: HitTestBehavior.opaque,
                                       onTap: () {
                                         HapticFeedback.lightImpact();
-                                        widget.onActionPressed?.call();
+                                        widget.action!.onPressed();
                                         dismiss();
                                       },
                                       child: Container(
@@ -471,13 +528,26 @@ class _ToastWidgetState extends State<_ToastWidget>
                                             width: 1.0,
                                           ),
                                         ),
-                                        child: Text(
-                                          widget.actionLabel!,
-                                          style: TextStyle(
-                                            color: statusColor,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12.5,
-                                          ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (widget.action!.icon != null) ...[
+                                              Icon(
+                                                widget.action!.icon,
+                                                size: 14,
+                                                color: statusColor,
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            Text(
+                                              widget.action!.label,
+                                              style: TextStyle(
+                                                color: statusColor,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12.5,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),

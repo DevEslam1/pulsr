@@ -23,4 +23,16 @@ class Formatters {
   static String formatSongCount(int count) {
     return count == 1 ? '1 song' : '$count songs';
   }
+
+  static String formatBytes(int? bytes) {
+    if (bytes == null || bytes <= 0) return '0 B';
+    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = 0;
+    double d = bytes.toDouble();
+    while (d >= 1024.0 && i < suffixes.length - 1) {
+      d /= 1024.0;
+      i++;
+    }
+    return '${d.toStringAsFixed(i == 0 ? 0 : 1)} ${suffixes[i]}';
+  }
 }

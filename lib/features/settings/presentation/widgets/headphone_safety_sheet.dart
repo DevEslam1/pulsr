@@ -8,6 +8,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 
 /// Sheet displaying WHO-ITU H.870 / EN 62368-1 sound dose tracking and
@@ -86,26 +87,14 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
   }
 
   Future<void> _confirmResetDose() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.palette.surfaceContainer,
-        title: Text(context.l10n.resetWeeklyDoseTitle),
-        content: Text(context.l10n.resetWeeklyDoseDesc),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(context.l10n.resetDoseAction),
-          ),
-        ],
-      ),
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: context.l10n.resetWeeklyDoseTitle,
+      message: context.l10n.resetWeeklyDoseDesc,
+      confirmLabel: context.l10n.resetDoseAction,
+      cancelLabel: context.l10n.cancel,
+      isDestructive: true,
+      icon: Icons.restore_rounded,
     );
 
     if (confirmed == true && mounted) {

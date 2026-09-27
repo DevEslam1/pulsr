@@ -354,18 +354,35 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
 
                         if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
-                            context?.contentResolver?.openOutputStream(uri, "rwt")?.use { out ->
+                            val cr = context?.contentResolver
+                                ?: throw java.io.IOException("ContentResolver unavailable for $uri")
+                            val outStream = cr.openOutputStream(uri, "rwt")
+                                ?: throw java.io.IOException("Failed to open output stream for content URI: $uri")
+                            outStream.use { out ->
                                 file.inputStream().use { input -> input.copyTo(out) }
                             }
                         }
 
                         // Post-write verification: re-read and compare key fields.
                         // Returns a map so Dart can distinguish written-but-unverified
-                        // from fully verified (defect 24-03 scoped-storage honesty).
+                        // from fully verified (defect 24-03 scoped-storage honesty, B-05).
                         val verifiedFields = mutableMapOf<String, Boolean>()
                         verified = false
+                        var verifyTempFile: File? = null
                         try {
-                            val reread = AudioFileIO.read(if (isContentUri) file else File(path))
+                            val fileToVerify = if (isContentUri) {
+                                val uri = android.net.Uri.parse(path)
+                                val cr = context?.contentResolver
+                                val inStream = cr?.openInputStream(uri)
+                                    ?: throw java.io.IOException("Failed to open input stream for verification of $uri")
+                                val vTemp = File.createTempFile("pulsr_verify_", ".tmp", context?.cacheDir)
+                                verifyTempFile = vTemp
+                                vTemp.outputStream().use { vOut -> inStream.use { vIn -> vIn.copyTo(vOut) } }
+                                vTemp
+                            } else {
+                                File(path)
+                            }
+                            val reread = AudioFileIO.read(fileToVerify)
                             val rtag = reread.tag
                             if (rtag != null) {
                                 val expTitle = tags["title"]?.toString()
@@ -398,6 +415,8 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         } catch (_: Exception) {
                             verified = false
+                        } finally {
+                            verifyTempFile?.let { runCatching { it.delete() } }
                         }
 
                         // Trigger Android system MediaStore scan so filesystem changes are indexed immediately.

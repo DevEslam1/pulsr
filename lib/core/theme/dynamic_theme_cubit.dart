@@ -301,8 +301,8 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
       }
       // Do not reset to default on single artwork 404/timeout — keep existing palette
       if (e is TimeoutException || e.toString().contains('404') || e.toString().contains('Failed host lookup')) {
-        ErrorLogger.log('Palette fetch transient failure for $cacheKey (keeping existing)',
-            error: e, stackTrace: st, category: 'DynamicTheme');
+        ErrorLogger.log('Palette fetch transient failure for $cacheKey (keeping existing): $e',
+            category: 'DynamicTheme');
         return;
       }
       ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey',

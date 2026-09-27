@@ -33,6 +33,7 @@ import androidx.core.content.FileProvider
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class NowPlayingWidget : AppWidgetProvider() {
 
@@ -71,9 +72,9 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val appWidgetIds = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS)
                     ?: appWidgetManager.getAppWidgetIds(componentName)
                 val data = HomeWidgetPlugin.getData(context)
-                val progressOnly = shouldRenderProgressOnly(data)
                 if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
                     for (appWidgetId in appWidgetIds) {
+                        val progressOnly = shouldRenderProgressOnly(data, appWidgetId)
                         updateAppWidget(context, appWidgetManager, appWidgetId, progressOnly)
                     }
                 }
@@ -112,10 +113,9 @@ class NowPlayingWidget : AppWidgetProvider() {
             // Ignore
         }
 
-        // On Android, AppWidget clicks are triggered by the Launcher or System Server
-        // (sentFromUid is the launcher or system UID, never Process.myUid()).
-        // Since action is strictly whitelisted in WIDGET_ACTIONS, allow it.
-        return true
+        // PendingIntents created by our widget inject EXTRA_WIDGET_TOKEN. External broadcasts
+        // lacking the token or WIDGET_CONTROL permission must not execute playback actions.
+        return false
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -257,7 +257,14 @@ class NowPlayingWidget : AppWidgetProvider() {
         cachedArtworkPath = null
         cachedArtworkMtime = 0L
         // A dismissed widget must re-render in full when it comes back.
-        renderedContentVersion = -1L
+        renderedContentVersions.clear()
+    }
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        for (id in appWidgetIds) {
+            renderedContentVersions.remove(id)
+        }
     }
 
     companion object {
@@ -334,11 +341,10 @@ class NowPlayingWidget : AppWidgetProvider() {
         private var cachedArtworkMtime: Long = 0L
         private var cachedArtworkBitmap: Bitmap? = null
 
-        /// Content version rendered by the last *full* repaint. Compared against
+        /// Content version rendered by the last *full* repaint per widget ID. Compared against
         /// the `contentVersion` the Dart side persists to recognise a progress-only
         /// tick (C-4).
-        @Volatile
-        private var renderedContentVersion: Long = -1L
+        private val renderedContentVersions = ConcurrentHashMap<Int, Long>()
 
         private fun sendExplicitMediaButton(context: Context, keyCode: Int) {
             try {
@@ -386,11 +392,12 @@ class NowPlayingWidget : AppWidgetProvider() {
         /// C-4: true when the only thing that changed since the last full repaint
         /// is progress/position — i.e. the persisted content version still matches
         /// what was last rendered — and the artwork bitmap is still usable.
-        private fun shouldRenderProgressOnly(data: SharedPreferences): Boolean {
+        private fun shouldRenderProgressOnly(data: SharedPreferences, appWidgetId: Int): Boolean {
             val cached = cachedArtworkBitmap
             if (cached == null || cached.isRecycled) return false
             val version = getSafeLong(data, "contentVersion", -1L)
-            return version >= 0L && version == renderedContentVersion
+            val lastRendered = renderedContentVersions[appWidgetId] ?: -1L
+            return version >= 0L && version == lastRendered
         }
 
         /// C-3: whether the live session is in a state where "play/pause" should
@@ -594,7 +601,12 @@ class NowPlayingWidget : AppWidgetProvider() {
                 }
 
                 if (!progressOnly) {
-                    renderedContentVersion = getSafeLong(data, "contentVersion", -1L)
+                    val version = getSafeLong(data, "contentVersion", -1L)
+                    if (version >= 0L) {
+                        renderedContentVersions[appWidgetId] = version
+                    } else {
+                        renderedContentVersions.remove(appWidgetId)
+                    }
                 }
             } catch (e: Throwable) {
                 android.util.Log.e("NowPlayingWidget", "Widget update failed, recovering with fallback views", e)
@@ -603,7 +615,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                     cachedArtworkBitmap = null
                     cachedArtworkPath = null
                     cachedArtworkMtime = 0L
-                    renderedContentVersion = -1L
+                    renderedContentVersions.remove(appWidgetId)
 
                     val fallbackViews = RemoteViews(context.packageName, R.layout.widget_now_playing).apply {
                         val data = HomeWidgetPlugin.getData(context)
@@ -853,6 +865,12 @@ class NowPlayingWidget : AppWidgetProvider() {
                         createSeekPendingIntent(context, ratio, 300 + i)
                     )
                 }
+                // H-13: Wire elapsed timestamp as 0% seek zone
+                views.setContentDescription(R.id.widget_elapsed, context.getString(R.string.widget_seek_to, 0))
+                views.setOnClickPendingIntent(
+                    R.id.widget_elapsed,
+                    createSeekPendingIntent(context, 0.0f, 320)
+                )
             }
 
             return views

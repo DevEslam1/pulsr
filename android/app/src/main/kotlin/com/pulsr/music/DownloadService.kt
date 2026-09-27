@@ -193,7 +193,7 @@ class DownloadService : Service() {
                 downloadTitles[vid] = title
                 // Remove completed ones
                 if (progress >= 100) {
-                    try { onDownloadCompletedListener?.invoke(vid) } catch (_: Exception) {}
+                    try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
                     activeDownloads.remove(vid)
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)

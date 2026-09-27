@@ -71,6 +71,7 @@ class CastSessionPlugin(
         override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = emitSession(session)
         override fun onSessionEnded(session: CastSession, error: Int) {
             selectedRouteId = null
+            mediaServer.stop()
             emitSession(null)
         }
         override fun onSessionStartFailed(session: CastSession, error: Int) {

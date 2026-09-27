@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -65,6 +66,9 @@ class _AppShellState extends State<AppShell> {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (nowMs - _lastNavMs < 200) return;
     _lastNavMs = nowMs;
+    _backPressStopwatch
+      ..stop()
+      ..reset();
 
     final isSameTab = index == widget.navigationShell.currentIndex;
 
@@ -103,10 +107,14 @@ class _AppShellState extends State<AppShell> {
     final isLandscape = context.isLandscape;
     final width = Adaptive.widthOf(context);
     final height = Adaptive.heightOf(context);
-    // Tablets get the side rail in both orientations (iPad-style); phones keep
+    // Tablets and unfolded foldables get the side rail in both orientations; phones keep
     // the bottom dock portrait *and* landscape so a wide-but-short landscape
     // phone is never handed a cramped desktop rail.
-    final useRail = isTablet && (!isLandscape || height >= 600);
+    final displayFeatures = MediaQuery.of(context).displayFeatures;
+    final hasFoldableHinge = displayFeatures.any(
+      (f) => f.type == DisplayFeatureType.hinge || f.type == DisplayFeatureType.fold,
+    );
+    final useRail = (isTablet || hasFoldableHinge) && (!isLandscape || height >= 600);
     final canShowInspector = useRail && (isLandscape || width >= 900);
     final extendedRail =
         _isSidebarExtended ?? (width >= Adaptive.railExtendedBreakpoint);

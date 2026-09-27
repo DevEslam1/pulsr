@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/waveform_seek_bar.dart
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -54,7 +55,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     super.didUpdateWidget(oldWidget);
     // New track => new waveform/duration: reset zoom & transient scrub state so
     // the visible window always matches the samples being painted.
-    if (!identical(oldWidget.samples, widget.samples) ||
+    if (!listEquals(oldWidget.samples, widget.samples) ||
         oldWidget.duration != widget.duration) {
       _zoomScale = 1.0;
       _dragFrozenWindow = null;
@@ -560,12 +561,14 @@ class _WaveformPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WaveformPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.samples != samples ||
         oldDelegate.activeColor != activeColor ||
         oldDelegate.inactiveColor != inactiveColor ||
         oldDelegate.chapterMarkers != chapterMarkers ||
         oldDelegate.loopPointA != loopPointA ||
         oldDelegate.loopPointB != loopPointB ||
-        oldDelegate.zoomScale != zoomScale;
+        oldDelegate.zoomScale != zoomScale ||
+        oldDelegate.visibleStart != visibleStart ||
+        oldDelegate.visibleCount != visibleCount ||
+        !listEquals(oldDelegate.samples, samples);
   }
 }

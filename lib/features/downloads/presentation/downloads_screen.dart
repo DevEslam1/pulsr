@@ -1,4 +1,3 @@
-// lib/features/downloads/presentation/downloads_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +15,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../sheets/add_to_playlist_sheet.dart';
 import '../cubit/downloads_cubit.dart';
 import '../cubit/downloads_state.dart';
 import 'widgets/download_tile.dart';
@@ -38,6 +38,9 @@ class DownloadsScreen extends StatefulWidget {
 class _DownloadsScreenState extends State<DownloadsScreen> {
   DownloadFilter _filter = DownloadFilter.all;
   late final AppDatabase? _db;
+  final Set<String> _selectedVideoIds = <String>{};
+
+  bool get _isSelectionMode => _selectedVideoIds.isNotEmpty;
 
   @override
   void initState() {
@@ -89,102 +92,149 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return PulsrPagePopScope(
-      child: Scaffold(
-        backgroundColor: p.bg,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: const PulsrBackButton(),
-          title: Text(
-            l10n.downloadsTitle,
-            style: TextStyle(
-              color: p.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: AppFontSize.titleLarge,
+      onPop: _isSelectionMode
+          ? () {
+              setState(() => _selectedVideoIds.clear());
+            }
+          : null,
+      child: BlocBuilder<DownloadsCubit, DownloadsState>(
+        builder: (context, state) {
+          final allTasks = state.taskList;
+          final activeTasks =
+              allTasks.where((t) => t.status.isActive).toList();
+          final completedTasks = allTasks
+              .where((t) => t.status == DownloadStatus.complete)
+              .toList();
+          final failedTasks = allTasks
+              .where((t) => t.status == DownloadStatus.failed)
+              .toList();
+
+          final filteredTasks = switch (_filter) {
+            DownloadFilter.all => allTasks,
+            DownloadFilter.downloading => activeTasks,
+            DownloadFilter.completed => completedTasks,
+            DownloadFilter.failed => failedTasks,
+          };
+
+          return Scaffold(
+            backgroundColor: p.bg,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: _isSelectionMode
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: l10n.cancel,
+                      onPressed: () =>
+                          setState(() => _selectedVideoIds.clear()),
+                    )
+                  : const PulsrBackButton(),
+              title: Text(
+                _isSelectionMode
+                    ? '${_selectedVideoIds.length} selected'
+                    : l10n.downloadsTitle,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: AppFontSize.titleLarge,
+                ),
+              ),
+              actions: _isSelectionMode
+                  ? [
+                      IconButton(
+                        icon: Icon(
+                          _selectedVideoIds.length == filteredTasks.length
+                              ? Icons.deselect_rounded
+                              : Icons.select_all_rounded,
+                        ),
+                        tooltip: _selectedVideoIds.length == filteredTasks.length
+                            ? 'Deselect all'
+                            : 'Select all',
+                        onPressed: () {
+                          setState(() {
+                            if (_selectedVideoIds.length ==
+                                filteredTasks.length) {
+                              _selectedVideoIds.clear();
+                            } else {
+                              _selectedVideoIds
+                                  .addAll(filteredTasks.map((t) => t.videoId));
+                            }
+                          });
+                        },
+                      ),
+                    ]
+                  : [
+                      BlocSelector<DownloadsCubit, DownloadsState,
+                          List<DownloadTask>>(
+                        selector: (state) => state.taskList
+                            .where((t) => t.status == DownloadStatus.complete)
+                            .toList(),
+                        builder: (context, completed) {
+                          if (completed.isEmpty) return const SizedBox.shrink();
+                          return IconButton(
+                            icon: const Icon(Icons.delete_sweep_rounded),
+                            tooltip: l10n.clear,
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
+                            onPressed: () =>
+                                _confirmClearCompleted(context, completed),
+                          );
+                        },
+                      ),
+                      BlocSelector<DownloadsCubit, DownloadsState, int>(
+                        selector: (state) => state.taskList
+                            .where((t) => t.status == DownloadStatus.failed)
+                            .length,
+                        builder: (context, failedCount) {
+                          if (failedCount == 0) return const SizedBox.shrink();
+                          return TextButton.icon(
+                            onPressed: () =>
+                                context.read<DownloadsCubit>().retryAllFailed(),
+                            icon: Icon(Icons.refresh_rounded,
+                                size: 18, color: p.accent),
+                            label: Text(
+                              '${l10n.retry} ($failedCount)',
+                              style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.bodySmall),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
             ),
-          ),
-          actions: [
-            BlocSelector<DownloadsCubit, DownloadsState, List<DownloadTask>>(
-              selector: (state) => state.taskList
-                  .where((t) => t.status == DownloadStatus.complete)
-                  .toList(),
-              builder: (context, completed) {
-                if (completed.isEmpty) return const SizedBox.shrink();
-                return IconButton(
-                  icon: const Icon(Icons.delete_sweep_rounded),
-                  tooltip: l10n.clear,
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                  onPressed: () => _confirmClearCompleted(context, completed),
+            bottomNavigationBar: _isSelectionMode
+                ? _buildBulkActionsBar(context, allTasks)
+                : null,
+            body: BlocListener<DownloadsCubit, DownloadsState>(
+              listenWhen: (prev, curr) =>
+                  curr.errorMessage != null &&
+                  curr.errorMessage != prev.errorMessage,
+              listener: (context, state) {
+                final message = state.errorMessage;
+                if (message == null) return;
+                PulsrToast.show(
+                  context,
+                  message: resolveUiErrorMessage(context, message),
+                  icon: Icons.error_outline_rounded,
+                  isError: true,
                 );
               },
-            ),
-            BlocSelector<DownloadsCubit, DownloadsState, int>(
-              selector: (state) => state.taskList
-                  .where((t) => t.status == DownloadStatus.failed)
-                  .length,
-              builder: (context, failedCount) {
-                if (failedCount == 0) return const SizedBox.shrink();
-                return TextButton.icon(
-                  onPressed: () =>
-                      context.read<DownloadsCubit>().retryAllFailed(),
-                  icon: Icon(Icons.refresh_rounded, size: 18, color: p.accent),
-                  label: Text(
-                    '${l10n.retry} ($failedCount)',
-                    style: TextStyle(
-                        color: p.accent, fontSize: AppFontSize.bodySmall),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        body: BlocListener<DownloadsCubit, DownloadsState>(
-          listenWhen: (prev, curr) =>
-              curr.errorMessage != null &&
-              curr.errorMessage != prev.errorMessage,
-          listener: (context, state) {
-            final message = state.errorMessage;
-            if (message == null) return;
-            PulsrToast.show(
-              context,
-              message: resolveUiErrorMessage(context, message),
-              icon: Icons.error_outline_rounded,
-              isError: true,
-            );
-          },
-          child: BlocBuilder<DownloadsCubit, DownloadsState>(
-            builder: (context, state) {
-              if (state.isLoading && state.tasks.isEmpty) {
-                return const SkeletonList(
-                    padding: EdgeInsets.only(top: AppSpacing.xs));
-              }
+              child: Builder(
+                builder: (context) {
+                  if (state.isLoading && state.tasks.isEmpty) {
+                    return const SkeletonList(
+                        padding: EdgeInsets.only(top: AppSpacing.xs));
+                  }
 
-              final allTasks = state.taskList;
-              final activeTasks =
-                  allTasks.where((t) => t.status.isActive).toList();
-              final completedTasks = allTasks
-                  .where((t) => t.status == DownloadStatus.complete)
-                  .toList();
-              final failedTasks = allTasks
-                  .where((t) => t.status == DownloadStatus.failed)
-                  .toList();
-
-              final filteredTasks = switch (_filter) {
-                DownloadFilter.all => allTasks,
-                DownloadFilter.downloading => activeTasks,
-                DownloadFilter.completed => completedTasks,
-                DownloadFilter.failed => failedTasks,
-              };
-
-              Widget content;
-              if (allTasks.isEmpty) {
-                content = LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: ConstrainedBox(
+                  Widget content;
+                  if (allTasks.isEmpty) {
+                    content = LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
                       constraints:
                           BoxConstraints(minHeight: constraints.maxHeight),
                       child: Column(
@@ -332,16 +382,62 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     final task = filteredTasks[index - 2];
                     final playable = task.status == DownloadStatus.complete &&
                         task.localSongId != null;
+                    final isSelected = _selectedVideoIds.contains(task.videoId);
+
                     return Padding(
                       key: ValueKey(task.videoId),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md, vertical: AppSpacing.s6),
+                          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(AppRadii.r16),
-                        onTap: playable
-                            ? () => _playCompleted(context, task)
-                            : null,
-                        child: DownloadTile(task: task),
+                        onLongPress: () {
+                          Feedback.forLongPress(context);
+                          setState(() {
+                            if (isSelected) {
+                              _selectedVideoIds.remove(task.videoId);
+                            } else {
+                              _selectedVideoIds.add(task.videoId);
+                            }
+                          });
+                        },
+                        onTap: () {
+                          if (_isSelectionMode) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedVideoIds.remove(task.videoId);
+                              } else {
+                                _selectedVideoIds.add(task.videoId);
+                              }
+                            });
+                          } else if (playable) {
+                            _playCompleted(context, task);
+                          }
+                        },
+                        child: Row(
+                          children: [
+                            if (_isSelectionMode) ...[
+                              Checkbox(
+                                value: isSelected,
+                                activeColor: p.accent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r4),
+                                ),
+                                onChanged: (val) {
+                                  setState(() {
+                                    if (val == true) {
+                                      _selectedVideoIds.add(task.videoId);
+                                    } else {
+                                      _selectedVideoIds.remove(task.videoId);
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                            ],
+                            Expanded(child: DownloadTile(task: task)),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -363,8 +459,120 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             },
           ),
         ),
+      );
+    },
+  ),
+);
+  }
+
+  Widget _buildBulkActionsBar(BuildContext context, List<DownloadTask> tasks) {
+    final p = context.palette;
+    final l10n = AppLocalizations.of(context)!;
+    final selectedTasks =
+        tasks.where((t) => _selectedVideoIds.contains(t.videoId)).toList();
+    final hasFailed =
+        selectedTasks.any((t) => t.status == DownloadStatus.failed);
+    final completedWithSong = selectedTasks
+        .where((t) =>
+            t.status == DownloadStatus.complete && t.localSongId != null)
+        .toList();
+
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          border: Border(top: BorderSide(color: p.hairline)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: p.error),
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+              label: Text(l10n.delete),
+              onPressed: selectedTasks.isEmpty
+                  ? null
+                  : () => _confirmDeleteSelected(context, selectedTasks),
+            ),
+            if (hasFailed)
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: p.accent),
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                label: Text(l10n.retry),
+                onPressed: () => _retrySelectedFailed(context, selectedTasks),
+              ),
+            if (completedWithSong.isNotEmpty)
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: p.textPrimary),
+                icon: const Icon(Icons.playlist_add_rounded, size: 20),
+                label: Text(l10n.addToPlaylist),
+                onPressed: () =>
+                    _addSelectedToPlaylist(context, completedWithSong),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteSelected(
+      BuildContext context, List<DownloadTask> selectedTasks) async {
+    final l10n = AppLocalizations.of(context)!;
+    final count = selectedTasks.length;
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: l10n.delete,
+      message:
+          'Remove $count selected download${count == 1 ? "" : "s"}?',
+      confirmLabel: l10n.delete,
+      cancelLabel: l10n.cancel,
+      isDestructive: true,
+    );
+    if (confirmed == true && context.mounted) {
+      final cubit = context.read<DownloadsCubit>();
+      await Future.wait(
+          selectedTasks.map((t) => cubit.deleteDownload(t.videoId)));
+      if (mounted) setState(() => _selectedVideoIds.clear());
+    }
+  }
+
+  void _retrySelectedFailed(
+      BuildContext context, List<DownloadTask> selectedTasks) {
+    final cubit = context.read<DownloadsCubit>();
+    final failed =
+        selectedTasks.where((t) => t.status == DownloadStatus.failed);
+    for (final t in failed) {
+      cubit.retryDownload(t.videoId);
+    }
+    if (mounted) setState(() => _selectedVideoIds.clear());
+  }
+
+  Future<void> _addSelectedToPlaylist(
+      BuildContext context, List<DownloadTask> completedTasks) async {
+    final db = _db;
+    if (db == null) return;
+    final songIds = completedTasks.map((t) => t.localSongId!).toSet();
+    final songs = await (db.select(db.songsTable)
+          ..where((t) => t.id.isIn(songIds)))
+        .get();
+    if (songs.isEmpty || !context.mounted) return;
+    await AddToPlaylistSheet.show(
+      context,
+      song: songs.first,
+      songs: songs,
+    );
+    if (mounted) setState(() => _selectedVideoIds.clear());
   }
 
   Future<void> _playCompleted(BuildContext context, DownloadTask task) async {

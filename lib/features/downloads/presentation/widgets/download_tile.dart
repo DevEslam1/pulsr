@@ -1,8 +1,12 @@
 // lib/features/downloads/presentation/widgets/download_tile.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/formatters.dart';
+import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
@@ -58,67 +62,139 @@ class DownloadTile extends StatelessWidget {
         ),
     };
 
+    int? resolvedBytes = task.fileSize;
+    if (resolvedBytes == null && task.filePath != null) {
+      try {
+        final f = File(task.filePath!);
+        if (f.existsSync()) resolvedBytes = f.lengthSync();
+      } catch (_) {}
+    }
+    final formattedSize = resolvedBytes != null && resolvedBytes > 0
+        ? Formatters.formatBytes(resolvedBytes)
+        : null;
+
+    final subtitleParts = <String>[
+      if (task.artist.isNotEmpty) task.artist,
+      if (formattedSize != null) formattedSize,
+    ];
+    final subtitleText = subtitleParts.join(' • ');
+
+    final hasArtwork = task.artworkUrl != null && task.artworkUrl!.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r16),
-          border: Border.all(color: p.hairline),
-        ),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(statusIcon, color: statusColor, size: 22),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title.isNotEmpty ? task.title : task.videoId,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: AppFontSize.callout,
+        color: p.surfaceContainer,
+        borderRadius: BorderRadius.circular(AppRadii.r16),
+        border: Border.all(color: p.hairline),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.s10,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (hasArtwork)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedArtwork(
+                          id: task.localSongId ?? task.sourceSongId ?? -1,
+                          remoteUrl: task.artworkUrl,
+                          type: ArtworkType.AUDIO,
+                          size: 44,
+                          borderRadius: AppRadii.r12,
                         ),
-                      ),
-                      if (task.artist.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.s2),
-                        Text(
-                          task.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.bodySmall,
+                        if (task.status == DownloadStatus.complete)
+                          PositionedDirectional(
+                            end: 2,
+                            bottom: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(1.5),
+                              decoration: BoxDecoration(
+                                color: p.surface,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.check_circle_rounded,
+                                  color: p.success, size: 14),
+                            ),
                           ),
-                        ),
                       ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                )
+              else
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                  ),
+                  child: Icon(statusIcon, color: statusColor, size: 22),
                 ),
-                const SizedBox(width: AppSpacing.xxs),
+              const SizedBox(width: AppSpacing.s10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title.isNotEmpty ? task.title : task.videoId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppFontSize.callout,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Row(
+                      children: [
+                        if (subtitleText.isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              subtitleText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.bodySmall,
+                              ),
+                            ),
+                          ),
+                        if (task.status != DownloadStatus.complete) ...[
+                          const SizedBox(width: AppSpacing.xxs),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                            ),
+                            child: Text(
+                              statusLabel,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
                 // FIX-A12: Direct cancel button during active download or queued state
                 if (task.status == DownloadStatus.downloading ||
                     task.status == DownloadStatus.tagging ||

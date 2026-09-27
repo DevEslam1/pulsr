@@ -9,6 +9,7 @@ import android.util.Log
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -47,6 +48,9 @@ class CastDiscoveryPlugin(
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var discovering = false
     private var lastError: String? = null
+    private val resolveQueue = ArrayDeque<NsdServiceInfo>()
+    private var isResolving = false
+    private val resolveLock = Any()
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -169,37 +173,64 @@ class CastDiscoveryPlugin(
 
     @Suppress("DEPRECATION")
     private fun resolve(nsd: NsdManager, serviceInfo: NsdServiceInfo) {
+        synchronized(resolveLock) {
+            resolveQueue.add(serviceInfo)
+            if (!isResolving) {
+                isResolving = true
+                processNextResolve(nsd)
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun processNextResolve(nsd: NsdManager) {
+        val nextService: NsdServiceInfo
+        synchronized(resolveLock) {
+            if (resolveQueue.isEmpty()) {
+                isResolving = false
+                return
+            }
+            nextService = resolveQueue.removeFirst()
+        }
+
         val resolveListener = object : NsdManager.ResolveListener {
             override fun onResolveFailed(info: NsdServiceInfo?, errorCode: Int) {
-                // Not fatal: another service may resolve. Ignore.
+                Log.w(TAG, "onResolveFailed for ${info?.serviceName}: $errorCode")
+                processNextResolve(nsd)
             }
 
             override fun onServiceResolved(info: NsdServiceInfo?) {
-                if (info == null) return
-                val attrs = mutableMapOf<String, String>()
                 try {
-                    info.attributes?.forEach { (k, v) ->
-                        if (CAST_ATTR_KEYS.contains(k)) {
-                            attrs[k] = String(v, Charsets.UTF_8)
-                        }
+                    if (info != null) {
+                        val attrs = mutableMapOf<String, String>()
+                        try {
+                            info.attributes?.forEach { (k, v) ->
+                                if (CAST_ATTR_KEYS.contains(k)) {
+                                    attrs[k] = String(v, Charsets.UTF_8)
+                                }
+                            }
+                        } catch (_: Exception) {}
+                        val id = attrs["id"] ?: info.serviceName
+                        val host = info.host?.hostAddress ?: ""
+                        devices[id] = mapOf(
+                            "id" to id,
+                            "name" to (attrs["fn"] ?: info.serviceName),
+                            "model" to (attrs["md"] ?: ""),
+                            "host" to host,
+                            "port" to info.port,
+                        )
+                        emitDevices()
                     }
-                } catch (_: Exception) {}
-                val id = attrs["id"] ?: info.serviceName
-                val host = info.host?.hostAddress ?: ""
-                devices[id] = mapOf(
-                    "id" to id,
-                    "name" to (attrs["fn"] ?: info.serviceName),
-                    "model" to (attrs["md"] ?: ""),
-                    "host" to host,
-                    "port" to info.port,
-                )
-                emitDevices()
+                } finally {
+                    processNextResolve(nsd)
+                }
             }
         }
         try {
-            nsd.resolveService(serviceInfo, resolveListener)
+            nsd.resolveService(nextService, resolveListener)
         } catch (e: Exception) {
             Log.w(TAG, "resolveService failed: ${e.message}")
+            processNextResolve(nsd)
         }
     }
 
@@ -207,6 +238,10 @@ class CastDiscoveryPlugin(
         val listener = discoveryListener ?: return
         discoveryListener = null
         discovering = false
+        synchronized(resolveLock) {
+            resolveQueue.clear()
+            isResolving = false
+        }
         try {
             nsdManager?.stopServiceDiscovery(listener)
         } catch (_: Exception) {}

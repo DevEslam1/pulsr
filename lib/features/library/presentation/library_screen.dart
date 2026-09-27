@@ -154,7 +154,8 @@ enum LibraryTabItem {
 }
 
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key});
+  final String? initialTabName;
+  const LibraryScreen({super.key, this.initialTabName});
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -280,7 +281,17 @@ class _LibraryScreenState extends State<LibraryScreen>
 
       final savedTabName = prefs.getString(_tabNamePrefKey);
       int targetIndex = 0;
-      if (savedTabName != null) {
+      if (widget.initialTabName != null) {
+        final reqName = widget.initialTabName!;
+        final reqItem = LibraryTabItem.values
+            .cast<LibraryTabItem?>()
+            .firstWhere((t) => t?.name == reqName, orElse: () => null);
+        if (reqItem != null && !_activeTabs.contains(reqItem)) {
+          _activeTabs.add(reqItem);
+        }
+        final found = _activeTabs.indexWhere((t) => t.name == reqName);
+        if (found != -1) targetIndex = found;
+      } else if (savedTabName != null) {
         final found = _activeTabs.indexWhere((t) => t.name == savedTabName);
         if (found != -1) targetIndex = found;
       } else {
@@ -305,6 +316,32 @@ class _LibraryScreenState extends State<LibraryScreen>
     } catch (e, st) {
       ErrorLogger.log('Failed to load library preferences',
           error: e, stackTrace: st, category: 'Library');
+    }
+  }
+
+  @override
+  void didUpdateWidget(LibraryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTabName != null &&
+        widget.initialTabName != oldWidget.initialTabName) {
+      _switchToTabByName(widget.initialTabName!);
+    }
+  }
+
+  void _switchToTabByName(String name) {
+    final tabItem = LibraryTabItem.values
+        .cast<LibraryTabItem?>()
+        .firstWhere((t) => t?.name == name, orElse: () => null);
+    if (tabItem != null && !_activeTabs.contains(tabItem)) {
+      setState(() {
+        _activeTabs.add(tabItem);
+        _rebuildTabController(initialIndex: _activeTabs.length - 1);
+      });
+      return;
+    }
+    final index = _activeTabs.indexWhere((t) => t.name == name);
+    if (index != -1 && index != _tabController.index) {
+      _tabController.animateTo(index);
     }
   }
 

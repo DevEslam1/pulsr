@@ -83,8 +83,11 @@ internal class JsDecipherCache(
      */
     fun decipherSignature(signature: String, playerHash: String = "default"): String {
         val rules = getRules(playerHash)
-        if (rules == null || rules.isExpired || rules.transformSteps.isEmpty()) {
+        if (rules == null || rules.isExpired) {
             throw UndecipherableSignatureException(playerHash)
+        }
+        if (rules.transformSteps.isEmpty()) {
+            return signature
         }
         return applyTransforms(signature, rules.transformSteps)
     }

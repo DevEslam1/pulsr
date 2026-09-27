@@ -17,8 +17,10 @@ import '../../core/services/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/download_settings.dart';
 import '../../domain/models/download_task.dart';
+import '../../core/di/injection.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/download_repository_interface.dart';
+import '../db/app_database.dart';
 
 @Singleton(as: IDownloadRepository)
 class DownloadRepositoryImpl implements IDownloadRepository {
@@ -27,6 +29,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   static final _random = Random();
 
   final YtDownloadService _ytDownloadService;
+  final AppDatabase? _db;
+
+  AppDatabase? get _effectiveDb =>
+      _db ?? (getIt.isRegistered<AppDatabase>() ? getIt<AppDatabase>() : null);
 
   /// Effective concurrency, refreshed from [DownloadSettings] whenever a task
   /// is admitted. The user-facing setting used to be dead code (a hard-coded 3
@@ -49,8 +55,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   static const Duration _storageStatsTtl = Duration(seconds: 5);
 
   DownloadRepositoryImpl(
-    this._ytDownloadService,
-  ) {
+    this._ytDownloadService, [
+    this._db,
+  ]) {
     // FIX-I02: Move reconcileOnBoot() call OUT of the constructor to DownloadsCubit._init()
     // C-7/C-9: the native foreground service reports notification-driven
     // pause/resume/cancel and foreground degradation back on this channel.
@@ -325,25 +332,97 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     try {
-      final freeBytes =
-          await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+      int freeBytes = 0;
+      try {
+        freeBytes =
+            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+      } catch (e, st) {
+        ErrorLogger.log('Could not read free disk space via platform channel',
+            error: e, stackTrace: st, category: 'Download');
+      }
 
       int totalUsedBytes = 0;
-      int completedCount = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).length;
+      int completedCount = 0;
       try {
-        final files = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).map((t) => t.filePath!).toList();
-        final sizes = await Future.wait(files.map((p) async {
-          try {
-            final f = File(p);
-            if (await f.exists()) return await f.length();
-          } catch (_) {}
+        final completedTasks = _tasks.values
+            .where((t) => t.status == DownloadStatus.complete)
+            .toList();
+        final db = _effectiveDb;
+
+        final sizes = await Future.wait(completedTasks.map((t) async {
+          // 1. Direct fileSize if present and non-zero
+          if (t.fileSize != null && t.fileSize! > 0) {
+            if (t.filePath != null) {
+              try {
+                if (await File(t.filePath!).exists()) return t.fileSize!;
+              } catch (e, st) {
+                ErrorLogger.log('Failed checking file existence for download',
+                    error: e, stackTrace: st, category: 'Download');
+              }
+            } else {
+              return t.fileSize!;
+            }
+          }
+
+          // 2. Direct filePath if present
+          if (t.filePath != null && t.filePath!.isNotEmpty) {
+            try {
+              final f = File(t.filePath!);
+              if (await f.exists()) {
+                final len = await f.length();
+                if (t.fileSize != len) {
+                  _tasks[t.videoId] = t.copyWith(fileSize: len);
+                }
+                return len;
+              }
+            } catch (e, st) {
+              ErrorLogger.log('Failed checking file length for download',
+                  error: e, stackTrace: st, category: 'Download');
+            }
+          }
+
+          // 3. Fallback to localSongId query in database
+          if (t.localSongId != null && db != null) {
+            try {
+              final song = await (db.select(db.songsTable)
+                    ..where((s) => s.id.equals(t.localSongId!)))
+                  .getSingleOrNull();
+              if (song != null) {
+                if (song.fileSize != null && song.fileSize! > 0) {
+                  _tasks[t.videoId] = t.copyWith(
+                    filePath: song.path,
+                    fileSize: song.fileSize,
+                  );
+                  return song.fileSize!;
+                }
+                final f = File(song.path);
+                if (await f.exists()) {
+                  final len = await f.length();
+                  _tasks[t.videoId] = t.copyWith(
+                    filePath: song.path,
+                    fileSize: len,
+                  );
+                  return len;
+                }
+              }
+            } catch (e, st) {
+              ErrorLogger.log('Failed querying downloaded song row',
+                  error: e, stackTrace: st, category: 'Download');
+            }
+          }
+
           return 0;
         }));
+
         totalUsedBytes = sizes.fold(0, (a, b) => a + b);
-        final existingCount = sizes.where((s) => s > 0).length;
-        if (existingCount > 0) completedCount = existingCount;
-        // FIX-A06: Remove ALL mutations of _tasks from getStorageStats getter.
-      } catch (_) {}
+        completedCount = sizes.where((s) => s > 0).length;
+        if (completedCount == 0 && completedTasks.isNotEmpty) {
+          completedCount = completedTasks.length;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed aggregating completed download sizes',
+            error: e, stackTrace: st, category: 'Download');
+      }
 
       final totalBytes = freeBytes + totalUsedBytes;
       final stats = StorageStats(
@@ -384,14 +463,37 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       final rawJson = prefs.getString(_prefKey);
       if (rawJson != null && rawJson.isNotEmpty) {
         final list = jsonDecode(rawJson) as List<dynamic>;
+        final db = _effectiveDb;
         for (final item in list) {
-          final task = DownloadTask.fromJson(item as Map<String, dynamic>);
+          var task = DownloadTask.fromJson(item as Map<String, dynamic>);
           if (task.status == DownloadStatus.downloading ||
               task.status == DownloadStatus.queued ||
               task.status == DownloadStatus.tagging) {
             // Restore interrupted downloads as paused on startup (process death reconciliation)
             _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
           } else if (task.status == DownloadStatus.complete) {
+            if ((task.filePath == null || task.fileSize == null) &&
+                task.localSongId != null &&
+                db != null) {
+              try {
+                final song = await (db.select(db.songsTable)
+                      ..where((s) => s.id.equals(task.localSongId!)))
+                    .getSingleOrNull();
+                if (song != null) {
+                  var size = song.fileSize;
+                  if ((size == null || size <= 0) && File(song.path).existsSync()) {
+                    size = File(song.path).lengthSync();
+                  }
+                  task = task.copyWith(
+                    filePath: song.path,
+                    fileSize: size,
+                  );
+                }
+              } catch (e, st) {
+                ErrorLogger.log('Failed reconciling boot download metadata',
+                    error: e, stackTrace: st, category: 'Download');
+              }
+            }
             if (task.filePath != null && !File(task.filePath!).existsSync()) {
               _tasks[task.videoId] =
                   task.copyWith(status: DownloadStatus.failed, error: 'File deleted');
@@ -424,19 +526,51 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   /// FIX-A06: Reconciles completed tasks against disk, marking deleted files as failed.
   Future<void> _reconcileCompletedFiles() async {
     final completedTasks = _tasks.values
-        .where((t) => t.status == DownloadStatus.complete && t.filePath != null)
+        .where((t) => t.status == DownloadStatus.complete)
         .toList();
+    final db = _effectiveDb;
     for (final task in completedTasks) {
       try {
-        final f = File(task.filePath!);
-        if (!await f.exists()) {
-          final updated = task.copyWith(
-            status: DownloadStatus.failed,
-            error: 'File deleted',
-          );
-          _updateTask(updated);
+        var filePath = task.filePath;
+        var fileSize = task.fileSize;
+
+        if ((filePath == null || fileSize == null) &&
+            task.localSongId != null &&
+            db != null) {
+          final song = await (db.select(db.songsTable)
+                ..where((s) => s.id.equals(task.localSongId!)))
+              .getSingleOrNull();
+          if (song != null) {
+            filePath = song.path;
+            fileSize = song.fileSize;
+          }
         }
-      } catch (_) {}
+
+        if (filePath != null) {
+          final f = File(filePath);
+          if (!await f.exists()) {
+            final updated = task.copyWith(
+              status: DownloadStatus.failed,
+              error: 'File deleted',
+            );
+            _updateTask(updated);
+          } else {
+            if (fileSize == null || fileSize <= 0) {
+              fileSize = await f.length();
+            }
+            if (task.filePath != filePath || task.fileSize != fileSize) {
+              final updated = task.copyWith(
+                filePath: filePath,
+                fileSize: fileSize,
+              );
+              _updateTask(updated);
+            }
+          }
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed reconciling completed download file',
+            error: e, stackTrace: st, category: 'Download');
+      }
     }
   }
 
@@ -671,11 +805,42 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             etaSeconds: null,
           ));
         },
-        (newId) {
+        (newId) async {
           _cachedStorageStats = null; // Invalidate storage stats cache on completion
           final current = _tasks[videoId] ?? task;
-          // Atomic commit: YtDownloadService already verified size and renamed .part → final via MediaStore;
-          // Here we store filePath if service returned it via side-channel? For now mark complete.
+          String? resolvedPath = current.filePath ?? _ytDownloadService.getDownloadedPath(videoId);
+          int? resolvedSize = current.fileSize;
+
+          final db = _effectiveDb;
+          if (db != null) {
+            try {
+              final song = await (db.select(db.songsTable)
+                    ..where((t) => t.id.equals(newId)))
+                  .getSingleOrNull();
+              if (song != null) {
+                resolvedPath = song.path;
+                resolvedSize = song.fileSize;
+                if ((resolvedSize == null || resolvedSize <= 0) &&
+                    File(resolvedPath).existsSync()) {
+                  resolvedSize = File(resolvedPath).lengthSync();
+                }
+              }
+            } catch (e, st) {
+              ErrorLogger.log('Failed reading completed song row',
+                  error: e, stackTrace: st, category: 'Download');
+            }
+          }
+
+          if (resolvedSize == null && resolvedPath != null) {
+            try {
+              final f = File(resolvedPath);
+              if (f.existsSync()) resolvedSize = f.lengthSync();
+            } catch (e, st) {
+              ErrorLogger.log('Failed checking resolved download file length',
+                  error: e, stackTrace: st, category: 'Download');
+            }
+          }
+
           _updateTask(current.copyWith(
             status: DownloadStatus.complete,
             progress: 1.0,
@@ -683,6 +848,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             speedKbps: null,
             etaSeconds: null,
             localSongId: newId,
+            filePath: resolvedPath,
+            fileSize: resolvedSize,
           ));
           // FIX-A06: Reconcile completed files after each successful download
           unawaited(_reconcileCompletedFiles());

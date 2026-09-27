@@ -1672,6 +1672,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 }
 
 class _SearchItem {
+  final String categoryId;
   final String category;
   final String title;
   final String subtitle;
@@ -1684,6 +1685,7 @@ class _SearchItem {
   final bool pro;
 
   _SearchItem({
+    this.categoryId = '',
     required this.category,
     required this.title,
     required this.subtitle,

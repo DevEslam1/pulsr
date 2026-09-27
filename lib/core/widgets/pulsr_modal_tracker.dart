@@ -62,7 +62,11 @@ class PulsrModalObserver extends NavigatorObserver {
       route is PopupRoute ||
       route is DialogRoute ||
       route is RawDialogRoute ||
-      route is ModalBottomSheetRoute;
+      route is ModalBottomSheetRoute ||
+      (route.settings.name != null &&
+          (route.settings.name!.contains('dialog') ||
+              route.settings.name!.contains('sheet') ||
+              route.settings.name!.contains('modal')));
 
   bool _isNowPlaying(Route route) =>
       route.settings.name == 'now-playing' ||

@@ -1,5 +1,6 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
 import 'package:flutter/material.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -50,24 +51,32 @@ class TabletSideInspector extends StatefulWidget {
 
 class _TabletSideInspectorState extends State<TabletSideInspector> {
   int _selectedTabIndex = 0; // 0: Queue, 1: Lyrics
+  double? _customWidth;
+  bool _isDragging = false;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
 
     final activeColor = p.accent;
-    final inspectorWidth = (Adaptive.widthOf(context) * 0.35).clamp(280.0, 400.0);
+    final defaultWidth = (Adaptive.widthOf(context) * 0.35).clamp(280.0, 400.0);
+    final inspectorWidth = (_customWidth ?? defaultWidth).clamp(280.0, 400.0);
 
     return Container(
       width: inspectorWidth,
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(
-          left: BorderSide(color: p.hairline, width: 1),
+          left: BorderSide(
+            color: _isDragging ? p.accent.withValues(alpha: 0.6) : p.hairline,
+            width: _isDragging ? 1.5 : 1.0,
+          ),
         ),
       ),
-      child: Column(
+      child: Stack(
         children: [
+          Column(
+            children: [
           // Header with Tabs & Close Button
           Padding(
             padding:
@@ -224,6 +233,43 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
           ),
         ],
       ),
-    );
+      // Left edge drag-to-resize handle
+      PositionedDirectional(
+        start: 0,
+        top: 0,
+        bottom: 0,
+        width: 14,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.resizeLeftRight,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: (_) => setState(() => _isDragging = true),
+            onHorizontalDragUpdate: (details) {
+              setState(() {
+                _customWidth = ((_customWidth ?? defaultWidth) - details.delta.dx)
+                    .clamp(280.0, 400.0);
+              });
+            },
+            onHorizontalDragEnd: (_) => setState(() => _isDragging = false),
+            onHorizontalDragCancel: () => setState(() => _isDragging = false),
+            child: Center(
+              child: AnimatedContainer(
+                duration: context.motionMs(150),
+                width: _isDragging ? 4 : 3,
+                height: _isDragging ? 48 : 32,
+                decoration: BoxDecoration(
+                  color: _isDragging
+                      ? p.accent
+                      : p.textTertiary.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+);
   }
 }

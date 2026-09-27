@@ -90,6 +90,9 @@ class YtDownloadService {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const _tagChannel = MethodChannel(PulsrChannels.tagEditor);
   int _maxConcurrentDownloads = 3;
+  final Map<String, String> _downloadedFilePaths = {};
+
+  String? getDownloadedPath(String videoId) => _downloadedFilePaths[videoId];
 
   /// Kept in step with [DownloadSettings.maxConcurrent] by
   /// [DownloadRepositoryImpl]; the class used to hard-code 3 independently of
@@ -608,6 +611,7 @@ class YtDownloadService {
       if (finalPath == null || finalPath.isEmpty) {
         return const Left(DownloadFailure('MediaStore did not return a path'));
       }
+      _downloadedFilePaths[videoId] = finalPath;
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
       ErrorLogger.addBreadcrumb('Download indexing: $videoId',

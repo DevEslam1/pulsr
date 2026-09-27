@@ -61,13 +61,24 @@ internal object PoTokenStore {
 
     @Volatile
     private var prefsInstance: SharedPreferences? = null
+    @Volatile
+    private var prefsInitAttempted = false
+    @Volatile
+    private var memoryData: StoredTokenData? = null
     private val lock = Any()
 
-    fun getPrefs(context: Context): SharedPreferences {
-        prefsInstance?.let { return it }
+    fun getPrefs(context: Context): SharedPreferences? {
+        if (prefsInitAttempted) return prefsInstance
         synchronized(lock) {
-            prefsInstance?.let { return it }
+            if (prefsInitAttempted) return prefsInstance
             val legacy = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            // Clean up any legacy plaintext prefs to prevent tokens lingering on disk unencrypted
+            try {
+                if (legacy.all.isNotEmpty()) {
+                    legacy.edit().clear().apply()
+                }
+            } catch (_: Throwable) {}
+
             val p = try {
                 val masterKey = MasterKey.Builder(context.applicationContext)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -80,10 +91,11 @@ internal object PoTokenStore {
                     EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
                 )
             } catch (t: Throwable) {
-                Log.w(TAG, "EncryptedSharedPreferences unavailable; falling back to standard prefs: ${t.message}")
-                legacy
+                Log.w(TAG, "EncryptedSharedPreferences unavailable; keeping poTokens in-memory only: ${t.message}")
+                null
             }
             prefsInstance = p
+            prefsInitAttempted = true
             return p
         }
     }
@@ -93,6 +105,9 @@ internal object PoTokenStore {
      */
     fun loadTokenData(context: Context): StoredTokenData {
         val prefs = getPrefs(context)
+        if (prefs == null) {
+            return memoryData ?: StoredTokenData("", "", "", "", 0L, DEFAULT_TTL_SECONDS, 0L)
+        }
         return try {
             val token = prefs.getString(KEY_STREAMING_TOKEN, "") ?: ""
             val visitor = prefs.getString(KEY_VISITOR_DATA, "") ?: ""
@@ -108,7 +123,7 @@ internal object PoTokenStore {
                 expiry = genAt + ttl
             }
 
-            StoredTokenData(
+            val loaded = StoredTokenData(
                 streamingPoToken = token,
                 visitorData = visitor,
                 integrityToken = integrity,
@@ -118,6 +133,8 @@ internal object PoTokenStore {
                 expiryInstant = expiry,
                 egressId = egressId
             )
+            memoryData = loaded
+            loaded
         } catch (t: Throwable) {
             Log.e(TAG, "Corrupt token store encountered; resetting store: ${t.message}", t)
             clear(context)
@@ -138,8 +155,19 @@ internal object PoTokenStore {
         generatedAt: Long = Instant.now().epochSecond,
         egressId: String = ""
     ) {
-        val prefs = getPrefs(context)
         val expiryInstant = generatedAt + ttlSeconds
+        val stored = StoredTokenData(
+            streamingPoToken = streamingPoToken,
+            visitorData = visitorData,
+            integrityToken = integrityToken,
+            dataSyncId = dataSyncId,
+            generatedAt = generatedAt,
+            ttlSeconds = ttlSeconds,
+            expiryInstant = expiryInstant,
+            egressId = egressId
+        )
+        memoryData = stored
+        val prefs = getPrefs(context) ?: return
         try {
             prefs.edit()
                 .putString(KEY_STREAMING_TOKEN, streamingPoToken)
@@ -160,8 +188,10 @@ internal object PoTokenStore {
      * Updates only the dataSyncId without altering existing token or expiry.
      */
     fun saveDataSyncId(context: Context, dataSyncId: String) {
+        memoryData = memoryData?.copy(dataSyncId = dataSyncId)
+            ?: StoredTokenData("", "", "", dataSyncId, 0L, DEFAULT_TTL_SECONDS, 0L)
         try {
-            getPrefs(context).edit().putString(KEY_DATA_SYNC_ID, dataSyncId).apply()
+            getPrefs(context)?.edit()?.putString(KEY_DATA_SYNC_ID, dataSyncId)?.apply()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to update dataSyncId in store: ${t.message}", t)
         }
@@ -173,8 +203,9 @@ internal object PoTokenStore {
      * which must keep it.
      */
     fun clearDataSyncId(context: Context) {
+        memoryData = memoryData?.copy(dataSyncId = "")
         try {
-            getPrefs(context).edit().remove(KEY_DATA_SYNC_ID).apply()
+            getPrefs(context)?.edit()?.remove(KEY_DATA_SYNC_ID)?.apply()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to clear dataSyncId in store: ${t.message}", t)
         }
@@ -185,15 +216,28 @@ internal object PoTokenStore {
      * signed-in account rather than the token.
      */
     fun clearAttestation(context: Context) {
+        memoryData = memoryData?.let {
+            StoredTokenData(
+                streamingPoToken = "",
+                visitorData = "",
+                integrityToken = "",
+                dataSyncId = it.dataSyncId,
+                generatedAt = 0L,
+                ttlSeconds = DEFAULT_TTL_SECONDS,
+                expiryInstant = 0L,
+                egressId = ""
+            )
+        }
         try {
-            getPrefs(context).edit()
-                .remove(KEY_STREAMING_TOKEN)
-                .remove(KEY_VISITOR_DATA)
-                .remove(KEY_INTEGRITY_TOKEN)
-                .remove(KEY_GENERATED_AT)
-                .remove(KEY_TTL_SECONDS)
-                .remove(KEY_EXPIRY_INSTANT)
-                .apply()
+            getPrefs(context)?.edit()
+                ?.remove(KEY_STREAMING_TOKEN)
+                ?.remove(KEY_VISITOR_DATA)
+                ?.remove(KEY_INTEGRITY_TOKEN)
+                ?.remove(KEY_GENERATED_AT)
+                ?.remove(KEY_TTL_SECONDS)
+                ?.remove(KEY_EXPIRY_INSTANT)
+                ?.remove(KEY_EGRESS_ID)
+                ?.apply()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to clear attestation state: ${t.message}", t)
         }
@@ -203,8 +247,9 @@ internal object PoTokenStore {
      * Clears all persisted poToken state (e.g. on invalidation or corruption).
      */
     fun clear(context: Context) {
+        memoryData = null
         try {
-            getPrefs(context).edit().clear().apply()
+            getPrefs(context)?.edit()?.clear()?.apply()
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to clear token store: ${t.message}", t)
         }

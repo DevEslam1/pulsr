@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../motion/pulsr_motion.dart';
 
+enum PulsrHapticStyle {
+  light,
+  medium,
+  selection,
+  heavy,
+}
+
 /// A premium, Apple/M3 tactile pressable wrapper.
 ///
 /// Compresses slightly on press down (scale 0.96) and springs back with an organic
@@ -15,6 +22,7 @@ class PulsrPressable extends StatefulWidget {
   final double pressedScale;
   final Duration duration;
   final bool enableHaptics;
+  final PulsrHapticStyle hapticStyle;
   final HitTestBehavior behavior;
 
   const PulsrPressable({
@@ -25,6 +33,7 @@ class PulsrPressable extends StatefulWidget {
     this.pressedScale = 0.96,
     this.duration = const Duration(milliseconds: 120),
     this.enableHaptics = true,
+    this.hapticStyle = PulsrHapticStyle.light,
     this.behavior = HitTestBehavior.opaque,
   });
 
@@ -71,7 +80,20 @@ class _PulsrPressableState extends State<PulsrPressable>
   void _handleTapUp(TapUpDetails _) {
     if (widget.onTap == null) return;
     if (widget.enableHaptics) {
-      HapticFeedback.lightImpact();
+      switch (widget.hapticStyle) {
+        case PulsrHapticStyle.light:
+          HapticFeedback.lightImpact();
+          break;
+        case PulsrHapticStyle.medium:
+          HapticFeedback.mediumImpact();
+          break;
+        case PulsrHapticStyle.selection:
+          HapticFeedback.selectionClick();
+          break;
+        case PulsrHapticStyle.heavy:
+          HapticFeedback.heavyImpact();
+          break;
+      }
     }
     _release();
     widget.onTap?.call();
@@ -101,7 +123,14 @@ class _PulsrPressableState extends State<PulsrPressable>
       onLongPress: widget.onLongPress != null
           ? () {
               if (widget.enableHaptics) {
-                HapticFeedback.mediumImpact();
+                switch (widget.hapticStyle) {
+                  case PulsrHapticStyle.heavy:
+                    HapticFeedback.heavyImpact();
+                    break;
+                  default:
+                    HapticFeedback.mediumImpact();
+                    break;
+                }
               }
               widget.onLongPress?.call();
             }

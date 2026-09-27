@@ -143,6 +143,8 @@ object ProxyPool {
         }
     }
 
+    fun clear() = clearPool()
+
     fun getActiveProxy(targetUrl: String? = null): Proxy? {
         val selected: ProxyNode
         synchronized(lock) {

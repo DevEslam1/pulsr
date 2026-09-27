@@ -1,5 +1,6 @@
 package com.pulsr.music
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -12,6 +13,13 @@ import java.net.Proxy
  * Strictly contains NO references to NewPipe, YTM, or GPL classes.
  */
 class FlavorAgnosticResilienceTest {
+
+    @After
+    fun tearDown() {
+        ProxyPool.clear()
+        ProxyPool.setAutoRotate(true)
+        ProxyPool.setOnPathChangeListener { }
+    }
 
     @Test
     fun testProxyPoolCircuitBreakerAndRotation() {

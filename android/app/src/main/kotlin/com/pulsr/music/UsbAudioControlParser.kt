@@ -222,7 +222,7 @@ object UsbAudioControlParser {
                         val subtype = descriptors[i + 2].toInt() and 0xFF
                         if (subtype == 0x02) { // FORMAT_TYPE
                             val formatType = descriptors[i + 3].toInt() and 0xFF
-                            if (formatType == 0x01) { // FORMAT_TYPE_I
+                            if (formatType == 0x01 || formatType == 0x03) { // FORMAT_TYPE_I or FORMAT_TYPE_III
                                 val samFreqType = descriptors[i + 7].toInt() and 0xFF
                                 if (samFreqType == 0 && bLength >= 14) {
                                     val lower = (descriptors[i + 8].toInt() and 0xFF) or

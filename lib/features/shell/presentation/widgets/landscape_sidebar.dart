@@ -22,6 +22,7 @@ class LandscapeSidebar extends StatelessWidget {
   final VoidCallback? onOpenNowPlaying;
   final VoidCallback? onToggleSideInspector;
   final bool isSideInspectorOpen;
+  final Map<int, int>? badgeCounts;
 
   const LandscapeSidebar({
     super.key,
@@ -32,6 +33,7 @@ class LandscapeSidebar extends StatelessWidget {
     this.onOpenNowPlaying,
     this.onToggleSideInspector,
     this.isSideInspectorOpen = false,
+    this.badgeCounts,
   });
 
   @override
@@ -98,6 +100,7 @@ class LandscapeSidebar extends StatelessWidget {
                               label: item.label,
                               isSelected: currentIndex == item.index,
                               isExtended: isExtended,
+                              badgeCount: badgeCounts?[item.index],
                               p: p,
                               onTap: () {
                                 if (currentIndex != item.index) {
@@ -132,6 +135,7 @@ class LandscapeSidebar extends StatelessWidget {
                               label: item.label,
                               isSelected: currentIndex == item.index,
                               isExtended: isExtended,
+                              badgeCount: badgeCounts?[item.index],
                               p: p,
                               onTap: () {
                                 if (currentIndex != item.index) {
@@ -319,6 +323,7 @@ class _SidebarNavItem extends StatelessWidget {
   final PulsrPalette p;
   final VoidCallback onTap;
   final String? trailingBadge;
+  final int? badgeCount;
 
   const _SidebarNavItem({
     required this.icon,
@@ -329,6 +334,7 @@ class _SidebarNavItem extends StatelessWidget {
     required this.p,
     required this.onTap,
     this.trailingBadge,
+    this.badgeCount,
   });
 
   @override
@@ -382,11 +388,28 @@ class _SidebarNavItem extends StatelessWidget {
                   child: AnimatedScale(
                     scale: isSelected ? 1.08 : 1.0,
                     duration: context.motionMs(180),
-                    child: Icon(
-                      isSelected ? activeIcon : icon,
-                      size: 23,
-                      color: isSelected ? activeColor : p.textSecondary,
-                    ),
+                    child: (badgeCount != null && badgeCount! > 0)
+                        ? Badge(
+                            label: Text(
+                              badgeCount! > 99 ? '99+' : '$badgeCount',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            backgroundColor: activeColor,
+                            textColor: p.onAccent,
+                            child: Icon(
+                              isSelected ? activeIcon : icon,
+                              size: 23,
+                              color: isSelected ? activeColor : p.textSecondary,
+                            ),
+                          )
+                        : Icon(
+                            isSelected ? activeIcon : icon,
+                            size: 23,
+                            color: isSelected ? activeColor : p.textSecondary,
+                          ),
                   ),
                 ),
               ),
@@ -477,8 +500,8 @@ class _SidebarNavItem extends StatelessWidget {
                   ),
                 ),
 
-                // Trailing Badge (e.g. Side Panel 'ON')
-                if (trailingBadge != null)
+                // Trailing Badge (e.g. Side Panel 'ON' or badgeCount)
+                if (trailingBadge != null || (badgeCount != null && badgeCount! > 0))
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
@@ -487,7 +510,7 @@ class _SidebarNavItem extends StatelessWidget {
                       borderRadius: BorderRadius.circular(AppRadii.r6),
                     ),
                     child: Text(
-                      trailingBadge!,
+                      trailingBadge ?? (badgeCount! > 99 ? '99+' : '$badgeCount'),
                       style: TextStyle(
                         fontSize: AppFontSize.tiny,
                         fontWeight: FontWeight.w800,

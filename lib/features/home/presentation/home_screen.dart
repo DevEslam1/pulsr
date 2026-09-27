@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -26,6 +27,7 @@ import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
@@ -511,7 +513,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpacing.xs),
 
                   // ---------- Content (Local vs Online) ----------
                   AnimatedSwitcher(
@@ -667,10 +669,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ---------- Quick Discovery Header (Row 2) ----------
+        const _QuickDiscoveryHeader(),
+        const SizedBox(height: AppSpacing.sm),
+
         // ---------- Quick actions ----------
         Padding(
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 0,
-              Adaptive.pagePadding(context), AppSpacing.md),
+              Adaptive.pagePadding(context), AppSpacing.xs),
           child: _buildQuickActionsRow(
             context,
             [
@@ -725,8 +731,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           ),
         ),
 
-        const SizedBox(height: AppSpacing.md),
-
         // ---------- Recently added (lazy loaded in 50-song batches) ----------
         RepaintBoundary(
           child: _RecentlyAddedSection(
@@ -746,6 +750,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: AppSpacing.xs),
         // ---------- Search YouTube Music Action Banner ----------
         Padding(
           padding: EdgeInsets.symmetric(
@@ -952,18 +957,21 @@ class _OnlineCategorySection extends StatefulWidget {
   State<_OnlineCategorySection> createState() => _OnlineCategorySectionState();
 }
 
-class _OnlineCategorySectionState extends State<_OnlineCategorySection>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
+class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
   /// One background pre-resolve of the list head per loaded category, so the
   /// first tap doesn't pay the full network resolve.
   bool _warmedFirst = false;
 
   @override
+  void didUpdateWidget(_OnlineCategorySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.title != oldWidget.title || widget.future != oldWidget.future) {
+      _warmedFirst = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    super.build(context);
     final p = context.palette;
     final isTablet = Adaptive.isTablet(context);
     final size = isTablet ? 158.0 : 138.0;
@@ -1155,7 +1163,10 @@ class _DiscoveryChip extends StatelessWidget {
       color: p.surfaceContainer,
       borderRadius: BorderRadius.circular(AppRadii.r14),
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: BorderRadius.circular(AppRadii.r14),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
@@ -1346,6 +1357,69 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
+class _QuickDiscoveryHeader extends StatelessWidget {
+  const _QuickDiscoveryHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final items = [
+      (
+        icon: Icons.person_rounded,
+        label: context.l10n.artists,
+        color: p.accent,
+        onTap: () => context.push('/library?tab=artists'),
+      ),
+      (
+        icon: Icons.album_rounded,
+        label: context.l10n.albums,
+        color: p.error,
+        onTap: () => context.push('/library?tab=albums'),
+      ),
+      (
+        icon: Icons.folder_rounded,
+        label: context.l10n.folders,
+        color: AppColors.mint,
+        onTap: () => context.push('/library?tab=folders'),
+      ),
+      (
+        icon: Icons.calendar_month_rounded,
+        label: 'Decades',
+        color: p.warning,
+        onTap: () => context.push('/year'),
+      ),
+      (
+        icon: Icons.history_rounded,
+        label: context.l10n.recentlyAdded,
+        color: p.info,
+        onTap: () => context.push('/recents'),
+      ),
+    ];
+
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(
+          horizontal: Adaptive.pagePadding(context),
+        ),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return _DiscoveryChip(
+            icon: item.icon,
+            label: item.label,
+            iconColor: item.color,
+            onTap: item.onTap,
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _RecentlyPlayedSection extends StatefulWidget {
   final GetSongsUseCase getSongsUseCase;
   final bool isTablet;
@@ -1422,14 +1496,16 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
         final size = widget.isTablet ? 158.0 : 138.0;
         final totalItemCount = songs.length + (hasMore ? 1 : 0);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              title: context.l10n.recentlyPlayed,
-              actionLabel: context.l10n.browseSeeAll,
-              onAction: () => context.push('/recents'),
-            ),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(
+                title: context.l10n.recentlyPlayed,
+                actionLabel: context.l10n.browseSeeAll,
+                onAction: () => context.push('/recents'),
+              ),
             SizedBox(
               height: _scaledCarouselHeight(context, widget.isTablet),
               child: ListView.builder(
@@ -1548,8 +1624,9 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
               ),
             ),
           ],
-        );
-      },
+        ),
+      );
+    },
     );
   }
 }
@@ -1647,6 +1724,12 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
               title: context.l10n.recentlyAdded,
               actionLabel: context.l10n.browseSeeAll,
               onAction: () => context.push('/library'),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                Adaptive.pagePadding(context),
+                AppSpacing.xs,
+                Adaptive.pagePadding(context),
+                AppSpacing.xs,
+              ),
             ),
             if (columns > 1)
               GridView.builder(
@@ -1877,22 +1960,13 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
   }
 
   Future<void> _requestPermission() async {
-    final shouldProceed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(context.l10n.homePermissionNeeded),
-        content: Text(context.l10n.homePermissionSubtitle),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(context.l10n.homeGrantPermission),
-          ),
-        ],
-      ),
+    final shouldProceed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: context.l10n.homePermissionNeeded,
+      message: context.l10n.homePermissionSubtitle,
+      confirmLabel: context.l10n.homeGrantPermission,
+      cancelLabel: context.l10n.cancel,
+      icon: Icons.lock_open_rounded,
     );
 
     if (shouldProceed != true) return;

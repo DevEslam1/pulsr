@@ -188,6 +188,147 @@ Page<dynamic> _resolveById<T>({
   );
 }
 
+Page<dynamic> _buildAlbumRoute(
+  BuildContext context,
+  GoRouterState state,
+  IMusicRepository repo,
+) {
+  AlbumsTableData? album;
+  String? heroTag = state.uri.queryParameters['heroTag'];
+  if (state.extra is AlbumsTableData) {
+    album = state.extra as AlbumsTableData;
+  } else if (state.extra is Map) {
+    final map = state.extra as Map;
+    if (map['album'] is AlbumsTableData) {
+      album = map['album'] as AlbumsTableData;
+    }
+    if (map['heroTag'] is String) {
+      heroTag = map['heroTag'] as String;
+    }
+  }
+  if (album != null) {
+    return _buildPulsrPageRoute(
+      key: state.pageKey,
+      child: AlbumDetailScreen(album: album, heroTag: heroTag),
+    );
+  }
+  final id = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+  final parsedId = int.tryParse(id ?? '');
+  return _resolveById<AlbumsTableData>(
+    pageKey: state.pageKey,
+    id: id,
+    fetchSingle: parsedId != null ? () => repo.getAlbumById(parsedId) : null,
+    watch: () => repo.watchAlbums(),
+    match: (a) => a.id.toString() == id,
+    builder: (context, a) =>
+        AlbumDetailScreen(album: a, heroTag: heroTag),
+    notFoundMessage: context.l10n.albumNotFoundHint,
+  );
+}
+
+Page<dynamic> _buildArtistRoute(
+  BuildContext context,
+  GoRouterState state,
+  IMusicRepository repo,
+) {
+  final artist = state.extra is ArtistsTableData
+      ? state.extra as ArtistsTableData
+      : null;
+  if (artist != null) {
+    return _buildPulsrPageRoute(
+      key: state.pageKey,
+      child: ArtistDetailScreen(artist: artist),
+    );
+  }
+  final id = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+  final parsedId = int.tryParse(id ?? '');
+  return _resolveById<ArtistsTableData>(
+    pageKey: state.pageKey,
+    id: id,
+    fetchSingle: parsedId != null ? () => repo.getArtistById(parsedId) : null,
+    watch: () => repo.watchArtists(),
+    match: (a) => a.id.toString() == id,
+    builder: (context, a) => ArtistDetailScreen(artist: a),
+    notFoundMessage: context.l10n.artistNotFoundHint,
+  );
+}
+
+Page<dynamic> _buildGenreRoute(
+  BuildContext context,
+  GoRouterState state,
+) {
+  GenreItem? genre = state.extra is GenreItem ? state.extra as GenreItem : null;
+  final name = state.pathParameters['name'] ?? state.uri.queryParameters['name'];
+  if (genre == null && name != null && name.isNotEmpty) {
+    genre = GenreItem(name: name, songCount: 0);
+  }
+  if (genre == null) {
+    return _buildPulsrPageRoute(
+      key: state.pageKey,
+      child: Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text(context.l10n.genreNotFoundHint)),
+      ),
+    );
+  }
+  return _buildPulsrPageRoute(
+    key: state.pageKey,
+    child: GenreDetailScreen(genreItem: genre),
+  );
+}
+
+Page<dynamic> _buildYearRoute(
+  BuildContext context,
+  GoRouterState state,
+) {
+  YearItem? year = state.extra is YearItem ? state.extra as YearItem : null;
+  final yearParam = state.pathParameters['year'] ?? state.uri.queryParameters['year'];
+  final parsedYear = int.tryParse(yearParam ?? '');
+  if (year == null && parsedYear != null) {
+    year = YearItem(year: parsedYear, songCount: 0);
+  }
+  if (year == null) {
+    return _buildPulsrPageRoute(
+      key: state.pageKey,
+      child: Scaffold(
+        appBar: AppBar(),
+        body: Center(child: Text(context.l10n.yearNotFoundHint)),
+      ),
+    );
+  }
+  return _buildPulsrPageRoute(
+    key: state.pageKey,
+    child: YearDetailScreen(yearItem: year),
+  );
+}
+
+Page<dynamic> _buildPlaylistRoute(
+  BuildContext context,
+  GoRouterState state,
+  IMusicRepository repo,
+) {
+  final playlist = state.extra is PlaylistsTableData
+      ? state.extra as PlaylistsTableData
+      : null;
+  if (playlist != null) {
+    return _buildPulsrPageRoute(
+      key: state.pageKey,
+      child: PlaylistDetailScreen(playlist: playlist),
+    );
+  }
+  final id = state.pathParameters['id'] ?? state.uri.queryParameters['id'];
+  final parsedId = int.tryParse(id ?? '');
+  return _resolveById<PlaylistsTableData>(
+    pageKey: state.pageKey,
+    id: id,
+    fetchSingle: parsedId != null ? () => repo.getPlaylistById(parsedId) : null,
+    watch: () => repo.watchPlaylists(),
+    match: (p) => p.id.toString() == id,
+    builder: (context, p) => PlaylistDetailScreen(playlist: p),
+    notFoundMessage: context.l10n.playlistNotFoundHint,
+  );
+}
+
 GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? musicRepository]) {
   final repo = musicRepository ?? getIt<IMusicRepository>();
   return GoRouter(
@@ -267,7 +408,10 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
                 name: 'library',
                 pageBuilder: (context, state) => _buildTabPage(
                   key: state.pageKey,
-                  child: const LibraryScreen(),
+                  child: LibraryScreen(
+                    initialTabName: state.uri.queryParameters['tab'] ??
+                        (state.extra is String ? state.extra as String : null),
+                  ),
                 ),
               ),
             ],
@@ -282,7 +426,9 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
                 name: 'search',
                 pageBuilder: (context, state) => _buildTabPage(
                   key: state.pageKey,
-                  child: const SearchScreen(),
+                  child: SearchScreen(
+                    initialQuery: state.uri.queryParameters['q'],
+                  ),
                 ),
               ),
             ],
@@ -347,136 +493,31 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
         path: '/album',
         name: 'album',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) {
-          AlbumsTableData? album;
-          String? heroTag = state.uri.queryParameters['heroTag'];
-          if (state.extra is AlbumsTableData) {
-            album = state.extra as AlbumsTableData;
-          } else if (state.extra is Map) {
-            final map = state.extra as Map;
-            if (map['album'] is AlbumsTableData) {
-              album = map['album'] as AlbumsTableData;
-            }
-            if (map['heroTag'] is String) {
-              heroTag = map['heroTag'] as String;
-            }
-          }
-          if (album != null) {
-            return _buildPulsrPageRoute(
-              key: state.pageKey,
-              child: AlbumDetailScreen(album: album, heroTag: heroTag),
-            );
-          }
-          final id = state.uri.queryParameters['id'];
-          final parsedId = int.tryParse(id ?? '');
-          return _resolveById<AlbumsTableData>(
-            pageKey: state.pageKey,
-            id: id,
-            fetchSingle: parsedId != null ? () => repo.getAlbumById(parsedId) : null,
-            watch: () => repo.watchAlbums(),
-            match: (a) => a.id.toString() == id,
-            builder: (context, a) =>
-                AlbumDetailScreen(album: a, heroTag: heroTag),
-            notFoundMessage: context.l10n.albumNotFoundHint,
-          );
-        },
+        pageBuilder: (context, state) => _buildAlbumRoute(context, state, repo),
       ),
       GoRoute(
         path: '/artist',
         name: 'artist',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) {
-          final artist = state.extra is ArtistsTableData
-              ? state.extra as ArtistsTableData
-              : null;
-          if (artist != null) {
-            return _buildPulsrPageRoute(
-               key: state.pageKey,
-               child: ArtistDetailScreen(artist: artist),
-            );
-          }
-          final id = state.uri.queryParameters['id'];
-          final parsedId = int.tryParse(id ?? '');
-          return _resolveById<ArtistsTableData>(
-            pageKey: state.pageKey,
-            id: id,
-            fetchSingle: parsedId != null ? () => repo.getArtistById(parsedId) : null,
-            watch: () => repo.watchArtists(),
-            match: (a) => a.id.toString() == id,
-            builder: (context, a) => ArtistDetailScreen(artist: a),
-            notFoundMessage: context.l10n.artistNotFoundHint,
-          );
-        },
+        pageBuilder: (context, state) => _buildArtistRoute(context, state, repo),
       ),
       GoRoute(
         path: '/genre',
         name: 'genre',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) {
-          final genre =
-              state.extra is GenreItem ? state.extra as GenreItem : null;
-          if (genre == null) {
-            return _buildPulsrPageRoute(
-              key: state.pageKey,
-              child: Scaffold(
-                appBar: AppBar(),
-                body: Center(child: Text(context.l10n.genreNotFoundHint)),
-              ),
-            );
-          }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: GenreDetailScreen(genreItem: genre),
-          );
-        },
+        pageBuilder: (context, state) => _buildGenreRoute(context, state),
       ),
       GoRoute(
         path: '/year',
         name: 'year',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) {
-          final year = state.extra is YearItem ? state.extra as YearItem : null;
-          if (year == null) {
-            return _buildPulsrPageRoute(
-              key: state.pageKey,
-              child: Scaffold(
-                appBar: AppBar(),
-                body: Center(child: Text(context.l10n.yearNotFoundHint)),
-              ),
-            );
-          }
-          return _buildPulsrPageRoute(
-            key: state.pageKey,
-            child: YearDetailScreen(yearItem: year),
-          );
-        },
+        pageBuilder: (context, state) => _buildYearRoute(context, state),
       ),
       GoRoute(
         path: '/playlist',
         name: 'playlist',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) {
-          final playlist = state.extra is PlaylistsTableData
-              ? state.extra as PlaylistsTableData
-              : null;
-          if (playlist != null) {
-            return _buildPulsrPageRoute(
-              key: state.pageKey,
-              child: PlaylistDetailScreen(playlist: playlist),
-            );
-          }
-          final id = state.uri.queryParameters['id'];
-          final parsedId = int.tryParse(id ?? '');
-          return _resolveById<PlaylistsTableData>(
-            pageKey: state.pageKey,
-            id: id,
-            fetchSingle: parsedId != null ? () => repo.getPlaylistById(parsedId) : null,
-            watch: () => repo.watchPlaylists(),
-            match: (p) => p.id.toString() == id,
-            builder: (context, p) => PlaylistDetailScreen(playlist: p),
-            notFoundMessage: context.l10n.playlistNotFoundHint,
-          );
-        },
+        pageBuilder: (context, state) => _buildPlaylistRoute(context, state, repo),
       ),
       GoRoute(
         path: '/playlist/manage',

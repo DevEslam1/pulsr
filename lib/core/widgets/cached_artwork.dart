@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../di/injection.dart';
+import '../motion/pulsr_motion.dart';
 import '../services/artwork_cache_manager.dart';
+import '../utils/error_logger.dart';
 import 'artwork_placeholder.dart';
 
 /// LRU Memory Bitmap Cache for Artwork images.
@@ -252,19 +254,30 @@ class _CachedArtworkState extends State<CachedArtwork> {
         for (final candidate in fallbackUrls) {
           final candidateUri = Uri.tryParse(candidate);
           if (candidateUri == null) continue;
+          HttpClientRequest? fallbackReq;
           try {
-            request = await getIt<HttpClient>()
+            fallbackReq = await getIt<HttpClient>()
                 .getUrl(candidateUri)
                 .timeout(const Duration(seconds: 6));
+            request = fallbackReq;
             response =
-                await request.close().timeout(const Duration(seconds: 6));
+                await fallbackReq.close().timeout(const Duration(seconds: 6));
             if (response.statusCode == 200) {
               resolved = true;
               break;
             } else {
               await response.drain<void>();
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Candidate artwork URL failed',
+                error: e, stackTrace: st, category: 'Artwork');
+            try {
+              fallbackReq?.abort();
+            } catch (abortErr, abortSt) {
+              ErrorLogger.log('Failed to abort fallback request',
+                  error: abortErr, stackTrace: abortSt, category: 'Artwork');
+            }
+          }
         }
         if (!resolved || response.statusCode != 200) return null;
       }
@@ -282,7 +295,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
         if (totalBytes > _maxRemoteBytes) {
           try {
             request?.abort();
-          } catch (_) {}
+          } catch (abortErr, abortSt) {
+            ErrorLogger.log('Failed to abort oversized request',
+                error: abortErr, stackTrace: abortSt, category: 'Artwork');
+          }
           return null;
         }
         builder.add(chunk);
@@ -290,10 +306,15 @@ class _CachedArtworkState extends State<CachedArtwork> {
       final bytes = builder.takeBytes();
       if (bytes.lengthInBytes > _maxRemoteBytes || bytes.isEmpty) return null;
       return bytes;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Remote artwork fetch failed',
+          error: e, stackTrace: st, category: 'Artwork');
       try {
         request?.abort();
-      } catch (_) {}
+      } catch (abortErr, abortSt) {
+        ErrorLogger.log('Failed to abort remote request',
+            error: abortErr, stackTrace: abortSt, category: 'Artwork');
+      }
       return null;
     }
   }
@@ -414,19 +435,30 @@ class _CachedArtworkState extends State<CachedArtwork> {
             ? null
             : (effectiveSize * 1.5).clamp(80, 800).round();
 
-        final content = _cachedBytes != null
-            ? Image.memory(
-                _cachedBytes!,
-                width: isBounded ? effectiveSize : null,
-                height: isBounded ? effectiveSize : null,
-                cacheWidth: widget.cacheWidth ?? decodeDim,
-                cacheHeight: widget.cacheHeight ?? decodeDim,
-                fit: BoxFit.cover,
-                filterQuality:
-                    isHq ? FilterQuality.high : FilterQuality.medium,
-                errorBuilder: (context, error, stackTrace) => placeholder,
-              )
-            : placeholder;
+        final content = AnimatedSwitcher(
+          duration: context.motionMs(200),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: _cachedBytes != null
+              ? Image.memory(
+                  _cachedBytes!,
+                  key: ValueKey(_cacheKey),
+                  width: isBounded ? effectiveSize : null,
+                  height: isBounded ? effectiveSize : null,
+                  cacheWidth: widget.cacheWidth ?? decodeDim,
+                  cacheHeight: widget.cacheHeight ?? decodeDim,
+                  fit: BoxFit.cover,
+                  filterQuality:
+                      isHq ? FilterQuality.high : FilterQuality.medium,
+                  errorBuilder: (context, error, stackTrace) => placeholder,
+                )
+              : SizedBox(
+                  key: const ValueKey('artwork_placeholder'),
+                  width: isBounded ? effectiveSize : null,
+                  height: isBounded ? effectiveSize : null,
+                  child: placeholder,
+                ),
+        );
 
         return ClipRRect(
           borderRadius: BorderRadius.circular(effectiveBorderRadius),

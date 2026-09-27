@@ -265,6 +265,21 @@ internal class InnertubeClient(
     }
 
     fun resolvePlayerStream(videoId: String, quality: String = "high", preferM4a: Boolean = false): Map<String, Any?> {
+        try {
+            val result = resolvePlayerStreamInternal(videoId, quality, preferM4a)
+            PoTokenManager.recordEgressSuccess()
+            return result
+        } catch (e: InnertubeException) {
+            if (e.signal == YtmBlockSignal.IpBlocked ||
+                e.signal == YtmBlockSignal.BotChallenge ||
+                e.signal == YtmBlockSignal.PoTokenInvalid) {
+                PoTokenManager.recordEgressRejection()
+            }
+            throw e
+        }
+    }
+
+    private fun resolvePlayerStreamInternal(videoId: String, quality: String = "high", preferM4a: Boolean = false): Map<String, Any?> {
         val traceId = UUID.randomUUID().toString()
 
         // Hard ceiling on the whole native chain. The hedged two-client race is
@@ -301,22 +316,6 @@ internal class InnertubeClient(
         val lastSignalRef = AtomicReference<YtmBlockSignal?>(null)
         val lastExceptionRef = AtomicReference<Throwable?>(null)
 
-        // Priority-based signal update: higher priority = more actionable recovery action.
-        fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
-            YtmBlockSignal.Interrupted             -> 9
-            YtmBlockSignal.BotChallenge            -> 8
-            YtmBlockSignal.PoTokenInvalid          -> 7
-            YtmBlockSignal.RateLimited             -> 6
-            YtmBlockSignal.IpBlocked               -> 5
-            YtmBlockSignal.SignatureDecipherFailed -> 4
-            YtmBlockSignal.SabrEnforced            -> 3
-            YtmBlockSignal.SignInRequired          -> 2
-            YtmBlockSignal.ClientDeprecated        -> 2
-            YtmBlockSignal.GeoBlocked              -> 2
-            YtmBlockSignal.VideoGone               -> 1
-            YtmBlockSignal.NetworkUnavailable      -> 0
-            null                                   -> -1
-        }
         fun updateBestSignal(newSignal: YtmBlockSignal?) {
             if (newSignal == null) return
             lastSignalRef.updateAndGet { current ->
@@ -356,7 +355,7 @@ internal class InnertubeClient(
         ): AttemptResult {
             if (Thread.currentThread().isInterrupted) return AttemptResult.Interrupted
             // FIX #2: Allow bypass during PoToken recovery
-            if (!ignoreShortCircuit && shortCircuit.get() != null) return AttemptResult.ShortCircuited
+            if (!ignoreShortCircuit && (shortCircuit.get() != null || deadlineExceeded())) return AttemptResult.ShortCircuited
 
             // FIX #7: Keep default safe and wrap fingerprint store in try block
             var actualRequestUa = client.userAgent
@@ -450,6 +449,10 @@ internal class InnertubeClient(
                 }
 
                 val streamingData = playerJson.optJSONObject("streamingData")
+                val assetsJs = playerJson.optJSONObject("assets")?.optString("js")
+                if (!assetsJs.isNullOrBlank()) {
+                    PlayerJavaScript.rememberPlayerUrlFromAssets(assetsJs)
+                }
                 val formatArrays = listOfNotNull(
                     streamingData?.optJSONArray("adaptiveFormats"),
                     streamingData?.optJSONArray("formats")
@@ -1037,7 +1040,12 @@ internal class InnertubeClient(
                 if (rawUrl != null) {
                     var resolved = if (sig != null) {
                         val decipherCache = JsDecipherCache.getInstance(context)
-                        val deciphered = decipherCache.decipherSignature(sig)
+                        val deciphered = try {
+                            decipherCache.decipherSignature(sig)
+                        } catch (_: Exception) {
+                            PlayerJavaScript.decipherSignature(sig)
+                                ?: throw UndecipherableSignatureException("rhino_failed")
+                        }
                         val separator = if (rawUrl.contains("?")) "&" else "?"
                         "$rawUrl$separator$sigParam=${URLEncoder.encode(deciphered, "UTF-8")}"
                     } else {
@@ -1057,38 +1065,46 @@ internal class InnertubeClient(
     }
 
     /**
-     * FIX #9: Surgically replaces only the 'n' parameter in the query string with boundary anchoring,
+     * FIX #9 / B-02: Surgically replaces only the 'n' parameter in the query string with boundary anchoring,
      * preserving parameter order, other parameters, and percent-encoding.
+     * Routes through cached rules as fast path and PlayerJavaScript (Rhino engine) as primary resolver.
      */
     private fun applyNTransformIfNeeded(url: String): String {
         return try {
             val uri = Uri.parse(url)
             val n = uri.getQueryParameter("n") ?: return url
             if (n.isEmpty()) return url
+
+            // Fast path: cached transform rules
             val cache = JsDecipherCache.getInstance(context)
-            val transformed = cache.decipherN(n)
-            // FIX #4: Guard against empty or unchanged transformed n
-            if (transformed.isNullOrEmpty() || transformed == n) return url
+            val cachedTransformed = runCatching { cache.decipherN(n) }.getOrNull()
+            if (!cachedTransformed.isNullOrEmpty() && cachedTransformed != n) {
+                val encodedOld = URLEncoder.encode(n, "UTF-8")
+                val encodedNew = URLEncoder.encode(cachedTransformed, "UTF-8")
 
-            val encodedOld = URLEncoder.encode(n, "UTF-8")
-            val encodedNew = URLEncoder.encode(transformed, "UTF-8")
+                val patternExact = Regex("([?&])n=${Regex.escape(n)}(?=&|$)")
+                val patternEncoded = Regex("([?&])n=${Regex.escape(encodedOld)}(?=&|$)")
 
-            // FIX #9: Anchor boundaries ([?&] ... (?=&|$)) so other params containing "n=" are not replaced
-            val patternExact = Regex("([?&])n=${Regex.escape(n)}(?=&|$)")
-            val patternEncoded = Regex("([?&])n=${Regex.escape(encodedOld)}(?=&|$)")
-
-            when {
-                patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
-                patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
-                else -> {
-                    uri.buildUpon().clearQuery().apply {
-                        for (name in uri.queryParameterNames) {
-                            if (name == "n") appendQueryParameter("n", transformed)
-                            else uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) }
-                        }
-                    }.build().toString()
+                return when {
+                    patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
+                    patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
+                    else -> {
+                        uri.buildUpon().clearQuery().apply {
+                            for (name in uri.queryParameterNames) {
+                                if (name == "n") appendQueryParameter("n", cachedTransformed)
+                                else uri.getQueryParameters(name).forEach { appendQueryParameter(name, it) }
+                            }
+                        }.build().toString()
+                    }
                 }
             }
+
+            // Primary engine: deobfuscate n via PlayerJavaScript (Rhino)
+            val deobfuscated = PlayerJavaScript.deobfuscateN(url)
+            if (!deobfuscated.isNullOrEmpty()) {
+                return deobfuscated
+            }
+            url
         } catch (t: Throwable) {
             Log.w(TAG, "n-transform failed: ${t.message}")
             url
@@ -1174,6 +1190,16 @@ internal class InnertubeClient(
             if (!params.isNullOrEmpty()) {
                 put("params", params)
             }
+            if (clientType.isWeb) {
+                val poToken = if (clientType.acceptsSessionAuth && cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isNotEmpty()) {
+                    PoTokenManager.accountPoTokenForSync(PoTokenManager.dataSyncId)
+                } else {
+                    PoTokenManager.streamingPoToken
+                }
+                if (poToken.isNotEmpty()) {
+                    put("serviceIntegrityDimensions", JSONObject().put("poToken", poToken))
+                }
+            }
         }
         return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.SEARCH)
     }
@@ -1240,17 +1266,20 @@ internal class InnertubeClient(
                 sleepAfterAttemptMs = 0L
             }
 
-            if (!rateLimiter.acquirePermit(bucket)) {
-                if (Thread.currentThread().isInterrupted) {
+            when (rateLimiter.tryAcquirePermit(bucket)) {
+                RateLimiter.PermitResult.GRANTED -> {}
+                RateLimiter.PermitResult.INTERRUPTED -> {
                     lastError = IOException("Rate limiter wait interrupted for ${clientType.name}")
-                } else {
+                    break
+                }
+                RateLimiter.PermitResult.TIMEOUT -> {
                     lastError = InnertubeException(
                         signal = YtmBlockSignal.RateLimited,
                         message = "Rate limiter permit acquisition timed out for ${clientType.name}",
                         traceId = traceId
                     )
+                    break
                 }
-                break
             }
 
             var call: okhttp3.Call? = null
@@ -1701,6 +1730,23 @@ internal class InnertubeClient(
             } catch (_: Exception) {}
             _streamResolverPool = null
             _preConnectExecutor = null
+        }
+
+        @JvmStatic
+        fun signalPriority(s: YtmBlockSignal?): Int = when (s) {
+            YtmBlockSignal.Interrupted             -> 9
+            YtmBlockSignal.BotChallenge            -> 8
+            YtmBlockSignal.PoTokenInvalid          -> 7
+            YtmBlockSignal.RateLimited             -> 6
+            YtmBlockSignal.IpBlocked               -> 5
+            YtmBlockSignal.SignatureDecipherFailed -> 4
+            YtmBlockSignal.SabrEnforced            -> 3
+            YtmBlockSignal.SignInRequired          -> 2
+            YtmBlockSignal.ClientDeprecated        -> 2
+            YtmBlockSignal.GeoBlocked              -> 2
+            YtmBlockSignal.VideoGone               -> 1
+            YtmBlockSignal.NetworkUnavailable      -> 0
+            null                                   -> -1
         }
     }
 }
