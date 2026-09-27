@@ -55,7 +55,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
               Adaptive.pagePadding(context), 160),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 155),
+            crossAxisCount:
+                PulsrAdaptiveGrid.columns(context, type: GridType.songs),
             crossAxisSpacing: 14,
             mainAxisSpacing: 18,
             childAspectRatio: 0.76,
@@ -147,11 +148,13 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       );
     }
 
-    // The A–Z rail only makes sense when the list is ordered by title.
-    final showAlphabet = songs.length >= 15 && state.sortBy == 'title';
+    // The A–Z rail only makes sense when the list is ordered by title and screen height >= 500dp.
+    final showAlphabet = songs.length >= 15 &&
+        state.sortBy == 'title' &&
+        MediaQuery.sizeOf(context).height >= 500;
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 
-    final trackCols = context.trackGridColumns;
+    final trackCols = PulsrAdaptiveGrid.songColumns(context);
     final hasMore = cubit.hasMoreSongs;
 
     Widget buildLoadMoreTile() {
@@ -287,7 +290,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
   ) {
     final p = context.palette;
     final downloaded = state.songs.where((s) => _isOnlineDownload(s)).toList();
-    final trackCols = context.trackGridColumns;
+    final trackCols = PulsrAdaptiveGrid.songColumns(context);
 
     if (downloaded.isEmpty) {
       return _buildEmpty(

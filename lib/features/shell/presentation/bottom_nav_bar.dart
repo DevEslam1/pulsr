@@ -16,6 +16,7 @@ class PulsrBottomNavBar extends StatefulWidget {
   final VoidCallback? onSwipeDown;
   final VoidCallback? onSwipeUp;
   final bool includeSafeArea;
+  final bool iconOnly;
 
   const PulsrBottomNavBar({
     super.key,
@@ -24,6 +25,7 @@ class PulsrBottomNavBar extends StatefulWidget {
     this.onSwipeDown,
     this.onSwipeUp,
     this.includeSafeArea = true,
+    this.iconOnly = false,
   });
 
   @override
@@ -48,8 +50,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
     final items = pulsrDestinations(context);
 
     final double maxBarWidth = isTablet ? 640.0 : 540.0;
-    final double barHeight = isTablet ? 68.0 : 64.0;
-    final navRadius = BorderRadius.circular(isTablet ? 28 : 24);
+    final double barHeight = widget.iconOnly ? 48.0 : (isTablet ? 68.0 : 64.0);
+    final navRadius = BorderRadius.circular(isTablet ? 28 : (widget.iconOnly ? 20 : 24));
 
     return SafeArea(
       top: false,
@@ -183,6 +185,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                       isSelected: widget.currentIndex == i,
                                       p: p,
                                       isTablet: isTablet,
+                                      iconOnly: widget.iconOnly,
                                       onTap: () {
                                         if (widget.currentIndex != i) {
                                           HapticFeedback.selectionClick();
@@ -222,6 +225,7 @@ class _NavTabItem extends StatelessWidget {
   final bool isSelected;
   final PulsrPalette p;
   final bool isTablet;
+  final bool iconOnly;
   final VoidCallback onTap;
 
   const _NavTabItem({
@@ -229,6 +233,7 @@ class _NavTabItem extends StatelessWidget {
     required this.isSelected,
     required this.p,
     required this.isTablet,
+    required this.iconOnly,
     required this.onTap,
   });
 
@@ -286,12 +291,25 @@ class _NavTabItem extends StatelessWidget {
                     ]
                   : null,
             ),
-            child: MediaQuery.withClampedTextScaling(
-              minScaleFactor: 0.8,
-              maxScaleFactor: 1.15,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: iconOnly
+                ? Center(
+                    child: AnimatedScale(
+                      scale: isSelected ? 1.08 : 1.0,
+                      duration: context.motionMs(220),
+                      curve: context.motionCurve(Curves.easeOutBack),
+                      child: Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        size: iconSize,
+                        color: isSelected ? p.accent : p.textTertiary,
+                      ),
+                    ),
+                  )
+                : MediaQuery.withClampedTextScaling(
+                    minScaleFactor: 0.8,
+                    maxScaleFactor: 1.15,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Selection indicator capsule: grows and lights up when active.
                   AnimatedContainer(

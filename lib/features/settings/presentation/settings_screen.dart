@@ -15,6 +15,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/responsive/breakpoints.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_slider.dart';
@@ -178,7 +179,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         final cubit = context.read<SettingsCubit>();
 
         final isTabletView =
-            Adaptive.widthOf(context) >= 720 || context.isTwoPane;
+            (context.breakpoint >= PulsrBreakpoint.medium &&
+                    (context.isLandscape || Adaptive.widthOf(context) >= 700)) ||
+                context.isTwoPane;
         final effectiveCategoryId =
             (isTabletView && _selectedCategoryId == 'all')
                 ? 'audio'

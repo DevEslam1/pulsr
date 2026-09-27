@@ -531,8 +531,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     children: [
                       // Left Action: Download (stream) or Add to Playlist (local)
                       SizedBox(
-                        width: isTablet ? 48 : 44,
-                        height: isTablet ? 48 : 44,
+                        width: 48,
+                        height: 48,
                         child: hasDownload
                             ? Center(
                                 child: YtmDownloadButton(
@@ -750,8 +750,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                   children: [
                     // Dismiss Button (40x40 circle)
                     SizedBox(
-                      width: isTablet ? 48 : 44,
-                      height: isTablet ? 48 : 44,
+                      width: 48,
+                      height: 48,
                       child: Material(
                         color: Colors.white.withValues(alpha: 0.07),
                         shape: const CircleBorder(),
@@ -837,8 +837,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
                     // More Options Button (40x40 circle)
                     SizedBox(
-                      width: isTablet ? 48 : 44,
-                      height: isTablet ? 48 : 44,
+                      width: 48,
+                      height: 48,
                       child: Material(
                         color: Colors.white.withValues(alpha: 0.07),
                         shape: const CircleBorder(),

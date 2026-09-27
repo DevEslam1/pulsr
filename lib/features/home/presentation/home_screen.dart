@@ -41,6 +41,8 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../core/responsive/responsive_values.dart';
+import '../../../core/responsive/adaptive_grid.dart';
 
 /// Scales a fixed two-line card title box (34px at the default text size) with
 /// the user's Dynamic Type setting so large text never clips. Pixel-identical
@@ -974,7 +976,7 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = Adaptive.isTablet(context);
-    final size = isTablet ? 158.0 : 138.0;
+    final size = context.responsive.value(compact: 138.0, medium: 150.0, expanded: 158.0);
 
     return FutureBuilder<List<YtmTrack>>(
       future: widget.future,
@@ -1206,8 +1208,7 @@ class _TrendingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isTablet = Adaptive.isTablet(context);
-    final size = isTablet ? 158.0 : 138.0;
+    final size = context.responsive.value(compact: 138.0, medium: 150.0, expanded: 158.0);
 
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
@@ -1674,7 +1675,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
-    final columns = context.trackGridColumns;
+    final columns = PulsrAdaptiveGrid.songColumns(context);
 
     return StreamBuilder<Result<List<SongsTableData>>>(
       stream: widget.getSongsUseCase.watchRecentlyAdded(limit: _currentLimit).distinct(),

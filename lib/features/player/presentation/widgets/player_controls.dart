@@ -292,12 +292,15 @@ class _ControlButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppRadii.r20),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                 AnimatedContainer(
                   duration: context.motionMs(200),
                   padding: const EdgeInsets.all(AppSpacing.s6),
@@ -337,6 +340,7 @@ class _ControlButton extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

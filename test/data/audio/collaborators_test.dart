@@ -9,9 +9,13 @@ import 'package:pulsr/data/audio/smart_preload_scheduler.dart';
 import 'package:pulsr/data/audio/stream_pre_resolver.dart';
 import 'package:pulsr/data/db/app_database.dart';
 
+import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/data/audio/collaborators/stream_resolution_pipeline.dart';
+
 class MockAudioPlayer extends Mock implements AudioPlayer {}
 class MockSmartPreloadScheduler extends Mock implements SmartPreloadScheduler {}
 class MockStreamPreResolver extends Mock implements StreamPreResolver {}
+class MockYtmService extends Mock implements YtmService {}
 
 SongsTableData _createMockSong(int id, {
   double? rgTrack,
@@ -125,6 +129,71 @@ void main() {
       when(() => activePlayer.volume).thenReturn(0.0);
       await controller.applyVolume(activePlayer, 1.0, smoothTransition: true);
       verify(() => activePlayer.setVolume(any())).called(greaterThanOrEqualTo(1));
+    });
+
+    test('dispose cancels active transition timers and nulls player references', () async {
+      when(() => activePlayer.volume).thenReturn(0.0);
+      final future = controller.applyVolume(activePlayer, 1.0, smoothTransition: true);
+      expect(controller.hasActiveTransitionTimer, isTrue);
+
+      controller.dispose();
+
+      expect(controller.isDisposed, isTrue);
+      expect(controller.hasActiveTransitionTimer, isFalse);
+      expect(controller.getActivePlayer, isNull);
+      expect(controller.getInactivePlayer, isNull);
+      await future;
+    });
+
+    test('Calculate target volume across DoP, nativeRG, DVC, ducking, and per-song offset', () {
+      final song = _createMockSong(1, rgTrack: -3.0, rgTrackPeak: 1.0);
+
+      // 1. DoP active: strictly unity gain
+      controller.updateSettings(
+        userVolume: 0.7,
+        isDopActive: true,
+        replayGainMode: 'track',
+      );
+      expect(controller.calculateTargetVolume(song, perSongOffsetDb: 2.0), equals(1.0));
+
+      // 2. Native RG active: mixer carries base volume, RG handled natively
+      controller.updateSettings(
+        isDopActive: false,
+        userVolume: 0.8,
+        nativeRgActive: true,
+        dvcEnabled: false,
+      );
+      expect(controller.calculateTargetVolume(song), closeTo(0.8, 0.001));
+
+      // 3. Native RG + DVC: user volume handled by native DVC stage -> mixer is 1.0
+      controller.updateSettings(
+        nativeRgActive: true,
+        dvcEnabled: true,
+      );
+      expect(controller.calculateTargetVolume(song), closeTo(1.0, 0.001));
+
+      // 4. Native RG + DVC with per-song offset: multiplier applied to 1.0
+      // +3dB -> ~1.412 clamped to 1.0, -3dB -> ~0.7079
+      expect(controller.calculateTargetVolume(song, perSongOffsetDb: -3.0), closeTo(0.7079, 0.01));
+
+      // 5. Ducked state with DVC
+      controller.updateSettings(
+        isDucked: true,
+        duckFactor: 0.25,
+      );
+      // DVC effective base = 1.0 * 0.25 = 0.25
+      expect(controller.calculateTargetVolume(song), closeTo(0.25, 0.001));
+
+      // 6. Untagged track default preamp is 0dB (does not attenuate)
+      final untaggedSong = _createMockSong(2);
+      controller.updateSettings(
+        isDucked: false,
+        nativeRgActive: false,
+        dvcEnabled: false,
+        userVolume: 0.9,
+        replayGainMode: 'track',
+      );
+      expect(controller.calculateTargetVolume(untaggedSong), closeTo(0.9, 0.001));
     });
   });
 
@@ -246,6 +315,35 @@ void main() {
         position: null,
         duration: null,
       )).called(1);
+    });
+  });
+
+  group('StreamResolutionPipeline LRU Eviction Tests', () {
+    test('Evicts oldest-inserted entry first when exceeding maxCacheEntries', () {
+      final pipeline = StreamResolutionPipeline(
+        ytmService: MockYtmService(),
+      );
+      final futureDate = DateTime.now().add(const Duration(hours: 1));
+
+      // Insert entries up to maxCacheEntries (128)
+      for (var i = 0; i < StreamResolutionPipeline.maxCacheEntries; i++) {
+        pipeline.streamCache['video_$i:high'] =
+            CachedStreamUrl('https://stream.url/$i', futureDate);
+      }
+      expect(pipeline.streamCache.length, equals(128));
+      expect(pipeline.streamCache.containsKey('video_0:high'), isTrue);
+
+      // Insert 129th entry and prune
+      pipeline.streamCache['video_128:high'] =
+          CachedStreamUrl('https://stream.url/128', futureDate);
+      pipeline.pruneCache();
+
+      expect(pipeline.streamCache.length, equals(128));
+      // Oldest inserted entry 'video_0:high' must be evicted first
+      expect(pipeline.streamCache.containsKey('video_0:high'), isFalse);
+      // Newer entries must remain
+      expect(pipeline.streamCache.containsKey('video_1:high'), isTrue);
+      expect(pipeline.streamCache.containsKey('video_128:high'), isTrue);
     });
   });
 }

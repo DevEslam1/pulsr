@@ -122,6 +122,7 @@ class WidgetService {
     bool isShuffle = false,
     String repeatMode = 'off',
     List<String>? nextQueueTitles,
+    String? queueCover,
   }) async {
     try {
       await _ensureAppGroup();
@@ -158,6 +159,11 @@ class WidgetService {
               : '';
           await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
         }
+        final upNext = (nextQueueTitles != null && nextQueueTitles.isNotEmpty)
+            ? nextQueueTitles.first
+            : '';
+        await HomeWidget.saveWidgetData<String>('upNext', upNext);
+        await HomeWidget.saveWidgetData<String>('queueCover', queueCover ?? '');
 
         // If artwork is already cached for this song, set it immediately
         final cachedArt = _artworkCache[song.id];
@@ -179,6 +185,8 @@ class WidgetService {
         for (int i = 0; i < 3; i++) {
           await HomeWidget.saveWidgetData<String>('nextTrack$i', '');
         }
+        await HomeWidget.saveWidgetData<String>('upNext', '');
+        await HomeWidget.saveWidgetData<String>('queueCover', '');
         await HomeWidget.saveWidgetData<String>('artwork', '');
         await HomeWidget.saveWidgetData<bool>('artworkFailed', false);
         _pendingArtworkQueue.clear();

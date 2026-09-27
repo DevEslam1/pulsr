@@ -188,7 +188,7 @@ extension AdaptiveContextX on BuildContext {
   double rsp(double value) => scaleSp(value);
   double rr(double value) => scaleR(value);
 
-  T responsive<T>({
+  T responsiveAdaptive<T>({
     required T phone,
     T? tablet,
     T? desktop,

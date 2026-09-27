@@ -11,6 +11,7 @@ import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/mini_player.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../../core/responsive/layout_delegate.dart';
 import '../bottom_nav_bar.dart';
 
 enum DockStackMode {
@@ -61,6 +62,7 @@ class StackedBottomDock extends StatefulWidget {
   final VoidCallback onOpenNowPlaying;
   final DockStackMode mode;
   final ValueChanged<DockStackMode> onModeChanged;
+  final ShellLayoutMode? layoutMode;
 
   const StackedBottomDock({
     super.key,
@@ -69,6 +71,7 @@ class StackedBottomDock extends StatefulWidget {
     required this.onOpenNowPlaying,
     required this.mode,
     required this.onModeChanged,
+    this.layoutMode,
   });
 
   @override
@@ -144,6 +147,13 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
   void _syncDock({required bool hasSong}) {
     if (!mounted) return;
+    final effectiveLayoutMode =
+        widget.layoutMode ?? PulsrLayoutDelegate.of(context).layoutMode;
+    if (effectiveLayoutMode == ShellLayoutMode.bottomNavWide) {
+      _maybeUpdateDock(height: 56.0, miniPlayer: hasSong);
+      return;
+    }
+
     final isTablet = Adaptive.isTablet(context);
     final double barHeight = isTablet ? 68.0 : 64.0;
     final double navBarPaddingVertical = isTablet ? 14.0 : 10.0;
@@ -268,15 +278,92 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
         child: BlocSelector<PlayerCubit, PlayerState, bool>(
           selector: (state) => state.currentSong != null,
           builder: (context, hasSong) {
+            final effectiveLayoutMode =
+                widget.layoutMode ?? PulsrLayoutDelegate.of(context).layoutMode;
 
-          // If no song is active, render only the standalone navigation bar
-          if (!hasSong) {
-            return PulsrBottomNavBar(
-              currentIndex: widget.currentIndex,
-              onTap: widget.onTapNav,
-              includeSafeArea: true,
-            );
-          }
+            if (effectiveLayoutMode == ShellLayoutMode.bottomNavWide) {
+              return SafeArea(
+                top: false,
+                left: false,
+                right: false,
+                bottom: true,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 860, maxHeight: 56),
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: p.surface.withValues(alpha: 0.88),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: p.isDark
+                                ? Colors.white.withValues(alpha: 0.14)
+                                : Colors.black.withValues(alpha: 0.08),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.12),
+                              blurRadius: 18,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Row(
+                            children: [
+                              if (hasSong) ...[
+                                Expanded(
+                                  flex: 5,
+                                  child: MiniPlayerHorizontal(
+                                    onTap: widget.onOpenNowPlaying,
+                                  ),
+                                ),
+                                Container(
+                                  width: 1,
+                                  height: 28,
+                                  color: p.hairline.withValues(alpha: 0.35),
+                                ),
+                                Expanded(
+                                  flex: 5,
+                                  child: PulsrBottomNavBar(
+                                    currentIndex: widget.currentIndex,
+                                    onTap: widget.onTapNav,
+                                    includeSafeArea: false,
+                                    iconOnly: true,
+                                  ),
+                                ),
+                              ] else ...[
+                                Expanded(
+                                  child: PulsrBottomNavBar(
+                                    currentIndex: widget.currentIndex,
+                                    onTap: widget.onTapNav,
+                                    includeSafeArea: false,
+                                    iconOnly: false,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // If no song is active, render only the standalone navigation bar
+            if (!hasSong) {
+              return PulsrBottomNavBar(
+                currentIndex: widget.currentIndex,
+                onTap: widget.onTapNav,
+                includeSafeArea: true,
+              );
+            }
 
           final mode = widget.mode;
           final isStacked = mode != DockStackMode.defaultLayout;
@@ -351,7 +438,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           ),
         ];
 
-        // ── Card 1: Mini Player Card ──
+        // â”€â”€ Card 1: Mini Player Card â”€â”€
         final bool isMiniBehind = isStacked && isNavBarOnTop;
         Widget miniPlayerWidget = MiniPlayer(
           onTap: widget.onOpenNowPlaying,
@@ -441,7 +528,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           ),
         );
 
-        // ── Card 2: Bottom Navigation Bar Card ──
+        // â”€â”€ Card 2: Bottom Navigation Bar Card â”€â”€
         final bool isBarBehind = isStacked && !isNavBarOnTop;
         Widget navBarWidget = PulsrBottomNavBar(
           currentIndex: widget.currentIndex,

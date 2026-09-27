@@ -240,8 +240,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                         children: [
                           // Left Action: Download (stream) or Add to Playlist (local)
                           SizedBox(
-                            width: isTablet ? 48 : 44,
-                            height: isTablet ? 48 : 44,
+                            width: 48,
+                            height: 48,
                             child: hasDownload
                                 ? Center(
                                     child: YtmDownloadButton(
@@ -490,8 +490,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                     children: [
                       // Dismiss Button
                       SizedBox(
-                        width: isTablet ? 48 : 44,
-                        height: isTablet ? 48 : 44,
+                        width: 48,
+                        height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -577,8 +577,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 
                       // More Options Button
                       SizedBox(
-                        width: isTablet ? 48 : 44,
-                        height: isTablet ? 48 : 44,
+                        width: 48,
+                        height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),

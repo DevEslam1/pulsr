@@ -582,7 +582,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (wasBluetooth != info.isBluetooth) {
         await _equalizerManager.resyncActiveEffects();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to refresh Bluetooth route and sync effects',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   /// One-shot auto-resume after a becoming-noisy pause.
@@ -812,16 +815,43 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// in [_notifyTrackChanged] corrects it once real header rates arrive.
   static const double assumedOutputSampleRate = 48000.0;
 
+  void _syncVolumeControllerSettings() {
+    final prefs = _cachedPrefs;
+    final bitPerfect = (prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+        (prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    _volumeController?.updateSettings(
+      userVolume: _volume,
+      replayGainMode: prefs?.getString(PrefsKeys.replayGainMode) ?? 'track',
+      preampWithRg: prefs?.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
+      preampWithoutRg:
+          prefs?.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
+      duckFactor: duckingController.duckFactor,
+      isDucked: _duckActive,
+      nativeRgActive: _nativeRgActive && Platform.isAndroid,
+      dvcEnabled: _dvcEnabled,
+      isDopActive: AudioQualityInfo.dsdDopActive,
+      bitPerfectBypass: bitPerfect,
+    );
+  }
+
   @override
   double _calculateReplayGainVolume(SongsTableData? song) {
-    // DoP carries raw DSD inside PCM markers: any software gain corrupts the
-    // 0x05/0xFA framing into white noise, so the mixer must strictly stay at unity (1.0).
-    // User volume is hardware-only; ReplayGain and per-song volume overrides are bypassed.
-    if (AudioQualityInfo.dsdDopActive) {
-      _volumeController?.setDopActive(true);
-      return 1.0;
+    _syncVolumeControllerSettings();
+    final controller = _volumeController;
+    if (controller != null) {
+      final perSongDb = song != null ? _perSongVolumeDbFor(song) : 0.0;
+      final target = controller.calculateTargetVolume(
+        song,
+        albumContext: _isConsecutiveAlbumPlayback(),
+        perSongOffsetDb: perSongDb,
+      );
+      if (_dvcEnabled && (song == null || song.id == currentSong?.id)) {
+        unawaited(_pushDvcGain(_volume));
+      }
+      return target;
     }
-    _volumeController?.setDopActive(false);
+
+    if (AudioQualityInfo.dsdDopActive) return 1.0;
     if (song == null) {
       if (_dvcEnabled) {
         unawaited(_pushDvcGain(_volume));
@@ -829,23 +859,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
       return _volume;
     }
-
     final prefs = _cachedPrefs;
-    if (prefs == null) return _volume; // Null guard
-
-    // Strict Bit-Perfect: bypass ReplayGain completely to preserve exact PCM samples
+    if (prefs == null) return _volume;
     final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
         (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
     if (bitPerfect) return _volume;
-
-    // Native pre-gain owns RG: mixer carries only user volume + per-song
-    // offset (bit-transparent, 20ms-smoothed natively, no double-apply).
     if (_nativeRgActive && Platform.isAndroid) {
       final perSongDb = _perSongVolumeDbFor(song);
       if (_dvcEnabled) {
-        // The native DVC stage applies the user volume; the player-side mixer
-        // must therefore carry only the per-song offset. Returning `_volume *
-        // factor` here double-applied the user volume (volume²).
         if (song.id == currentSong?.id) {
           unawaited(_pushDvcGain(_volume));
         }
@@ -858,13 +879,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
       return base;
     }
-
     final dvc = _dvcEnabled;
     var scaled = ReplayGainMath.apply(
       mode: prefs.getString(PrefsKeys.replayGainMode) ?? 'track',
-      // Under DVC the user volume is applied by the native float stage, so the
-      // player-side mixer carries only ReplayGain. This keeps crossfade and
-      // ducking (which scale the player volume) fully functional.
       volume: dvc ? 1.0 : _volume,
       trackGainDb: song.replayGainTrack,
       trackPeak: song.replayGainTrackPeak,
@@ -872,11 +889,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       albumPeak: song.replayGainAlbumPeak,
       albumContext: _isConsecutiveAlbumPlayback(),
       preampWithRg: prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
-      // Default 0dB: untagged tracks must not be attenuated without consent.
       preampWithoutRg:
           prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
     );
-    // Per-song volume override (dB) applied in the single mixer stage.
     try {
       final perSongDb = _perSongVolumeDbFor(song);
       if (perSongDb != 0.0) {
@@ -884,13 +899,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         scaled = (scaled * factor).clamp(0.0, 1.0);
       }
     } catch (_) {}
-    if (dvc) {
-      // Only the active track's user volume is authoritative for the single
-      // native DVC stage; other (crossfade) calculations must not clobber it.
-      if (song.id == currentSong?.id) {
-        unawaited(_pushDvcGain(_volume));
-      }
-      return scaled;
+    if (dvc && song.id == currentSong?.id) {
+      unawaited(_pushDvcGain(_volume));
     }
     return scaled;
   }
@@ -901,7 +911,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> _pushDvcGain(double gain) async {
     try {
       await AudioEffectsChannel().setDvcGain(gain.clamp(0.0, 4.0));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to push DVC gain to native channel',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   /// Reads the per-song volume override without a hard DI dependency so unit
@@ -1276,8 +1289,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
     );
-    _volumeController?.setDopActive(AudioQualityInfo.dsdDopActive);
-    _volumeController?.setDvcEnabled(_dvcEnabled);
+    _syncVolumeControllerSettings();
     unawaited(HeadsetControlConfig.load(_cachedPrefs).then((cfg) {
       _cachedHeadsetConfig = cfg;
     }));
@@ -1608,7 +1620,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                   _preDuckVolume = _activePlayer.volume;
                   _preDuckInactiveVolume = _inactivePlayer.volume;
                   final f = duckingController.duckFactor;
-                  _volumeController?.updateSettings(duckFactor: f);
+                  _volumeController?.updateSettings(duckFactor: f, isDucked: true);
                   await _activePlayer.setVolume(f * (_preDuckVolume ?? 1.0));
                   if (_crossfadeManager.isCrossfading) {
                     await _inactivePlayer
@@ -1657,6 +1669,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                 if (_duckDepthCounter > 0) _duckDepthCounter--;
                 if (_duckActive && _duckDepthCounter == 0) {
                   _duckActive = false;
+                  _volumeController?.updateSettings(isDucked: false);
                   // Restore to the CURRENT ReplayGain-compensated target, not
                   // the stale pre-duck snapshot: gain settings or a track
                   // change during the duck would otherwise leave the level
@@ -1717,6 +1730,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
                 _duckActive = false;
+                _volumeController?.updateSettings(isDucked: false);
                 _duckDepthCounter = 0;
                 break;
               case AudioInterruptionType.unknown:
@@ -1724,6 +1738,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
                 _duckActive = false;
+                _volumeController?.updateSettings(isDucked: false);
                 _duckDepthCounter = 0;
                 break;
             }
@@ -2308,7 +2323,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     _crossfadeManager.dispose();
     try {
       await AudioEffectsChannel().releaseEffects();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to release native audio effects',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
     try {
       final session = await AudioSession.instance;
       await session.setActive(false);

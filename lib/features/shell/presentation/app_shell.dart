@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/utils/adaptive.dart';
+import '../../../core/responsive/layout_delegate.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_modal_tracker.dart';
@@ -103,21 +102,11 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = Adaptive.isTablet(context);
-    final isLandscape = context.isLandscape;
-    final width = Adaptive.widthOf(context);
-    final height = Adaptive.heightOf(context);
-    // Tablets and unfolded foldables get the side rail in both orientations; phones keep
-    // the bottom dock portrait *and* landscape so a wide-but-short landscape
-    // phone is never handed a cramped desktop rail.
-    final displayFeatures = MediaQuery.of(context).displayFeatures;
-    final hasFoldableHinge = displayFeatures.any(
-      (f) => f.type == DisplayFeatureType.hinge || f.type == DisplayFeatureType.fold,
-    );
-    final useRail = (isTablet || hasFoldableHinge) && (!isLandscape || height >= 600);
-    final canShowInspector = useRail && (isLandscape || width >= 900);
+    final layoutDelegate = PulsrLayoutDelegate.of(context);
+    final useRail = layoutDelegate.showRail;
+    final canShowInspector = layoutDelegate.showSideInspector;
     final extendedRail =
-        _isSidebarExtended ?? (width >= Adaptive.railExtendedBreakpoint);
+        _isSidebarExtended ?? layoutDelegate.railExpanded;
 
     return BlocListener<PlayerCubit, PlayerState>(
       // Playback errors (bot/verification blocks, "multiple tracks failed",
@@ -215,6 +204,7 @@ class _AppShellState extends State<AppShell> {
           onToggleQueue: () => context.read<PlayerCubit>().toggleQueue(),
           child: _buildShellContent(
             context,
+            layoutDelegate: layoutDelegate,
             useRail: useRail,
             canShowInspector: canShowInspector,
             extendedRail: extendedRail,
@@ -226,12 +216,13 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildShellContent(
     BuildContext context, {
+    required PulsrLayoutDelegate layoutDelegate,
     required bool useRail,
     required bool canShowInspector,
     required bool extendedRail,
   }) {
 
-    // ── Phone / Compact Layout (bottom dock) ───────────────────────────
+    // Phone / Compact Layout (bottom dock)
     if (!useRail) {
       return Scaffold(
         resizeToAvoidBottomInset: false,
@@ -247,6 +238,7 @@ class _AppShellState extends State<AppShell> {
                 onTapNav: _onTapNav,
                 onOpenNowPlaying: () => _openNowPlaying(context),
                 mode: _dockMode,
+                layoutMode: layoutDelegate.layoutMode,
                 onModeChanged: (newMode) => setState(() => _dockMode = newMode),
               ),
             ),
@@ -255,7 +247,7 @@ class _AppShellState extends State<AppShell> {
       );
     }
 
-    // ── Tablet Layout (side rail + docked player bar) ──────────────────
+    // â”€â”€ Tablet Layout (side rail + docked player bar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     return Scaffold(
       body: SafeArea(
         child: Row(

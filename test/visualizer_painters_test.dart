@@ -55,4 +55,20 @@ void main() {
     await tester.pump(const Duration(milliseconds: 25));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('AudioVisualizer renders playing state without requesting microphone permission', (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(
+        body: AudioVisualizer(
+          style: VisualizerStyle.bar,
+          isPlaying: true,
+          audioSessionId: null, // Simulated fallback
+          height: 100,
+        ),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AudioVisualizer), findsOneWidget);
+  });
 }

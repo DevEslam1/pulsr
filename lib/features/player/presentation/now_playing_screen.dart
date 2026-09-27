@@ -128,7 +128,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: context.isLandscape
-                        ? (context.isTablet ? 1160.0 : 960.0)
+                        ? double.infinity
                         : (context.isTablet ? 780.0 : 560.0),
                   ),
                   child: Stack(

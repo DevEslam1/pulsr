@@ -9,25 +9,37 @@ import 'package:pulsr/data/audio/replay_gain_math.dart';
 /// Manages player volume staging, ReplayGain application with smooth transitions,
 /// volume ducking, and crossfade volume math.
 class PlaybackVolumeController {
-  final AudioPlayer Function() getActivePlayer;
-  final AudioPlayer Function() getInactivePlayer;
+  AudioPlayer Function()? getActivePlayer;
+  AudioPlayer Function()? getInactivePlayer;
 
   double _userVolume = 1.0;
   String _replayGainMode = 'off';
   double _preampWithRg = 0.0;
-  double _preampWithoutRg = -3.0;
+  double _preampWithoutRg = 0.0;
   bool _isDucked = false;
   double _duckFactor = 0.2;
   bool _isDopActive = false;
   bool _nativeRgActive = false;
   bool _dvcEnabled = false;
+  bool _bitPerfectBypass = false;
+
+  Timer? _transitionTimer;
+  Completer<void>? _transitionCompleter;
+  bool _isDisposed = false;
 
   double get userVolume => _userVolume;
   String get replayGainMode => _replayGainMode;
+  double get preampWithRg => _preampWithRg;
+  double get preampWithoutRg => _preampWithoutRg;
   bool get isDucked => _isDucked;
+  double get duckFactor => _duckFactor;
   bool get isDopActive => _isDopActive;
   bool get nativeRgActive => _nativeRgActive;
   bool get dvcEnabled => _dvcEnabled;
+  bool get bitPerfectBypass => _bitPerfectBypass;
+  bool get isDisposed => _isDisposed;
+  bool get hasActiveTransitionTimer =>
+      _transitionTimer != null && _transitionTimer!.isActive;
 
   void setDopActive(bool active) {
     _isDopActive = active;
@@ -37,12 +49,20 @@ class PlaybackVolumeController {
     _dvcEnabled = enabled;
   }
 
+  void setBitPerfectBypass(bool bypass) {
+    _bitPerfectBypass = bypass;
+  }
+
   /// Mirrors [PulsrAudioHandler.isNativeRgActive]: when true the native DSP
   /// pre-gain owns ReplayGain, so this controller must not re-apply it in
   /// [calculateTargetVolume] (ducking/crossfade path) — otherwise the gain
   /// would double. DoP unity-gain still takes precedence over both.
   void setNativeRgActive(bool active) {
     _nativeRgActive = active;
+  }
+
+  void setDuckedState(bool ducked) {
+    _isDucked = ducked;
   }
 
   PlaybackVolumeController({
@@ -56,30 +76,48 @@ class PlaybackVolumeController {
     double? preampWithRg,
     double? preampWithoutRg,
     double? duckFactor,
+    bool? isDucked,
+    bool? nativeRgActive,
+    bool? dvcEnabled,
+    bool? isDopActive,
+    bool? bitPerfectBypass,
   }) {
     if (userVolume != null) _userVolume = userVolume.clamp(0.0, 1.0);
     if (replayGainMode != null) _replayGainMode = replayGainMode;
     if (preampWithRg != null) _preampWithRg = preampWithRg;
     if (preampWithoutRg != null) _preampWithoutRg = preampWithoutRg;
     if (duckFactor != null) _duckFactor = duckFactor.clamp(0.05, 1.0);
+    if (isDucked != null) _isDucked = isDucked;
+    if (nativeRgActive != null) _nativeRgActive = nativeRgActive;
+    if (dvcEnabled != null) _dvcEnabled = dvcEnabled;
+    if (isDopActive != null) _isDopActive = isDopActive;
+    if (bitPerfectBypass != null) _bitPerfectBypass = bitPerfectBypass;
   }
 
   /// Calculates target volume for [song] with current ReplayGain, ducking, and per-song offset.
-  double calculateTargetVolume(SongsTableData? song,
-      {bool albumContext = false, double perSongOffsetDb = 0.0}) {
+  double calculateTargetVolume(
+    SongsTableData? song, {
+    bool albumContext = false,
+    double perSongOffsetDb = 0.0,
+  }) {
     // During DSD DoP transmission, volume must strictly stay at 1.0 (unity gain)
     // to avoid corrupting 0x05 / 0xFA marker bits into white noise.
     if (_isDopActive) return 1.0;
 
-    final effectiveUserVolume = _dvcEnabled ? 1.0 : _userVolume;
-    if (song == null) {
-      return _isDucked ? (effectiveUserVolume * _duckFactor) : effectiveUserVolume;
-    }
+    // Strict Bit-Perfect: bypass ReplayGain completely to preserve exact PCM samples
+    if (_bitPerfectBypass) return _userVolume;
 
+    final effectiveUserVolume = _dvcEnabled ? 1.0 : _userVolume;
     final baseVolume =
         _isDucked ? (effectiveUserVolume * _duckFactor) : effectiveUserVolume;
+
+    if (song == null) {
+      return baseVolume;
+    }
+
     // Native pre-gain owns RG: keep the mixer at user volume (+ per-song).
-    final rgVolume = (_nativeRgActive || (_dvcEnabled && _nativeRgActive))
+    // Prompt 1.2: simplified condition to `_nativeRgActive`
+    final rgVolume = _nativeRgActive
         ? baseVolume
         : ReplayGainMath.apply(
             mode: _replayGainMode,
@@ -93,7 +131,7 @@ class PlaybackVolumeController {
             preampWithoutRg: _preampWithoutRg,
           );
 
-    if (perSongOffsetDb.abs() >= 0.1) {
+    if (perSongOffsetDb.abs() >= 0.01) {
       final multiplier = math.pow(10, perSongOffsetDb / 20.0).toDouble();
       return (rgVolume * multiplier).clamp(0.0, 1.0);
     }
@@ -106,7 +144,11 @@ class PlaybackVolumeController {
     double targetVolume, {
     bool smoothTransition = false,
   }) async {
+    if (_isDisposed) return;
     final clamped = targetVolume.clamp(0.0, 1.0);
+    _transitionTimer?.cancel();
+    _transitionTimer = null;
+
     if (!smoothTransition) {
       try {
         await player.setVolume(clamped);
@@ -129,16 +171,37 @@ class PlaybackVolumeController {
     const steps = 10;
     const stepDuration = Duration(milliseconds: 50);
     final diff = clamped - startVol;
+    var stepIndex = 0;
 
-    for (var i = 1; i <= steps; i++) {
-      await Future.delayed(stepDuration);
-      final current = (startVol + diff * (i / steps)).clamp(0.0, 1.0);
+    if (_transitionCompleter != null && !_transitionCompleter!.isCompleted) {
+      _transitionCompleter!.complete();
+    }
+    final completer = Completer<void>();
+    _transitionCompleter = completer;
+    _transitionTimer = Timer.periodic(stepDuration, (timer) async {
+      if (_isDisposed) {
+        timer.cancel();
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
+      stepIndex++;
+      final current = (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
       try {
         await player.setVolume(current);
       } catch (_) {
-        break;
+        timer.cancel();
+        if (!completer.isCompleted) completer.complete();
+        return;
       }
-    }
+
+      if (stepIndex >= steps) {
+        timer.cancel();
+        _transitionTimer = null;
+        if (!completer.isCompleted) completer.complete();
+      }
+    });
+
+    return completer.future;
   }
 
   /// Sets ducked state for transient notifications / speech.
@@ -147,14 +210,24 @@ class PlaybackVolumeController {
   Future<void> setDucked(bool ducked, SongsTableData? currentSong,
       {double perSongOffsetDb = 0.0}) async {
     _isDucked = ducked;
-    final active = getActivePlayer();
-    final target = calculateTargetVolume(currentSong,
-        perSongOffsetDb: perSongOffsetDb);
-    await applyVolume(active, target, smoothTransition: true);
+    final active = getActivePlayer?.call();
+    if (active != null) {
+      final target = calculateTargetVolume(currentSong,
+          perSongOffsetDb: perSongOffsetDb);
+      await applyVolume(active, target, smoothTransition: true);
+    }
   }
 
-  /// Lifecycle teardown hook (Issue 20).
+  /// Lifecycle teardown hook (Prompt 1.3).
   void dispose() {
-    // Teardown hook for future streams / timers
+    _isDisposed = true;
+    _transitionTimer?.cancel();
+    _transitionTimer = null;
+    if (_transitionCompleter != null && !_transitionCompleter!.isCompleted) {
+      _transitionCompleter!.complete();
+    }
+    _transitionCompleter = null;
+    getActivePlayer = null;
+    getInactivePlayer = null;
   }
 }

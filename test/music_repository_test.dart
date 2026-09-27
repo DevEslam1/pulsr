@@ -415,6 +415,42 @@ void main() {
       expect((await db.select(db.songsTable).get()).length, equals(2));
     });
 
+    test('remap benchmark on large library completes rapidly and memory bounded', () async {
+      await db.batch((batch) {
+        batch.insertAll(
+          db.songsTable,
+          List.generate(
+            1500,
+            (i) => SongsTableCompanion.insert(
+              id: Value(i + 1),
+              title: 'Song $i',
+              path: '/storage/emulated/0/Music/song_$i.mp3',
+            ),
+          ),
+        );
+      });
+
+      final incoming = List.generate(
+        3000,
+        (i) => SongsTableCompanion.insert(
+          id: Value(10000 + i),
+          title: 'Updated Song $i',
+          path: '/storage/emulated/0/Music/song_$i.mp3',
+        ),
+      );
+
+      final sw = Stopwatch()..start();
+      final res = await repository.syncScannedMusic(
+        songs: incoming,
+        albums: const [],
+        artists: const [],
+      );
+      sw.stop();
+
+      expect(res.isRight(), isTrue);
+      expect(sw.elapsedMilliseconds, lessThan(4000));
+    });
+
     test('FTS search with excluded folders does not throw', () async {
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(

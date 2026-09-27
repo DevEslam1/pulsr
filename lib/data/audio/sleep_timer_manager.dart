@@ -49,14 +49,45 @@ class SleepTimerManager {
   int get remainingTracks => _remainingTracks;
 
   Duration _calculateRemainingTracksDuration() {
-    if (_queuedDurations.isNotEmpty) {
-      final total = _queuedDurations.take(_remainingTracks).fold<Duration>(
-            Duration.zero,
-            (prev, d) => prev + d,
-          );
-      if (total > Duration.zero) return total;
+    if (_remainingTracks <= 0) return Duration.zero;
+
+    var knownTotal = Duration.zero;
+    var knownCount = 0;
+    final tracksToInspect = _queuedDurations.take(_remainingTracks);
+
+    for (final d in tracksToInspect) {
+      if (d > Duration.zero) {
+        knownTotal += d;
+        knownCount++;
+      }
     }
-    return Duration(minutes: _remainingTracks * 3);
+
+    final unknownCount = _remainingTracks - knownCount;
+    if (unknownCount <= 0) {
+      return knownTotal;
+    }
+
+    // Derive per-track average from the known durations in queue
+    var averageDuration = Duration.zero;
+    if (knownCount > 0) {
+      averageDuration =
+          Duration(milliseconds: knownTotal.inMilliseconds ~/ knownCount);
+    } else {
+      final allKnown =
+          _queuedDurations.where((d) => d > Duration.zero).toList();
+      if (allKnown.isNotEmpty) {
+        final totalAll =
+            allKnown.fold<Duration>(Duration.zero, (prev, d) => prev + d);
+        averageDuration = Duration(
+            milliseconds: totalAll.inMilliseconds ~/ allKnown.length);
+      }
+    }
+
+    if (averageDuration <= Duration.zero) {
+      averageDuration = const Duration(minutes: 3);
+    }
+
+    return knownTotal + (averageDuration * unknownCount);
   }
 
   /// Starts or replaces a duration-based monotonic sleep timer.

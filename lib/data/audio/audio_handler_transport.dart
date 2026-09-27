@@ -549,7 +549,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist playback speed preference',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   Future<void> setPitch(double pitch) async {
@@ -562,7 +565,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackPitch, clamped);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist playback pitch preference',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   Future<void> validatePlayerState() async {

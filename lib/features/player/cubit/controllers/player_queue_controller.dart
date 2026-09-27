@@ -269,13 +269,9 @@ class PlayerQueueController {
     final startPos = initialPosition ??
         ((queue != null && isSameSong) ? state.position : Duration.zero);
     final prevSlot = _queueSlots[state.activeQueueSlot];
-    final prevQueue = state.queue;
-    final prevIndex = state.currentIndex;
-    final prevSong = state.currentSong;
-    final prevPosition = state.position;
-    final prevDuration = state.duration;
-    final prevLyrics = state.lyrics;
-    final prevLyricsSource = state.lyricsSource;
+    final prevQueue = state.queue, prevIndex = state.currentIndex;
+    final prevSong = state.currentSong, prevPosition = state.position;
+    final prevDuration = state.duration, prevLyrics = state.lyrics, prevLyricsSource = state.lyricsSource;
 
     setQueueSlot(
       state.activeQueueSlot,
@@ -288,10 +284,7 @@ class PlayerQueueController {
     _bumpQueueVersion();
 
     _emit(state.copyWith(
-      queueSlice: state.queueSlice.copyWith(
-        queue: effectiveQueue,
-        currentIndex: effectiveIndex,
-      ),
+      queueSlice: state.queueSlice.copyWith(queue: effectiveQueue, currentIndex: effectiveIndex),
       playback: state.playback.copyWith(
         currentSong: song,
         duration: Duration(milliseconds: song.durationMs),
@@ -337,10 +330,7 @@ class PlayerQueueController {
         _bumpQueueVersion();
         final s = _getState();
         _emit(s.copyWith(
-          queueSlice: s.queueSlice.copyWith(
-            queue: prevQueue,
-            currentIndex: prevIndex,
-          ),
+          queueSlice: s.queueSlice.copyWith(queue: prevQueue, currentIndex: prevIndex),
           playback: s.playback.copyWith(
             currentSong: prevSong,
             duration: prevDuration,
@@ -348,10 +338,7 @@ class PlayerQueueController {
             isPlaying: false,
             errorMessage: 'Failed to play ${song.title}',
           ),
-          lyricsSlice: s.lyricsSlice.copyWith(
-            lyrics: prevLyrics,
-            lyricsSource: prevLyricsSource,
-          ),
+          lyricsSlice: s.lyricsSlice.copyWith(lyrics: prevLyrics, lyricsSource: prevLyricsSource),
         ));
         try {
           if (prevQueue.isNotEmpty) {
@@ -363,32 +350,19 @@ class PlayerQueueController {
             );
           }
         } catch (rollbackError, rollbackSt) {
-          // C-03: The rollback itself failed. Previously this was swallowed,
-          // leaving state claiming `prevQueue` while the audio handler had
-          // nothing loaded. Log it and clear the queue so the UI is truthful.
-          ErrorLogger.log(
-            'Queue rollback failed after load error',
-            error: rollbackError,
-            stackTrace: rollbackSt,
-            category: 'PlayerQueueController',
-          );
-          try {
-            await _audioHandler.pause();
-          } catch (_) {}
-          try {
-            await _audioHandler.clearQueue();
-          } catch (_) {}
+          ErrorLogger.log('Queue rollback failed after load error',
+              error: rollbackError, stackTrace: rollbackSt, category: 'PlayerQueueController');
+          try { await _audioHandler.pause(); } catch (_) {}
+          try { await _audioHandler.clearQueue(); } catch (_) {}
           try {
             if (!_isClosed()) {
               final broken = _getState();
               _emit(broken.copyWith(
-                queueSlice: broken.queueSlice
-                    .copyWith(queue: const [], currentIndex: 0),
+                queueSlice: broken.queueSlice.copyWith(queue: const [], currentIndex: 0),
                 playback: broken.playback.copyWith(
                   currentSong: null,
                   isPlaying: false,
-                  errorMessage:
-                      'Playback unavailable — please pick another track',
+                  errorMessage: 'Playback unavailable — please pick another track',
                 ),
               ));
             }

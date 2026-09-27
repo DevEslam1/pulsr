@@ -69,6 +69,11 @@ class PlayerWidgetCoordinator {
     }
     _lastUpdateTime = now;
     _lastProgressUpdateTime = now;
+    String? queueCover;
+    if (s.queue.isNotEmpty && s.currentIndex + 1 < s.queue.length) {
+      final nextSong = s.queue[s.currentIndex + 1];
+      queueCover = nextSong.artworkUri ?? nextSong.remoteArtworkUrl;
+    }
     _widgetService?.updateNowPlaying(
       song: s.currentSong,
       isPlaying: s.isPlaying,
@@ -82,6 +87,7 @@ class PlayerWidgetCoordinator {
         PlayerRepeatMode.off => 'off',
       },
       nextQueueTitles: nextTitles(s, queueVersion),
+      queueCover: queueCover,
     );
   }
 

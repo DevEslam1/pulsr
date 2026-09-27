@@ -151,7 +151,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     double? outputRate;
     try {
       outputRate = (await _currentOutputInfo())?.sampleRate.toDouble();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read output sample rate for DSP resampler',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
     await _equalizerManager.syncNativeLatency(
       trackRate,
       outputRate: outputRate,

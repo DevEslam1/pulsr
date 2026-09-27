@@ -8,6 +8,7 @@ import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import '../responsive/responsive_values.dart';
 
 /// Uniform dialog entry-points used across the entire app.
 ///
@@ -332,7 +333,13 @@ class PulsrDialog extends StatelessWidget {
       elevation: 0,
       insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: BoxConstraints(
+          maxWidth: context.responsive.value(
+            compact: 400.0,
+            medium: 480.0,
+            expanded: 540.0,
+          ),
+        ),
         child: GlassContainer(
           borderRadius: AppRadii.dialogRadius,
           opacity: p.isDark ? 0.88 : 0.94,

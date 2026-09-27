@@ -1,5 +1,6 @@
 // lib/data/audio/collaborators/stream_resolution_pipeline.dart
 import 'dart:async';
+import 'dart:collection';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
@@ -24,13 +25,15 @@ class StreamResolutionPipeline {
   /// racing a second Dart-level chain here only doubled native load.
   bool hedgedEnabled;
 
-  final Map<String, CachedStreamUrl> _streamCache = {};
+  /// Explicit LinkedHashMap preserving strict insertion-order for LRU cache eviction.
+  final LinkedHashMap<String, CachedStreamUrl> _streamCache = LinkedHashMap();
   final Map<String, Future<({String url, String? userAgent, String? cookies, String quality})>> _inFlightResolves = {};
   int _resolveEpoch = 0;
 
   /// Cap on the in-memory URL cache. Without a bound it grew for every distinct
   /// `videoId:quality` seen in a session.
   static const int _maxCacheEntries = 128;
+  static int get maxCacheEntries => _maxCacheEntries;
 
   /// Treat a cached URL that expires within this window as already stale, so we
   /// re-resolve rather than hand just_audio a URL that 403s a moment into
@@ -43,7 +46,7 @@ class StreamResolutionPipeline {
     this.hedgedEnabled = true,
   });
 
-  Map<String, CachedStreamUrl> get streamCache => _streamCache;
+  LinkedHashMap<String, CachedStreamUrl> get streamCache => _streamCache;
 
   void invalidateCache(String videoId) {
     // Keys are `videoId:quality`; anchor the prefix to the separator so a
@@ -59,8 +62,10 @@ class StreamResolutionPipeline {
     _resolveEpoch++;
   }
 
-  /// Evicts expired entries first, then oldest-inserted, to keep the URL cache
-  /// bounded across a long session.
+  /// Evicts expired entries first, then oldest-inserted (insertion-order LRU),
+  /// to keep the URL cache bounded across a long session.
+  void pruneCache() => _pruneCache();
+
   void _pruneCache() {
     if (_streamCache.length <= _maxCacheEntries) return;
     final now = DateTime.now();

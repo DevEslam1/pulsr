@@ -241,6 +241,9 @@ class CastService {
     }
   }
 
+  /// Stops the active cast session.
+  Future<bool> stopCasting() => disconnect();
+
   Future<CastResult> castLocalFile({
     required String path,
     String title = '',

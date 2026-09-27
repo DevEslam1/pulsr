@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/constants/channels.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/performance/gpu_budget.dart';
@@ -16,7 +15,6 @@ import '../../../../data/visualizer/milkdrop_preset_store.dart';
 import '../../../../data/visualizer/visualizer_preset_store.dart';
 import '../../../../domain/models/milkdrop_preset.dart';
 import '../../../../domain/models/visualizer_preset.dart';
-import '../../../../core/widgets/pulsr_toast.dart';
 import 'visualizer/milkdrop_renderer.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -47,6 +45,7 @@ class AudioVisualizer extends StatefulWidget {
   final MilkdropPreset? milkdropPreset;
   final VisualizerPreset? customPreset;
   final VoidCallback? onPermissionDenied;
+  final bool preferSimulated;
 
   const AudioVisualizer({
     super.key,
@@ -62,6 +61,7 @@ class AudioVisualizer extends StatefulWidget {
     this.milkdropPreset,
     this.customPreset,
     this.onPermissionDenied,
+    this.preferSimulated = false,
   });
 
   /// Deterministic per-track seed (defect 16-05): prefers explicit trackSeed,
@@ -96,10 +96,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   StreamSubscription? _subscription;
   late AnimationController _animController;
   bool _isAppActive = true;
-  bool _permissionAsked = false;
-  bool _permissionDenied = false;
-  bool _permanentlyDenied = false;
-  bool _toastShown = false;
+  bool _hasActiveSession = false;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
@@ -221,11 +218,6 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isAppActive = true;
-      _permissionAsked = false;
-      _toastShown = false;
-      if (_permissionDenied && !_permanentlyDenied && widget.isPlaying && widget.style != VisualizerStyle.off) {
-        _initVisualizer();
-      }
       if (widget.isPlaying && widget.style != VisualizerStyle.off) {
         _startAnimation();
         _restartNativeStream();
@@ -241,7 +233,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   @override
   void didUpdateWidget(covariant AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.audioSessionId != widget.audioSessionId) {
+    if (oldWidget.preferSimulated != widget.preferSimulated) {
+      if (widget.preferSimulated) {
+        _stopNativeStream();
+      } else {
+        _restartNativeStream();
+      }
+    } else if (oldWidget.audioSessionId != widget.audioSessionId) {
       _restartNativeStream();
     }
     if (oldWidget.style != widget.style &&
@@ -277,51 +275,8 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
   Future<void> _initVisualizer() async {
     if (!Platform.isAndroid || widget.style == VisualizerStyle.off) return;
-
     try {
-      var status = await Permission.microphone.status;
-      if (status.isGranted) {
-        _permanentlyDenied = false;
-        _toastShown = false;
-        if (_permissionDenied && mounted) {
-          setState(() => _permissionDenied = false);
-        }
-        _subscribeToStream();
-      } else {
-        if (!_permissionDenied) {
-          widget.onPermissionDenied?.call();
-        }
-        if (status.isPermanentlyDenied) {
-          _permanentlyDenied = true;
-          if (!_toastShown) {
-            _toastShown = true;
-            ErrorLogger.log(
-                'Microphone permission permanently denied for visualizer',
-                category: 'Visualizer');
-            if (mounted) {
-              PulsrToast.show(
-                context,
-                message: context.l10n.rcMicNeeded,
-                actionLabel: 'Settings',
-                onActionPressed: () => openAppSettings(),
-              );
-            }
-          }
-        } else if (!_permissionAsked) {
-          _permissionAsked = true;
-          status = await Permission.microphone.request();
-          if (status.isGranted) {
-            _permanentlyDenied = false;
-            _toastShown = false;
-            if (_permissionDenied && mounted) {
-              setState(() => _permissionDenied = false);
-            }
-            _subscribeToStream();
-            return;
-          }
-        }
-        if (mounted) setState(() => _permissionDenied = true);
-      }
+      _subscribeToStream();
     } catch (e, st) {
       ErrorLogger.log('Failed to init visualizer',
           error: e, stackTrace: st, category: 'Visualizer');
@@ -330,9 +285,21 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
   void _subscribeToStream() {
     _subscription?.cancel();
+    if (widget.preferSimulated) {
+      if (mounted) setState(() => _hasActiveSession = false);
+      return;
+    }
     final sessionId = widget.audioSessionId ?? 0;
+    if (sessionId <= 0) {
+      if (mounted) setState(() => _hasActiveSession = false);
+      return;
+    }
     _methodChannel.invokeMethod(
-        'setAudioSessionId', {'audioSessionId': sessionId}).catchError((_) {});
+        'setAudioSessionId', {'audioSessionId': sessionId}).then((_) {
+      if (mounted) setState(() => _hasActiveSession = true);
+    }).catchError((_) {
+      if (mounted) setState(() => _hasActiveSession = false);
+    });
 
     _subscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
@@ -348,6 +315,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       onError: (dynamic error) {
         _subscription?.cancel();
         _subscription = null;
+        if (mounted) setState(() => _hasActiveSession = false);
       },
     );
   }
@@ -356,6 +324,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     _subscription?.cancel();
     _subscription = null;
     if (Platform.isAndroid &&
+        !widget.preferSimulated &&
         widget.style != VisualizerStyle.off &&
         widget.isPlaying) {
       _subscribeToStream();
@@ -375,10 +344,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
     final now = DateTime.now();
     final staleMs = now.difference(_lastNativeDataTime).inMilliseconds;
-    final isStale = staleMs > 250;
+    final isStale = widget.preferSimulated || staleMs > 250;
 
     if (isStale && widget.isPlaying && widget.style != VisualizerStyle.off) {
-      if (Platform.isAndroid && _lastNativeDataTime.millisecondsSinceEpoch > 0 && staleMs > 1500) {
+      if (!widget.preferSimulated &&
+          Platform.isAndroid &&
+          _lastNativeDataTime.millisecondsSinceEpoch > 0 &&
+          staleMs > 1500) {
         // Native stream stopped delivering samples; decay to zero to avoid misleading synthetic animation
         for (int i = 0; i < _numBands; i++) {
           _targetData[i] = 0.0;
@@ -533,60 +505,31 @@ class _AudioVisualizerState extends State<AudioVisualizer>
                 ),
               ),
             ),
-          if (_permissionDenied && Platform.isAndroid)
+          if (widget.style != VisualizerStyle.off &&
+              Platform.isAndroid &&
+              widget.isPlaying &&
+              !widget.preferSimulated &&
+              !_hasActiveSession &&
+              (widget.audioSessionId == null || widget.audioSessionId! <= 0))
             PositionedDirectional(
-              top: 12,
-              start: 16,
-              end: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+              bottom: 6,
+              start: 6,
+              child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: p.surfaceContainerHigh.withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
-                  border: Border.all(color: p.accent.withValues(alpha: 0.4)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.mic_none_rounded, size: 20, color: p.accent),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(
-                        context.l10n.rcMicNeeded,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                  child: Text(
+                    context.l10n.visualizerCpuFallbackBadge,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        foregroundColor: p.accent,
-                      ),
-                      onPressed: () async {
-                        final status = await Permission.microphone.request();
-                        if (status.isGranted) {
-                          _initVisualizer();
-                        } else {
-                          await openAppSettings();
-                        }
-                      },
-                      child: Text(
-                        context.l10n.gotIt.isNotEmpty ? 'Grant' : '',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

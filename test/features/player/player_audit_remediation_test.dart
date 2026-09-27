@@ -8,6 +8,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/cubit/player_widget_coordinator.dart';
 import 'package:pulsr/features/player/cubit/quran_restore_snapshot.dart';
 import 'package:pulsr/features/player/presentation/widgets/dsp_inspector_sheet.dart';
+import 'package:pulsr/features/widgets/widget_service.dart';
 
 SongsTableData _makeSong(int id, String title, String artist) {
   return SongsTableData(
@@ -187,5 +188,38 @@ DSP Chain Status:
       expect(restored.isShuffle, isTrue);
       expect(restored.preampDb, -1.5);
     });
+
+    test('PlayerWidgetCoordinator.updateProgressThrottled drops calls faster than widgetThrottleDuration', () {
+      final fakeService = _FakeWidgetService();
+      final coordinator = PlayerWidgetCoordinator(fakeService);
+      const state = PlayerState(
+        playback: PlaybackSlice(isPlaying: true, position: Duration(seconds: 1)),
+      );
+
+      // First call executes immediately
+      coordinator.updateProgressThrottled(state);
+      expect(fakeService.updateProgressCount, 1);
+
+      // Rapid successive call inside throttle window (1000ms) should be dropped
+      coordinator.updateProgressThrottled(state);
+      expect(fakeService.updateProgressCount, 1);
+
+      // Further call inside throttle window is also dropped
+      coordinator.updateProgressThrottled(state);
+      expect(fakeService.updateProgressCount, 1);
+    });
   });
+}
+
+class _FakeWidgetService extends Fake implements WidgetService {
+  int updateProgressCount = 0;
+
+  @override
+  Future<void> updateProgress({
+    required bool isPlaying,
+    Duration position = Duration.zero,
+    Duration duration = Duration.zero,
+  }) async {
+    updateProgressCount++;
+  }
 }

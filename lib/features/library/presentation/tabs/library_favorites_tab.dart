@@ -160,7 +160,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                         ),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount:
-                              Adaptive.gridColumns(context, minItemWidth: 155),
+                              PulsrAdaptiveGrid.columns(context, type: GridType.songs),
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 18,
                           childAspectRatio: 0.76,

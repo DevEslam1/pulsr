@@ -232,7 +232,7 @@ class _PulsrSliderState extends State<PulsrSlider>
                   ),
                 )
               : null,
-          height: widget.height,
+          height: max(48.0, widget.height),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;

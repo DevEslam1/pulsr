@@ -43,6 +43,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   bool _busy = false;
   bool _scanning = false;
   bool _initialized = false;
+  bool _ownsDiscovery = false;
   Timer? _scanTimeoutTimer;
 
   bool get _isAndroid => PlatformCapabilities.isAndroid;
@@ -58,6 +59,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   Future<void> _init() async {
     if (_initialized) return;
     _initialized = true;
+    _ownsDiscovery = true;
     setState(() => _scanning = true);
     final sdk = await _service.isSessionAvailable();
     if (!mounted) return;
@@ -108,6 +110,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   Future<void> _rescan() async {
     if (_busy) return;
     HapticFeedback.lightImpact();
+    _ownsDiscovery = true;
     setState(() => _scanning = true);
     if (_sdk) {
       await _service.stopSessionDiscovery();
@@ -130,8 +133,10 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
     _deviceSub?.cancel();
     _routeSub?.cancel();
     _sessionSub?.cancel();
-    unawaited(_service.stopSessionDiscovery());
-    unawaited(_service.stopDiscovery());
+    if (_ownsDiscovery) {
+      unawaited(_service.stopSessionDiscovery());
+      unawaited(_service.stopDiscovery());
+    }
     super.dispose();
   }
 

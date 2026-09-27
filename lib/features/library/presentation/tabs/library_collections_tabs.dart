@@ -38,7 +38,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                   Adaptive.pagePadding(context), 160),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount:
-                    Adaptive.gridColumns(context, minItemWidth: 168),
+                    PulsrAdaptiveGrid.columns(context, type: GridType.albums),
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 18,
                 childAspectRatio: 0.78,
@@ -167,8 +167,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
               padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
                   Adaptive.pagePadding(context), 160),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: Adaptive.gridColumns(context,
-                    minItemWidth: 150, phoneColumns: 3, maxColumns: 8),
+                crossAxisCount:
+                    PulsrAdaptiveGrid.columns(context, type: GridType.artists),
                 crossAxisSpacing: 14,
                 mainAxisSpacing: 18,
                 childAspectRatio: 0.82,
@@ -398,8 +398,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
             Adaptive.pagePadding(context), 160),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount:
-              Adaptive.gridColumns(context, minItemWidth: 160, phoneColumns: 2),
+          crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(context,
+              minItemWidth: 160, maxColumns: 6),
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 3.4,

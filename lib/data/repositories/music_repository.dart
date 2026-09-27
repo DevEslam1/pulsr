@@ -1416,15 +1416,41 @@ class MusicRepository implements IMusicRepository {
   Future<List<SongsTableCompanion>> _remapSongsOntoExistingPaths(
       List<SongsTableCompanion> songs) async {
     if (songs.isEmpty) return songs;
-    final existing = await (_db.select(_db.songsTable)
-          ..where((t) => t.source.equals(SongSource.local)))
-        .get();
-    if (existing.isEmpty) return songs;
-    final byKey = <(String, int), int>{};
-    for (final s in existing) {
-      if (s.path.isEmpty) continue;
-      byKey[(s.path.toLowerCase(), s.cueStartMs ?? -1)] = s.id;
+
+    final paths = <String>{};
+    for (final c in songs) {
+      final p = c.path.present ? c.path.value : null;
+      if (p != null && p.isNotEmpty) paths.add(p);
     }
+    if (paths.isEmpty) return songs;
+
+    final pathList = paths.toList();
+    final byKey = <(String, int), int>{};
+    const batchSize = 400;
+
+    for (var i = 0; i < pathList.length; i += batchSize) {
+      final chunk =
+          pathList.sublist(i, min(i + batchSize, pathList.length));
+      final query = _db.selectOnly(_db.songsTable)
+        ..addColumns([
+          _db.songsTable.id,
+          _db.songsTable.path,
+          _db.songsTable.cueStartMs,
+        ])
+        ..where(_db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.isIn(chunk));
+
+      final rows = await query.get();
+      for (final row in rows) {
+        final id = row.read(_db.songsTable.id);
+        final path = row.read(_db.songsTable.path);
+        final cueStart = row.read(_db.songsTable.cueStartMs);
+        if (id != null && path != null && path.isNotEmpty) {
+          byKey[(path.toLowerCase(), cueStart ?? -1)] = id;
+        }
+      }
+    }
+
     if (byKey.isEmpty) return songs;
     var changed = false;
     final out = <SongsTableCompanion>[];

@@ -58,15 +58,24 @@ class PlaybackBookmarkStore {
     required int durationMs,
     String? genre,
     String? album,
+    int? customMinDurationMs,
+    List<String>? customGenres,
   }) {
-    if (durationMs >= minDurationMs) return true;
+    final threshold = customMinDurationMs ?? minDurationMs;
+    if (durationMs >= threshold) return true;
     final haystack =
         '${genre ?? ''} ${album ?? ''}'.toLowerCase();
-    return haystack.contains('podcast') ||
-        haystack.contains('audiobook') ||
-        haystack.contains('audio book') ||
-        haystack.contains('talk') ||
-        haystack.contains('lecture');
+    final genres = customGenres ?? [
+      'podcast',
+      'audiobook',
+      'audio book',
+      'talk',
+      'lecture',
+    ];
+    for (final g in genres) {
+      if (haystack.contains(g.toLowerCase())) return true;
+    }
+    return false;
   }
 
   static String keyFor({int? songId, String? remoteId, String? path}) {
