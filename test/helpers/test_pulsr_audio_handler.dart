@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
+import 'package:pulsr/data/audio/comparison_slot.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
@@ -458,7 +459,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
       );
       _mediaItemController.add(item);
       _queueController.add(songs
-          .map((s) => MediaItem(id: s.id.toString(), title: s.title, artist: s.artist))
+          .map((s) =>
+              MediaItem(id: s.id.toString(), title: s.title, artist: s.artist))
           .toList());
       _onTrackChangedController.add(_currentTrack!);
       if (autoPlay) {

@@ -18,16 +18,22 @@ extension EqualizerPresetOps on EqualizerManager {
 
   // --- PRESET JSON IMPORT / EXPORT ---
 
-  String exportPresetToJson([EqPreset? preset]) {
+  String exportPresetToJson([EqPreset? preset, bool pretty = false]) {
     final target = preset ?? currentPreset;
-    return json.encode(target.toJson());
+    return EqPresetSchemaValidator.exportToJson(target, pretty: pretty);
   }
 
   Future<bool> importPresetFromJson(String jsonString) async {
     try {
-      final decoded = json.decode(jsonString) as Map<String, dynamic>;
-      final preset = EqPreset.fromJson(decoded);
-      await setPreset(preset);
+      final validation = EqPresetSchemaValidator.validateAndParse(jsonString);
+      if (!validation.isValid || validation.preset == null) {
+        ErrorLogger.log(
+          'Failed to import EQ preset: ${validation.errorMessage}',
+          category: 'EqualizerManager',
+        );
+        return false;
+      }
+      await setPreset(validation.preset!);
       return true;
     } catch (e, st) {
       ErrorLogger.log(

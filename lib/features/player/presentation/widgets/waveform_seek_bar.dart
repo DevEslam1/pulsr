@@ -23,6 +23,7 @@ class WaveformSeekBar extends StatefulWidget {
   final List<Duration>? chapterMarkers;
   final Duration? loopPointA;
   final Duration? loopPointB;
+  final Duration? crossfadeDuration;
   final String? semanticLabel;
 
   const WaveformSeekBar({
@@ -37,6 +38,7 @@ class WaveformSeekBar extends StatefulWidget {
     this.chapterMarkers,
     this.loopPointA,
     this.loopPointB,
+    this.crossfadeDuration,
     this.semanticLabel,
   });
 
@@ -249,6 +251,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                   duration: widget.duration,
                                   loopPointA: widget.loopPointA,
                                   loopPointB: widget.loopPointB,
+                                  crossfadeDuration: widget.crossfadeDuration,
                                   zoomScale: _zoomScale,
                                   visibleStart: window.startIndex,
                                   visibleCount: window.visibleCount,
@@ -384,6 +387,7 @@ class _WaveformPainter extends CustomPainter {
   final Duration duration;
   final Duration? loopPointA;
   final Duration? loopPointB;
+  final Duration? crossfadeDuration;
   final double zoomScale;
   final int visibleStart;
   final int visibleCount;
@@ -397,6 +401,7 @@ class _WaveformPainter extends CustomPainter {
     required this.duration,
     this.loopPointA,
     this.loopPointB,
+    this.crossfadeDuration,
     this.zoomScale = 1.0,
     this.visibleStart = 0,
     this.visibleCount = 0,
@@ -556,6 +561,29 @@ class _WaveformPainter extends CustomPainter {
         canvas.drawLine(Offset(xB, 0), Offset(xB, size.height), loopPaint);
       }
     }
+
+    // 5. Render Crossfade Region if configured
+    if (crossfadeDuration != null &&
+        crossfadeDuration! > Duration.zero &&
+        duration > crossfadeDuration!) {
+      final double fadeStartRatio =
+          ((duration - crossfadeDuration!).inMilliseconds /
+                  duration.inMilliseconds)
+              .clamp(0.0, 1.0);
+      final double? fadeStartX = mapToVisibleX(fadeStartRatio);
+      final double? fadeEndX = mapToVisibleX(1.0);
+      if (fadeStartX != null && fadeEndX != null && fadeStartX < fadeEndX) {
+        final fadeRect = Rect.fromLTRB(fadeStartX, 0, fadeEndX, size.height);
+        final fadePaint = Paint()
+          ..shader = LinearGradient(
+            colors: [
+              activeColor.withValues(alpha: 0.0),
+              activeColor.withValues(alpha: 0.16),
+            ],
+          ).createShader(fadeRect);
+        canvas.drawRect(fadeRect, fadePaint);
+      }
+    }
   }
 
   @override
@@ -566,6 +594,7 @@ class _WaveformPainter extends CustomPainter {
         oldDelegate.chapterMarkers != chapterMarkers ||
         oldDelegate.loopPointA != loopPointA ||
         oldDelegate.loopPointB != loopPointB ||
+        oldDelegate.crossfadeDuration != crossfadeDuration ||
         oldDelegate.zoomScale != zoomScale ||
         oldDelegate.visibleStart != visibleStart ||
         oldDelegate.visibleCount != visibleCount ||

@@ -60,6 +60,13 @@ class CrossfadeManager {
   int _fadeId = 0;
   Completer<void>? _crossfadeCompleter;
 
+  /// Completers owned by in-flight [fadeVolume] / [crossfadeVolumes] calls.
+  /// Their futures are resolved ONLY when the driving timer fires, so an
+  /// external [cancel]/[dispose] that hard-cancels those timers must complete
+  /// them here — otherwise an awaited fade never returns and any mutex held
+  /// across it ([protect]) deadlocks permanently.
+  final List<Completer<void>> _activeFadeCompleters = [];
+
   Mutex get mutex => _fadeMutex;
 
   /// Returns the next fade identifier.
@@ -353,6 +360,8 @@ class CrossfadeManager {
     }
 
     final completer = Completer<void>();
+    _activeFadeCompleters.add(completer);
+    completer.future.whenComplete(() => _activeFadeCompleters.remove(completer));
     final stopwatch = clock.stopwatch()..start();
 
     // --- Native sample-accurate path (Pulsr Android fork) ---
@@ -494,6 +503,8 @@ class CrossfadeManager {
       return;
     }
     final completer = Completer<void>();
+    _activeFadeCompleters.add(completer);
+    completer.future.whenComplete(() => _activeFadeCompleters.remove(completer));
     final stopwatch = clock.stopwatch()..start();
 
     // Only the OUTGOING player may use the native per-sample gain ramp. The
@@ -583,6 +594,10 @@ class CrossfadeManager {
       t.cancel();
     }
     _activeTimers.clear();
+    // The cancelled timers can no longer complete their fade futures; resolve
+    // them here so an awaited fadeVolume/crossfadeVolumes (and the mutex held
+    // across it) does not hang forever.
+    _completeActiveFades();
     _fadeTimer?.cancel();
     _fadeTimer = null;
     isCrossfading = false; // Set BEFORE stopping players
@@ -660,6 +675,7 @@ class CrossfadeManager {
       t.cancel();
     }
     _activeTimers.clear();
+    _completeActiveFades();
     _fadeTimer?.cancel();
     _fadeTimer = null;
     isCrossfading = false;
@@ -669,5 +685,16 @@ class CrossfadeManager {
       _crossfadeCompleter!.complete();
     }
     _crossfadeCompleter = null;
+  }
+
+  /// Completes every in-flight fade completer whose driving timer was just
+  /// cancelled. Iterates a copy because each completion triggers a
+  /// `whenComplete` that removes the entry from [_activeFadeCompleters].
+  void _completeActiveFades() {
+    if (_activeFadeCompleters.isEmpty) return;
+    for (final c in List.of(_activeFadeCompleters)) {
+      if (!c.isCompleted) c.complete();
+    }
+    _activeFadeCompleters.clear();
   }
 }

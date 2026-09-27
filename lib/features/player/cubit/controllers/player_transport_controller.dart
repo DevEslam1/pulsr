@@ -215,6 +215,10 @@ class PlayerTransportController {
     try {
       await _audioHandler.setShuffleMode(
           next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
+      // Progress-only widget ticks never carry shuffle/repeat, so without a
+      // forced full push the home-screen widget's shuffle icon lags behind an
+      // in-app toggle until the next track change (matches the favorite path).
+      _updateWidgetThrottled?.call(force: true);
     } catch (e, st) {
       ErrorLogger.log('Toggle shuffle failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');
@@ -241,6 +245,9 @@ class PlayerTransportController {
     _emit(state.copyWith(playback: state.playback.copyWith(repeatMode: next, errorMessage: null)));
     try {
       await _audioHandler.setRepeatMode(nextMode);
+      // See toggleShuffle: force a full widget push so the repeat icon reflects
+      // the change immediately rather than on the next full render.
+      _updateWidgetThrottled?.call(force: true);
     } catch (e, st) {
       ErrorLogger.log('Toggle repeat failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');

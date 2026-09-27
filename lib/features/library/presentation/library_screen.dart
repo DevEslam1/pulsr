@@ -36,6 +36,7 @@ import '../cubit/library_state.dart';
 import '../../tag_editor/tag_editor_screen.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import 'widgets/alphabet_quick_scroll.dart';
 import 'widgets/category_card.dart';
 import 'widgets/folder_browser_tab.dart';
 import 'widgets/folder_tree_browser_tab.dart';

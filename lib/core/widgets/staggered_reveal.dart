@@ -29,26 +29,26 @@ class StaggeredReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!context.motionEnabled) return child;
+    if (!context.motionEnabled || index >= 15) return child;
     final delay = (index.clamp(0, 14) * 20).ms;
     final anim = child
         .animate(key: ValueKey('${groupKey ?? ''}#${horizontal ? 'h' : 'v'}$index'))
         .fadeIn(duration: 240.ms, delay: delay, curve: Curves.easeOut);
-    if (horizontal) {
-      return anim.slideX(
-        begin: beginOffset,
-        end: 0,
-        duration: 240.ms,
-        delay: delay,
-        curve: Curves.easeOutCubic,
-      );
-    }
-    return anim.slideY(
-      begin: beginOffset,
-      end: 0,
-      duration: 240.ms,
-      delay: delay,
-      curve: Curves.easeOutCubic,
-    );
+    final animated = horizontal
+        ? anim.slideX(
+            begin: beginOffset,
+            end: 0,
+            duration: 240.ms,
+            delay: delay,
+            curve: Curves.easeOutCubic,
+          )
+        : anim.slideY(
+            begin: beginOffset,
+            end: 0,
+            duration: 240.ms,
+            delay: delay,
+            curve: Curves.easeOutCubic,
+          );
+    return RepaintBoundary(child: animated);
   }
 }

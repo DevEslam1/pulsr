@@ -431,9 +431,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
         );
 
         final isHq = _isHighRes;
+        final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
         final decodeDim = isHq
-            ? null
-            : (effectiveSize * 1.5).clamp(80, 800).round();
+            ? (effectiveSize * dpr).clamp(300, 1440).round()
+            : (effectiveSize * dpr).clamp(80, 800).round();
 
         final content = AnimatedSwitcher(
           duration: context.motionMs(200),

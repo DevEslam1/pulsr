@@ -12,8 +12,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
+import '../../../../core/services/sound_feedback_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
@@ -234,16 +237,24 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         child: InkWell(
           onTap: () {
-            HapticFeedback.mediumImpact();
+            PulsrHaptics.confirm();
+            SoundFeedbackService.playClick();
             onTap();
           },
           child: Center(
             child: AnimatedSwitcher(
-              duration: context.motionMs(240),
-              transitionBuilder: (child, anim) => ScaleTransition(
-                scale: anim,
-                child: child,
-              ),
+              duration: context.motionMs(280),
+              transitionBuilder: (child, anim) {
+                final isHeart = (child.key as ValueKey<bool>?)?.value == true;
+                final curve = isHeart ? Curves.easeOutBack : Curves.easeOutCubic;
+                return ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: anim,
+                    curve: context.motionCurve(curve),
+                  ),
+                  child: child,
+                );
+              },
               child: Icon(
                 isFavorite
                     ? Icons.favorite_rounded
@@ -443,13 +454,15 @@ class PlayerViewSwitcher extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(barRadius),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(3.0),
-              decoration: BoxDecoration(
-                color: surfaceBase.withValues(alpha: surfaceFillAlpha),
-                borderRadius: BorderRadius.circular(barRadius),
+          child: Builder(
+            builder: (context) {
+              final pillContainer = Container(
+                padding: const EdgeInsets.all(3.0),
+                decoration: BoxDecoration(
+                  color: GpuBudget.isGpuSaverActive
+                      ? surfaceBase
+                      : surfaceBase.withValues(alpha: surfaceFillAlpha),
+                  borderRadius: BorderRadius.circular(barRadius),
                 border: Border.all(
                   color: surfaceBase.withValues(alpha: borderAlpha),
                   width: 1.0,
@@ -519,7 +532,16 @@ class PlayerViewSwitcher extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            );
+
+              if (GpuBudget.isGpuSaverActive) {
+                return pillContainer;
+              }
+              return BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: pillContainer,
+              );
+            },
           ),
         ),
       ),
@@ -601,14 +623,16 @@ class PlayerBottomActionDock extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(barRadius),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(3.0),
-              decoration: BoxDecoration(
-                color: (p.isDark ? Colors.white : Colors.black)
-                    .withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(barRadius),
+          child: Builder(
+            builder: (context) {
+              final dockContainer = Container(
+                padding: const EdgeInsets.all(3.0),
+                decoration: BoxDecoration(
+                  color: GpuBudget.isGpuSaverActive
+                      ? p.surface
+                      : (p.isDark ? Colors.white : Colors.black)
+                          .withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(barRadius),
                 border: Border.all(
                   color: (p.isDark ? Colors.white : Colors.black)
                       .withValues(alpha: 0.12),
@@ -751,7 +775,16 @@ class PlayerBottomActionDock extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            );
+
+              if (GpuBudget.isGpuSaverActive) {
+                return dockContainer;
+              }
+              return BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: dockContainer,
+              );
+            },
           ),
         ),
       ),

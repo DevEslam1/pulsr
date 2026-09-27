@@ -16,6 +16,7 @@ import 'async_lock.dart';
 import 'audio_effects_channel.dart';
 import 'comparison_slot.dart';
 import 'eq_frequency_validation.dart';
+import 'eq_preset_schema_validator.dart';
 import 'headphone_profiles_repository.dart';
 import 'ir_file_parser.dart';
 import 'live_prog_slider_persistence.dart';
@@ -1627,7 +1628,9 @@ class EqualizerManager {
     if (predelayMs != null) reverbPredelayMs = predelayMs.clamp(0.0, 150.0);
     if (damping != null) reverbDamping = damping.clamp(0.0, 1.0);
     if (PlatformCapabilities.isAndroid) {
-      if (preset != null) await _effectsChannel.setReverbPreset(preset);
+      // Forward the clamped field, not the raw argument, so an out-of-range
+      // ordinal never reaches native and produce the wrong room (see clamp above).
+      if (preset != null) await _effectsChannel.setReverbPreset(reverbPreset);
       // FIX M-7: always sync wet/dry after preset change so DSP is not stale
       await _effectsChannel.setReverbWetDry(wetDry ?? reverbWetDry);
       // Predelay, damping and cross-channel share one native call; push the
@@ -1728,6 +1731,11 @@ class EqualizerManager {
   bool _savedLiveProgEnabled = false;
   DynamicsPreset _savedDynamicsPreset = DynamicsPreset.off;
 
+  /// A snapshot recall that arrived while battery-degraded. Held here (an
+  /// extension cannot own fields) so [restoreFromDegrade] can apply it once the
+  /// heavy stages are allowed back — see [EqualizerSnapshotOps.applyEffectsState].
+  Map<String, dynamic>? _pendingDegradeEffectsSnapshot;
+
   bool get isDegradedForPower => _isDegradedForPower;
 
   /// Temporarily disables heavy DSP stages (reverb, crossfeed, saturation,
@@ -1798,6 +1806,13 @@ class EqualizerManager {
         true,
         code: liveProgCode.isNotEmpty ? liveProgCode : null,
       );
+    }
+    // A snapshot recalled while degraded was deferred; apply it now that the
+    // heavy stages are permitted again so the user's recall is not lost.
+    final pending = _pendingDegradeEffectsSnapshot;
+    _pendingDegradeEffectsSnapshot = null;
+    if (pending != null) {
+      await applyEffectsState(pending);
     }
     _syncPipeline();
   }
@@ -1955,19 +1970,7 @@ class EqualizerManager {
     // Sanitize to the ranges the native DynamicEQ stage honors (see
     // DynamicEQ::setBand) so the stored Dart state never diverges from what
     // the DSP actually applies.
-    final sanitized = DynamicEqBandConfig(
-      frequency: band.frequency.clamp(20.0, 20000.0),
-      q: band.q.clamp(0.1, 12.0),
-      thresholdDb: band.thresholdDb.clamp(-80.0, 0.0),
-      ratio: band.ratio.clamp(1.0, 20.0),
-      attackMs: band.attackMs.clamp(0.1, 200.0),
-      releaseMs: band.releaseMs.clamp(5.0, 2000.0),
-      maxCutDb: band.maxCutDb.clamp(-24.0, 0.0),
-      maxBoostDb: band.maxBoostDb.clamp(0.0, 24.0),
-      mode: band.mode.clamp(0, 1),
-      filterType: band.filterType.clamp(0, 2),
-      enabled: band.enabled,
-    );
+    final sanitized = band.sanitized();
     final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
     bands[index] = sanitized;
     dynamicEqBands = bands;

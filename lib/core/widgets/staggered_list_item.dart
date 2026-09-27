@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 
 /// Wraps a list item with a staggered cascading entrance animation (smooth fade
 /// and subtle vertical rise) inspired by Meloplay's staggered list transitions.
@@ -49,18 +50,20 @@ class _StaggeredListItemState extends State<StaggeredListItem>
       curve: Curves.easeOutCubic,
     ));
 
-    // Stagger animation up to the first 15 items for high performance
-    final clampedIndex = widget.index.clamp(0, 14);
-    final delay = widget.itemDelay * clampedIndex;
-
-    if (delay == Duration.zero) {
-      _controller.forward();
+    // Stagger animation capped to the first 15 items for high scroll performance
+    if (widget.index < 15) {
+      final delay = widget.itemDelay * widget.index;
+      if (delay == Duration.zero) {
+        _controller.forward();
+      } else {
+        Future.delayed(delay, () {
+          if (mounted) {
+            _controller.forward();
+          }
+        });
+      }
     } else {
-      Future.delayed(delay, () {
-        if (mounted) {
-          _controller.forward();
-        }
-      });
+      _controller.value = 1.0;
     }
   }
 
@@ -72,11 +75,16 @@ class _StaggeredListItemState extends State<StaggeredListItem>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
+    if (!context.motionEnabled || widget.index >= 15) {
+      return widget.child;
+    }
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: widget.child,
+        ),
       ),
     );
   }

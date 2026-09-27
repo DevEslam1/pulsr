@@ -84,6 +84,16 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     final effectiveSongId = widget.songId ?? songId;
     final effectiveFilePath = widget.filePath ?? songPath;
 
+    double crossfadeSec = 0.0;
+    try {
+      crossfadeSec = context.select<SettingsCubit, double>(
+        (c) => c.state.crossfadeSeconds,
+      );
+    } catch (_) {
+      final fallback = getIt.isRegistered<SettingsCubit>() ? getIt<SettingsCubit>() : null;
+      crossfadeSec = fallback?.state.crossfadeSeconds ?? 0.0;
+    }
+
     if (_lastSongId != effectiveSongId || _lastFilePath != effectiveFilePath) {
       _lastSongId = effectiveSongId;
       _lastFilePath = effectiveFilePath;
@@ -125,6 +135,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     semanticLabel: widget.semanticLabel,
                     loopPointA: widget.loopPointA,
                     loopPointB: widget.loopPointB,
+                    crossfadeDuration: crossfadeSec > 0
+                        ? Duration(milliseconds: (crossfadeSec * 1000).round())
+                        : null,
                   ));
             }
             if (snapshot.hasError) {
@@ -136,13 +149,13 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
               );
             }
             // Accurate fallback while waveform is computing or on failure
-            return _buildStandardSeekBar(context);
+            return _buildStandardSeekBar(context, crossfadeSec);
           },
         ),
       );
     }
 
-    return _withUpNext(_buildStandardSeekBar(context));
+    return _withUpNext(_buildStandardSeekBar(context, crossfadeSec));
   }
 
   /// Adds the "Up Next" strip below the seek bar (shared by every theme).
@@ -220,7 +233,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     return _PlayerPositionScope(builder: build);
   }
 
-  Widget _buildStandardSeekBar(BuildContext context) {
+  Widget _buildStandardSeekBar(BuildContext context, [double crossfadeSec = 0.0]) {
     bool isPlaying = false;
     try {
       isPlaying = context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
@@ -334,6 +347,28 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         letterSpacing: AppTracking.label,
                       ),
                     ),
+                    if (crossfadeSec > 0 &&
+                        widget.duration.inSeconds > (crossfadeSec * 2))
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 11,
+                            color: context.palette.accent.withValues(alpha: 0.75),
+                          ),
+                          const SizedBox(width: AppSpacing.xxs),
+                          Text(
+                            '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
+                            style: TextStyle(
+                              color: context.palette.accent.withValues(alpha: 0.75),
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: const [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                      ),
                     Text(
                       Formatters.formatDuration(widget.duration),
                       style: TextStyle(

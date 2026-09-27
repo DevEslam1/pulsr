@@ -2,21 +2,24 @@ part of '../library_screen.dart';
 
 mixin LibrarySongsTab on State<LibraryScreen> {
   /// Ensures the list head is pre-resolved exactly once per screen, so the
-  /// first online tap doesn't pay the network resolve.
+  /// first online taps don't pay the network resolve. Warms the top few online
+  /// tracks (staggered inside [warmStreams]) rather than just the first, since
+  /// a user often taps a little way down a freshly opened list.
   bool _warmedHeadOnline = false;
 
   void _warmHeadOnlineIfNeeded(
       List<SongsTableData> songs, PlayerCubit playerCubit) {
     if (_warmedHeadOnline || songs.isEmpty) return;
-    for (final s in songs) {
-      if (s.source == SongSource.youtube &&
-          s.isDownloaded != true &&
-          (s.remoteId?.isNotEmpty ?? false)) {
-        _warmedHeadOnline = true;
-        playerCubit.warmStream(s);
-        return;
-      }
-    }
+    final online = [
+      for (final s in songs)
+        if (s.source == SongSource.youtube &&
+            s.isDownloaded != true &&
+            (s.remoteId?.isNotEmpty ?? false))
+          s,
+    ];
+    if (online.isEmpty) return;
+    _warmedHeadOnline = true;
+    playerCubit.warmStreams(online, count: 3);
   }
 
   // ================= SONGS =================
@@ -265,37 +268,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
               end: 4,
               top: 8,
               bottom: 150,
-              child: Container(
-                width: 30,
-                decoration: BoxDecoration(
-                    color: p.surfaceContainer.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(AppRadii.r16)),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
-                  child: Column(
-                    children: alphabet
-                        .map((l) => Semantics(
-                              button: true,
-                              label: l,
-                              excludeSemantics: true,
-                              child: InkWell(
-                                onTap: () => _scrollToLetter(l, songs),
-                                child: SizedBox(
-                                  width: 30,
-                                  height: 18,
-                                  child: Center(
-                                    child: Text(l,
-                                        style: TextStyle(
-                                            fontSize: AppFontSize.tiny,
-                                            fontWeight: FontWeight.w800,
-                                            color: p.textTertiary)),
-                                  ),
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
+              child: AlphabetQuickScroll(
+                availableLetters: alphabet,
+                onLetterSelected: (l) => _scrollToLetter(l, songs),
               ),
             ),
         ],

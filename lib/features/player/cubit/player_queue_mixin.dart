@@ -15,6 +15,13 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   /// instantly. Safe and idempotent; call it when a list of songs first renders.
   void warmStream(SongsTableData song) => queueController.warmStream(song);
 
+  /// Pre-resolve the first [count] online tracks of [songs] in the background
+  /// so a tap near the top of a freshly rendered list starts from cache instead
+  /// of a cold resolve. Staggered, filtered to streaming-eligible tracks,
+  /// idempotent, and safe to call on every render.
+  void warmStreams(List<SongsTableData> songs, {int count = 3}) =>
+      queueController.warmStreams(songs, count: count);
+
   Future<void> playSong(
     SongsTableData song, {
     List<SongsTableData>? queue,

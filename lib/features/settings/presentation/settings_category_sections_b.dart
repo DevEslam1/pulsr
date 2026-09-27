@@ -145,8 +145,8 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
             children: [
               if (state.proxyEnabled)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                   margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: p.success.withValues(alpha: 0.15),
@@ -241,10 +241,18 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     }).toList();
 
     if (results.isEmpty) {
-      final suggestions = ['Equalizer', 'Theme', 'Downloads', 'Smart Audio', 'Volume', 'Timer'];
+      final suggestions = [
+        'Equalizer',
+        'Theme',
+        'Downloads',
+        'Smart Audio',
+        'Volume',
+        'Timer'
+      ];
       return Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -273,7 +281,8 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
               Text(
                 context.l10n.settingsSearchHint,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(
@@ -282,7 +291,9 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                 alignment: WrapAlignment.center,
                 children: suggestions.map((s) {
                   return ActionChip(
-                    label: Text(s, style: TextStyle(fontSize: AppFontSize.tiny, color: p.textPrimary)),
+                    label: Text(s,
+                        style: TextStyle(
+                            fontSize: AppFontSize.tiny, color: p.textPrimary)),
                     backgroundColor: p.surfaceContainer,
                     side: BorderSide(color: p.hairline),
                     onPressed: () {
@@ -310,7 +321,8 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
       itemBuilder: (context, i) {
         if (i == 0) {
           return Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.xs, 0, AppSpacing.xs, AppSpacing.sm),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.xs, 0, AppSpacing.xs, AppSpacing.sm),
             child: Text(
               context.l10n.settingsResultsCount(results.length),
               style: TextStyle(
@@ -343,8 +355,8 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                     children: [
                       Container(
                         margin: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                         decoration: BoxDecoration(
                           color: p.accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(AppRadii.r6),
@@ -364,10 +376,14 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
                         Container(
                           margin: const EdgeInsets.only(bottom: AppSpacing.xxs),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                              horizontal: AppSpacing.s6,
+                              vertical: AppSpacing.s2),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [p.accent, p.accent.withValues(alpha: 0.7)],
+                              colors: [
+                                p.accent,
+                                p.accent.withValues(alpha: 0.7)
+                              ],
                             ),
                             borderRadius: BorderRadius.circular(AppRadii.r6),
                           ),
@@ -403,7 +419,8 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
               subtitle: _buildHighlightedText(
                 r.subtitle,
                 query,
-                baseStyle: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                baseStyle: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
                 matchStyle: TextStyle(
                   color: p.accent,
                   fontWeight: FontWeight.w800,
@@ -437,7 +454,10 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
 
   String _mapCategoryNameToId(String catName, BuildContext context) {
     if (catName == context.l10n.settingsCategoryAppearance) return 'appearance';
-    if (catName == context.l10n.audioAndSound || catName == context.l10n.settingsSearchCategoryAudio) return 'audio';
+    if (catName == context.l10n.audioAndSound ||
+        catName == context.l10n.settingsSearchCategoryAudio) {
+      return 'audio';
+    }
     if (catName == context.l10n.playback) return 'playback';
     if (catName == context.l10n.gestures) return 'gestures';
     if (catName == context.l10n.settingsCategoryProfiles) return 'profiles';
@@ -751,72 +771,14 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
         categoryId: 'about',
         category: context.l10n.settingsSearchCategoryAbout,
         title: context.l10n.about,
-        subtitle: context.l10n.settingsSearchAboutSubtitle(AppConfig.appVersion),
+        subtitle:
+            context.l10n.settingsSearchAboutSubtitle(AppConfig.appVersion),
         icon: Icons.info_outline_rounded,
         keywords: ['about', 'version', 'license', 'developer'],
         onTap: () => showAboutSheet(context),
       ),
     ];
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // Requires: provided by the composing class (same library).
   _Category _catById(String id);
@@ -828,7 +790,15 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
   Widget _iconBox(BuildContext context, IconData icon);
 
   // Requires: provided by the composing class (same library).
-  Widget _navTile( BuildContext context, IconData icon, String title, String subtitle, { Widget? trailing, String? trailingBadge, VoidCallback? onTap, });
+  Widget _navTile(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle, {
+    Widget? trailing,
+    String? trailingBadge,
+    VoidCallback? onTap,
+  });
 
   // Requires: provided by the composing class (same library).
   TextEditingController get _searchController;
@@ -838,7 +808,13 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
   set _searchQuery(String value);
 
   // Requires: provided by the composing class (same library).
-  Widget _section( BuildContext context, String title, String subtitle, List<Widget> children, { GlobalKey? key, });
+  Widget _section(
+    BuildContext context,
+    String title,
+    String subtitle,
+    List<Widget> children, {
+    GlobalKey? key,
+  });
 
   // Requires: provided by the composing class (same library).
   // ignore: unused_element
@@ -846,10 +822,21 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
   set _selectedCategoryId(String value);
 
   // Requires: provided by the composing class (same library).
-  void _showDurationFilterDialog( BuildContext context, SettingsCubit cubit, int currentSec, );
+  void _showDurationFilterDialog(
+    BuildContext context,
+    SettingsCubit cubit,
+    int currentSec,
+  );
 
   // Requires: provided by the composing class (same library).
-  Widget _switchTile( BuildContext context, IconData icon, String title, String subtitle, { required bool value, required ValueChanged<bool> onChanged, });
+  Widget _switchTile(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle, {
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  });
 
   Widget _buildHighlightedText(
     String text,
@@ -857,22 +844,11 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     required TextStyle baseStyle,
     required TextStyle matchStyle,
   }) {
-    if (query.isEmpty) return Text(text, style: baseStyle);
-    final spans = <TextSpan>[];
-    int start = 0;
-    final lower = text.toLowerCase();
-    while (true) {
-      final index = lower.indexOf(query, start);
-      if (index == -1) {
-        spans.add(TextSpan(text: text.substring(start), style: baseStyle));
-        break;
-      }
-      if (index > start) {
-        spans.add(TextSpan(text: text.substring(start, index), style: baseStyle));
-      }
-      spans.add(TextSpan(text: text.substring(index, index + query.length), style: matchStyle));
-      start = index + query.length;
-    }
-    return Text.rich(TextSpan(children: spans));
+    return PulsrHighlightedText(
+      text: text,
+      query: query,
+      baseStyle: baseStyle,
+      matchStyle: matchStyle,
+    );
   }
 }

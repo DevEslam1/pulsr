@@ -117,6 +117,41 @@ class PlayerQueueController {
     } catch (_) {}
   }
 
+  /// Gap between successive speculative warms in [warmStreams], so opening a
+  /// list never stacks several full multi-engine resolves on the native thread
+  /// pool — or bursts enough googlevideo requests to trip bot detection — at
+  /// once. Mirrors the search screen's own speculative-warm stagger.
+  static const Duration _warmStreamStagger = Duration(milliseconds: 400);
+
+  /// Fire-and-forget pre-resolution of the first [count] streaming-eligible
+  /// tracks of a freshly rendered list — the taps a user is most likely to
+  /// make near the top. Each warm is staggered by [_warmStreamStagger], skips
+  /// tracks that aren't online-streamable (local, already downloaded, or
+  /// missing a remote id), is a no-op when the URL is already cached fresh, and
+  /// short-circuits cheaply while YTM is bot-cooling (the underlying
+  /// [resolveStream] skips the native tiers). Idempotent and non-throwing;
+  /// safe to call on every render.
+  void warmStreams(List<SongsTableData> songs, {int count = 3}) {
+    if (songs.isEmpty || count <= 0) return;
+    var warmed = 0;
+    for (final song in songs) {
+      if (warmed >= count) break;
+      if (song.source != SongSource.youtube ||
+          song.isDownloaded == true ||
+          (song.remoteId?.isEmpty ?? true)) {
+        continue;
+      }
+      final delay = _warmStreamStagger * warmed;
+      warmed++;
+      unawaited(Future<void>.delayed(delay, () {
+        if (_isClosed()) return;
+        try {
+          _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
+        } catch (_) {}
+      }));
+    }
+  }
+
   Future<void> playRadioStation(RadioStation station) async {
     final uri = Uri.tryParse(station.url);
     if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {

@@ -318,6 +318,23 @@ class DynamicEqBandConfig {
         'filterType': filterType,
         'enabled': enabled,
       };
+
+  /// Clamps every field to the range the native DynamicEQ stage honors
+  /// (see DynamicEQ::setBand). Both the manager and the cubit controller use
+  /// this so the Dart/UI state never diverges from what the DSP applies.
+  DynamicEqBandConfig sanitized() => DynamicEqBandConfig(
+        frequency: frequency.clamp(20.0, 20000.0),
+        q: q.clamp(0.1, 12.0),
+        thresholdDb: thresholdDb.clamp(-80.0, 0.0),
+        ratio: ratio.clamp(1.0, 20.0),
+        attackMs: attackMs.clamp(0.1, 200.0),
+        releaseMs: releaseMs.clamp(5.0, 2000.0),
+        maxCutDb: maxCutDb.clamp(-24.0, 0.0),
+        maxBoostDb: maxBoostDb.clamp(0.0, 24.0),
+        mode: mode.clamp(0, 1),
+        filterType: filterType.clamp(0, 2),
+        enabled: enabled,
+      );
 }
 
 /// One band of the Native C++ 4-Band Multiband Compressor.

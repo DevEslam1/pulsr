@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
+import '../performance/gpu_budget.dart';
 import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -146,9 +147,11 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: maxSheetWidth),
           child: Container(
             decoration: BoxDecoration(
-              color: p.isDark
-                  ? p.surface.withValues(alpha: 0.92)
-                  : p.surface.withValues(alpha: 0.96),
+              color: GpuBudget.isGpuSaverActive
+                  ? p.surface
+                  : (p.isDark
+                      ? p.surface.withValues(alpha: 0.92)
+                      : p.surface.withValues(alpha: 0.96)),
               borderRadius: isTablet
                   ? BorderRadius.circular(AppRadii.r28)
                   : AppRadii.bottomSheetRadius,
@@ -173,82 +176,91 @@ class PulsrBottomSheetContainer extends StatelessWidget {
               borderRadius: isTablet
                   ? BorderRadius.circular(AppRadii.r28)
                   : AppRadii.bottomSheetRadius,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: _PulsrBottomSheetScope(
-                  child: SafeArea(
-                    top: false,
-                    left: false,
-                    right: false,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Top drag pill
-                        if (showDragHandle) ...[
-                          const SizedBox(height: AppSpacing.s10),
-                          Center(
-                            child: Container(
-                              width: 38,
-                              height: 4.5,
-                              decoration: BoxDecoration(
-                                color: (p.isDark ? Colors.white : Colors.black)
-                                    .withValues(alpha: 0.18),
-                                borderRadius: AppRadii.full,
+              child: Builder(
+                builder: (context) {
+                  final sheetContent = _PulsrBottomSheetScope(
+                    child: SafeArea(
+                      top: false,
+                      left: false,
+                      right: false,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Top drag pill
+                          if (showDragHandle) ...[
+                            const SizedBox(height: AppSpacing.s10),
+                            Center(
+                              child: Container(
+                                width: 38,
+                                height: 4.5,
+                                decoration: BoxDecoration(
+                                  color: (p.isDark ? Colors.white : Colors.black)
+                                      .withValues(alpha: 0.18),
+                                  borderRadius: AppRadii.full,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.s10),
-                        ],
+                            const SizedBox(height: AppSpacing.s10),
+                          ],
 
-                        // Optional Header
-                        if (title != null) ...[
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s20,
-                                vertical: AppSpacing.s6),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      DefaultTextStyle.merge(
-                                        style: TextStyle(
-                                          color: p.textPrimary,
-                                          fontSize: AppFontSize.title,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: AppTracking.title,
-                                        ),
-                                        child: title!,
-                                      ),
-                                      if (subtitle != null) ...[
-                                        const SizedBox(height: AppSpacing.s2),
+                          // Optional Header
+                          if (title != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s20,
+                                  vertical: AppSpacing.s6),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
                                         DefaultTextStyle.merge(
                                           style: TextStyle(
-                                            color: p.textSecondary,
-                                            fontSize: AppFontSize.label,
+                                            color: p.textPrimary,
+                                            fontSize: AppFontSize.title,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: AppTracking.title,
                                           ),
-                                          child: subtitle!,
+                                          child: title!,
                                         ),
+                                        if (subtitle != null) ...[
+                                          const SizedBox(height: AppSpacing.s2),
+                                          DefaultTextStyle.merge(
+                                            style: TextStyle(
+                                              color: p.textSecondary,
+                                              fontSize: AppFontSize.label,
+                                            ),
+                                            child: subtitle!,
+                                          ),
+                                        ],
                                       ],
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                if (trailing != null) trailing!,
-                              ],
+                                  if (trailing != null) trailing!,
+                                ],
+                              ),
                             ),
-                          ),
-                          Divider(color: p.hairline, height: 1),
-                        ],
+                            Divider(color: p.hairline, height: 1),
+                          ],
 
-                        // Sheet Body
-                        Flexible(child: child),
-                      ],
+                          // Sheet Body
+                          Flexible(child: child),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+
+                  if (GpuBudget.isGpuSaverActive) {
+                    return sheetContent;
+                  }
+                  return BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: sheetContent,
+                  );
+                },
               ),
             ),
           ),

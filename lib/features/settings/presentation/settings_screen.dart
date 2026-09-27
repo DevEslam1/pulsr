@@ -41,6 +41,8 @@ import 'widgets/settings_section.dart';
 import 'widgets/storage_cache_section.dart';
 import 'widgets/theme_schedule_row.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
+import 'widgets/settings_tiles.dart';
+import '../../../core/widgets/highlighted_text.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 part 'settings_category_sections_a.dart';
@@ -1371,18 +1373,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       Divider(height: 1, indent: 72, color: p.hairline);
 
   @override
-  Widget _iconBox(BuildContext context, IconData icon) {
-    final p = context.palette;
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: p.accentContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r12),
-      ),
-      child: Icon(icon, color: p.accent, size: 20),
-    );
-  }
+  Widget _iconBox(BuildContext context, IconData icon) => SettingsIconBox(icon);
 
   @override
   Widget _navTile(

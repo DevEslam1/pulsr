@@ -340,18 +340,23 @@ class PlayerThemeScaffold extends StatelessWidget {
                         const SizedBox(width: 24),
                         Expanded(
                           flex: 5,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (trackInfo != null) trackInfo!(context, metrics),
-                              SizedBox(height: metrics.spacingTrackToSeek),
-                              resolvedSeekBar,
-                              SizedBox(height: metrics.spacingSeekToControls),
-                              resolvedControls,
-                              SizedBox(height: metrics.spacingControlsToDock),
-                              resolvedDock,
-                              SizedBox(height: metrics.spacingBelowDock),
-                            ],
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (trackInfo != null) trackInfo!(context, metrics),
+                                  SizedBox(height: metrics.spacingTrackToSeek),
+                                  resolvedSeekBar,
+                                  SizedBox(height: metrics.spacingSeekToControls),
+                                  resolvedControls,
+                                  SizedBox(height: metrics.spacingControlsToDock),
+                                  resolvedDock,
+                                  SizedBox(height: metrics.spacingBelowDock),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],

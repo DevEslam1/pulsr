@@ -129,14 +129,17 @@ extension EqualizerSnapshotOps on EqualizerManager {
   /// pushed unconditionally — a stage the snapshot has OFF is correctly
   /// disabled even if it was ON before recall.
   ///
-  /// No-ops while battery degrade is active so recall cannot resurrect the
-  /// heavy stages that [degradeToEssentials] intentionally suppressed; the
-  /// snapshot state is still written to memory and takes effect on
-  /// [restoreFromDegrade].
+  /// No-ops the native pushes while battery degrade is active so recall cannot
+  /// resurrect the heavy stages that [degradeToEssentials] intentionally
+  /// suppressed; the recall is stashed and re-applied on [restoreFromDegrade].
   Future<void> applyEffectsState(Map<String, dynamic> m) async {
     // Battery degrade intentionally suppressed the heavy DSP stages; a snapshot
-    // recall must not resurrect them mid-session (see the doc above).
-    if (_isDegradedForPower) return;
+    // recall must not resurrect them mid-session. Defer it to restore so the
+    // user's recall is honored once power is back (see the doc above).
+    if (_isDegradedForPower) {
+      _pendingDegradeEffectsSnapshot = m;
+      return;
+    }
     double d(String k, double fallback) =>
         (m[k] as num?)?.toDouble() ?? fallback;
     int i(String k, int fallback) => (m[k] as num?)?.toInt() ?? fallback;

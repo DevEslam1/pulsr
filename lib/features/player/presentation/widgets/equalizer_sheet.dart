@@ -2709,6 +2709,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   gains: gains,
                   activeColor: effectiveEnabled ? p.accent : p.textTertiary,
                   height: 52,
+                  onGainChanged: effectiveEnabled
+                      ? (idx, gain) {
+                          context.read<PlayerCubit>().setBandGain(idx, gain);
+                        }
+                      : null,
                 ),
               ),
             ),

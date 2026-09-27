@@ -71,6 +71,27 @@ jobs:
           flutter test test/a11y/accessibility_compliance_test.dart
           flutter test test/code_hygiene_test.dart
 
+      - name: Run Core Widgets Safety & Phase 0-10 Suites
+        run: |
+          flutter test test/core/widgets/core_widgets_golden_test.dart
+          flutter test test/core/constants/tokens_lock_test.dart
+          flutter test test/core/theme/phase1_design_tokens_test.dart
+          flutter test test/features/player/player_themes_preview_test.dart
+          flutter test test/integration/smoke_flow_test.dart
+          flutter test test/data/audio/eq_preset_schema_validator_test.dart
+          flutter test test/features/player/eq_curve_visualizer_test.dart
+          flutter test test/features/player/milkdrop_renderer_test.dart
+          flutter test test/features/player/crossfade_seek_bar_test.dart
+          flutter test test/features/player/player_theme_scaffold_test.dart
+          flutter test test/features/library/alphabet_quick_scroll_test.dart
+          flutter test test/features/library/duplicate_finder_test.dart
+          flutter test test/features/library/smart_playlist_rule_builder_test.dart
+          flutter test test/features/downloads/download_quality_picker_sheet_test.dart
+          flutter test test/features/downloads/storage_stats_header_test.dart
+          flutter test test/features/perf/phase7_perf_audit_test.dart
+          flutter test test/features/responsive/phase9_responsive_test.dart
+          flutter test test/features/polish/phase10_polish_test.dart
+
       - name: Run Tests with Coverage
         run: flutter test --coverage
 

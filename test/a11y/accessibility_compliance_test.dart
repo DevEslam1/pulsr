@@ -7,6 +7,7 @@ import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/spinning_vinyl_disc.dart';
 import 'package:pulsr/core/widgets/waveform_logo.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/core/widgets/pulsr_slider.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -267,6 +268,90 @@ void main() {
 
       // Zero exceptions (zero RenderFlex overflow errors)
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+        '6. Screen-reader critical user flows: play song, add to playlist, adjust EQ',
+        (tester) async {
+      final mockPlayerCubit = MockPlayerCubit();
+      when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
+      when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
+
+      bool songPlayed = false;
+      bool addedToPlaylist = false;
+      double eqGain = 0.0;
+
+      const song = SongsTableData(
+        id: 777,
+        title: 'Masterpiece',
+        artist: 'Audiophile Maestro',
+        album: 'Acoustic Sessions',
+        durationMs: 240000,
+        path: '/storage/emulated/0/Music/masterpiece.mp3',
+        source: SongSource.local,
+        playCount: 1,
+        dateAdded: 0,
+        isFavorite: true,
+        isMissing: false,
+        isDownloaded: true,
+        lastPositionMs: 0,
+      );
+
+      await tester.pumpWidget(
+        _buildA11yHarness(
+          playerCubit: mockPlayerCubit,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SongTile(
+                song: song,
+                onTap: () => songPlayed = true,
+              ),
+              PlayerDockIconButton(
+                icon: Icons.playlist_add_rounded,
+                tooltip: 'Add to Playlist',
+                isActive: false,
+                activeColor: Colors.tealAccent,
+                inactiveColor: Colors.white70,
+                onTap: () => addedToPlaylist = true,
+              ),
+              PulsrSlider(
+                value: eqGain,
+                min: -12.0,
+                max: 12.0,
+                semanticLabel: '1kHz EQ Band',
+                onChanged: (v) => eqGain = v,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Flow 1: Play song via Semantics tap
+      final songSemantics = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label == 'Masterpiece by Audiophile Maestro',
+      );
+      expect(songSemantics, findsOneWidget);
+      await tester.tap(songSemantics);
+      expect(songPlayed, isTrue);
+
+      // Flow 2: Add to playlist button with tooltip Semantics
+      final playlistFinder = find.byWidgetPredicate(
+        (w) => w is PlayerDockIconButton && w.tooltip == 'Add to Playlist',
+      );
+      expect(playlistFinder, findsOneWidget);
+      await tester.tap(playlistFinder);
+      expect(addedToPlaylist, isTrue);
+
+      // Flow 3: Adjust EQ slider via accessibility actions
+      final eqSemantics = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.slider == true && w.properties.label == '1kHz EQ Band',
+      );
+      expect(eqSemantics, findsOneWidget);
+      final Semantics sliderWidget = tester.widget(eqSemantics);
+      sliderWidget.properties.onIncrease?.call();
+      expect(eqGain, greaterThan(0.0));
     });
   });
 }

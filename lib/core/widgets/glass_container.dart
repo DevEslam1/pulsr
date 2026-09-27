@@ -11,6 +11,18 @@ enum GlassTier {
   solid,
 }
 
+/// Standardized BackdropFilter sigma and opacity pairs for design-system glass surfaces.
+enum GlassPreset {
+  dock(blur: 24.0, opacity: 0.72),
+  sheet(blur: 20.0, opacity: 0.82),
+  dialog(blur: 16.0, opacity: 0.88),
+  chip(blur: 8.0, opacity: 0.60);
+
+  final double blur;
+  final double opacity;
+  const GlassPreset({required this.blur, required this.opacity});
+}
+
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double blur;
@@ -93,10 +105,30 @@ class GlassContainer extends StatelessWidget {
         specularHighlight = false,
         isLiquid = false;
 
+  /// Standardized glass container configured by [GlassPreset].
+  GlassContainer.fromPreset({
+    super.key,
+    required this.child,
+    required GlassPreset preset,
+    this.borderRadius,
+    this.shape,
+    this.border,
+    this.padding,
+    this.color,
+    this.boxShadow,
+    this.enableBlur = true,
+    this.specularHighlight = false,
+    this.tintFactor,
+  })  : tier = GlassTier.standard,
+        blur = preset.blur,
+        opacity = preset.opacity,
+        isLiquid = preset == GlassPreset.dock;
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final effectiveRadius = borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
+    final effectiveRadius =
+        borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
     final effectiveAlpha = tintFactor != null
         ? (0.20 + (tintFactor!.clamp(0.0, 1.0) * 0.70))
         : opacity;
@@ -107,8 +139,10 @@ class GlassContainer extends StatelessWidget {
     // Layered border: subtle outer contour
     final effectiveBorder = border ??
         Border.all(
-          color: (p.isDark ? Colors.white : Colors.black)
-              .withValues(alpha: p.isDark ? (isLiquid ? 0.14 : 0.10) : (isLiquid ? 0.10 : 0.06)),
+          color: (p.isDark ? Colors.white : Colors.black).withValues(
+              alpha: p.isDark
+                  ? (isLiquid ? 0.14 : 0.10)
+                  : (isLiquid ? 0.10 : 0.06)),
           width: isLiquid ? 1.2 : 1.0,
         );
 

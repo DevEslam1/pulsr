@@ -6,6 +6,7 @@ import '../../features/player/cubit/player_cubit.dart';
 import '../constants/app_typography.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
+import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 import 'pulsr_dock_tracker.dart';
@@ -405,21 +406,25 @@ class _ToastWidgetState extends State<_ToastWidget>
                         ),
                         child: ClipRRect(
                           borderRadius: snackbarRadius,
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: snackbarRadius,
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    p.surface.withValues(
-                                        alpha: p.isDark ? 0.82 : 0.90),
-                                    p.surfaceContainer.withValues(
-                                        alpha: p.isDark ? 0.76 : 0.86),
-                                  ],
-                                ),
+                          child: Builder(
+                            builder: (context) {
+                              final toastContainer = Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: snackbarRadius,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      GpuBudget.isGpuSaverActive
+                                          ? p.surface
+                                          : p.surface.withValues(
+                                              alpha: p.isDark ? 0.82 : 0.90),
+                                      GpuBudget.isGpuSaverActive
+                                          ? p.surfaceContainer
+                                          : p.surfaceContainer.withValues(
+                                              alpha: p.isDark ? 0.76 : 0.86),
+                                    ],
+                                  ),
                                 border: Border.all(
                                   color: widget.isError
                                       ? p.error.withValues(alpha: 0.45)
@@ -572,9 +577,18 @@ class _ToastWidgetState extends State<_ToastWidget>
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
+                            );
+
+                            if (GpuBudget.isGpuSaverActive) {
+                              return toastContainer;
+                            }
+                            return BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                              child: toastContainer,
+                            );
+                          },
                         ),
+                      ),
                       ),
                     ),
                   ),

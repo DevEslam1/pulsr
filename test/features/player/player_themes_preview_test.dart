@@ -35,7 +35,8 @@ void main() {
       bgColor: const Color(0xFF1C1B1F),
     );
 
-    test('preview() wraps built theme with IgnorePointer and 360x640 bounds', () {
+    test('preview() wraps built theme with IgnorePointer and 360x640 bounds',
+        () {
       final previewWidget = ThemeRegistry.preview(
         PlayerThemeMode.classic,
         dummyProps,

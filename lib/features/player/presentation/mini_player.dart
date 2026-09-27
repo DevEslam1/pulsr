@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/utils/adaptive.dart';
@@ -395,21 +396,25 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 ),
                 child: ClipRRect(
                   borderRadius: playerRadius,
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: playerRadius,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            p.surface
-                                .withValues(alpha: p.isDark ? 0.78 : 0.88),
-                            p.surfaceContainer
-                                .withValues(alpha: p.isDark ? 0.72 : 0.84),
-                          ],
-                        ),
+                  child: Builder(
+                    builder: (context) {
+                      final miniPlayerContainer = Container(
+                        decoration: BoxDecoration(
+                          borderRadius: playerRadius,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              GpuBudget.isGpuSaverActive
+                                  ? p.surface
+                                  : p.surface
+                                      .withValues(alpha: p.isDark ? 0.78 : 0.88),
+                              GpuBudget.isGpuSaverActive
+                                  ? p.surfaceContainer
+                                  : p.surfaceContainer
+                                      .withValues(alpha: p.isDark ? 0.72 : 0.84),
+                            ],
+                          ),
                         border: Border.all(
                           color: p.isDark
                               ? Colors.white.withValues(alpha: 0.14)
@@ -649,9 +654,18 @@ class _MiniPlayerState extends State<MiniPlayer> {
                   ],
                 ),
                   ),
-                ),
-              ),
+                );
+
+                if (GpuBudget.isGpuSaverActive) {
+                  return miniPlayerContainer;
+                }
+                return BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                  child: miniPlayerContainer,
+                );
+              },
             ),
+          ),
           ),
         ),
       ),

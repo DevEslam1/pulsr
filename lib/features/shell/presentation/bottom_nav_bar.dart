@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../core/utils/adaptive.dart';
@@ -129,20 +130,25 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                   ),
                   child: ClipRRect(
                     borderRadius: navRadius,
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: navRadius,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
-                              p.surfaceContainer
-                                  .withValues(alpha: p.isDark ? 0.72 : 0.84),
-                            ],
-                          ),
+                    child: Builder(
+                      builder: (context) {
+                        final navContainer = Container(
+                          decoration: BoxDecoration(
+                            borderRadius: navRadius,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                GpuBudget.isGpuSaverActive
+                                    ? p.surface
+                                    : p.surface
+                                        .withValues(alpha: p.isDark ? 0.78 : 0.88),
+                                GpuBudget.isGpuSaverActive
+                                    ? p.surfaceContainer
+                                    : p.surfaceContainer
+                                        .withValues(alpha: p.isDark ? 0.72 : 0.84),
+                              ],
+                            ),
                           border: Border.all(
                             color: p.isDark
                                 ? Colors.white.withValues(alpha: 0.14)
@@ -189,7 +195,16 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                             ),
                           ],
                         ),
-                      ),
+                      );
+
+                        if (GpuBudget.isGpuSaverActive) {
+                          return navContainer;
+                        }
+                        return BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                          child: navContainer,
+                        );
+                      },
                     ),
                   ),
                 ),

@@ -1045,7 +1045,9 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
         final songs = [for (final track in tracks) track.toSongData()];
         if (!_warmedFirst && songs.isNotEmpty) {
           _warmedFirst = true;
-          widget.playerCubit.warmStream(songs.first);
+          // Warm the top couple of a carousel (kept low: home renders several
+          // carousels, so a larger count would burst resolves across them).
+          widget.playerCubit.warmStreams(songs, count: 2);
         }
         final ytmCubit = getIt.isRegistered<YtmDownloadCubit>()
             ? getIt<YtmDownloadCubit>()

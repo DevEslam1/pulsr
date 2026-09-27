@@ -21,8 +21,10 @@ class ArtworkCacheManager {
       100; // 100 MB default maximum cache size
 
   final Map<String, Uint8List> _memoryCache = {};
+  final Map<String, WeakReference<Uint8List>> _weakMemoryCache = {};
   static const int _maxMemoryItems = 150;
   static const int _maxMemoryBytes = 35 * 1024 * 1024; // 35 MB memory ceiling
+  static const int largePayloadThreshold = 512 * 1024; // 512 KB
   int _currentMemoryBytes = 0;
 
   Directory? _cacheDir;
@@ -63,14 +65,24 @@ class ArtworkCacheManager {
 
   /// Retrieves artwork bytes from memory cache or persistent disk cache
   Future<Uint8List?> get(String key) async {
-    // 1. Check memory cache
+    // 1. Check memory cache (strong)
     if (_memoryCache.containsKey(key)) {
       final bytes = _memoryCache.remove(key)!;
       _memoryCache[key] = bytes; // LRU refresh
       return bytes;
     }
 
-    // 2. Check disk cache
+    // 2. Check weak memory cache for large payloads
+    final weak = _weakMemoryCache[key];
+    if (weak != null) {
+      final target = weak.target;
+      if (target != null && target.isNotEmpty) {
+        return target;
+      }
+      _weakMemoryCache.remove(key);
+    }
+
+    // 3. Check disk cache
     try {
       if (_cacheDir == null) await init();
       if (_cacheDir != null && await _cacheDir!.exists()) {
@@ -117,6 +129,11 @@ class ArtworkCacheManager {
   }
 
   void _putMemory(String key, Uint8List bytes) {
+    if (bytes.lengthInBytes > largePayloadThreshold) {
+      _weakMemoryCache[key] = WeakReference(bytes);
+      return;
+    }
+
     if (_memoryCache.containsKey(key)) {
       final old = _memoryCache.remove(key)!;
       _currentMemoryBytes -= old.lengthInBytes;
@@ -155,6 +172,7 @@ class ArtworkCacheManager {
   /// Clears both in-memory and disk cache
   Future<void> clearAllCache() async {
     _memoryCache.clear();
+    _weakMemoryCache.clear();
     _currentMemoryBytes = 0;
     try {
       if (_cacheDir == null) await init();

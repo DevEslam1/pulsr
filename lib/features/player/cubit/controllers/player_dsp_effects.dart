@@ -515,16 +515,19 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       );
 
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) {
-    final bands = List<DynamicEqBandConfig>.from(_getState().dynamicEqBands);
-    while (bands.length <= index) {
-      bands.add(const DynamicEqBandConfig());
-    }
-    bands[index] = band;
+    final current = _getState().dynamicEqBands;
+    // Match EqualizerManager.setDynamicEqBand: it rejects out-of-range indices
+    // (use addDynamicEqBand to append) and stores the sanitized band. Mirror
+    // both here so PlayerState never diverges from the engine state.
+    if (index < 0 || index >= current.length) return Future.value();
+    final sanitized = band.sanitized();
+    final bands = List<DynamicEqBandConfig>.from(current);
+    bands[index] = sanitized;
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
       requiresGuard: false,
       updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
-      applyAudioHandler: () => _audioHandler.setDynamicEqBand(index, band),
+      applyAudioHandler: () => _audioHandler.setDynamicEqBand(index, sanitized),
     );
   }
 

@@ -181,6 +181,14 @@ class _OnlinePlaylistDetailScreenState
           _artworkUrl ??= fetchedTracks.firstOrNull?.artworkUrl;
         }
       });
+      // Speculative warm: pre-resolve the head of the list so a tap near the
+      // top starts from the shared YtmUrlCache instead of a cold multi-engine
+      // resolve. Staggered and bot-cooldown-aware inside warmStreams.
+      if (!_disposed && mounted) {
+        context.read<PlayerCubit>().warmStreams(
+              [for (final t in fetchedTracks.take(3)) t.toSongData()],
+            );
+      }
     } catch (e) {
       if (_disposed || !mounted) return;
       setState(() {

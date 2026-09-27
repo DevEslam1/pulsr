@@ -150,11 +150,18 @@ class YtmService {
 
   /// How long Tier-1 (the authenticated account InnerTube resolve) runs alone
   /// before Tier-2 (the native multi-client chain) is started alongside it.
-  /// Long enough that a warm signed-in resolve — the case this ordering exists
-  /// for — still finishes first and never pays for a redundant native chain;
-  /// short enough that a slow account hop no longer delays the native chain by
-  /// its full duration.
-  static const Duration _tier1HedgeDelay = Duration(milliseconds: 1500);
+  /// A warm signed-in resolve is a single InnerTube `/player` round-trip
+  /// (~300-600ms), so this window still lets it win outright and skip a
+  /// redundant native chain in the common case; a slow account hop now delays
+  /// the (usually faster) native tier by at most this window instead of the
+  /// old 1500ms — halving worst-case dead-time on a signed-in cold tap.
+  /// Only signed-in cold taps are affected: a logged-out resolve returns null
+  /// from Tier-1 immediately and promotes the native tier without waiting out
+  /// the hedge (see `runAccountTier` and the null branch that calls
+  /// `startNativeTier()` below). Lowering trades a slightly higher chance of
+  /// spending one extra (uncancellable) native chain for a faster start when
+  /// the account hop lags.
+  static const Duration _tier1HedgeDelay = Duration(milliseconds: 700);
 
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =

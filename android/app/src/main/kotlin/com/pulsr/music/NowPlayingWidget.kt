@@ -671,16 +671,16 @@ class NowPlayingWidget : AppWidgetProvider() {
                 context.getString(if (isPlaying) R.string.widget_pause else R.string.widget_play)
             )
 
-            // C-4 progress-only tick: re-attach the cached artwork (so the launcher
-            // keeps showing it) and touch nothing else — no bitmap decode, no text,
-            // no fresh PendingIntents.
-            if (isProgressOnly) {
-                val cachedBmp = cachedArtworkBitmap
-                if (cachedBmp != null && !cachedBmp.isRecycled) {
-                    views.setImageViewBitmap(R.id.widget_artwork, cachedBmp)
-                }
-                return views
-            }
+            // C-4 progress-only tick: `updateAppWidget()` REPLACES the widget's
+            // RemoteViews wholesale (only `partiallyUpdateAppWidget()` merges a
+            // diff onto the previous ones), so a RemoteViews handed to it must be
+            // a *complete* description of the widget. Returning early here left
+            // out the title/artist text, favourite/shuffle/repeat icons and —
+            // critically — every click PendingIntent, so ~1s into playback the
+            // transport buttons went dead and the labels blanked until the next
+            // full render. We therefore keep populating everything below; the only
+            // progress-only shortcut is reusing the already-decoded artwork bitmap
+            // (see the artwork section) to skip the disk decode.
 
             // ---- Text (Title & Artist) ----
             val title = getSafeString(data, "title")
@@ -793,8 +793,20 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
 
             // ---- Artwork ----
+            // On a progress-only tick reuse the already-decoded bitmap so the
+            // per-second update never touches disk. getOrDecodeArtworkBitmap is
+            // itself cached by path+mtime, so a full render would also avoid the
+            // decode — preferring the cache here just keeps the fast path explicit
+            // and guards against a stale prefs `artwork` path during the tick.
             val artworkPath = getSafeString(data, "artwork")
-            val bmp = if (!artworkPath.isNullOrEmpty()) getOrDecodeArtworkBitmap(context, artworkPath) else null
+            val cachedBmp = cachedArtworkBitmap
+            val bmp = if (isProgressOnly && cachedBmp != null && !cachedBmp.isRecycled) {
+                cachedBmp
+            } else if (!artworkPath.isNullOrEmpty()) {
+                getOrDecodeArtworkBitmap(context, artworkPath)
+            } else {
+                null
+            }
             if (bmp != null && !bmp.isRecycled) {
                 views.setImageViewBitmap(R.id.widget_artwork, bmp)
             } else {

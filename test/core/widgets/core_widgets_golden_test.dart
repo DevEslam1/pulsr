@@ -34,7 +34,8 @@ Widget _buildThemedHarness({
 
 void main() {
   group('Core Widgets Safety Suite (Phase 0)', () {
-    testWidgets('PulsrCard renders properly with child and responds to hover/tap',
+    testWidgets(
+        'PulsrCard renders properly with child and responds to hover/tap',
         (tester) async {
       var tapped = false;
       await tester.pumpWidget(

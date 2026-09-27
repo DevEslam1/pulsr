@@ -13,6 +13,7 @@ import '../../cubit/player_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import '../../../../data/db/app_database.dart';
 
 class NowPlayingQueueView extends StatefulWidget {
   const NowPlayingQueueView({super.key});
@@ -185,8 +186,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                           final song = queue[index];
                           final isCurrent = index == state.currentIndex;
 
-                          return Material(
-                            key: slotKeys[index],
+                          final itemTile = Material(
                             color: Colors.transparent,
                             child: ListTile(
                               leading: Stack(
@@ -265,8 +265,29 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                       constraints: const BoxConstraints(
                                           minWidth: AppSpacing.minTouchTarget,
                                           minHeight: AppSpacing.minTouchTarget),
-                                      onPressed: () =>
-                                          cubit.removeQueueItem(index),
+                                      onPressed: () {
+                                        final prevQueue =
+                                            List<SongsTableData>.from(state.queue);
+                                        final prevIndex = state.currentIndex;
+                                        cubit.removeQueueItem(index);
+                                        ScaffoldMessenger.of(context).clearSnackBars();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              song.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            action: SnackBarAction(
+                                              label: context.l10n.undo,
+                                              onPressed: () {
+                                                cubit.restoreQueue(
+                                                    prevQueue, prevIndex);
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ReorderableDragStartListener(
                                     index: index,
@@ -287,6 +308,49 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                 cubit.playSong(song, queue: queue);
                               },
                             ),
+                          );
+
+                          if (isCurrent) {
+                            return KeyedSubtree(
+                              key: slotKeys[index],
+                              child: itemTile,
+                            );
+                          }
+
+                          return Dismissible(
+                            key: slotKeys[index],
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: AlignmentDirectional.centerEnd,
+                              padding: const EdgeInsetsDirectional.only(
+                                  end: AppSpacing.md),
+                              color: p.favorite.withValues(alpha: 0.18),
+                              child: Icon(Icons.delete_outline_rounded,
+                                  color: p.favorite),
+                            ),
+                            onDismissed: (_) {
+                              final prevQueue =
+                                  List<SongsTableData>.from(state.queue);
+                              final prevIndex = state.currentIndex;
+                              cubit.removeQueueItem(index);
+                              ScaffoldMessenger.of(context).clearSnackBars();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    song.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  action: SnackBarAction(
+                                    label: context.l10n.undo,
+                                    onPressed: () {
+                                      cubit.restoreQueue(prevQueue, prevIndex);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            child: itemTile,
                           );
                         },
                       ),
