@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -104,8 +103,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                 valueListenable: _visualDyNotifier,
                 builder: (context, visualDy, child) {
                   return AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    curve: Curves.easeOutCubic,
+                    duration: context.motionMs(120),
+                    curve: context.motionCurve(Curves.easeOutCubic),
                     transform: Matrix4.translationValues(0, visualDy, 0),
                     height: barHeight,
                     child: child,
@@ -188,7 +187,6 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                       iconOnly: widget.iconOnly,
                                       onTap: () {
                                         if (widget.currentIndex != i) {
-                                          HapticFeedback.selectionClick();
                                           widget.onTap(i);
                                         }
                                       },

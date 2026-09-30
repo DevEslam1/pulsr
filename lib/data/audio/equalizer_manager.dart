@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show ValueNotifier;
+import 'package:flutter/foundation.dart' show ValueNotifier, listEquals;
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
@@ -27,6 +27,7 @@ export 'async_lock.dart' show AsyncLock;
 
 part 'equalizer_preset_ops.dart';
 part 'equalizer_snapshot_ops.dart';
+part 'equalizer_effect_ops.dart';
 
 class EqualizerManager {
   final AndroidLoudnessEnhancer? loudnessEnhancerA;
@@ -264,7 +265,28 @@ class EqualizerManager {
   EqualizerManager({this.loudnessEnhancerA, this.loudnessEnhancerB});
 
   void _debouncedSavePreferences() {
-    if (_isDegradedForPower) return; // battery degrade must not clobber saved ON prefs
+    if (_restoringFromDegrade) {
+      // BUG-22: restoreFromDegrade persists the merged state once at the end;
+      // intermediate debounced writes during the restore would race it.
+      return;
+    }
+    if (_isDegradedForPower) {
+      // BUG-04: capture the user's changes instead of silently dropping them.
+      // Diffing against the post-degrade baseline stores only the touched keys
+      // so restore can merge them without re-disabling untouched stages.
+      final baseline = _degradeBaselinePrefs;
+      if (baseline != null) {
+        final current = _buildSavePreferencesMap();
+        final delta = <String, dynamic>{};
+        for (final entry in current.entries) {
+          if (baseline[entry.key] != entry.value) {
+            delta[entry.key] = entry.value;
+          }
+        }
+        _pendingDegradePrefs = delta.isEmpty ? null : delta;
+      }
+      return;
+    }
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 350), () {
       _savePreferences();
@@ -1428,335 +1450,6 @@ class EqualizerManager {
     _debouncedSavePreferences();
   }
 
-  Future<void> setVirtualizerEnabled(bool enabled) async {
-    // FIX M-9: skip no-op IPC when virtualizer is not supported
-    if (!_effectsChannel.isVirtualizerSupported) return;
-    
-    final previous = isVirtualizerEnabled;
-    isVirtualizerEnabled = enabled;
-    try {
-      final applied = await _effectsChannel.setVirtualizerEnabled(enabled);
-      if (enabled) {
-        _recordEffectOutcome('virtualizer', applied);
-        // Never leave the toggle ON when the engine rejected the request.
-        if (!applied) isVirtualizerEnabled = previous;
-      } else {
-        _recordEffectOutcome('virtualizer', true);
-      }
-      await _savePreferences();
-    } catch (e, st) {
-      isVirtualizerEnabled = previous;
-      _recordEffectOutcome('virtualizer', false);
-      ErrorLogger.log(
-        'Failed to set virtualizer enabled',
-        error: e,
-        stackTrace: st,
-        category: 'EqualizerManager',
-      );
-    }
-  }
-
-  Future<void> setVirtualizerStrength(double strength) async {
-    // FIX M-9: skip no-op IPC when virtualizer is not supported
-    if (!_effectsChannel.isVirtualizerSupported) return;
-    
-    virtualizerStrength = strength.clamp(0.0, 1.0);
-    final applied = await _effectsChannel.setVirtualizerStrength(
-      virtualizerStrength,
-    );
-    _recordEffectOutcome('virtualizer', applied || virtualizerStrength <= 0.0);
-    await _savePreferences();
-  }
-
-  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {
-    dynamicsPreset = preset;
-    if (enabled != null) {
-      isDynamicsEnabled = enabled;
-    } else if (preset == DynamicsPreset.off) {
-      isDynamicsEnabled = false;
-    } else {
-      isDynamicsEnabled = true;
-    }
-    if (!_isDynamicsBypassed) {
-      final applied = await _effectsChannel.setDynamicsPreset(
-        dynamicsPreset,
-        isDynamicsEnabled,
-      );
-      final wantsDynamics = isDynamicsEnabled && preset != DynamicsPreset.off;
-      // A rejected "off" still reaches the desired disabled state; only an
-      // enabled-but-rejected preset is a genuine "not applied".
-      _recordEffectOutcome('dynamics', applied || !wantsDynamics);
-    }
-    await _savePreferences();
-  }
-
-  Future<void> toggleDynamicsBypass() async {
-    _isDynamicsBypassed = !_isDynamicsBypassed;
-    if (_isDynamicsBypassed) {
-      await _effectsChannel.setDynamicsPreset(DynamicsPreset.off, false);
-    } else {
-      await _effectsChannel.setDynamicsPreset(
-        dynamicsPreset,
-        isDynamicsEnabled,
-      );
-    }
-    await _savePreferences();
-  }
-
-  bool get isSpatializerSupported => _effectsChannel.isSpatializerSupported;
-  bool get isHeadTrackerAvailable => _effectsChannel.isHeadTrackerAvailable;
-
-  /// Applies the spatializer enable flag, then falls back to the hardware
-  /// virtualizer when the device has no Spatializer API. Uses the channel
-  /// directly (never [_savePreferences]) so it is safe to call from within
-  /// [_restorePreferences] while [_effectsLock] is held, and from the public
-  /// setter, restore and reattach paths alike.
-  Future<bool> _applySpatializerWithFallback(bool enabled) async {
-    final applied = await _effectsChannel.setSpatializerEnabled(enabled);
-    if (enabled && !_effectsChannel.isSpatializerSupported) {
-      if (!isVirtualizerEnabled) {
-        isVirtualizerEnabled = true;
-        _recordEffectOutcome(
-          'virtualizer',
-          await _effectsChannel.setVirtualizerEnabled(true),
-        );
-        if (virtualizerStrength < 0.3) {
-          virtualizerStrength = 0.7;
-          _recordEffectOutcome(
-            'virtualizer',
-            await _effectsChannel.setVirtualizerStrength(virtualizerStrength),
-          );
-        }
-      }
-    }
-    return applied;
-  }
-
-  Future<void> setSpatializerEnabled(bool enabled) async {
-    final previous = isSpatializerEnabled;
-    isSpatializerEnabled = enabled;
-    try {
-      final applied = await _applySpatializerWithFallback(enabled);
-      if (enabled) {
-        _recordEffectOutcome('spatializer', applied);
-        if (!applied) isSpatializerEnabled = previous;
-      } else {
-        _recordEffectOutcome('spatializer', true);
-      }
-      await _savePreferences();
-    } catch (e, st) {
-      isSpatializerEnabled = previous;
-      _recordEffectOutcome('spatializer', false);
-      ErrorLogger.log(
-        'Failed to set spatializer enabled',
-        error: e,
-        stackTrace: st,
-        category: 'EqualizerManager',
-      );
-    }
-  }
-
-  bool get hasOemAudio => _effectsChannel.hasOemAudio;
-  List<String> get detectedOemEngines => _effectsChannel.detectedOemEngines;
-
-  Future<void> setCrossfeed(
-    bool enabled, {
-    double? delayUs,
-    double? feedDb,
-    double? fcut,
-    int? mode,
-  }) async {
-    isCrossfeedEnabled = enabled;
-    if (delayUs != null) {
-      crossfeedDelayUs = delayUs.clamp(200.0, 700.0);
-    }
-    if (feedDb != null) {
-      crossfeedFeedDb = feedDb.clamp(-15.0, -6.0);
-    }
-    if (fcut != null) {
-      crossfeedFcut = fcut.clamp(200.0, 2000.0);
-    }
-    if (mode != null) crossfeedMode = mode.clamp(0, 3);
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setCrossfeedParams(
-        crossfeedDelayUs,
-        crossfeedFeedDb,
-        fcut: crossfeedFcut,
-      );
-      await _effectsChannel.setCrossfeedMode(crossfeedMode);
-      await _effectsChannel.setCrossfeedEnabled(enabled);
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  Future<void> setCrossfeedMode(int mode) async {
-    crossfeedMode = mode.clamp(0, 3);
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setCrossfeedMode(crossfeedMode);
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  Future<void> setLookaheadLimiter(
-    bool enabled, {
-    double? thresholdDb,
-    double? releaseMs,
-    double? lookaheadMs,
-  }) async {
-    isLimiterEnabled = enabled;
-    if (thresholdDb != null) limiterThresholdDb = thresholdDb;
-    if (releaseMs != null) limiterReleaseMs = releaseMs;
-    if (lookaheadMs != null) limiterLookaheadMs = lookaheadMs;
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setLimiterParams(
-        limiterLookaheadMs,
-        limiterThresholdDb,
-        limiterReleaseMs,
-      );
-      await _effectsChannel.setLimiterEnabled(enabled);
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  Future<void> setCompressorParams({
-    double? thresholdDb,
-    double? ratio,
-    double? attackMs,
-    double? releaseMs,
-    double? makeupGainDb,
-  }) async {
-    if (thresholdDb != null) limiterThresholdDb = thresholdDb;
-    if (ratio != null) compressorRatio = ratio;
-    if (attackMs != null) compressorAttackMs = attackMs;
-    if (releaseMs != null) limiterReleaseMs = releaseMs;
-    if (makeupGainDb != null) compressorMakeupGainDb = makeupGainDb;
-
-    // Any explicit edit marks the compressor knobs as user-owned so restore
-    // and reattach keep forwarding them to the HAL.
-    _hasStoredCompressorParams = true;
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setLimiterParams(
-        limiterLookaheadMs,
-        limiterThresholdDb,
-        limiterReleaseMs,
-        ratio: compressorRatio,
-        attackMs: compressorAttackMs,
-        makeupGainDb: compressorMakeupGainDb,
-      );
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  Future<void> setReverb(
-    bool enabled, {
-    int? preset,
-    double? wetDry,
-    double? predelayMs,
-    double? damping,
-  }) async {
-    isReverbEnabled = enabled;
-    if (preset != null) {
-      // Wire values are ReverbPreset ordinals (0..N); anything else has no
-      // synthesizable IR on the native side, so clamp instead of forwarding
-      // garbage that would silently produce the wrong room.
-      reverbPreset =
-          preset.clamp(0, ReverbPreset.values.length - 1);
-    }
-    if (wetDry != null) reverbWetDry = wetDry.clamp(0.0, 1.0);
-    if (predelayMs != null) reverbPredelayMs = predelayMs.clamp(0.0, 150.0);
-    if (damping != null) reverbDamping = damping.clamp(0.0, 1.0);
-    if (PlatformCapabilities.isAndroid) {
-      // Forward the clamped field, not the raw argument, so an out-of-range
-      // ordinal never reaches native and produce the wrong room (see clamp above).
-      if (preset != null) await _effectsChannel.setReverbPreset(reverbPreset);
-      // FIX M-7: always sync wet/dry after preset change so DSP is not stale
-      await _effectsChannel.setReverbWetDry(wetDry ?? reverbWetDry);
-      // Predelay, damping and cross-channel share one native call; push the
-      // current values so a preset change never leaves them stale.
-      await _effectsChannel.setReverbParams(
-        predelayMs: reverbPredelayMs,
-        damping: reverbDamping,
-        crossChannel: reverbCrossChannel,
-      );
-      await _effectsChannel.setReverbEnabled(enabled);
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  /// Loads a user-supplied impulse response. Returns true only when the native
-  /// side accepted it, so callers never flip the UI to "Custom (Loaded)" on a
-  /// failed load.
-  Future<bool> loadCustomImpulseResponse(List<double> irSamples) async {
-    if (irSamples.isEmpty) {
-      ErrorLogger.log(
-        'Cannot load an empty impulse response',
-        category: 'EqualizerManager',
-      );
-      return false;
-    }
-    if (!PlatformCapabilities.isAndroid) {
-      ErrorLogger.log(
-        'Custom impulse response convolution reverb is only supported on Android',
-        category: 'EqualizerManager',
-      );
-      return false;
-    }
-    final loaded = await _effectsChannel.loadImpulseResponse(irSamples);
-    if (!loaded) {
-      ErrorLogger.log(
-        'Custom impulse response rejected by native DSP',
-        category: 'EqualizerManager',
-      );
-      return false;
-    }
-    isReverbEnabled = true;
-    // Must be `custom`: any synthesizable ordinal makes the native side
-    // build its own IR on the next re-apply and discard the loaded one.
-    reverbPreset = ReverbPreset.custom.wireValue;
-    customImpulseResponse = List<double>.unmodifiable(irSamples);
-    await _effectsChannel.setReverbEnabled(true);
-    _debouncedSavePreferences();
-    _syncPipeline();
-    return true;
-  }
-
-  Future<int> getPipelineLatencyFrames() =>
-      _effectsChannel.getPipelineLatencyFrames();
-  Future<void> setBandSolo(int index, bool solo) =>
-      _effectsChannel.setBandSolo(index, solo);
-  Future<void> setBandMute(int index, bool mute) =>
-      _effectsChannel.setBandMute(index, mute);
-
-  Future<void> setStereoBalance(double balance) async {
-    stereoBalance = balance.clamp(-1.0, 1.0);
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setStereoBalance(stereoBalance);
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  Future<void> setMonoMix(bool mono) async {
-    monoMix = mono;
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setMonoMix(mono);
-    }
-    _debouncedSavePreferences();
-    _syncPipeline();
-  }
-
-  Future<void> setSincResampler(bool enabled) async {
-    isSincResamplerEnabled = enabled;
-    if (PlatformCapabilities.isAndroid) {
-      await _effectsChannel.setSincResamplerEnabled(enabled);
-    }
-    _debouncedSavePreferences();
-  }
 
   bool _isDegradedForPower = false;
   bool _savedReverbEnabled = false;
@@ -1777,6 +1470,19 @@ class EqualizerManager {
   /// extension cannot own fields) so [restoreFromDegrade] can apply it once the
   /// heavy stages are allowed back — see [EqualizerSnapshotOps.applyEffectsState].
   Map<String, dynamic>? _pendingDegradeEffectsSnapshot;
+
+  /// BUG-04: deltas the user made to any pref while battery-degraded. Merged
+  /// back in [restoreFromDegrade] so those changes are neither dropped nor
+  /// clobbered by the pre-degrade snapshot.
+  Map<String, dynamic>? _pendingDegradePrefs;
+
+  /// The degraded-state pref map captured at the end of [degradeToEssentials],
+  /// used to distinguish a user change from the degrade itself.
+  Map<String, dynamic>? _degradeBaselinePrefs;
+
+  /// BUG-22: true while [restoreFromDegrade] runs, so its intermediate setters
+  /// do not schedule debounced saves over the final merged write.
+  bool _restoringFromDegrade = false;
 
   bool get isDegradedForPower => _isDegradedForPower;
 
@@ -1814,6 +1520,10 @@ class EqualizerManager {
     if (_savedViperDdcEnabled) await setViperDdc(false);
     if (_savedArbitraryEqEnabled) await setArbitraryEq(false);
     if (_savedLiveProgEnabled) await setLiveProg(false);
+    // Capture the degraded state as the diff baseline AFTER disabling, so the
+    // disable pass itself is never mistaken for a user change.
+    _pendingDegradePrefs = null;
+    _degradeBaselinePrefs = _buildSavePreferencesMap();
     _syncPipeline();
   }
 
@@ -1821,29 +1531,63 @@ class EqualizerManager {
   Future<void> restoreFromDegrade() async {
     if (!_isDegradedForPower) return;
     _isDegradedForPower = false;
+    _restoringFromDegrade = true;
+    // Keys the user changed while degraded; those stages must keep the user's
+    // value instead of reverting to the pre-degrade snapshot (BUG-04).
+    final changed = _pendingDegradePrefs?.keys.toSet() ?? const <String>{};
 
-    if (_savedReverbEnabled) await setReverb(true);
-    if (_savedCrossfeedEnabled) await setCrossfeed(true);
-    if (_savedSaturationEnabled) await setSaturation(true);
-    if (_savedStereoWidthEnabled) await setStereoWidth(true);
-    if (_savedLoudnessContourEnabled) await setLoudnessContour(true);
-    if (_savedSubCrossoverEnabled) await setSubCrossover(true);
-    if (_savedDynamicEqEnabled) await setDynamicEq(true);
-    if (_savedDynamicsEnabled) {
+    if (_savedReverbEnabled &&
+        !changed.contains(PrefsKeys.convolutionReverbEnabled)) {
+      await setReverb(true);
+    }
+    if (_savedCrossfeedEnabled &&
+        !changed.contains(PrefsKeys.crossfeedEnabled)) {
+      await setCrossfeed(true);
+    }
+    if (_savedSaturationEnabled &&
+        !changed.contains(PrefsKeys.saturationEnabled)) {
+      await setSaturation(true);
+    }
+    if (_savedStereoWidthEnabled &&
+        !changed.contains(PrefsKeys.stereoWidthEnabled)) {
+      await setStereoWidth(true);
+    }
+    if (_savedLoudnessContourEnabled &&
+        !changed.contains(PrefsKeys.loudnessContourEnabled)) {
+      await setLoudnessContour(true);
+    }
+    if (_savedSubCrossoverEnabled &&
+        !changed.contains(PrefsKeys.subCrossoverEnabled)) {
+      await setSubCrossover(true);
+    }
+    if (_savedDynamicEqEnabled &&
+        !changed.contains(PrefsKeys.dynamicEqEnabled)) {
+      await setDynamicEq(true);
+    }
+    if (_savedDynamicsEnabled &&
+        !changed.contains(PrefsKeys.eqDynamicsEnabled)) {
       await setDynamicsPreset(_savedDynamicsPreset, enabled: true);
     }
-    if (_savedLimiterEnabled) await setLookaheadLimiter(true);
-    if (_savedViperDdcEnabled) await setViperDdc(true);
+    if (_savedLimiterEnabled &&
+        !changed.contains(PrefsKeys.lookaheadLimiterEnabled)) {
+      await setLookaheadLimiter(true);
+    }
+    if (_savedViperDdcEnabled &&
+        !changed.contains(PrefsKeys.viperDdcEnabled)) {
+      await setViperDdc(true);
+    }
     // Re-pass the stored curves/code: the setters only (re)load native
     // content when it is supplied, otherwise just the enable flag is pushed
     // and the stage comes back empty.
-    if (_savedArbitraryEqEnabled) {
+    if (_savedArbitraryEqEnabled &&
+        !changed.contains(PrefsKeys.arbitraryEqEnabled)) {
       await setArbitraryEq(
         true,
         eqString: arbitraryEqString.isNotEmpty ? arbitraryEqString : null,
       );
     }
-    if (_savedLiveProgEnabled) {
+    if (_savedLiveProgEnabled &&
+        !changed.contains(PrefsKeys.liveProgEnabled)) {
       await setLiveProg(
         true,
         code: liveProgCode.isNotEmpty ? liveProgCode : null,
@@ -1856,6 +1600,11 @@ class EqualizerManager {
     if (pending != null) {
       await applyEffectsState(pending);
     }
+    _pendingDegradePrefs = null;
+    _degradeBaselinePrefs = null;
+    _restoringFromDegrade = false;
+    // Persist the merged result exactly once (BUG-04/22).
+    await _savePreferences();
     _syncPipeline();
   }
 

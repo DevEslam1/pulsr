@@ -328,7 +328,9 @@ class YtmService {
     _authExpiredController.close();
     try {
       _httpClient.close();
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   Map<String, String> _localeArgs() {
@@ -347,7 +349,9 @@ class YtmService {
   Future<void> syncCookies(String cookies) async {
     try {
       await _channel.invokeMethod<bool>('setCookies', {'cookies': cookies});
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Tears down the native session on an explicit disconnect.
@@ -363,7 +367,9 @@ class YtmService {
       await _channel
           .invokeMethod<bool>('clearCookies')
           .timeout(const Duration(seconds: 4));
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Calls native PoTokenManager to ensure attestation tokens are ready.
@@ -384,7 +390,9 @@ class YtmService {
       await _channel
           .invokeMethod<bool>('invalidatePoToken')
           .timeout(const Duration(seconds: 2));
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Retrieves state of PoTokenManager.
@@ -438,14 +446,18 @@ class YtmService {
     try {
       await _channel
           .invokeMethod<bool>('setDataSyncId', {'dataSyncId': dataSyncId});
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Pre-warms BotGuard WebView and Capability Matrix.
   Future<void> preWarm() async {
     try {
       await _channel.invokeMethod<bool>('preWarm');
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Checks if active connection is via VPN.
@@ -462,7 +474,9 @@ class YtmService {
   Future<void> resetIdentities() async {
     try {
       await _channel.invokeMethod<bool>('resetIdentities');
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Returns true if native stack is running in limited mode (no poToken).
@@ -490,17 +504,23 @@ class YtmService {
       if (getIt.isRegistered<YtmUrlCache>()) {
         getIt<YtmUrlCache>().clear();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     try {
       if (getIt.isRegistered<YtmBrowseService>()) {
         getIt<YtmBrowseService>().clearCache();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     try {
       await _channel
           .invokeMethod<bool>('clearNetworkCaches')
           .timeout(const Duration(seconds: 3));
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   Future<bool> isAvailable() async {
@@ -846,7 +866,9 @@ class YtmService {
         timeout: _defaultSearchTimeout,
       );
       if (raw != null && raw.isNotEmpty) return _parseTracks(raw);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     return trending(limit: limit);
   }
 
@@ -860,7 +882,9 @@ class YtmService {
         timeout: _defaultSearchTimeout,
       );
       if (raw != null && raw.isNotEmpty) return _parseTracks(raw);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     return const [];
   }
 
@@ -995,7 +1019,9 @@ class YtmService {
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         return cachedEntry.toStream(quality: quality);
       }
     }
@@ -1042,7 +1068,9 @@ class YtmService {
             _noteResolveSuccess(videoId: videoId);
             inBotCooldown = false;
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       } else {
         debugPrint(
             '[YTM_SERVICE] Block cooldown active (${lastSignal?.name ?? 'unknown'}); failing fast for $videoId');
@@ -1055,7 +1083,9 @@ class YtmService {
 
     try {
       _tracker?.markStage(PlaybackStage.pluginEntered);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     // Tier-1 (authenticated account InnerTube) and Tier-2 (native multi-client
     // extractor) used to run strictly one after the other, so a slow Tier-1
     // charged its whole 50 s budget before the native chain — normally the
@@ -1095,13 +1125,17 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.clientRequestSent);
               _tracker?.markStage(PlaybackStage.poTokenNeeded);
-            } catch (_) {}
+            } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
             final directStream =
                 await account.resolvePlayerStream(videoId, quality: quality);
             if (directStream != null) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
-              } catch (_) {}
+              } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
               // putStream, not put: the entry keeps the real container, MIME and
               // bitrate. put() alone let a later cache hit rebuild the stream by
               // guessing them from the URL, which wrote Opus bytes into a .m4a.
@@ -1153,7 +1187,9 @@ class YtmService {
           _tracker?.markStage(PlaybackStage.clientRequestSent);
           // Check poToken state heuristically: if we have a cached token, this is warm
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         // maxRetries: 0 — the native side already runs its own multi-client
         // hedged chain with internal retries. A Dart-level timeout retry can't
         // cancel the still-running native call, so it just stacks a *second* full
@@ -1173,7 +1209,9 @@ class YtmService {
         if (stream != null) {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
-          } catch (_) {}
+          } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
           urlCache?.putStream(stream, quality: cacheQuality);
           _noteResolveSuccess(videoId: videoId);
           return stream;
@@ -1283,7 +1321,9 @@ class YtmService {
           if (stream != null) {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
-            } catch (_) {}
+            } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
             urlCache?.putStream(stream, quality: cacheQuality);
             _noteResolveSuccess(videoId: videoId);
             return stream;
@@ -1316,7 +1356,9 @@ class YtmService {
       if (dartStream != null) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         urlCache?.putStream(dartStream, quality: cacheQuality);
         _noteResolveSuccess(videoId: videoId);
         return dartStream;
@@ -1357,7 +1399,9 @@ class YtmService {
           await getPoTokenState().timeout(const Duration(seconds: 2));
       guestPoToken = poState?['streamingPoToken'] as String?;
       guestVisitorData = poState?['visitorData'] as String?;
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
 
     final List<_DartPlayerClient> clients = [
       (

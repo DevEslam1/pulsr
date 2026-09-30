@@ -9,6 +9,261 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
+  String get sleepTimerDurationMinutes => 'المدة (بالدقائق)';
+
+  @override
+  String get sleepTimerMinutesHint => 'مثال: 25';
+
+  @override
+  String get minuteAbbreviation => 'د';
+
+  @override
+  String get sleepTimerInvalidRange => 'أدخل قيمة من 1 إلى 720 دقيقة';
+
+  @override
+  String get moreOptions => 'خيارات';
+
+  @override
+  String get googleCast => 'Google Cast';
+
+  @override
+  String get autoplay => 'التشغيل التلقائي';
+
+  @override
+  String trackCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مسار',
+      many: '$count مسارًا',
+      few: '$count مسارات',
+      two: 'مساران',
+      one: 'مسار واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get decades => 'العقود';
+
+  @override
+  String get libraryManageTabs => 'التبويبات';
+
+  @override
+  String get libraryAtLeastOneTab => 'مطلوب تبويب واحد على الأقل';
+
+  @override
+  String libraryTabsReorder(int active, int total) {
+    return '$active من $total تبويبات • اسحب لإعادة الترتيب';
+  }
+
+  @override
+  String libraryTabsLongPress(int active, int total) {
+    return '$active من $total تبويبات • اضغط مطولاً للتنظيم';
+  }
+
+  @override
+  String libraryInactiveTabs(int count) {
+    return 'غير مفعّلة ($count)';
+  }
+
+  @override
+  String get whatsNew => 'الجديد';
+
+  @override
+  String get developer => 'المطوّر';
+
+  @override
+  String get showMore => 'عرض المزيد';
+
+  @override
+  String get showLess => 'عرض أقل';
+
+  @override
+  String get resetWaveformZoom => 'إعادة ضبط تكبير الموجة';
+
+  @override
+  String get dspLabel => 'DSP';
+
+  @override
+  String get queueTab => 'قائمة الانتظار';
+
+  @override
+  String get addTab => 'إضافة تبويب';
+
+  @override
+  String get twoPaneSelectItem => 'اختر عنصرًا لعرض التفاصيل';
+
+  @override
+  String get leAudioRequiresBle =>
+      'تتطلب برامج ترميز LE Audio (LC3 / Opus) اتصال Bluetooth LE Audio.';
+
+  @override
+  String get castEntireQueue => 'بث قائمة الانتظار بأكملها';
+
+  @override
+  String get roomAveragingTitle => 'متوسط الغرفة بثلاث نقاط';
+
+  @override
+  String get roomAveragingSubtitle =>
+      'يقيس الوسط و1 م يسارًا و1 م يمينًا لتصحيح دقيق';
+
+  @override
+  String get roomPositionCenter => 'الوسط';
+
+  @override
+  String get roomPositionLeft => 'يسار';
+
+  @override
+  String get roomPositionRight => 'يمين';
+
+  @override
+  String get correctionCurveRange => 'منحنى التصحيح (20 Hz – 20 kHz)';
+
+  @override
+  String get offsetMinus50Ms => '-50 ms';
+
+  @override
+  String get offsetPlus50Ms => '+50 ms';
+
+  @override
+  String get freq20Hz => '20 Hz';
+
+  @override
+  String get freq100Hz => '100 Hz';
+
+  @override
+  String get freq1kHz => '1 kHz';
+
+  @override
+  String get freq10kHz => '10 kHz';
+
+  @override
+  String get freq20kHz => '20 kHz';
+
+  @override
+  String songRemovedFromPlaylist(String title, String playlist) {
+    return 'تمت إزالة $title من $playlist';
+  }
+
+  @override
+  String playlistDeleted(String name) {
+    return 'تم حذف $name';
+  }
+
+  @override
+  String get voiceSearch => 'البحث الصوتي';
+
+  @override
+  String get voiceSearchUnavailable => 'البحث الصوتي غير متاح';
+
+  @override
+  String get searchLocalOnlineHint =>
+      'ابحث في الموسيقى المحلية وعبر الإنترنت...';
+
+  @override
+  String noLocalSongsMatch(String query) {
+    return 'لا توجد أغانٍ محلية تطابق \"$query\"';
+  }
+
+  @override
+  String noOnlineSongsMatch(String query) {
+    return 'لا توجد أغانٍ عبر الإنترنت تطابق \"$query\"';
+  }
+
+  @override
+  String get professionalMode => 'الوضع الاحترافي';
+
+  @override
+  String get professionalModeUnlocked =>
+      'تم فتح DSP المتقدم والبث بت مثالي وعناصر التحكم الصوتية الاحترافية.';
+
+  @override
+  String get quickDspControls => 'عناصر تحكم DSP السريعة';
+
+  @override
+  String get eqEngineTitle => 'محرك المعادل';
+
+  @override
+  String get eqEngineSubtitle => 'تصفية بارامترية biquad مباشرة';
+
+  @override
+  String get truePeakLimiterTitle => 'محدد الذروة الحقيقية';
+
+  @override
+  String get truePeakLimiterSubtitle => 'بدون قص بين العينات';
+
+  @override
+  String get viperDdcTitle => 'تصحيح سماعات ViPER-DDC';
+
+  @override
+  String get settingsSectionSoundPlayback => 'الصوت والتشغيل';
+
+  @override
+  String get settingsSectionAppearanceGestures => 'المظهر والإيماءات';
+
+  @override
+  String get settingsSectionSystemPrivacy => 'النظام والخصوصية';
+
+  @override
+  String get whatChanges => 'ما الذي يتغير؟';
+
+  @override
+  String get expEqTitle => 'المعادل و DSP';
+
+  @override
+  String get expEqPro => 'معادل بارامتري بـ10 نطاقات وعامل Q وتصحيح الغرفة';
+
+  @override
+  String get expEqNormal => 'إعدادات صوت ذكية مختارة';
+
+  @override
+  String get expUsbTitle => 'DAC USB والإخراج';
+
+  @override
+  String get expUsbPro => 'قفل عتاد بت مثالي وبث DSD DoP';
+
+  @override
+  String get expUsbNormal => 'AudioTrack النظام (32-bit float)';
+
+  @override
+  String get expCrossfadeTitle => 'التشغيل والتلاشي المتقاطع';
+
+  @override
+  String get expCrossfadePro => 'منحنى 0-12 ثانية دقيق ومعايرة زمن الاستجابة';
+
+  @override
+  String get expCrossfadeNormal => 'تلاشٍ متقاطع سلس قياسي 3 ثوانٍ';
+
+  @override
+  String get expGainTitle => 'الربح والجهارة';
+
+  @override
+  String get expGainPro => 'معايرة ReplayGain بالديسيبل ومضخم أولي يدوي';
+
+  @override
+  String get expGainNormal => 'موازنة تلقائية للجهارة المدركة';
+
+  @override
+  String get expVisualizersTitle => 'المؤثرات المرئية';
+
+  @override
+  String get expVisualizersPro => 'مشغّل إعدادات Milkdrop و JSON مخصص';
+
+  @override
+  String get expVisualizersNormal => 'أنماط Classic Wave و Radial Frequency';
+
+  @override
+  String queueReorderSemantics(String title, int index, int count) {
+    return 'إعادة ترتيب $title. الموضع $index من $count';
+  }
+
+  @override
+  String songByArtist(String title, String artist) {
+    return '$title بواسطة $artist';
+  }
+
+  @override
   String get customDurationMinutes => 'مدة مخصصة (بالدقائق).';
 
   @override
@@ -6750,5 +7005,179 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cassettePulsrTape => 'PULSR C-90';
 
   @override
+  String get dspPitchUpSemitone => 'حِدّة +1 نصف نغمة';
+
+  @override
+  String get dspPitchDownSemitone => 'حِدّة -1 نصف نغمة';
+
+  @override
+  String get dspPitchMeterUnavailable =>
+      'كشف حِدّة الصوت غير متاح في هذا الإصدار.';
+
+  @override
+  String get castNoLocalItems =>
+      'لا يوجد ما يمكن بثّه — الملفات المحلية فقط قابلة للبث.';
+
+  @override
+  String settingsCastingQueueTo(String device) {
+    return 'بث قائمة التشغيل إلى $device';
+  }
+
+  @override
+  String castCastingTo(String device) {
+    return 'البث إلى $device';
+  }
+
+  @override
+  String get castToSpeakerDisplay => 'البث إلى مكبر صوت / شاشة';
+
+  @override
+  String get castManageHint => 'اضغط لإدارة مستوى البث أو قطع الاتصال';
+
+  @override
+  String get castStreamHint => 'بث صوتي عبر Wi-Fi بدون فقدان/مع فقدان';
+
+  @override
+  String get downloadsMatchStream => 'التنزيلات مطابقة للبث';
+
+  @override
+  String get sleepTimerEndOfQueue => 'مؤقّت النوم: نهاية قائمة التشغيل';
+
+  @override
+  String sleepTimerTracksRemaining(int count) {
+    return 'مؤقّت النوم: $count مقطوعات متبقية';
+  }
+
+  @override
+  String sleepTimerMinutesRemaining(int minutes) {
+    return 'مؤقّت النوم: $minutes دقيقة متبقية';
+  }
+
+  @override
   String get statusCancelled => 'تم الإلغاء';
+
+  @override
+  String get dockStyleTitle => 'نمط الإرساء';
+
+  @override
+  String get dockStyleSubtitle =>
+      'اختر طريقة تراص المشغّل المصغّر وشريط التنقّل';
+
+  @override
+  String get dockStyleDefault => 'جنبًا إلى جنب';
+
+  @override
+  String get dockStyleDefaultDesc => 'المشغّل المصغّر فوق شريط التنقّل';
+
+  @override
+  String get dockStyleSystem => 'كبسولة عائمة';
+
+  @override
+  String get dockStyleSystemDesc => 'كبسولة وسائط عائمة فوق شريط التنقّل';
+
+  @override
+  String get dockStyleMiniTop => 'المشغّل المصغّر في المقدّمة';
+
+  @override
+  String get dockStyleMiniTopDesc => 'يظهر شريط التنقّل خلف المشغّل المصغّر';
+
+  @override
+  String get dockStyleNavTop => 'شريط التنقّل في المقدّمة';
+
+  @override
+  String get dockStyleNavTopDesc => 'يظهر المشغّل المصغّر خلف شريط التنقّل';
+
+  @override
+  String get dockStyleHint =>
+      'اضغط مطوّلًا على المشغّل المصغّر لتغيير نمط الإرساء';
+
+  @override
+  String whatsNewSubtitle(String version) {
+    return 'شاهد الجديد في الإصدار $version';
+  }
+
+  @override
+  String get studioMoreInStudio => 'المزيد في وضع الاستوديو';
+
+  @override
+  String studioControlsAvailable(int count) {
+    return '$count من أدوات الاستوديو متاحة';
+  }
+
+  @override
+  String get studioSwitchCta => 'التبديل إلى الاستوديو';
+
+  @override
+  String get studioExplainerTitle => 'ما الذي يضيفه وضع الاستوديو';
+
+  @override
+  String get studioExplainerBody =>
+      'إخراج مثالي للبت، وحزمة DSP الكاملة، وملفات الأجهزة، والأتمتة، وخادم الوسيط. يمكنك الرجوع في أي وقت.';
+
+  @override
+  String get alphabetIndexLabel => 'فهرس الحروف الأبجدي';
+
+  @override
+  String get badgeOn => 'مُشغّل';
+
+  @override
+  String get keepBestQualityForAll => 'الإبقاء على أفضل جودة للجميع';
+
+  @override
+  String selectedHighestQuality(int count) {
+    return 'تم اختيار أعلى جودة لـ $count مجموعة';
+  }
+
+  @override
+  String get enterSearchValue => 'أدخل قيمة البحث…';
+
+  @override
+  String get radioSearchHint => 'ابحث عن محطة أو نوع أو رابط…';
+
+  @override
+  String get webSessionInterruptedTitle => 'انقطعت جلسة الويب';
+
+  @override
+  String get webSessionInterruptedDesc =>
+      'تم فصل مقبض عرض الويب أو استعادته بواسطة النظام. اضغط أدناه لإعادة تحميل الجلسة.';
+
+  @override
+  String get onboardingGesturesTitle => 'الإيماءات والاختصارات';
+
+  @override
+  String get onboardingGesturesDesc =>
+      'بعض السحب واللمسات تجعل Pulsr سهل الاستخدام.';
+
+  @override
+  String get onboardingGestureSwipeUpTitle => 'اسحب لأعلى';
+
+  @override
+  String get onboardingGestureSwipeUpDesc => 'يفتح مشغّل الشاشة الكاملة';
+
+  @override
+  String get onboardingGestureSwipeDownTitle => 'اسحب لأسفل';
+
+  @override
+  String get onboardingGestureSwipeDownDesc =>
+      'يعيد ترتيب المشغّل المصغّر وشريط التنقّل';
+
+  @override
+  String get onboardingGestureDoubleTapTitle => 'انقر مرتين على الغلاف';
+
+  @override
+  String get onboardingGestureDoubleTapDesc => 'يبدّل المفضّلة';
+
+  @override
+  String get onboardingGestureLongPressTitle =>
+      'اضغط مطوّلًا على المشغّل المصغّر';
+
+  @override
+  String get onboardingGestureLongPressDesc => 'يفتح خيارات نمط الإرساء';
+
+  @override
+  String get onboardingPersonalizeTitle => 'اجعله يناسبك';
+
+  @override
+  String get onboardingPersonalizeDesc =>
+      'اختر لونًا الآن — يمكنك تغييره في أي وقت من الإعدادات.';
 }

@@ -1,7 +1,9 @@
 // lib/features/onboarding/presentation/onboarding_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -14,6 +16,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../data/scanner/media_scanner_service.dart';
+import '../../settings/cubit/settings_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -31,6 +34,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _isLoading = false;
+
+  /// Total walkthrough pages (privacy, playback, beauty, gestures, personalize).
+  static const int _pageCount = 5;
+  int get _lastPage => _pageCount - 1;
 
   @override
   void dispose() {
@@ -182,7 +189,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextPage() {
-    if (_currentPage < 2) {
+    if (_currentPage < _lastPage) {
       _pageController.nextPage(
         duration: context.motionMs(350),
         curve: context.motionCurve(Curves.easeInOut),
@@ -192,7 +199,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _skipToFinal() {
     _pageController.animateToPage(
-      2,
+      _lastPage,
       duration: context.motionMs(400),
       curve: context.motionCurve(Curves.easeInOut),
     );
@@ -226,7 +233,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: p.accent,
                     ),
                   ),
-                  if (_currentPage < 2)
+                  if (_currentPage < _lastPage)
                     TextButton(
                       onPressed: _skipToFinal,
                       child: Text(context.l10n.skipAction,
@@ -255,6 +262,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _buildPage1(context),
                   _buildPage2(context),
                   _buildPage3(context),
+                  _buildPage4(context),
+                  _buildPage5(context),
                 ],
               ),
             ),
@@ -273,7 +282,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   // Page Indicators (Dots)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (index) {
+                    children: List.generate(_pageCount, (index) {
                       final isActive = index == _currentPage;
                       return AnimatedContainer(
                         duration: context.motionMs(300),
@@ -293,7 +302,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   SizedBox(
                     width: double.infinity,
                     height: isLandscape ? 44 : 52,
-                    child: _currentPage == 2
+                    child: _currentPage == _lastPage
                         ? FilledButton(
                             style: FilledButton.styleFrom(
                               backgroundColor: p.accent,
@@ -637,6 +646,237 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       height: 1.5,
                     ),
               ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Page 4: "Gestures & shortcuts"
+  Widget _buildPage4(BuildContext context) {
+    final p = context.palette;
+    final isLandscape = context.isLandscape;
+    final gestures = <(IconData, String, String)>[
+      (Icons.swipe_up_rounded, context.l10n.onboardingGestureSwipeUpTitle,
+          context.l10n.onboardingGestureSwipeUpDesc),
+      (Icons.swipe_down_rounded, context.l10n.onboardingGestureSwipeDownTitle,
+          context.l10n.onboardingGestureSwipeDownDesc),
+      (Icons.favorite_rounded, context.l10n.onboardingGestureDoubleTapTitle,
+          context.l10n.onboardingGestureDoubleTapDesc),
+      (Icons.touch_app_rounded, context.l10n.onboardingGestureLongPressTitle,
+          context.l10n.onboardingGestureLongPressDesc),
+    ];
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.s28,
+            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+              Text(
+                context.l10n.onboardingGesturesTitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.heading,
+                    ),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(200))
+                  .slideY(begin: 0.1, end: 0),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                context.l10n.onboardingGesturesDesc,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: p.textSecondary,
+                      height: 1.5,
+                    ),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(400))
+                  .slideY(begin: 0.1, end: 0),
+              SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.lg),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.s14),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Column(
+                  children: [
+                    for (final (icon, title, desc) in gestures) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: p.accent.withValues(alpha: 0.4)),
+                            ),
+                            child: Icon(icon, color: p.accent, size: 19),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.bodySmall,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  desc,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (title != gestures.last.$2)
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          child: Divider(
+                              height: 1,
+                              color: p.hairline.withValues(alpha: 0.4)),
+                        ),
+                    ],
+                  ],
+                ),
+              ).animate().fadeIn(delay: context.motionMs(500)),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Page 5: "Make it yours"
+  Widget _buildPage5(BuildContext context) {
+    final p = context.palette;
+    final isLandscape = context.isLandscape;
+    final selected = context
+        .select<SettingsCubit, int>((c) => c.state.customAccentColorValue);
+    final cubit = context.read<SettingsCubit>();
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.s28,
+            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.s20),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: BorderRadius.circular(
+                      isLandscape ? AppRadii.r18 : AppRadii.r24),
+                  border: Border.all(color: p.hairline, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: p.accent.withValues(alpha: 0.2),
+                      blurRadius: 36,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  alignment: WrapAlignment.center,
+                  children: AppColors.customAccents.map((color) {
+                    final isSelected = selected == color.toARGB32();
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        cubit.setCustomAccentColor(color);
+                      },
+                      child: AnimatedContainer(
+                        duration: context.motionMs(200),
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? p.textPrimary
+                                : Colors.transparent,
+                            width: isSelected ? 3 : 1,
+                          ),
+                        ),
+                        child: isSelected
+                            ? Icon(
+                                Icons.check_rounded,
+                                color: color.computeLuminance() > 0.5
+                                    ? Colors.black
+                                    : Colors.white,
+                                size: 22,
+                              )
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              )
+                  .animate()
+                  .fadeIn(duration: context.motionMs(500))
+                  .scale(begin: const Offset(0.9, 0.9)),
+              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s40),
+              Text(
+                context.l10n.onboardingPersonalizeTitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: AppTracking.heading,
+                    ),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(200))
+                  .slideY(begin: 0.1, end: 0),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                context.l10n.onboardingPersonalizeDesc,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: p.textSecondary,
+                      height: 1.5,
+                    ),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(400))
+                  .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],
           ),

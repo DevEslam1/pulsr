@@ -494,7 +494,9 @@ class YtDownloadService {
                 DownloadFailure('Insufficient storage space for download'));
           }
         }
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
 
       var ext = safeExtension(stream.container);
       temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
@@ -576,7 +578,9 @@ class YtDownloadService {
           try {
             renamed =
                 await temp.rename(p.join(dir.path, 'ytdl_$videoId.$ext'));
-          } catch (_) {}
+          } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
           if (renamed != null) temp = renamed;
         }
       }
@@ -695,21 +699,27 @@ class YtDownloadService {
               await resolvedArtFile.delete().catchError((_) => resolvedArtFile);
             }
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
       if (temp != null) {
         try {
           if (await temp.exists()) {
             await temp.delete();
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
       if (tempArt != null) {
         try {
           if (await tempArt!.exists()) {
             await tempArt!.delete();
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
       _lastForegroundPublishMs.remove(videoId);
     }
@@ -1014,10 +1024,14 @@ class YtDownloadService {
         final existing = (await stamp.readAsString()).trim();
         resumable = existing == expectedStamp || existing == '$total';
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     try {
       await stamp.writeAsString(expectedStamp, flush: true);
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
 
     final chunkReceived = List<int>.filled(_concurrentChunks, 0);
     var lastEmitTime = 0;
@@ -1250,7 +1264,9 @@ class YtDownloadService {
         if (await outPartFile.exists()) {
           await outPartFile.delete();
         }
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
 
       // Parts used to be deleted unconditionally, so a cancel or a single
       // dropped socket at 95% threw away every byte of all four chunks and the
@@ -1261,13 +1277,17 @@ class YtDownloadService {
             if (await part.exists()) {
               await part.delete();
             }
-          } catch (_) {}
+          } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         }
         try {
           if (await stamp.exists()) {
             await stamp.delete();
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
 
       if (!mergeCompleted) {
@@ -1275,7 +1295,9 @@ class YtDownloadService {
           if (await dest.exists()) {
             await dest.delete();
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
     }
   } on _RangeIgnored {
@@ -1335,26 +1357,34 @@ class YtDownloadService {
             stampMatches =
                 resumeStampMatches(await stampFile.readAsString(), urlStamp);
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         if (resumeOffset > 0 && !stampMatches) {
           // Written for a different URL, or by a build without the stamp:
           // nothing in it is known to line up, so start over.
           try {
             await partFile.delete();
-          } catch (_) {}
+          } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
           resumeOffset = 0;
         }
         // Keep resume only if meaningful (>64k) to avoid overhead for tiny partials
         if (resumeOffset < 64 * 1024) {
           try {
             await partFile.delete();
-          } catch (_) {}
+          } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
           resumeOffset = 0;
         }
       }
       try {
         await stampFile.writeAsString(urlStamp, flush: true);
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     } catch (_) {
       resumeOffset = 0;
     }
@@ -1391,7 +1421,9 @@ class YtDownloadService {
         await response.drain<void>();
         try {
           await partFile.delete();
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         // FIX-A01: On second occurrence, throw DownloadFailure('Server does not support resume')
         if (retryCount >= 1) {
           throw const DownloadFailure('Server does not support resume');
@@ -1530,7 +1562,9 @@ class YtDownloadService {
         final raf = await partFile.open(mode: FileMode.append);
         await raf.flush();
         await raf.close();
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       if (await dest.exists()) {
         await dest.delete();
       }
@@ -1539,7 +1573,9 @@ class YtDownloadService {
         if (await stampFile.exists()) {
           await stampFile.delete();
         }
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     }
   }
 
@@ -1589,9 +1625,13 @@ class YtDownloadService {
               const Duration(minutes: 10)) {
             await entity.delete();
           }
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Removes every scratch file this service may have written for [videoId].
@@ -1622,9 +1662,13 @@ class YtDownloadService {
         if (!name.startsWith(audio) && !name.startsWith(art)) continue;
         try {
           await entity.delete();
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   Future<void> _tag(String path, SongsTableData song,
@@ -1805,6 +1849,8 @@ class YtDownloadService {
       if (getIt.isRegistered<AdaptiveBufferEngine>()) {
         getIt<AdaptiveBufferEngine>().sampleThroughput(bytes, elapsed);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 }

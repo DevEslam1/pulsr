@@ -61,16 +61,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   String? _lastFilePath;
   Future<List<double>>? _cachedWaveformFuture;
 
-  @override
-  void didUpdateWidget(PlayerSeekBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.songId != widget.songId ||
-        oldWidget.filePath != widget.filePath) {
-      _dragValue = null;
-      _tapSeekPending = false;
-      _tapSeekRatio = null;
-    }
-  }
+  /// BUG-03/09/23: bumped whenever the displayed track changes. Reset and
+  /// future creation are kept in one place (build) so a hot-reload rebuild
+  /// cannot reset the future without also resetting the transient drag state,
+  /// and a late waveform result can be detected as stale.
+  int _waveformGeneration = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -97,10 +92,13 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     if (_lastSongId != effectiveSongId || _lastFilePath != effectiveFilePath) {
       _lastSongId = effectiveSongId;
       _lastFilePath = effectiveFilePath;
+      // BUG-03: reset drag state and the cached future together so they can
+      // never disagree about which track is displayed.
       _dragValue = null;
       _tapSeekPending = false;
       _tapSeekRatio = null;
       _cachedWaveformFuture = null;
+      _waveformGeneration++;
     }
 
     // Check if Waveform Seek Bar is enabled in settings and song ID is available
@@ -114,6 +112,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         songId: effectiveSongId,
         filePath: effectiveFilePath,
       );
+      final generation = _waveformGeneration;
 
       return _withUpNext(
         FutureBuilder<List<double>>(
@@ -121,6 +120,10 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           initialData: instantSamples,
           future: _cachedWaveformFuture,
           builder: (context, snapshot) {
+            // BUG-09/23: ignore a result that arrived for a superseded track.
+            if (generation != _waveformGeneration) {
+              return _buildStandardSeekBar(context, crossfadeSec);
+            }
             final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
                 ? snapshot.data!
                 : instantSamples;
@@ -156,6 +159,14 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     }
 
     return _withUpNext(_buildStandardSeekBar(context, crossfadeSec));
+  }
+
+  /// BUG-17: resolve the crossfade label, falling back to a hardcoded string if
+  /// the localization key is missing for the active locale.
+  String _crossfadeLabel(BuildContext context) {
+    final label = context.l10n.browseCrossfade;
+    if (label.isEmpty || label == 'browseCrossfade') return 'Crossfade';
+    return label;
   }
 
   /// Adds the "Up Next" strip below the seek bar (shared by every theme).
@@ -318,6 +329,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     });
                   },
                   onChangeCancel: () {
+                    // BUG-27: tactile confirmation that the drag was cancelled.
+                    HapticFeedback.selectionClick();
                     if (_tapSeekPending && _tapSeekRatio != null) {
                       widget.onSeek(Duration(milliseconds: _tapSeekRatio!.round()));
                     }
@@ -362,7 +375,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           ),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
-                            '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
+                            // BUG-17: guard against an untranslated key
+                            // surfacing as the raw identifier.
+                            '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${_crossfadeLabel(context)}',
                             style: TextStyle(
                               color: context.palette.accent.withValues(alpha: 0.75),
                               fontSize: AppFontSize.tiny,

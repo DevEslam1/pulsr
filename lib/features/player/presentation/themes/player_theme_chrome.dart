@@ -133,6 +133,7 @@ class PlayerSwitcherItem extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticsLabel,
+      onTap: onTap,
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -229,18 +230,21 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    void handleTap() {
+      PulsrHaptics.confirm();
+      SoundFeedbackService.playClick();
+      onTap();
+    }
+
     return Semantics(
       button: true,
       label: semanticLabel,
+      onTap: handleTap,
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         child: InkWell(
-          onTap: () {
-            PulsrHaptics.confirm();
-            SoundFeedbackService.playClick();
-            onTap();
-          },
+          onTap: handleTap,
           child: Center(
             child: AnimatedSwitcher(
               duration: context.motionMs(280),
@@ -346,7 +350,9 @@ class PlayerDockIconButton extends StatelessWidget {
                 child: Text(
                   badgeText!,
                   style: TextStyle(
-                    color: Colors.black,
+                    color: activeColor.computeLuminance() > 0.5
+                        ? AppColors.onBright
+                        : Colors.white,
                     fontSize: style.badgeFontSize,
                     fontWeight: FontWeight.w900,
                   ),
@@ -385,6 +391,7 @@ class PlayerDockIconButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: tooltip,
+      onTap: onTap,
       excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -675,7 +682,8 @@ class PlayerBottomActionDock extends StatelessWidget {
                   Expanded(
                     child: PlayerDockIconButton(
                       icon: outputIcon,
-                      tooltip: isCast ? 'Google Cast' : l10n.audioOutputAndDac,
+                      tooltip:
+                          isCast ? l10n.googleCast : l10n.audioOutputAndDac,
                       badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
                       isActive: isCast || isUsb,
                       activeColor: isCast
@@ -719,11 +727,13 @@ class PlayerBottomActionDock extends StatelessWidget {
                     child: PlayerDockIconButton(
                       icon: Icons.timer_outlined,
                       tooltip: isEndQ
-                          ? 'Sleep Timer: End of Queue'
+                          ? l10n.sleepTimerEndOfQueue
                           : (remainingTracks != null
-                              ? 'Sleep Timer: $remainingTracks tracks remaining'
+                              ? l10n.sleepTimerTracksRemaining(remainingTracks)
                               : (props.state.sleepTimerRemaining != null
-                                  ? 'Sleep Timer: ${props.state.sleepTimerRemaining!.inMinutes}m remaining'
+                                  ? l10n.sleepTimerMinutesRemaining(
+                                      props.state.sleepTimerRemaining!
+                                          .inMinutes)
                                   : l10n.sleepTimer)),
                       badgeText: hasTimer
                           ? (remainingTracks != null

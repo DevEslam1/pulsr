@@ -533,29 +533,14 @@ class CrossfadeManager {
       _nativeCurveArmedOnOutgoing = true;
     }
 
-    var newArmed = false;
-    if (oldArmed) {
-      // Complementary curve for incoming player: for each sample point,
-      // the incoming curve is the sum-safe complement (1 - G) * sumSafe,
-      // which is evaluated by evaluateSumSafeGainPair's second element.
-      final newCurve = List<double>.generate(points, (i) {
-        final (_, n) = evaluateSumSafeGainPair(i / (points - 1),
-            isRepeatOne: isRepeatOne);
-        return n;
-      });
-      newArmed = await _armNativeCurve(inactive, newCurve, segmentMs);
-      if (newArmed) {
-        try {
-          await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
-          _incomingWithArmedCurve = inactive;
-          _nativeCurveArmedOnIncoming = true;
-        } catch (_) {
-          newArmed = false;
-          _clearNativeCurve(inactive);
-        }
-      }
-    }
-
+    // The INCOMING player is intentionally never armed with a native curve.
+    // The native curve is a *multiplier* on the player's base volume, so
+    // fading in requires pinning the base at the target and arming a 0→1
+    // multiplier. The platform exposes up to one buffer already rendered at the
+    // pre-arm (unity) gain the instant the base is raised, so the next track
+    // would start loud then drop and fade in. Stepping the incoming player's
+    // ABSOLUTE volume never lets the base jump past the current fade gain, so
+    // no full-gain buffer can leak.
     double lastFraction = 0.0;
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
@@ -577,14 +562,13 @@ class CrossfadeManager {
       final (oldGain, newGain) = evaluateSumSafeGainPair(fraction,
           isRepeatOne: isRepeatOne);
       try {
-        // If native sink curves are active, sink multiplies per-sample.
-        // If fallback (not armed), step volume via Dart timer.
+        // The outgoing player uses its native sink curve when armed; otherwise
+        // it is stepped here. The incoming player is ALWAYS stepped (never
+        // armed) — see the note above.
         if (!oldArmed) {
           active.setVolume((oldGain * fromActiveVol).clamp(0.0, 1.0));
         }
-        if (!newArmed) {
-          inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
-        }
+        inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
       } catch (e, st) {
         ErrorLogger.log(
           'Error adjusting volume during crossfade',
@@ -607,11 +591,6 @@ class CrossfadeManager {
           _clearNativeCurve(active);
           _outgoingWithArmedCurve = null;
           _nativeCurveArmedOnOutgoing = false;
-        }
-        if (newArmed) {
-          _clearNativeCurve(inactive);
-          _incomingWithArmedCurve = null;
-          _nativeCurveArmedOnIncoming = false;
         }
         t.cancel();
         _activeTimers.remove(t);

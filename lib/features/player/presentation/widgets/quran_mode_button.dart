@@ -34,6 +34,10 @@ class QuranModeDockButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        QuranModeSheet.show(context);
+      },
       excludeSemantics: true,
       child: InkWell(
       onTap: () {

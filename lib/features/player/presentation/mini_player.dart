@@ -34,9 +34,18 @@ enum MiniPlayerVariant { auto, compact, horizontal, tablet }
 
 class MiniPlayer extends StatefulWidget {
   static bool debugDisableWaveAnimation = false;
+
+  /// BUG-18: reset static test flags so they cannot leak across tests in the
+  /// same process. Call from `setUp`/`tearDown`.
+  @visibleForTesting
+  static void resetDebugFlags() {
+    debugDisableWaveAnimation = false;
+  }
+
   final VoidCallback onTap;
   final VoidCallback? onSwipeDown;
   final VoidCallback? onSwipeUp;
+  final VoidCallback? onLongPress;
   final MiniPlayerVariant variant;
 
   const MiniPlayer({
@@ -44,6 +53,7 @@ class MiniPlayer extends StatefulWidget {
     required this.onTap,
     this.onSwipeDown,
     this.onSwipeUp,
+    this.onLongPress,
     this.variant = MiniPlayerVariant.auto,
   });
 
@@ -52,6 +62,7 @@ class MiniPlayer extends StatefulWidget {
     required this.onTap,
     this.onSwipeDown,
     this.onSwipeUp,
+    this.onLongPress,
   }) : variant = MiniPlayerVariant.compact;
 
   const MiniPlayer.horizontal({
@@ -59,6 +70,7 @@ class MiniPlayer extends StatefulWidget {
     required this.onTap,
     this.onSwipeDown,
     this.onSwipeUp,
+    this.onLongPress,
   }) : variant = MiniPlayerVariant.horizontal;
 
   const MiniPlayer.tablet({
@@ -66,31 +78,82 @@ class MiniPlayer extends StatefulWidget {
     required this.onTap,
     this.onSwipeDown,
     this.onSwipeUp,
+    this.onLongPress,
   }) : variant = MiniPlayerVariant.tablet;
 
   @override
-  State<MiniPlayer> createState() => _MiniPlayerState();
+  State<MiniPlayer> createState() => MiniPlayerState();
 }
 
-class _MiniPlayerState extends State<MiniPlayer> {
+class MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
   bool _controllerDisposed = false;
   int _lastKnownIndex = -1;
   final ValueNotifier<bool> _isInteracting = ValueNotifier<bool>(false);
   bool _swipeInFlight = false;
+
+  @visibleForTesting
+  ValueNotifier<bool> get isInteractingNotifier => _isInteracting;
+
+  /// BUG-05: guards a single deferred sync attempt instead of an unbounded
+  /// retry chain that could fire on a disposed state.
+  bool _syncScheduled = false;
   Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
   double _horizontalDragDx = 0.0;
 
   /// The Hero tag used by the full-screen artwork for the active theme, so the
   /// mini -> full shared-element transition actually runs (tags must match).
-  String _fullArtworkHeroTag(PlayerThemeMode mode) {
+  /// B21: returns null for themes whose full screen renders no artwork (the
+  /// cassette view), so the mini player does not fabricate an unmatched Hero.
+  String? _fullArtworkHeroTag(PlayerThemeMode mode) {
     switch (mode) {
       case PlayerThemeMode.minimal:
         return 'now_playing_art_minimal';
-      default:
+      case PlayerThemeMode.vinyl:
+        return 'now_playing_art_vinyl';
+      case PlayerThemeMode.circle:
+        return 'now_playing_art_circle';
+      case PlayerThemeMode.waveform:
+        return 'now_playing_art_waveform';
+      case PlayerThemeMode.cassette:
+        return null;
+      case PlayerThemeMode.classic:
+      case PlayerThemeMode.card:
+      case PlayerThemeMode.lyricsFocus:
         return 'now_playing_art_full';
     }
+  }
+
+  Widget _buildMiniArtwork({
+    required SongsTableData item,
+    required bool isCurrent,
+    required int index,
+    required PlayerThemeMode playerThemeMode,
+    required double artworkSize,
+    required bool isPlaying,
+  }) {
+    final Widget art = playerThemeMode == PlayerThemeMode.vinyl
+        ? SpinningVinylDisc(
+            id: item.id,
+            remoteArtworkUrl: item.remoteArtworkUrl,
+            size: artworkSize,
+            isPlaying: isPlaying,
+          )
+        : CachedArtwork(
+            id: item.id,
+            remoteUrl: item.remoteArtworkUrl,
+            type: ArtworkType.AUDIO,
+            size: artworkSize,
+            borderRadius: 12,
+          );
+    final tag = isCurrent
+        ? _fullArtworkHeroTag(playerThemeMode)
+        : (playerThemeMode == PlayerThemeMode.vinyl
+            ? null
+            : 'queue_art_${item.id}_$index');
+    if (tag == null) return art;
+    return Hero(tag: tag, child: art);
   }
 
   /// Honors the user's configured mini-player swipe actions
@@ -115,7 +178,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
           break;
         case MiniPlayerSwipeAction.volume:
           HapticFeedback.selectionClick();
-          await cubit.adjustVolume(swipedLeft ? 0.05 : -0.05);
+          // BUG-15: swipe right increases volume, swipe left decreases.
+          await cubit.adjustVolume(swipedLeft ? -0.05 : 0.05);
           break;
         case MiniPlayerSwipeAction.none:
           break;
@@ -174,59 +238,70 @@ class _MiniPlayerState extends State<MiniPlayer> {
   @override
   void dispose() {
     _controllerDisposed = true;
-    _isInteracting.removeListener(_onInteractionChanged);
-    _isInteracting.dispose();
+    _syncScheduled = false;
+    try {
+      _isInteracting.removeListener(_onInteractionChanged);
+      _isInteracting.dispose();
+    } catch (_) {}
     _verticalSwipeTimer?.cancel();
-    _pageController?.dispose();
+    _verticalSwipeTimer = null;
+    try {
+      _pageController?.dispose();
+    } catch (_) {}
     _pageController = null;
     super.dispose();
   }
 
-  void _syncPageController(int targetIndex, int queueLength, {int retryCount = 0}) {
+  void _syncPageController(int targetIndex, int queueLength) {
     if (_controllerDisposed || !mounted) return;
     try {
       final controller = _pageController;
-      if (queueLength == 0 || controller == null || _controllerDisposed) return;
+      if (queueLength == 0 || controller == null || _controllerDisposed || !mounted) return;
       final safeIndex = targetIndex.clamp(0, queueLength - 1);
       // Never fight an in-progress user gesture or in-flight skip.
       if (_isInteracting.value || _swipeInFlight) return;
       if (_lastKnownIndex != safeIndex) {
-        if (!controller.hasClients || !controller.position.hasContentDimensions) {
-          // B-4 & H-04: Limit recursive post-frame callbacks to avoid infinite loops if unattached.
-          // On final retry failure, force _lastKnownIndex = safeIndex so subsequent track changes diff correctly.
-          if (retryCount < 5) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && !_controllerDisposed) {
-                _syncPageController(targetIndex, queueLength, retryCount: retryCount + 1);
-              }
-            });
-          } else {
-            _lastKnownIndex = safeIndex;
-            Future.delayed(const Duration(seconds: 1), () {
-              if (mounted && !_controllerDisposed) {
-                _syncPageController(targetIndex, queueLength, retryCount: 0);
-              }
-            });
-          }
+        // BUG-14: `hasContentDimensions` can throw while the PageView is
+        // attached but not yet laid out; treat that as "not ready".
+        bool hasDimensions;
+        try {
+          hasDimensions =
+              !_controllerDisposed && controller.hasClients && controller.position.hasContentDimensions;
+        } catch (_) {
+          hasDimensions = false;
+        }
+        if (!hasDimensions) {
+          // BUG-05: schedule exactly one retry, never a delayed fallback that
+          // could outlive this state.
+          if (_syncScheduled) return;
+          _syncScheduled = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _syncScheduled = false;
+            if (mounted && !_controllerDisposed) {
+              _syncPageController(targetIndex, queueLength);
+            }
+          });
           return;
         }
-        if (controller.page?.round() != safeIndex) {
-          try {
+        try {
+          if (_controllerDisposed || !mounted || !controller.hasClients) return;
+          final currentPage = controller.page;
+          if (currentPage != null && currentPage.round() != safeIndex) {
             final maxPage = controller.position.viewportDimension > 0
                 ? (controller.position.maxScrollExtent / controller.position.viewportDimension).round()
                 : queueLength - 1;
-            if (safeIndex <= maxPage && !_controllerDisposed) {
+            if (safeIndex <= maxPage && !_controllerDisposed && mounted) {
               controller.jumpToPage(safeIndex);
               _lastKnownIndex = safeIndex;
             }
-          } catch (e, st) {
-            if (e is! FlutterError) {
-              ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
-                  error: e, stackTrace: st, category: 'MiniPlayer');
-            }
+          } else {
+            _lastKnownIndex = safeIndex;
           }
-        } else {
-          _lastKnownIndex = safeIndex;
+        } catch (e, st) {
+          if (e is! FlutterError) {
+            ErrorLogger.log('MiniPlayer PageController jumpToPage failed',
+                error: e, stackTrace: st, category: 'MiniPlayer');
+          }
         }
       }
     } catch (e, st) {
@@ -245,6 +320,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
       ErrorLogger.log('MiniPlayer swipe failed',
           error: e, stackTrace: st, category: 'MiniPlayer');
     } finally {
+      // BUG-24: release the interaction flag so future syncs can run. Scroll
+      // end may have fired while _swipeInFlight was still true, leaving it set.
+      if (!_controllerDisposed) {
+        _isInteracting.value = false;
+      }
       if (mounted) {
         setState(() {
           _swipeInFlight = false;
@@ -355,6 +435,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
               customSemanticsActions: customSemanticsActions,
               child: GestureDetector(
             behavior: HitTestBehavior.opaque,
+            onLongPress: widget.onLongPress,
             onVerticalDragStart: (_) {
               if (_swipeInFlight) return;
               _verticalDragDy = 0.0;
@@ -490,6 +571,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                     height: 52,
                                     child: NotificationListener<ScrollNotification>(
                                       onNotification: (notification) {
+                                        if (_controllerDisposed) return false;
                                         if (notification is ScrollStartNotification &&
                                             notification.dragDetails != null) {
                                           _isInteracting.value = true;
@@ -535,31 +617,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                               Stack(
                                                 alignment: Alignment.center,
                                                 children: [
-                                                  if (playerThemeMode ==
-                                                      PlayerThemeMode.vinyl)
-                                                    SpinningVinylDisc(
-                                                      id: item.id,
-                                                      remoteArtworkUrl:
-                                                          item.remoteArtworkUrl,
-                                                      size: artworkSize,
-                                                      isPlaying: state.isPlaying &&
-                                                          isCurrent,
-                                                    )
-                                                  else
-                                                    Hero(
-                                                      tag: isCurrent
-                                                          ? _fullArtworkHeroTag(
-                                                              playerThemeMode)
-                                                          : 'queue_art_${item.id}_$index',
-                                                      child: CachedArtwork(
-                                                        id: item.id,
-                                                        remoteUrl:
-                                                            item.remoteArtworkUrl,
-                                                        type: ArtworkType.AUDIO,
-                                                        size: artworkSize,
-                                                        borderRadius: 12,
-                                                      ),
-                                                    ),
+                                                  _buildMiniArtwork(
+                                                    item: item,
+                                                    isCurrent: isCurrent,
+                                                    index: index,
+                                                    playerThemeMode:
+                                                        playerThemeMode,
+                                                    artworkSize: artworkSize,
+                                                    isPlaying: state.isPlaying &&
+                                                        isCurrent,
+                                                  ),
                                                   if (isCurrent && state.isPlaying && playerThemeMode != PlayerThemeMode.vinyl)
                                                     PositionedDirectional(
                                                       bottom: 2,
@@ -644,7 +711,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                       ? context.l10n.pause
                                       : context.l10n.play,
                                   icon: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 200),
+                                    duration: PulsrDurations.state,
                                     transitionBuilder: (child, anim) =>
                                         ScaleTransition(scale: anim, child: child),
                                     child: Icon(

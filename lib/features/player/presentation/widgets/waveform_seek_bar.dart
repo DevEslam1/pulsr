@@ -78,10 +78,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     }
   }
 
-  // FIX-M8 / H-07 / B-9: Guard against totalCount <= 0 and freeze visible window during drag
-  // to avoid coordinate feedback jitter on fast scrubbing.
-  ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
-    if (_dragFrozenWindow != null) return _dragFrozenWindow!;
+  /// Raw visible-window computation for the current zoom, ignoring any frozen
+  /// window. Kept separate so a zoom change mid-drag can refresh the freeze
+  /// instead of reusing a stale range (BUG-08).
+  ({int startIndex, int visibleCount}) _computeWindow(int totalCount) {
     if (totalCount <= 0) return (startIndex: 0, visibleCount: 0);
     if (totalCount == 1) return (startIndex: 0, visibleCount: 1);
     final int visibleCount = (totalCount /
@@ -98,6 +98,13 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final int startIndex =
         (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
     return (startIndex: startIndex, visibleCount: visibleCount);
+  }
+
+  // FIX-M8 / H-07 / B-9: Guard against totalCount <= 0 and freeze visible window during drag
+  // to avoid coordinate feedback jitter on fast scrubbing.
+  ({int startIndex, int visibleCount}) _visibleWindow(int totalCount) {
+    if (_dragFrozenWindow != null) return _dragFrozenWindow!;
+    return _computeWindow(totalCount);
   }
 
   /// Maps a local X coordinate to a global 0..1 ratio through the visible
@@ -188,9 +195,19 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         if (now - _lastScaleMs >= 33) {
                           _lastScaleMs = now;
                           setState(() {
-                            _zoomScale = (_zoomScale * details.scale).clamp(
+                            // BUG-28: clamp the gesture factor before applying
+                            // it so an extreme pinch cannot overflow.
+                            final clampedScale =
+                                details.scale.clamp(0.1, 10.0);
+                            _zoomScale = (_zoomScale * clampedScale).clamp(
                                 PlayerConstants.waveformMinZoom,
                                 PlayerConstants.waveformMaxZoom);
+                            // BUG-08: if a scrub is in progress, re-freeze the
+                            // window at the new zoom so coordinate mapping stays
+                            // accurate.
+                            if (_dragFrozenWindow != null) {
+                              _dragFrozenWindow = _computeWindow(totalCount);
+                            }
                           });
                         }
                       }
@@ -251,21 +268,27 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         children: [
                           Positioned.fill(
                             child: RepaintBoundary(
-                              child: CustomPaint(
-                                painter: _WaveformPainter(
-                                  samples: widget.samples,
-                                  progress: progressPercent,
-                                  activeColor: widget.activeColor,
-                                  inactiveColor: inactiveColor,
-                                  chapterMarkers: widget.chapterMarkers,
-                                  duration: widget.duration,
-                                  loopPointA: widget.loopPointA,
-                                  loopPointB: widget.loopPointB,
-                                  crossfadeDuration: widget.crossfadeDuration,
-                                  zoomScale: _zoomScale,
-                                  visibleStart: window.startIndex,
-                                  visibleCount: window.visibleCount,
-                                  style: widget.style,
+                              child: Semantics(
+                                label: context.l10n.waveformSeekBar,
+                                value:
+                                    '${Formatters.formatDuration(currentDuration)} / '
+                                    '${Formatters.formatDuration(widget.duration)}',
+                                child: CustomPaint(
+                                  painter: _WaveformPainter(
+                                    samples: widget.samples,
+                                    progress: progressPercent,
+                                    activeColor: widget.activeColor,
+                                    inactiveColor: inactiveColor,
+                                    chapterMarkers: widget.chapterMarkers,
+                                    duration: widget.duration,
+                                    loopPointA: widget.loopPointA,
+                                    loopPointB: widget.loopPointB,
+                                    crossfadeDuration: widget.crossfadeDuration,
+                                    zoomScale: _zoomScale,
+                                    visibleStart: window.startIndex,
+                                    visibleCount: window.visibleCount,
+                                    style: widget.style,
+                                  ),
                                 ),
                               ),
                             ),
@@ -331,7 +354,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                   if (_zoomScale > 1.05)
                     Semantics(
                       button: true,
-                      label: 'Reset waveform zoom',
+                      label: context.l10n.resetWaveformZoom,
                       child: GestureDetector(
                         onTap: () {
                           HapticFeedback.selectionClick();
@@ -438,6 +461,8 @@ class _WaveformPainter extends CustomPainter {
     final int endBound = (visibleStart + visibleCount).clamp(2, totalCount);
     final int startIndex = visibleStart.clamp(0, endBound - 2);
     final int endIndex = endBound;
+    // BUG-16: never call sublist with an inverted range.
+    if (startIndex >= endIndex || endIndex > totalCount) return;
     final int visible = endIndex - startIndex;
     final visibleSamples = samples.sublist(startIndex, endIndex);
 

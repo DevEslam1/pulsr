@@ -24,37 +24,57 @@ class SearchCubit extends PulsrCubit<SearchState> {
   })  : _searchUseCase = searchUseCase,
         _folderUseCases = folderUseCases,
         super(const SearchState()) {
-    _loadHistory();
+    historyReady = _loadHistoryAsync();
     _loadFilter();
     savedSearchesReady = _loadSavedSearches();
   }
+
+  late final Future<void> historyReady;
+  bool _historyLoaded = false;
+  @visibleForTesting
+  bool get isHistoryLoaded => _historyLoaded;
 
   Future<void> _loadHistoryAsync() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_historyKey) ?? [];
-      if (!isClosed) safeEmit(state.copyWith(history: list));
+      if (!isClosed) {
+        _historyLoaded = true;
+        final currentHistory = state.history;
+        final merged = <String>[...currentHistory];
+        for (final item in list) {
+          if (!merged.any((m) => m.toLowerCase() == item.toLowerCase())) {
+            merged.add(item);
+          }
+        }
+        safeEmit(state.copyWith(history: merged.take(historyMax).toList()));
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to load search history',
           error: e, stackTrace: st, category: 'SearchCubit');
     }
   }
 
-  void _loadHistory() { unawaited(_loadHistoryAsync()); }
-
   void clearError() {
     safeEmit(state.copyWith(errorMessage: null));
   }
 
   void setFilter(String filter) {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
     safeEmit(state.copyWith(selectedFilter: filter));
     unawaited(_persistFilter(filter));
     _executeSearch(state.query, filterOverride: filter);
   }
 
   void onQueryChanged(String query) {
-    safeEmit(state.copyWith(query: query));
+    _generation++;
     _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _searchSub?.cancel();
+    removeFromComposite(_searchSub);
+    _searchSub = null;
+    safeEmit(state.copyWith(query: query));
     _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
     }));
@@ -245,6 +265,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
     if (q.isEmpty || q.length < 2) return;
     _historyDebounceTimer?.cancel();
     _historyDebounceTimer = autoTimer(Timer(const Duration(milliseconds: 400), () async {
+      await historyReady;
       if (isClosed) return;
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -258,6 +279,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
   }
 
   Future<void> clearHistory() async {
+    await historyReady;
     try {
       final p = await SharedPreferences.getInstance();
       await p.remove(_historyKey);
@@ -267,6 +289,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
   /// Removes a single recent-search entry (case-insensitive).
   Future<void> removeHistoryQuery(String query) async {
+    await historyReady;
     final updated = state.history
         .where((h) => h.toLowerCase() != query.trim().toLowerCase())
         .toList();

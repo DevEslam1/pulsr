@@ -46,13 +46,40 @@ class TabletSideInspector extends StatefulWidget {
   });
 
   @override
-  State<TabletSideInspector> createState() => _TabletSideInspectorState();
+  State<TabletSideInspector> createState() => TabletSideInspectorState();
 }
 
-class _TabletSideInspectorState extends State<TabletSideInspector> {
+class TabletSideInspectorState extends State<TabletSideInspector> {
   int _selectedTabIndex = 0; // 0: Queue, 1: Lyrics
   double? _customWidth;
   bool _isDragging = false;
+  double? _lastScreenWidth;
+  double _dragDeltaAccumulator = 0.0;
+
+  @visibleForTesting
+  double? get customWidth => _customWidth;
+
+  @visibleForTesting
+  set customWidth(double? value) => setState(() => _customWidth = value);
+
+  @visibleForTesting
+  double get dragDeltaAccumulator => _dragDeltaAccumulator;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final currentWidth = Adaptive.widthOf(context);
+    if (_lastScreenWidth != null &&
+        _lastScreenWidth != currentWidth &&
+        _lastScreenWidth! > 0) {
+      if (_customWidth != null) {
+        // Proportionally scale _customWidth so rotation doesn't cause a visual jump
+        final ratio = _customWidth! / _lastScreenWidth!;
+        _customWidth = (ratio * currentWidth).clamp(280.0, 400.0);
+      }
+    }
+    _lastScreenWidth = currentWidth;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,8 +93,8 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
       width: inspectorWidth,
       decoration: BoxDecoration(
         color: p.surface,
-        border: Border(
-          left: BorderSide(
+        border: BorderDirectional(
+          start: BorderSide(
             color: _isDragging ? p.accent.withValues(alpha: 0.6) : p.hairline,
             width: _isDragging ? 1.5 : 1.0,
           ),
@@ -119,18 +146,22 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                                         : p.textSecondary,
                                   ),
                                   const SizedBox(width: AppSpacing.s6),
-                                  BlocSelector<PlayerCubit, PlayerState, int>(
-                                    selector: (state) => state.queue.length,
-                                    builder: (context, queueCount) => Text(
-                                      'Queue ($queueCount)',
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.label,
-                                        fontWeight: _selectedTabIndex == 0
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
-                                        color: _selectedTabIndex == 0
-                                            ? p.onAccent
-                                            : p.textSecondary,
+                                  Flexible(
+                                    child: BlocSelector<PlayerCubit, PlayerState, int>(
+                                      selector: (state) => state.queue.length,
+                                      builder: (context, queueCount) => Text(
+                                        'Queue ($queueCount)',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.label,
+                                          fontWeight: _selectedTabIndex == 0
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: _selectedTabIndex == 0
+                                              ? p.onAccent
+                                              : p.textSecondary,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -165,16 +196,20 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                                         : p.textSecondary,
                                   ),
                                   const SizedBox(width: AppSpacing.s6),
-                                  Text(
-                                    context.l10n.lyricsLabel,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: _selectedTabIndex == 1
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
-                                      color: _selectedTabIndex == 1
-                                          ? p.onAccent
-                                          : p.textSecondary,
+                                  Flexible(
+                                    child: Text(
+                                      context.l10n.lyricsLabel,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: _selectedTabIndex == 1
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        color: _selectedTabIndex == 1
+                                            ? p.onAccent
+                                            : p.textSecondary,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -243,15 +278,34 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
           cursor: SystemMouseCursors.resizeLeftRight,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: (_) => setState(() => _isDragging = true),
-            onHorizontalDragUpdate: (details) {
-              setState(() {
-                _customWidth = ((_customWidth ?? defaultWidth) - details.delta.dx)
-                    .clamp(280.0, 400.0);
-              });
+            onHorizontalDragStart: (_) {
+              _dragDeltaAccumulator = 0.0;
+              setState(() => _isDragging = true);
             },
-            onHorizontalDragEnd: (_) => setState(() => _isDragging = false),
-            onHorizontalDragCancel: () => setState(() => _isDragging = false),
+            onHorizontalDragUpdate: (details) {
+              final isRtl = Directionality.of(context) == TextDirection.rtl;
+              final delta = isRtl ? details.delta.dx : -details.delta.dx;
+              _dragDeltaAccumulator += delta;
+              if (_dragDeltaAccumulator.abs() >= 1.0) {
+                final current = _customWidth ?? defaultWidth;
+                final newWidth =
+                    (current + _dragDeltaAccumulator).clamp(280.0, 400.0);
+                _dragDeltaAccumulator = 0.0;
+                if (newWidth != _customWidth) {
+                  setState(() {
+                    _customWidth = newWidth;
+                  });
+                }
+              }
+            },
+            onHorizontalDragEnd: (_) {
+              _dragDeltaAccumulator = 0.0;
+              setState(() => _isDragging = false);
+            },
+            onHorizontalDragCancel: () {
+              _dragDeltaAccumulator = 0.0;
+              setState(() => _isDragging = false);
+            },
             child: Center(
               child: AnimatedContainer(
                 duration: context.motionMs(150),

@@ -186,6 +186,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: newCurrentIndex,
       ),
     ));
+    _updateWidgetThrottled(force: true);
 
     try {
       await _audioHandler.reorderQueue(oldIndex, newIndex);
@@ -212,6 +213,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           errorMessage: 'Failed to reorder queue',
         ),
       ));
+      _updateWidgetThrottled(force: true);
     }
   }
 
@@ -246,17 +248,49 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: newIndex,
       ),
     ));
+    _updateWidgetThrottled();
 
     try {
       await _audioHandler.removeQueueItemAt(index);
     } catch (e, st) {
+      // B10: mirror reorderQueue's rollback so UI queue and engine queue cannot
+      // diverge when the handler rejects the removal.
       ErrorLogger.log('Failed to remove queue item in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
+      final current = _getState();
+      setQueueSlot(
+        state.activeQueueSlot,
+        songs: state.queue,
+        currentIndex: state.currentIndex,
+        position: state.position,
+        speed: state.playbackSpeed,
+      );
+      debouncedPersistQueueSlots();
+      _bumpQueueVersion();
+      _emit(current.copyWith(
+        queueSlice: current.queueSlice.copyWith(
+          queue: state.queue,
+          currentIndex: state.currentIndex,
+        ),
+        playback: current.playback.copyWith(
+          errorMessage: 'Failed to remove queue item',
+        ),
+      ));
+      _updateWidgetThrottled(force: true);
     }
   }
 
   Future<void> switchQueueSlot(int slot) async {
-    if (_isSwitchingSlot || _isClosed()) return;
+    if (_isClosed()) return;
+    if (_isSwitchingSlot) {
+      final state = _getState();
+      _emit(state.copyWith(
+        playback: state.playback.copyWith(
+          errorMessage: 'Queue slot switch already in progress',
+        ),
+      ));
+      return;
+    }
     _isSwitchingSlot = true;
     try {
       final state = _getState();
@@ -270,6 +304,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         position: state.position,
         speed: state.playbackSpeed,
       );
+      queueIntegrityCheck(slot);
       final targetSlot = _queueSlots[slot] ??
           const QueueSlotData(
               songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
@@ -565,4 +600,49 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ErrorLogger.log('Find next local match failed', error: e, stackTrace: st, category: 'PlayerQueueController');
     });
   }
+
+  bool queueIntegrityCheck(int slot) {
+    final data = _queueSlots[slot];
+    if (data == null) return true;
+    if (data.currentIndex < 0 ||
+        (data.songIds.isNotEmpty && data.currentIndex >= data.songIds.length) ||
+        data.position.isNegative) {
+      ErrorLogger.log('Corrupted queue slot data detected at slot $slot', category: 'PlayerQueueController');
+      _queueSlots.remove(slot);
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> playRadioStation(RadioStation station) async {
+    final uri = Uri.tryParse(station.url);
+    if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      final s = _getState();
+      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
+      return;
+    }
+    final song = SongsTableData(
+      id: station.songId,
+      title: station.name,
+      artist: (station.genre != null && station.genre!.isNotEmpty)
+          ? station.genre!
+          : station.name,
+      album: '',
+      durationMs: 0,
+      path: station.url,
+      source: SongSource.radio,
+      remoteArtworkUrl: station.artworkUrl,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+    );
+    unawaited(RadioStationStore().markPlayed(
+      station.id,
+      DateTime.now().millisecondsSinceEpoch,
+    ));
+    await playSong(song);
+  }
 }
+

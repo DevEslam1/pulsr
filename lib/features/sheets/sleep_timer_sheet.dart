@@ -31,9 +31,9 @@ class SleepTimerSheet extends StatelessWidget {
     final presets = [15, 30, 45, 60, 90];
     final screenHeight = MediaQuery.sizeOf(context).height;
 
-    return BlocSelector<PlayerCubit, PlayerState, Duration?>(
-      selector: (state) => state.sleepTimerRemaining,
-      builder: (context, sleepTimerRemaining) {
+    return BlocBuilder<PlayerCubit, PlayerState>(
+      builder: (context, state) {
+        final sleepTimerRemaining = state.sleepTimerRemaining;
         final cubit = context.read<PlayerCubit>();
         final remainingTracks = cubit.sleepTimerRemainingTracks;
         final isQueueMode = cubit.isEndOfQueueSleepTimer;
@@ -134,8 +134,7 @@ class SleepTimerSheet extends StatelessWidget {
                                   ),
                                   // FIX BUG-5: Show as selected when end-of-track
                                   // timer is active so the user has visual feedback.
-                                  selected: timerMode == SleepTimerMode.endOfTrack &&
-                                      sleepTimerRemaining != null,
+                                  selected: timerMode == SleepTimerMode.endOfTrack,
                                   onSelected: (_) {
                                     cubit.startEndOfTrackTimer();
                                     Navigator.pop(context);
@@ -234,66 +233,74 @@ class SleepTimerSheet extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: AppSpacing.sm),
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Container(
-                                padding: const EdgeInsets.all(AppSpacing.xs),
-                                decoration: BoxDecoration(
-                                  color: p.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(AppRadii.r8),
-                                ),
-                                child: Icon(Icons.timer_outlined,
-                                    color: p.accent),
+                            Material(
+                              type: MaterialType.transparency,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(AppSpacing.xs),
+                                      decoration: BoxDecoration(
+                                        color: p.surfaceContainer,
+                                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                                      ),
+                                      child: Icon(Icons.timer_outlined,
+                                          color: p.accent),
+                                    ),
+                                    title: Text(context.l10n.customDurationMinutes,
+                                        style: TextStyle(color: p.textPrimary)),
+                                    trailing: Icon(Icons.chevron_right_rounded,
+                                        color: p.textSecondary),
+                                    onTap: () async {
+                                      final minutes = await _showCustomMinutesDialog(context);
+                                      if (minutes != null && minutes > 0 && context.mounted) {
+                                        cubit.startSleepTimer(minutes);
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                  ),
+                                  ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(AppSpacing.xs),
+                                      decoration: BoxDecoration(
+                                        color: p.surfaceContainer,
+                                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                                      ),
+                                      child: Icon(Icons.access_time_rounded,
+                                          color: p.accent),
+                                    ),
+                                    title: Text(context.l10n.stopAtSpecificTime,
+                                        style: TextStyle(color: p.textPrimary)),
+                                    trailing: Icon(Icons.chevron_right_rounded,
+                                        color: p.textSecondary),
+                                    onTap: () async {
+                                      final now = TimeOfDay.now();
+                                      final selectedTime = await showTimePicker(
+                                        context: context,
+                                        initialTime: now,
+                                      );
+                                      if (selectedTime != null && context.mounted) {
+                                        final today = DateTime.now();
+                                        var stopDate = DateTime(
+                                            today.year,
+                                            today.month,
+                                            today.day,
+                                            selectedTime.hour,
+                                            selectedTime.minute);
+                                        if (stopDate.isBefore(today)) {
+                                          stopDate =
+                                              stopDate.add(const Duration(days: 1));
+                                        }
+                                        cubit.startAbsoluteSleepTimer(stopDate);
+                                        Navigator.pop(context);
+                                      }
+                                    },
+                                  ),
+                                ],
                               ),
-                              title: Text(context.l10n.customDurationMinutes,
-                                  style: TextStyle(color: p.textPrimary)),
-                              trailing: Icon(Icons.chevron_right_rounded,
-                                  color: p.textSecondary),
-                              onTap: () async {
-                                final minutes = await _showCustomMinutesDialog(context);
-                                if (minutes != null && minutes > 0 && context.mounted) {
-                                  cubit.startSleepTimer(minutes);
-                                  Navigator.pop(context);
-                                }
-                              },
-                            ),
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: Container(
-                                padding: const EdgeInsets.all(AppSpacing.xs),
-                                decoration: BoxDecoration(
-                                  color: p.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(AppRadii.r8),
-                                ),
-                                child: Icon(Icons.access_time_rounded,
-                                    color: p.accent),
-                              ),
-                              title: Text(context.l10n.stopAtSpecificTime,
-                                  style: TextStyle(color: p.textPrimary)),
-                              trailing: Icon(Icons.chevron_right_rounded,
-                                  color: p.textSecondary),
-                              onTap: () async {
-                                final now = TimeOfDay.now();
-                                final selectedTime = await showTimePicker(
-                                  context: context,
-                                  initialTime: now,
-                                );
-                                if (selectedTime != null && context.mounted) {
-                                  final today = DateTime.now();
-                                  var stopDate = DateTime(
-                                      today.year,
-                                      today.month,
-                                      today.day,
-                                      selectedTime.hour,
-                                      selectedTime.minute);
-                                  if (stopDate.isBefore(today)) {
-                                    stopDate =
-                                        stopDate.add(const Duration(days: 1));
-                                  }
-                                  cubit.startAbsoluteSleepTimer(stopDate);
-                                  Navigator.pop(context);
-                                }
-                              },
                             ),
                           ],
                         ),
@@ -304,58 +311,85 @@ class SleepTimerSheet extends StatelessWidget {
               );
             }
 
-  Future<int?> _showCustomMinutesDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    final p = context.palette;
-    String? errorText;
+  Future<int?> _showCustomMinutesDialog(BuildContext context) {
     return PulsrDialogHelper.showCustomDialog<int>(
       context,
       useRootNavigator: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          backgroundColor: p.surfaceContainer,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r18)),
-          title: Text(
-            context.l10n.customTime,
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
-          ),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            onChanged: (_) {
-              if (errorText != null) {
-                setState(() => errorText = null);
-              }
-            },
-            decoration: InputDecoration(
-              labelText: 'Duration (minutes)',
-              hintText: 'e.g. 25',
-              suffixText: 'min',
-              errorText: errorText,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () {
-                final val = int.tryParse(controller.text.trim());
-                if (val != null && val > 0 && val <= 720) {
-                  Navigator.pop(ctx, val);
-                } else {
-                  setState(() {
-                    errorText = 'Enter 1 to 720 minutes';
-                  });
-                }
-              },
-              child: Text(context.l10n.ok),
-            ),
-          ],
+      builder: (ctx) => const _CustomMinutesDialog(),
+    );
+  }
+}
+
+class _CustomMinutesDialog extends StatefulWidget {
+  const _CustomMinutesDialog();
+
+  @override
+  State<_CustomMinutesDialog> createState() => _CustomMinutesDialogState();
+}
+
+class _CustomMinutesDialogState extends State<_CustomMinutesDialog> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return AlertDialog(
+      backgroundColor: p.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.r18),
+      ),
+      title: Text(
+        context.l10n.customTime,
+        style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
+      ),
+      content: TextField(
+        controller: _controller,
+        keyboardType: TextInputType.number,
+        autofocus: true,
+        onChanged: (_) {
+          if (_errorText != null) {
+            setState(() => _errorText = null);
+          }
+        },
+        decoration: InputDecoration(
+          labelText: context.l10n.sleepTimerDurationMinutes,
+          hintText: context.l10n.sleepTimerMinutesHint,
+          suffixText: context.l10n.minuteAbbreviation,
+          errorText: _errorText,
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            final val = int.tryParse(_controller.text.trim());
+            if (val != null && val > 0 && val <= 720) {
+              Navigator.pop(context, val);
+            } else {
+              setState(() {
+                _errorText = context.l10n.sleepTimerInvalidRange;
+              });
+            }
+          },
+          child: Text(context.l10n.ok),
+        ),
+      ],
     );
   }
 }

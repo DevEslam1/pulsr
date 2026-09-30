@@ -63,6 +63,10 @@ class RoomCorrectionSheet extends StatefulWidget {
     );
   }
 
+  @visibleForTesting
+  static double calculateSnr(Int16List pcm) =>
+      _RoomCorrectionSheetState.calculateSnr(pcm);
+
   @override
   State<RoomCorrectionSheet> createState() => _RoomCorrectionSheetState();
 }
@@ -148,7 +152,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   }
 
   static double _calculateSnr(Int16List pcm) {
-    if (pcm.isEmpty) return 20.0;
+    if (pcm.isEmpty || pcm.length < 1024) return 0.0;
     const windowSize = 1024;
     double maxWindowRms = 0.0;
     double minWindowRms = double.infinity;
@@ -164,12 +168,16 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       if (rms > 0 && rms < minWindowRms) minWindowRms = rms;
     }
 
+    if (maxWindowRms <= 0.0) return 0.0;
     if (minWindowRms <= 0 || minWindowRms == double.infinity) minWindowRms = 1.0;
-    if (maxWindowRms <= minWindowRms) return 10.0;
+    if (maxWindowRms <= minWindowRms) return 0.0;
 
     final snr = 20 * (math.log(maxWindowRms / minWindowRms) / math.ln10);
-    return snr.clamp(5.0, 50.0);
+    return snr.clamp(0.0, 50.0);
   }
+
+  @visibleForTesting
+  static double calculateSnr(Int16List pcm) => _calculateSnr(pcm);
 
   Future<void> _start() async {
     _currentPoint = 0;
@@ -195,13 +203,13 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       return;
     }
 
+    bool captureActive = false;
     try {
       final tones = RoomCorrectionService.tonePlan();
       final wav = RoomCorrectionService.synthSweepWav(tones);
 
-      bool started = false;
       try {
-        started = await _service.startCapture();
+        captureActive = await _service.startCapture();
       } catch (err) {
         if (mounted) {
           setState(() {
@@ -211,7 +219,13 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         }
         return;
       }
-      if (!started || !mounted) {
+      if (!captureActive || !mounted) {
+        if (captureActive) {
+          try {
+            await _service.stopCapture();
+          } catch (_) {}
+          captureActive = false;
+        }
         if (mounted) {
           setState(() {
             _phase = _RcPhase.idle;
@@ -269,16 +283,12 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       // Tail margin so the last tone's window is fully captured.
       await Future<void>.delayed(const Duration(milliseconds: 250));
       if (!mounted) {
-        if (_service.isCapturing) {
-          try {
-            await _service.stopCapture();
-          } catch (_) {}
-        }
         return;
       }
 
       setState(() => _phase = _RcPhase.analyzing);
       final pcm = await _service.stopCapture();
+      captureActive = false;
       final response =
           RoomCorrectionService.analyzeResponse(pcm, RoomCorrectionService.captureSampleRate, tones);
       if (response.length < tones.length ~/ 2) {
@@ -298,6 +308,13 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       }
     } catch (e, st) {
       ErrorLogger.log('Room correction failed', error: e, stackTrace: st, category: 'RoomCorrection');
+      if (mounted) {
+        setState(() {
+          _phase = _RcPhase.idle;
+          _error = e.toString();
+        });
+      }
+    } finally {
       _progressTimer?.cancel();
       _progressTimer = null;
       try {
@@ -305,12 +322,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         await _player?.dispose();
       } catch (_) {}
       _player = null;
-      if (!mounted) return;
-      setState(() {
-        _phase = _RcPhase.idle;
-        _error = e.toString();
-      });
-      if (_service.isCapturing) {
+      if (captureActive || _service.isCapturing) {
         try {
           await _service.stopCapture();
         } catch (_) {}
@@ -338,7 +350,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     final gains = RoomCorrectionService.fitCorrection(avgResponse, tones);
     final avgSnr = _snrValues.isNotEmpty
         ? (_snrValues.reduce((a, b) => a + b) / _snrValues.length)
-        : 20.0;
+        : 0.0;
 
     if (!mounted) return;
     setState(() {
@@ -461,6 +473,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         IconButton(
                           icon: Icon(Icons.close_rounded,
                               color: p.textSecondary),
+                          tooltip: context.l10n.close,
                           visualDensity: VisualDensity.compact,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
@@ -537,7 +550,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '3-Point Room Averaging',
+                                    context.l10n.roomAveragingTitle,
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: AppFontSize.bodySmall,
@@ -545,7 +558,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                     ),
                                   ),
                                   Text(
-                                    'Measures Center, 1m Left, and 1m Right for robust correction',
+                                    context.l10n.roomAveragingSubtitle,
                                     style: TextStyle(
                                       fontSize: AppFontSize.caption,
                                       color: p.textSecondary,
@@ -756,15 +769,15 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           children: [
                             Container(width: 10, height: 3, color: const Color(0xFF4FC3F7)),
                             const SizedBox(width: 4),
-                            Text('Center', style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            Text(context.l10n.roomPositionCenter, style: TextStyle(color: p.textTertiary, fontSize: 10)),
                             const SizedBox(width: 8),
                             Container(width: 10, height: 3, color: const Color(0xFF81C784)),
                             const SizedBox(width: 4),
-                            Text('Left', style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            Text(context.l10n.roomPositionLeft, style: TextStyle(color: p.textTertiary, fontSize: 10)),
                             const SizedBox(width: 8),
                             Container(width: 10, height: 3, color: const Color(0xFFFFB74D)),
                             const SizedBox(width: 4),
-                            Text('Right', style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            Text(context.l10n.roomPositionRight, style: TextStyle(color: p.textTertiary, fontSize: 10)),
                           ],
                         ),
                         const SizedBox(height: 2),

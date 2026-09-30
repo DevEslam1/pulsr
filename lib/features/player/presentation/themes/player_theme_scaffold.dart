@@ -16,8 +16,10 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import '../../../../core/constants/app_radii.dart';
 import '../../../../core/responsive/pulsr_responsive_tokens.dart';
 import '../../../../core/responsive/breakpoints.dart';
+import '../../../../core/utils/adaptive.dart';
 
 /// Computed responsive metrics used across player themes.
 class PlayerThemeMetrics {
@@ -174,7 +176,7 @@ class PlayerHeaderBar extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
           color: p.textPrimary,
-          tooltip: 'Close',
+          tooltip: context.l10n.close,
           onPressed: onBack ?? () => Navigator.of(context).maybePop(),
         ),
         Expanded(
@@ -211,7 +213,7 @@ class PlayerHeaderBar extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.more_vert_rounded, size: 22),
             color: p.textPrimary,
-            tooltip: 'Options',
+            tooltip: context.l10n.moreOptions,
             onPressed: () {
               if (song != null) {
                 SongInfoSheet.show(context, song: song);
@@ -282,6 +284,10 @@ class PlayerThemeScaffold extends StatelessWidget {
           if (background != null) Positioned.fill(child: background!),
           if (ambientGlow != null) Positioned.fill(child: ambientGlow!),
           SafeArea(
+            top: false,
+            bottom: false,
+            left: !context.isLandscape,
+            right: !context.isLandscape,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final metrics = PlayerThemeMetrics.calculate(context, constraints);
@@ -367,8 +373,15 @@ class PlayerThemeScaffold extends StatelessWidget {
                       );
 
                 if (metrics.isLandscape) {
+                  final insets = MediaQuery.paddingOf(context);
+                  final horizontalPad = math.max(16.0, math.max(insets.left, insets.right));
+                  final effectivePadding = EdgeInsets.symmetric(
+                    horizontal: metrics.isTablet ? math.max(32.0, horizontalPad) : horizontalPad,
+                    vertical: metrics.isCompactHeight ? 4.0 : 8.0,
+                  );
+
                   return Padding(
-                    padding: padding,
+                    padding: effectivePadding,
                     child: Row(
                       children: [
                         Expanded(
@@ -379,7 +392,12 @@ class PlayerThemeScaffold extends StatelessWidget {
                               SizedBox(height: metrics.switcherTopPad),
                               resolvedSwitcher,
                               SizedBox(height: metrics.switcherBottomPad),
-                              Expanded(child: resolvedCenter),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(AppRadii.r24),
+                                  child: resolvedCenter,
+                                ),
+                              ),
                             ],
                           ),
                         ),

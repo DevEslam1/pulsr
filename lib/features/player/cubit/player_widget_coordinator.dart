@@ -13,8 +13,11 @@ class PlayerWidgetCoordinator {
 
   final WidgetService? _widgetService;
 
-  DateTime? _lastUpdateTime;
-  DateTime? _lastProgressUpdateTime;
+  // B16: monotonic clock so widget-push throttling is immune to system clock
+  // changes (matches PlayerScrobbleCoordinator).
+  final Stopwatch _clock = Stopwatch()..start();
+  int? _lastUpdateMs;
+  int? _lastProgressUpdateMs;
   int? _cachedNextTitlesIndex;
   int? _cachedQueueLength;
   int? _cachedCurrentSongId;
@@ -25,18 +28,28 @@ class PlayerWidgetCoordinator {
   // FIX-L05: Extract nextTitlesCount constant and middle dot separator
   static const int nextTitlesCount = 3;
 
+  /// Explicitly invalidates the next-titles cache (e.g. after a queue reorder or replace).
+  void invalidateNextTitlesCache() {
+    _cachedNextTitles = null;
+    _cachedNextTitlesIndex = null;
+    _cachedQueueLength = null;
+    _cachedCurrentSongId = null;
+    _cachedQueueVersion = null;
+    _cachedNextIdsHash = null;
+  }
+
   @visibleForTesting
   List<String>? nextTitles(PlayerState s, int queueVersion) {
     if (s.queue.isEmpty || s.currentIndex + 1 >= s.queue.length) {
-      _cachedNextTitles = null;
-      _cachedNextTitlesIndex = null;
+      invalidateNextTitlesCache();
       _cachedQueueLength = 0;
-      _cachedCurrentSongId = null;
-      _cachedNextIdsHash = null;
       return null;
     }
     final nextIdsHash = Object.hashAll(
-      s.queue.skip(s.currentIndex + 1).take(nextTitlesCount).map((item) => item.id),
+      s.queue.skip(s.currentIndex + 1).take(nextTitlesCount).map(
+            (item) => Object.hash(
+                item.id, item.title, item.artist, item.remoteId, item.path),
+          ),
     );
     if (_cachedQueueVersion == queueVersion &&
         _cachedNextTitlesIndex == s.currentIndex &&
@@ -61,14 +74,16 @@ class PlayerWidgetCoordinator {
   }
 
   void updateThrottled(PlayerState s, int queueVersion, {bool force = false}) {
-    final now = DateTime.now();
+    if (!_clock.isRunning) _clock.start();
+    final now = _clock.elapsedMilliseconds;
     if (!force &&
-        _lastUpdateTime != null &&
-        now.difference(_lastUpdateTime!) < PlayerConstants.widgetThrottleDuration) {
+        _lastUpdateMs != null &&
+        now - _lastUpdateMs! <
+            PlayerConstants.widgetThrottleDuration.inMilliseconds) {
       return;
     }
-    _lastUpdateTime = now;
-    _lastProgressUpdateTime = now;
+    _lastUpdateMs = now;
+    _lastProgressUpdateMs = now;
     String? queueCover;
     if (s.queue.isNotEmpty && s.currentIndex + 1 < s.queue.length) {
       final nextSong = s.queue[s.currentIndex + 1];
@@ -92,12 +107,14 @@ class PlayerWidgetCoordinator {
   }
 
   void updateProgressThrottled(PlayerState s) {
-    final now = DateTime.now();
-    if (_lastProgressUpdateTime != null &&
-        now.difference(_lastProgressUpdateTime!) < PlayerConstants.widgetThrottleDuration) {
+    if (!_clock.isRunning) _clock.start();
+    final now = _clock.elapsedMilliseconds;
+    if (_lastProgressUpdateMs != null &&
+        now - _lastProgressUpdateMs! <
+            PlayerConstants.widgetThrottleDuration.inMilliseconds) {
       return;
     }
-    _lastProgressUpdateTime = now;
+    _lastProgressUpdateMs = now;
     try {
       unawaited(_widgetService?.updateProgress(
         isPlaying: s.isPlaying,
@@ -105,6 +122,34 @@ class PlayerWidgetCoordinator {
         duration: s.duration,
       ));
     } catch (_) {}
+  }
+
+  @visibleForTesting
+  bool get isClockRunning => _clock.isRunning;
+
+  void reset() {
+    _clock.reset();
+    _lastUpdateMs = null;
+    _lastProgressUpdateMs = null;
+    _cachedNextTitles = null;
+    _cachedNextTitlesIndex = null;
+    _cachedQueueLength = null;
+    _cachedCurrentSongId = null;
+    _cachedQueueVersion = null;
+    _cachedNextIdsHash = null;
+  }
+
+  void dispose() {
+    _clock.stop();
+    _clock.reset();
+    _lastUpdateMs = null;
+    _lastProgressUpdateMs = null;
+    _cachedNextTitles = null;
+    _cachedNextTitlesIndex = null;
+    _cachedQueueLength = null;
+    _cachedCurrentSongId = null;
+    _cachedQueueVersion = null;
+    _cachedNextIdsHash = null;
   }
 }
 

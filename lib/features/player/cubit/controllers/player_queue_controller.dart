@@ -58,6 +58,10 @@ class PlayerQueueController {
   AsyncGuard get lyricsGuard => _lyricsGuard;
 
   bool _isSwitchingSlot = false;
+  @visibleForTesting
+  bool get isSwitchingSlot => _isSwitchingSlot;
+  @visibleForTesting
+  set isSwitchingSlot(bool value) => _isSwitchingSlot = value;
 
   PlayerQueueController({
     required PulsrAudioHandler audioHandler,
@@ -107,30 +111,29 @@ class PlayerQueueController {
     );
   }
 
-  /// Fire-and-forget stream pre-resolution for a track the user is likely to
-  /// play next — e.g. the first item of a freshly rendered list. Fills the
-  /// shared YtmUrlCache so the eventual tap skips the network resolve entirely
-  /// instead of paying it at tap-to-sound time. Idempotent and non-throwing.
+  final List<Timer> _warmTimers = [];
+
+  @visibleForTesting
+  int get activeWarmTimersCount => _warmTimers.length;
+
+  void _cancelWarmTimers() {
+    for (final timer in _warmTimers) {
+      timer.cancel();
+    }
+    _warmTimers.clear();
+  }
+
+  /// Fire-and-forget stream pre-resolution for a track the user is likely to play next.
   void warmStream(SongsTableData song) {
     try {
       _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
     } catch (_) {}
   }
 
-  /// Gap between successive speculative warms in [warmStreams], so opening a
-  /// list never stacks several full multi-engine resolves on the native thread
-  /// pool — or bursts enough googlevideo requests to trip bot detection — at
-  /// once. Mirrors the search screen's own speculative-warm stagger.
+  /// Gap between successive speculative warms in [warmStreams].
   static const Duration _warmStreamStagger = Duration(milliseconds: 400);
 
-  /// Fire-and-forget pre-resolution of the first [count] streaming-eligible
-  /// tracks of a freshly rendered list — the taps a user is most likely to
-  /// make near the top. Each warm is staggered by [_warmStreamStagger], skips
-  /// tracks that aren't online-streamable (local, already downloaded, or
-  /// missing a remote id), is a no-op when the URL is already cached fresh, and
-  /// short-circuits cheaply while YTM is bot-cooling (the underlying
-  /// [resolveStream] skips the native tiers). Idempotent and non-throwing;
-  /// safe to call on every render.
+  /// Fire-and-forget pre-resolution of the first [count] streaming-eligible tracks.
   void warmStreams(List<SongsTableData> songs, {int count = 3}) {
     if (songs.isEmpty || count <= 0) return;
     var warmed = 0;
@@ -143,44 +146,16 @@ class PlayerQueueController {
       }
       final delay = _warmStreamStagger * warmed;
       warmed++;
-      unawaited(Future<void>.delayed(delay, () {
+      late final Timer timer;
+      timer = Timer(delay, () {
+        _warmTimers.remove(timer);
         if (_isClosed()) return;
         try {
           _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
         } catch (_) {}
-      }));
+      });
+      _warmTimers.add(timer);
     }
-  }
-
-  Future<void> playRadioStation(RadioStation station) async {
-    final uri = Uri.tryParse(station.url);
-    if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-      final s = _getState();
-      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
-      return;
-    }
-    final song = SongsTableData(
-      id: station.songId,
-      title: station.name,
-      artist: (station.genre != null && station.genre!.isNotEmpty)
-          ? station.genre!
-          : station.name,
-      album: '',
-      durationMs: 0,
-      path: station.url,
-      source: SongSource.radio,
-      remoteArtworkUrl: station.artworkUrl,
-      isFavorite: false,
-      isMissing: false,
-      isDownloaded: false,
-      playCount: 0,
-      lastPositionMs: 0,
-    );
-    unawaited(RadioStationStore().markPlayed(
-      station.id,
-      DateTime.now().millisecondsSinceEpoch,
-    ));
-    await playSong(song);
   }
 
   Future<void> playSong(
@@ -266,9 +241,22 @@ class PlayerQueueController {
     final isSameSong = _isSameTrack(state.currentSong, song);
     // When the same track keeps playing but its queue is being replaced (e.g.
     // Shuffle), preserve the current position instead of restarting from zero.
+    // M6: read the live player position, not `state.position` — during a seek the
+    // cubit state hasn't committed the new offset yet, so the stale value would
+    // make the track visibly jump backwards.
     final startPos = initialPosition ??
-        ((queue != null && isSameSong) ? state.position : Duration.zero);
+        ((queue != null && isSameSong)
+            ? _audioHandler.compensatedPosition
+            : Duration.zero);
     final prevSlot = _queueSlots[state.activeQueueSlot];
+    final prevSlotSnapshot = prevSlot != null
+        ? QueueSlotData(
+            songIds: List<int>.from(prevSlot.songIds),
+            currentIndex: prevSlot.currentIndex,
+            position: prevSlot.position,
+            speed: prevSlot.speed,
+          )
+        : null;
     final prevQueue = state.queue, prevIndex = state.currentIndex;
     final prevSong = state.currentSong, prevPosition = state.position;
     final prevDuration = state.duration, prevLyrics = state.lyrics, prevLyricsSource = state.lyricsSource;
@@ -323,8 +311,10 @@ class PlayerQueueController {
           'Resolution guard must be invalid after rollback');
 
       if (!_isClosed()) {
-        if (prevSlot != null) {
-          _queueSlots[state.activeQueueSlot] = prevSlot;
+        if (prevSlotSnapshot != null) {
+          _queueSlots[state.activeQueueSlot] = prevSlotSnapshot;
+        } else {
+          _queueSlots.remove(state.activeQueueSlot);
         }
         _debouncedPersistQueueSlots();
         _bumpQueueVersion();
@@ -352,6 +342,9 @@ class PlayerQueueController {
         } catch (rollbackError, rollbackSt) {
           ErrorLogger.log('Queue rollback failed after load error',
               error: rollbackError, stackTrace: rollbackSt, category: 'PlayerQueueController');
+          _queueSlots.remove(state.activeQueueSlot);
+          _debouncedPersistQueueSlots();
+          _bumpQueueVersion();
           try { await _audioHandler.pause(); } catch (_) {}
           try { await _audioHandler.clearQueue(); } catch (_) {}
           try {
@@ -388,6 +381,7 @@ class PlayerQueueController {
   }
 
   void dispose() {
+    _cancelWarmTimers();
     _persistQueueDebounce?.cancel();
     _persistQueueDebounce = null;
     _mediaItemResolutionGuard.invalidate();

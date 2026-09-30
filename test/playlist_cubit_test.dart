@@ -82,5 +82,37 @@ void main() {
 
       await cubit.close();
     });
+
+    test('H-06: cache save queue is capped at maxCacheSaveQueueSize (50) and coalesces', () async {
+      final cubit = PlaylistCubit(playlistUseCases: playlistUseCases);
+
+      expect(cubit.cacheSaveQueueLength, equals(0));
+
+      // Enqueue 75 tasks into the cache save queue
+      for (var i = 0; i < 75; i++) {
+        cubit.enqueueCacheSaveForTesting(() async {});
+      }
+
+      // The queue must never exceed 50 items
+      expect(cubit.cacheSaveQueueLength, equals(PlaylistCubit.maxCacheSaveQueueSize));
+      expect(cubit.cacheSaveQueueLength, equals(50));
+
+      await cubit.close();
+    });
+
+    test('[M-09] _loadOnlineCache safely catches FormatException and corrupted data and purges cache', () async {
+      SharedPreferences.setMockInitialValues({
+        PlaylistCubit.onlineCacheKey: '{corrupted: json [',
+      });
+
+      final cubit = PlaylistCubit(playlistUseCases: playlistUseCases);
+      await cubit.loadOnlineCacheForTesting();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(PlaylistCubit.onlineCacheKey), isFalse);
+      expect(cubit.onlineState.likedTracks, isEmpty);
+
+      await cubit.close();
+    });
   });
 }

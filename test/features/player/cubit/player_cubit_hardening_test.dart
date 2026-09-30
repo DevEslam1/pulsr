@@ -670,6 +670,89 @@ void main() {
           )).called(1);
     });
 
+    test('[H-18] maybeFollowTrackSampleRate serializes concurrent calls without race condition', () async {
+      final mockHiRes = MockHiResAudioService();
+      final mockSettings = MockSettingsCubit();
+      when(() => mockSettings.state).thenReturn(
+        const SettingsState(followTrackSampleRate: true),
+      );
+      when(() => mockSettings.refreshOutputDevice()).thenAnswer((_) async {});
+
+      final appliedRates = <int>[];
+      final completer1 = Completer<void>();
+      when(() => mockHiRes.setTargetOutputFormat(
+            sampleRate: any(named: 'sampleRate'),
+            bitDepth: any(named: 'bitDepth'),
+          )).thenAnswer((invocation) async {
+        final rate = invocation.namedArguments[#sampleRate] as int;
+        appliedRates.add(rate);
+        if (rate == 44100) {
+          await completer1.future;
+        }
+        return true;
+      });
+
+      var state = const PlayerState();
+      final dspController = PlayerDspController(
+        audioHandler: testAudioHandler,
+        settingsCubit: mockSettings,
+        hiResAudioService: mockHiRes,
+        getState: () => state,
+        emit: (s) => state = s,
+        syncAudioEffects: ({bool force = false}) {},
+        isClosed: () => false,
+      );
+
+      final track1 = SongsTableData(
+        id: 1,
+        title: 'Track 1',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 100000,
+        path: '/path/1.flac',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        sampleRate: 44100,
+        bitDepth: 16,
+      );
+
+      final track2 = SongsTableData(
+        id: 2,
+        title: 'Track 2',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 100000,
+        path: '/path/2.flac',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        sampleRate: 96000,
+        bitDepth: 24,
+      );
+
+      // Launch both concurrently
+      final f1 = dspController.maybeFollowTrackSampleRate(track1);
+      final f2 = dspController.maybeFollowTrackSampleRate(track2);
+
+      // Verify track1 is currently running and track2 is blocked by the mutex
+      await pumpEventQueue();
+      expect(appliedRates, equals([44100]));
+
+      // Complete track 1
+      completer1.complete();
+      await Future.wait([f1, f2]);
+
+      // Both executed in strict serialized order
+      expect(appliedRates, equals([44100, 96000]));
+    });
+
     test('Fix #10: PlayerCubit.close() isolates controller disposal failures', () async {
       SharedPreferences.setMockInitialValues({});
       final cubit = PlayerCubit(

@@ -1,5 +1,135 @@
 {
   "@@locale": "ar",
+  "sleepTimerDurationMinutes": "المدة (بالدقائق)",
+  "sleepTimerMinutesHint": "مثال: 25",
+  "minuteAbbreviation": "د",
+  "sleepTimerInvalidRange": "أدخل قيمة من 1 إلى 720 دقيقة",
+  "moreOptions": "خيارات",
+  "googleCast": "Google Cast",
+  "autoplay": "التشغيل التلقائي",
+  "trackCount": "{count, plural, =1{مسار واحد} =2{مساران} few{{count} مسارات} many{{count} مسارًا} other{{count} مسار}}",
+  "@trackCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "decades": "العقود",
+  "libraryManageTabs": "التبويبات",
+  "libraryAtLeastOneTab": "مطلوب تبويب واحد على الأقل",
+  "libraryTabsReorder": "{active} من {total} تبويبات • اسحب لإعادة الترتيب",
+  "@libraryTabsReorder": {
+    "placeholders": {
+      "active": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "libraryTabsLongPress": "{active} من {total} تبويبات • اضغط مطولاً للتنظيم",
+  "@libraryTabsLongPress": {
+    "placeholders": {
+      "active": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "libraryInactiveTabs": "غير مفعّلة ({count})",
+  "@libraryInactiveTabs": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "whatsNew": "الجديد",
+  "developer": "المطوّر",
+  "showMore": "عرض المزيد",
+  "showLess": "عرض أقل",
+  "resetWaveformZoom": "إعادة ضبط تكبير الموجة",
+  "dspLabel": "DSP",
+  "queueTab": "قائمة الانتظار",
+  "addTab": "إضافة تبويب",
+  "twoPaneSelectItem": "اختر عنصرًا لعرض التفاصيل",
+  "leAudioRequiresBle": "تتطلب برامج ترميز LE Audio (LC3 / Opus) اتصال Bluetooth LE Audio.",
+  "castEntireQueue": "بث قائمة الانتظار بأكملها",
+  "roomAveragingTitle": "متوسط الغرفة بثلاث نقاط",
+  "roomAveragingSubtitle": "يقيس الوسط و1 م يسارًا و1 م يمينًا لتصحيح دقيق",
+  "roomPositionCenter": "الوسط",
+  "roomPositionLeft": "يسار",
+  "roomPositionRight": "يمين",
+  "correctionCurveRange": "منحنى التصحيح (20 Hz – 20 kHz)",
+  "offsetMinus50Ms": "-50 ms",
+  "offsetPlus50Ms": "+50 ms",
+  "freq20Hz": "20 Hz",
+  "freq100Hz": "100 Hz",
+  "freq1kHz": "1 kHz",
+  "freq10kHz": "10 kHz",
+  "freq20kHz": "20 kHz",
+  "songRemovedFromPlaylist": "تمت إزالة {title} من {playlist}",
+  "@songRemovedFromPlaylist": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "playlist": { "type": "String" }
+    }
+  },
+  "playlistDeleted": "تم حذف {name}",
+  "@playlistDeleted": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "voiceSearch": "البحث الصوتي",
+  "voiceSearchUnavailable": "البحث الصوتي غير متاح",
+  "searchLocalOnlineHint": "ابحث في الموسيقى المحلية وعبر الإنترنت...",
+  "noLocalSongsMatch": "لا توجد أغانٍ محلية تطابق \"{query}\"",
+  "@noLocalSongsMatch": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "noOnlineSongsMatch": "لا توجد أغانٍ عبر الإنترنت تطابق \"{query}\"",
+  "@noOnlineSongsMatch": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "professionalMode": "الوضع الاحترافي",
+  "professionalModeUnlocked": "تم فتح DSP المتقدم والبث بت مثالي وعناصر التحكم الصوتية الاحترافية.",
+  "quickDspControls": "عناصر تحكم DSP السريعة",
+  "eqEngineTitle": "محرك المعادل",
+  "eqEngineSubtitle": "تصفية بارامترية biquad مباشرة",
+  "truePeakLimiterTitle": "محدد الذروة الحقيقية",
+  "truePeakLimiterSubtitle": "بدون قص بين العينات",
+  "viperDdcTitle": "تصحيح سماعات ViPER-DDC",
+  "settingsSectionSoundPlayback": "الصوت والتشغيل",
+  "settingsSectionAppearanceGestures": "المظهر والإيماءات",
+  "settingsSectionSystemPrivacy": "النظام والخصوصية",
+  "whatChanges": "ما الذي يتغير؟",
+  "expEqTitle": "المعادل و DSP",
+  "expEqPro": "معادل بارامتري بـ10 نطاقات وعامل Q وتصحيح الغرفة",
+  "expEqNormal": "إعدادات صوت ذكية مختارة",
+  "expUsbTitle": "DAC USB والإخراج",
+  "expUsbPro": "قفل عتاد بت مثالي وبث DSD DoP",
+  "expUsbNormal": "AudioTrack النظام (32-bit float)",
+  "expCrossfadeTitle": "التشغيل والتلاشي المتقاطع",
+  "expCrossfadePro": "منحنى 0-12 ثانية دقيق ومعايرة زمن الاستجابة",
+  "expCrossfadeNormal": "تلاشٍ متقاطع سلس قياسي 3 ثوانٍ",
+  "expGainTitle": "الربح والجهارة",
+  "expGainPro": "معايرة ReplayGain بالديسيبل ومضخم أولي يدوي",
+  "expGainNormal": "موازنة تلقائية للجهارة المدركة",
+  "expVisualizersTitle": "المؤثرات المرئية",
+  "expVisualizersPro": "مشغّل إعدادات Milkdrop و JSON مخصص",
+  "expVisualizersNormal": "أنماط Classic Wave و Radial Frequency",
+  "queueReorderSemantics": "إعادة ترتيب {title}. الموضع {index} من {count}",
+  "@queueReorderSemantics": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "index": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "songByArtist": "{title} بواسطة {artist}",
+  "@songByArtist": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "artist": { "type": "String" }
+    }
+  },
   "customDurationMinutes": "مدة مخصصة (بالدقائق).",
   "partialBatchDetected": "تم اكتشاف دفعة جزئية",
   "somethingWentWrong": "حدث خطأ ما",
@@ -3961,5 +4091,58 @@
   "bpBypassesAndroidMixer": "يتجاوز مازج أندرويد ومعالجة DSP لإخراج صوتي مطابق (يتطلب USB أندرويد 14+، والسلكي يتطلب مساراً مباشراً)",
   "settingsResultsCount": "{count, plural, =1{تم العثور على إعداد واحد} =2{تم العثور على إعدادين} few{تم العثور على {count} إعدادات} many{تم العثور على {count} إعداداً} other{تم العثور على {count} إعداد}}",
   "cassettePulsrTape": "PULSR C-90",
-  "statusCancelled": "تم الإلغاء"
+  "dspPitchUpSemitone": "حِدّة +1 نصف نغمة",
+  "dspPitchDownSemitone": "حِدّة -1 نصف نغمة",
+  "dspPitchMeterUnavailable": "كشف حِدّة الصوت غير متاح في هذا الإصدار.",
+  "castNoLocalItems": "لا يوجد ما يمكن بثّه — الملفات المحلية فقط قابلة للبث.",
+  "settingsCastingQueueTo": "بث قائمة التشغيل إلى {device}",
+  "castCastingTo": "البث إلى {device}",
+  "castToSpeakerDisplay": "البث إلى مكبر صوت / شاشة",
+  "castManageHint": "اضغط لإدارة مستوى البث أو قطع الاتصال",
+  "castStreamHint": "بث صوتي عبر Wi-Fi بدون فقدان/مع فقدان",
+  "downloadsMatchStream": "التنزيلات مطابقة للبث",
+  "sleepTimerEndOfQueue": "مؤقّت النوم: نهاية قائمة التشغيل",
+  "sleepTimerTracksRemaining": "مؤقّت النوم: {count} مقطوعات متبقية",
+  "sleepTimerMinutesRemaining": "مؤقّت النوم: {minutes} دقيقة متبقية",
+  "statusCancelled": "تم الإلغاء",
+  "dockStyleTitle": "نمط الإرساء",
+  "dockStyleSubtitle": "اختر طريقة تراص المشغّل المصغّر وشريط التنقّل",
+  "dockStyleDefault": "جنبًا إلى جنب",
+  "dockStyleDefaultDesc": "المشغّل المصغّر فوق شريط التنقّل",
+  "dockStyleSystem": "كبسولة عائمة",
+  "dockStyleSystemDesc": "كبسولة وسائط عائمة فوق شريط التنقّل",
+  "dockStyleMiniTop": "المشغّل المصغّر في المقدّمة",
+  "dockStyleMiniTopDesc": "يظهر شريط التنقّل خلف المشغّل المصغّر",
+  "dockStyleNavTop": "شريط التنقّل في المقدّمة",
+  "dockStyleNavTopDesc": "يظهر المشغّل المصغّر خلف شريط التنقّل",
+  "dockStyleHint": "اضغط مطوّلًا على المشغّل المصغّر لتغيير نمط الإرساء",
+  "whatsNewSubtitle": "شاهد الجديد في الإصدار {version}",
+  "@whatsNewSubtitle": {"placeholders": {"version": {"type": "String"}}},
+  "studioMoreInStudio": "المزيد في وضع الاستوديو",
+  "studioControlsAvailable": "{count} من أدوات الاستوديو متاحة",
+  "@studioControlsAvailable": {"placeholders": {"count": {"type": "int"}}},
+  "studioSwitchCta": "التبديل إلى الاستوديو",
+  "studioExplainerTitle": "ما الذي يضيفه وضع الاستوديو",
+  "studioExplainerBody": "إخراج مثالي للبت، وحزمة DSP الكاملة، وملفات الأجهزة، والأتمتة، وخادم الوسيط. يمكنك الرجوع في أي وقت.",
+  "alphabetIndexLabel": "فهرس الحروف الأبجدي",
+  "badgeOn": "مُشغّل",
+  "keepBestQualityForAll": "الإبقاء على أفضل جودة للجميع",
+  "selectedHighestQuality": "تم اختيار أعلى جودة لـ {count} مجموعة",
+  "@selectedHighestQuality": {"placeholders": {"count": {"type": "int"}}},
+  "enterSearchValue": "أدخل قيمة البحث…",
+  "radioSearchHint": "ابحث عن محطة أو نوع أو رابط…",
+  "webSessionInterruptedTitle": "انقطعت جلسة الويب",
+  "webSessionInterruptedDesc": "تم فصل مقبض عرض الويب أو استعادته بواسطة النظام. اضغط أدناه لإعادة تحميل الجلسة.",
+  "onboardingGesturesTitle": "الإيماءات والاختصارات",
+  "onboardingGesturesDesc": "بعض السحب واللمسات تجعل Pulsr سهل الاستخدام.",
+  "onboardingGestureSwipeUpTitle": "اسحب لأعلى",
+  "onboardingGestureSwipeUpDesc": "يفتح مشغّل الشاشة الكاملة",
+  "onboardingGestureSwipeDownTitle": "اسحب لأسفل",
+  "onboardingGestureSwipeDownDesc": "يعيد ترتيب المشغّل المصغّر وشريط التنقّل",
+  "onboardingGestureDoubleTapTitle": "انقر مرتين على الغلاف",
+  "onboardingGestureDoubleTapDesc": "يبدّل المفضّلة",
+  "onboardingGestureLongPressTitle": "اضغط مطوّلًا على المشغّل المصغّر",
+  "onboardingGestureLongPressDesc": "يفتح خيارات نمط الإرساء",
+  "onboardingPersonalizeTitle": "اجعله يناسبك",
+  "onboardingPersonalizeDesc": "اختر لونًا الآن — يمكنك تغييره في أي وقت من الإعدادات."
 }

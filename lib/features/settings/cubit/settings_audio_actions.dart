@@ -855,6 +855,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(silenceSkipSensitivity: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.silenceSkipSensitivity, clamped);
+    // B17: apply live so the slider actually drives the native silence skipper
+    // instead of only persisting a value.
+    try {
+      await getIt<PulsrAudioHandler>().setSilenceSkipSensitivity(clamped);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply silence-skip sensitivity live',
+          error: e, stackTrace: st, category: 'Settings');
+    }
   }
 
   /// F5: Bluetooth latency auto-calibration. Uses the codec latency table

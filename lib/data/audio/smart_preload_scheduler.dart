@@ -105,46 +105,93 @@ class SmartPreloadScheduler {
       }
     }
 
+    final meterProbe = isMeteredConnectionProvider;
+    if (meterProbe == null) {
+      // No injected probe: dispatch synchronously (assume unmetered) and refresh
+      // the cached state in the background for subsequent scheduling passes.
+      unawaited(_refreshMeteredState());
+      _dispatchPreloads(
+        queue: queue,
+        currentIndex: currentIndex,
+        isShuffle: isShuffle,
+        shuffleIndices: shuffleIndices,
+        preloadCount: preloadCount,
+        isMetered: _meteredCache,
+      );
+      return;
+    }
+
     unawaited(() async {
-      final isMetered = await (isMeteredConnectionProvider != null
-          ? isMeteredConnectionProvider!()
-          : ConnectivityGuard.isMeteredConnection());
-
-      if (isMetered && networkPolicy == PreloadNetworkPolicy.wifiOnly) {
-        return;
+      bool isMetered;
+      try {
+        isMetered = await meterProbe();
+      } catch (_) {
+        isMetered = false;
       }
-
-      int effectiveCount = preloadCount.clamp(1, 5);
-      if (isMetered && networkPolicy == PreloadNetworkPolicy.conservativeOnMetered) {
-        // Metered connection: limit preload to at most 1 item.
-        effectiveCount = 1;
-      }
-
-      if (isShuffle) {
-        if (shuffleIndices != null && shuffleIndices.isNotEmpty) {
-          final pos = shuffleIndices.indexOf(currentIndex);
-          if (pos >= 0) {
-            for (int i = 1; i <= effectiveCount; i++) {
-              final p = pos + i;
-              if (p >= shuffleIndices.length) break;
-              final idx = shuffleIndices[p];
-              if (idx >= 0 && idx < queue.length) {
-                _preloadTrack(queue[idx], priority: i, isMetered: isMetered);
-              }
-            }
-            return;
-          }
-        }
-        _preloadRandomTracks(queue, currentIndex, count: effectiveCount, isMetered: isMetered);
-      } else {
-        for (int i = 1; i <= effectiveCount; i++) {
-          final idx = currentIndex + i;
-          if (idx < queue.length) {
-            _preloadTrack(queue[idx], priority: i, isMetered: isMetered);
-          }
-        }
-      }
+      _dispatchPreloads(
+        queue: queue,
+        currentIndex: currentIndex,
+        isShuffle: isShuffle,
+        shuffleIndices: shuffleIndices,
+        preloadCount: preloadCount,
+        isMetered: isMetered,
+      );
     }());
+  }
+
+  bool _meteredCache = false;
+
+  Future<void> _refreshMeteredState() async {
+    try {
+      _meteredCache = await ConnectivityGuard.isMeteredConnection();
+    } catch (_) {
+      // Keep the last known state on failure.
+    }
+  }
+
+  void _dispatchPreloads({
+    required List<SongsTableData> queue,
+    required int currentIndex,
+    required bool isShuffle,
+    required List<int>? shuffleIndices,
+    required int preloadCount,
+    required bool isMetered,
+  }) {
+    if (isMetered && networkPolicy == PreloadNetworkPolicy.wifiOnly) {
+      return;
+    }
+
+    int effectiveCount = preloadCount.clamp(1, 5);
+    if (isMetered && networkPolicy == PreloadNetworkPolicy.conservativeOnMetered) {
+      // Metered connection: limit preload to at most 1 item.
+      effectiveCount = 1;
+    }
+
+    if (isShuffle) {
+      if (shuffleIndices != null && shuffleIndices.isNotEmpty) {
+        final pos = shuffleIndices.indexOf(currentIndex);
+        if (pos >= 0) {
+          for (int i = 1; i <= effectiveCount; i++) {
+            final p = pos + i;
+            if (p >= shuffleIndices.length) break;
+            final idx = shuffleIndices[p];
+            if (idx >= 0 && idx < queue.length) {
+              _preloadTrack(queue[idx], priority: i, isMetered: isMetered);
+            }
+          }
+          return;
+        }
+      }
+      _preloadRandomTracks(queue, currentIndex,
+          count: effectiveCount, isMetered: isMetered);
+    } else {
+      for (int i = 1; i <= effectiveCount; i++) {
+        final idx = currentIndex + i;
+        if (idx < queue.length) {
+          _preloadTrack(queue[idx], priority: i, isMetered: isMetered);
+        }
+      }
+    }
   }
 
   void _preloadRandomTracks(

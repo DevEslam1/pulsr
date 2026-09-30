@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import 'player_material_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -28,6 +29,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     this.warning = AppColors.warning,
     this.info = AppColors.info,
     required this.isDark,
+    required this.playerCard,
+    required this.deepShade,
   });
 
   final Color accent;
@@ -49,6 +52,12 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color info; // informational / neutral highlight role
   final bool isDark;
 
+  /// Immersive card-player surface (glass card / solid card).
+  final Color playerCard;
+
+  /// Deepest immersive-player backdrop below [bg] (circle/classic themes).
+  final Color deepShade;
+
   Color get background => bg;
   Color get primary => accent;
   Color get surfaceCard => surfaceContainer;
@@ -57,7 +66,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   /// Guaranteed WCAG AA contrast (>= 4.5:1) against the accent color.
   Color get textOnAccent {
     final lum = accent.computeLuminance();
-    return lum > 0.179 ? const Color(0xFF101223) : Colors.white;
+    return lum > 0.179 ? AppColors.onBright : Colors.white;
   }
 
   @override
@@ -80,6 +89,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? warning,
     Color? info,
     bool? isDark,
+    Color? playerCard,
+    Color? deepShade,
   }) {
     return PulsrPalette(
       accent: accent ?? this.accent,
@@ -100,6 +111,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       warning: warning ?? this.warning,
       info: info ?? this.info,
       isDark: isDark ?? this.isDark,
+      playerCard: playerCard ?? this.playerCard,
+      deepShade: deepShade ?? this.deepShade,
     );
   }
 
@@ -132,6 +145,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       warning: Color.lerp(warning, other.warning, t) ?? warning,
       info: Color.lerp(info, other.info, t) ?? info,
       isDark: t < 0.5 ? isDark : other.isDark,
+      playerCard: Color.lerp(playerCard, other.playerCard, t) ?? playerCard,
+      deepShade: Color.lerp(deepShade, other.deepShade, t) ?? deepShade,
     );
   }
 }
@@ -169,7 +184,7 @@ class AuraTheme {
       {bool dimWhitePoint = false}) {
     final isDark = brightness == Brightness.dark;
     final onAccent = accent.computeLuminance() > 0.5
-        ? const Color(0xFF101223)
+        ? AppColors.onBright
         : Colors.white;
 
     if (!isDark) {
@@ -192,6 +207,8 @@ class AuraTheme {
         success: AppColors.success,
         error: AppColors.error,
         isDark: false,
+        playerCard: Colors.white,
+        deepShade: const Color(0xFFF4F6FB),
       );
     }
     if (isAmoled) {
@@ -216,6 +233,8 @@ class AuraTheme {
         success: AppColors.success,
         error: AppColors.error,
         isDark: true,
+        playerCard: const Color(0xFF0B0B0E),
+        deepShade: Colors.black,
       );
     }
     return PulsrPalette(
@@ -241,6 +260,8 @@ class AuraTheme {
       success: AppColors.success,
       error: AppColors.error,
       isDark: true,
+      playerCard: const Color(0xFF141828),
+      deepShade: PlayerMaterialColors.immersiveBackdrop,
     );
   }
 

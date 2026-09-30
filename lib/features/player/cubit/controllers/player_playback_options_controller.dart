@@ -38,6 +38,10 @@ class PlayerPlaybackOptionsController {
   final PerSongPlaybackStore _perSongPlaybackStore;
   final PerSongVolumeStore _perSongVolumeStore;
   final PerSongEqStore _perSongEqStore;
+  // B5: brings the Bit-Perfect/AAudio/DoP conflict gate to Quran Mode DSP paths.
+  final String? Function()? _dspBlockedReason;
+  // Recovery hook mirroring PlayerDspController.applyDspEffect's _syncAudioEffects.
+  final void Function()? _syncAudioEffects;
 
   bool get isClosed => _isClosed();
 
@@ -52,6 +56,8 @@ class PlayerPlaybackOptionsController {
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
     Future<void> Function(SongsTableData song, {bool isOfflineOnly})? onLoadLyrics,
+    String? Function()? dspBlockedReason,
+    void Function()? syncAudioEffects,
   })  : _audioHandler = audioHandler,
         _earbudOptimizationService = earbudOptimizationService,
         _hiResAudioService = hiResAudioService,
@@ -61,7 +67,9 @@ class PlayerPlaybackOptionsController {
         _onLoadLyrics = onLoadLyrics,
         _perSongPlaybackStore = perSongPlaybackStore ?? PerSongPlaybackStore(),
         _perSongVolumeStore = perSongVolumeStore ?? PerSongVolumeStore(),
-        _perSongEqStore = perSongEqStore ?? PerSongEqStore();
+        _perSongEqStore = perSongEqStore ?? PerSongEqStore(),
+        _dspBlockedReason = dspBlockedReason,
+        _syncAudioEffects = syncAudioEffects;
 
   // ──────────────────────────────────────────────
   // Sleep Timer
@@ -137,12 +145,15 @@ class PlayerPlaybackOptionsController {
   double get minPlaybackSpeed => _audioHandler.minPlaybackSpeed;
   double get maxPlaybackSpeed => _audioHandler.maxPlaybackSpeed;
 
-  Future<void> setPlaybackSpeed(double speed) async {
+  Future<void> setPlaybackSpeed(double speed, {bool persist = true}) async {
     final s = _getState();
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
     _emit(s.copyWith(playback: s.playback.copyWith(playbackSpeed: clamped)));
     try {
       await _audioHandler.setSpeed(clamped);
+      // B13: Quran Mode applies its own playback speed transiently and must not
+      // poison the user's per-song speed memory for this track.
+      if (!persist) return;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
       // A-01: remember this track's speed for its next resume.
@@ -357,35 +368,5 @@ class PlayerPlaybackOptionsController {
     ));
   }
 
-  // ──────────────────────────────────────────────
-  // Overlays
-  // ──────────────────────────────────────────────
-  void toggleLyrics() => toggleLyricsVisibility();
-
-  void toggleLyricsVisibility() {
-    HapticFeedback.lightImpact();
-    final s = _getState();
-    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
-  }
-
-  void toggleQueue() => toggleQueueVisibility();
-
-  void toggleQueueVisibility() {
-    HapticFeedback.lightImpact();
-    final s = _getState();
-    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
-  }
-
-  void resetOverlayViews() {
-    final s = _getState();
-    if (s.isLyricsVisible || s.isQueueVisible) {
-      _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: false, isQueueVisible: false)));
-    }
-  }
-
-  void setExpanded(bool expanded) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
-  Future<void> setTrackBpm(SongsTableData song, double? bpm) => _audioHandler.setTrackBpm(song, bpm);
-  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
-  void setSilenceSkipSensitivity(int sensitivity) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(silenceSkipSensitivity: sensitivity)));
   void dispose() {}
 }

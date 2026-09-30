@@ -1,5 +1,14 @@
 part of 'settings_screen.dart';
 
+/// Segment order for the theme-mode [PulsrSegmentedControl]; the selected
+/// index maps back to the mode on change.
+const List<AppThemeMode> _themeModeOrder = [
+  AppThemeMode.system,
+  AppThemeMode.light,
+  AppThemeMode.dark,
+  AppThemeMode.amoled,
+];
+
 mixin SettingsCategorySectionsA on State<SettingsScreen> {
   Widget _buildAppearanceSection(
     BuildContext context,
@@ -31,89 +40,27 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
               const SizedBox(height: AppSpacing.s10),
               SizedBox(
                 width: double.infinity,
-                child: SegmentedButton<AppThemeMode>(
-                  showSelectedIcon: false,
-                  style: ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    backgroundColor: WidgetStateProperty.resolveWith((states) {
-                      if (states.contains(WidgetState.selected)) {
-                        return p.accent.withValues(alpha: 0.18);
-                      }
-                      return Colors.transparent;
-                    }),
-                    side: WidgetStatePropertyAll(
-                      BorderSide(color: p.hairline),
-                    ),
-                    shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
-                      ),
-                    ),
-                  ),
+                child: PulsrSegmentedControl(
                   segments: [
-                    ButtonSegment(
-                      value: AppThemeMode.system,
-                      label: Text(
-                        context.l10n.systemDefault,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: state.themeMode == AppThemeMode.system
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                      icon: const Icon(Icons.brightness_auto_rounded, size: 15),
+                    PulsrSegment(
+                      label: context.l10n.systemDefault,
+                      icon: Icons.brightness_auto_rounded,
                     ),
-                    ButtonSegment(
-                      value: AppThemeMode.light,
-                      label: Text(
-                        context.l10n.themeLight,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: state.themeMode == AppThemeMode.light
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                      icon: const Icon(Icons.light_mode_rounded, size: 15),
+                    PulsrSegment(
+                      label: context.l10n.themeLight,
+                      icon: Icons.light_mode_rounded,
                     ),
-                    ButtonSegment(
-                      value: AppThemeMode.dark,
-                      label: Text(
-                        context.l10n.themeDark,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: state.themeMode == AppThemeMode.dark
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                      icon: const Icon(Icons.dark_mode_rounded, size: 15),
+                    PulsrSegment(
+                      label: context.l10n.themeDark,
+                      icon: Icons.dark_mode_rounded,
                     ),
-                    ButtonSegment(
-                      value: AppThemeMode.amoled,
-                      label: Text(
-                        context.l10n.amoledLabel,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: state.themeMode == AppThemeMode.amoled
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                      icon: const Icon(Icons.contrast_rounded, size: 15),
+                    PulsrSegment(
+                      label: context.l10n.amoledLabel,
+                      icon: Icons.contrast_rounded,
                     ),
                   ],
-                  selected: {state.themeMode},
-                  onSelectionChanged: (sel) => cubit.setThemeMode(sel.first),
+                  selectedIndex: _themeModeOrder.indexOf(state.themeMode),
+                  onChanged: (i) => cubit.setThemeMode(_themeModeOrder[i]),
                 ),
               ),
             ],
@@ -345,6 +292,22 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
           trailingBadge: context.l10n.settingsBadgePalette,
           onTap: () => showColorSourcePickerSheet(
               context, cubit, state.themeColorSource),
+        ),
+        _divider(p),
+        ValueListenableBuilder<DockStackMode>(
+          valueListenable: DockStyleController.mode,
+          builder: (context, dockMode, _) => _navTile(
+            context,
+            Icons.vertical_align_bottom_rounded,
+            context.l10n.dockStyleTitle,
+            dockStyleName(context, dockMode),
+            trailingBadge: context.l10n.settingsBadgeStyle,
+            onTap: () => DockStylePickerSheet.show(
+              context,
+              current: dockMode,
+              onSelected: DockStyleController.set,
+            ),
+          ),
         ),
         _divider(p),
         _navTile(

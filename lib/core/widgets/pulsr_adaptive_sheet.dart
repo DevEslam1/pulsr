@@ -190,6 +190,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                 if (isDialog && trailing == null)
                   IconButton(
                     icon: Icon(Icons.close_rounded, size: 20, color: p.textSecondary),
+                    tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                     onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
                   ),
               ],

@@ -15,6 +15,16 @@ class CachedStreamUrl {
   CachedStreamUrl(this.url, this.expires, {this.userAgent, this.cookies});
 }
 
+/// BUG-06: an in-flight resolve together with a completion marker, so a
+/// superseded future whose identity no longer matches the map cannot be left
+/// dangling (and can be pruned once complete).
+class _InFlightResolve {
+  _InFlightResolve(this.future);
+  final Future<({String url, String? userAgent, String? cookies, String quality})>
+      future;
+  bool done = false;
+}
+
 /// Pipeline resolving YouTube Music stream URLs, integrating multi-layer caching,
 /// in-flight deduplication, and error classification.
 class StreamResolutionPipeline {
@@ -27,7 +37,7 @@ class StreamResolutionPipeline {
 
   /// Explicit LinkedHashMap preserving strict insertion-order for LRU cache eviction.
   final LinkedHashMap<String, CachedStreamUrl> _streamCache = LinkedHashMap();
-  final Map<String, Future<({String url, String? userAgent, String? cookies, String quality})>> _inFlightResolves = {};
+  final Map<String, _InFlightResolve> _inFlightResolves = {};
   final Map<String, int> _videoIdEpochs = {};
   int _resolveEpoch = 0;
 
@@ -127,9 +137,11 @@ class StreamResolutionPipeline {
         );
       }
       final inFlight = _inFlightResolves[cacheKey];
-      if (inFlight != null) {
-        return await inFlight;
+      if (inFlight != null && !inFlight.done) {
+        return await inFlight.future;
       }
+      _inFlightResolves.remove(cacheKey);
+      _pruneInFlight();
     }
 
     final future = () async {
@@ -184,16 +196,45 @@ class StreamResolutionPipeline {
     // force-refresh must not overwrite an in-flight normal resolve's entry,
     // and a completing resolve must not evict a *different* future that
     // replaced it in the map (which left later callers un-deduped).
+    _InFlightResolve? entry;
     if (!forceRefresh) {
-      _inFlightResolves[cacheKey] = future;
+      // Race close (BUG-06): another resolve may have registered while we were
+      // awaiting the offline/wifi probes. Prefer theirs rather than overwriting
+      // it, so neither future is orphaned in the map.
+      final existing = _inFlightResolves[cacheKey];
+      if (existing != null && !existing.done) {
+        return await existing.future;
+      }
+      entry = _InFlightResolve(future);
+      _inFlightResolves[cacheKey] = entry;
+      final captured = entry;
+      // Mark completion and drop the entry as soon as the future settles,
+      // regardless of whether its identity still matches the map. `then` with
+      // an onError handler keeps a failed resolve from surfacing as an
+      // unhandled async error on this side channel.
+      void settle() {
+        captured.done = true;
+        if (identical(_inFlightResolves[cacheKey], captured)) {
+          _inFlightResolves.remove(cacheKey);
+        }
+      }
+
+      unawaited(future.then<void>((_) => settle(), onError: (_, __) => settle()));
     }
     try {
       return await future;
     } finally {
-      if (identical(_inFlightResolves[cacheKey], future)) {
+      if (entry != null && identical(_inFlightResolves[cacheKey], entry)) {
         _inFlightResolves.remove(cacheKey);
       }
     }
+  }
+
+  /// BUG-06: drop completed in-flight entries whose identity was superseded
+  /// before their own cleanup could run.
+  void _pruneInFlight() {
+    if (_inFlightResolves.isEmpty) return;
+    _inFlightResolves.removeWhere((_, v) => v.done);
   }
 
   Future<void> warmStreamCache(SongsTableData song, SharedPreferences prefs) async {

@@ -19,8 +19,9 @@ class AudioEffectsChannel {
     PulsrChannels.audioEffects,
   );
 
-  static final AudioEffectsChannel _instance = AudioEffectsChannel._internal();
-  factory AudioEffectsChannel() => _instance;
+  static AudioEffectsChannel? _instance;
+  factory AudioEffectsChannel() =>
+      _instance ??= AudioEffectsChannel._internal();
   AudioEffectsChannel._internal() {
     _channel.setMethodCallHandler(_handleNativeCall);
   }
@@ -44,17 +45,26 @@ class AudioEffectsChannel {
   /// effect was applied, so callers can gate the UI truthfully.
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
-  /// Dispose stream controller (call on hot restart / test teardown).
+  /// Drops the singleton and closes its route stream (BUG-25).
   ///
-  /// WARNING: AudioEffectsChannel is a static singleton. Closing its
-  /// StreamControllers permanently breaks event streams for the app lifetime.
-  /// In production this should never be called; it exists only for test
-  /// teardown where a fresh isolate is spun up anyway.
+  /// In production this is never called, so the app keeps one long-lived
+  /// instance. Tests call it in teardown so the next [AudioEffectsChannel()]
+  /// returns a fresh instance instead of leaking stale capability/session
+  /// state from a previous test.
   void dispose() {
-    // Intentionally left empty for production safety.
-    // In tests, the isolate teardown handles cleanup automatically.
-    // Closing a singleton's streams is irreversible and will cause
-    // future observers to silently fail or crash.
+    if (!_routeChangedController.isClosed) {
+      _routeChangedController.close();
+    }
+    _isVirtualizerSupported = false;
+    _isDynamicsSupported = false;
+    _isSpatializerSupported = false;
+    _isHeadTrackerAvailable = false;
+    _isVolumeBoostSupported = false;
+    _isBassBoostSupported = false;
+    _isPcmDspAttached = false;
+    if (identical(_instance, this)) {
+      _instance = null;
+    }
   }
 
   bool _isVirtualizerSupported = false;

@@ -100,6 +100,450 @@ abstract class AppLocalizations {
     Locale('es')
   ];
 
+  /// No description provided for @sleepTimerDurationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration (minutes)'**
+  String get sleepTimerDurationMinutes;
+
+  /// No description provided for @sleepTimerMinutesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 25'**
+  String get sleepTimerMinutesHint;
+
+  /// No description provided for @minuteAbbreviation.
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get minuteAbbreviation;
+
+  /// No description provided for @sleepTimerInvalidRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a value from 1 to 720 minutes'**
+  String get sleepTimerInvalidRange;
+
+  /// No description provided for @moreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get moreOptions;
+
+  /// No description provided for @googleCast.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Cast'**
+  String get googleCast;
+
+  /// No description provided for @autoplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Autoplay'**
+  String get autoplay;
+
+  /// No description provided for @trackCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 track} other{{count} tracks}}'**
+  String trackCount(int count);
+
+  /// No description provided for @decades.
+  ///
+  /// In en, this message translates to:
+  /// **'Decades'**
+  String get decades;
+
+  /// No description provided for @libraryManageTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Tabs'**
+  String get libraryManageTabs;
+
+  /// No description provided for @libraryAtLeastOneTab.
+  ///
+  /// In en, this message translates to:
+  /// **'At least one tab is required'**
+  String get libraryAtLeastOneTab;
+
+  /// No description provided for @libraryTabsReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'{active} of {total} tabs • Drag to reorder'**
+  String libraryTabsReorder(int active, int total);
+
+  /// No description provided for @libraryTabsLongPress.
+  ///
+  /// In en, this message translates to:
+  /// **'{active} of {total} tabs • Long-press to organize'**
+  String libraryTabsLongPress(int active, int total);
+
+  /// No description provided for @libraryInactiveTabs.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive ({count})'**
+  String libraryInactiveTabs(int count);
+
+  /// No description provided for @whatsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s New'**
+  String get whatsNew;
+
+  /// No description provided for @developer.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer'**
+  String get developer;
+
+  /// No description provided for @showMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get showMore;
+
+  /// No description provided for @showLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get showLess;
+
+  /// No description provided for @resetWaveformZoom.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset waveform zoom'**
+  String get resetWaveformZoom;
+
+  /// No description provided for @dspLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP'**
+  String get dspLabel;
+
+  /// No description provided for @queueTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue'**
+  String get queueTab;
+
+  /// No description provided for @addTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tab'**
+  String get addTab;
+
+  /// No description provided for @twoPaneSelectItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Select an item to view details'**
+  String get twoPaneSelectItem;
+
+  /// No description provided for @leAudioRequiresBle.
+  ///
+  /// In en, this message translates to:
+  /// **'LE Audio codecs (LC3 / Opus) require a Bluetooth LE Audio connection.'**
+  String get leAudioRequiresBle;
+
+  /// No description provided for @castEntireQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Cast Entire Queue'**
+  String get castEntireQueue;
+
+  /// No description provided for @roomAveragingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'3-Point Room Averaging'**
+  String get roomAveragingTitle;
+
+  /// No description provided for @roomAveragingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Measures Center, 1m Left, and 1m Right for robust correction'**
+  String get roomAveragingSubtitle;
+
+  /// No description provided for @roomPositionCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get roomPositionCenter;
+
+  /// No description provided for @roomPositionLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get roomPositionLeft;
+
+  /// No description provided for @roomPositionRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get roomPositionRight;
+
+  /// No description provided for @correctionCurveRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Correction Curve (20 Hz – 20 kHz)'**
+  String get correctionCurveRange;
+
+  /// No description provided for @offsetMinus50Ms.
+  ///
+  /// In en, this message translates to:
+  /// **'-50 ms'**
+  String get offsetMinus50Ms;
+
+  /// No description provided for @offsetPlus50Ms.
+  ///
+  /// In en, this message translates to:
+  /// **'+50 ms'**
+  String get offsetPlus50Ms;
+
+  /// No description provided for @freq20Hz.
+  ///
+  /// In en, this message translates to:
+  /// **'20 Hz'**
+  String get freq20Hz;
+
+  /// No description provided for @freq100Hz.
+  ///
+  /// In en, this message translates to:
+  /// **'100 Hz'**
+  String get freq100Hz;
+
+  /// No description provided for @freq1kHz.
+  ///
+  /// In en, this message translates to:
+  /// **'1 kHz'**
+  String get freq1kHz;
+
+  /// No description provided for @freq10kHz.
+  ///
+  /// In en, this message translates to:
+  /// **'10 kHz'**
+  String get freq10kHz;
+
+  /// No description provided for @freq20kHz.
+  ///
+  /// In en, this message translates to:
+  /// **'20 kHz'**
+  String get freq20kHz;
+
+  /// No description provided for @songRemovedFromPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} removed from {playlist}'**
+  String songRemovedFromPlaylist(String title, String playlist);
+
+  /// No description provided for @playlistDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {name}'**
+  String playlistDeleted(String name);
+
+  /// No description provided for @voiceSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice search'**
+  String get voiceSearch;
+
+  /// No description provided for @voiceSearchUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice search is unavailable'**
+  String get voiceSearchUnavailable;
+
+  /// No description provided for @searchLocalOnlineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search local & online music...'**
+  String get searchLocalOnlineHint;
+
+  /// No description provided for @noLocalSongsMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No local songs match \"{query}\"'**
+  String noLocalSongsMatch(String query);
+
+  /// No description provided for @noOnlineSongsMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No online songs match \"{query}\"'**
+  String noOnlineSongsMatch(String query);
+
+  /// No description provided for @professionalMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Professional Mode'**
+  String get professionalMode;
+
+  /// No description provided for @professionalModeUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced DSP, bit-perfect streaming, and pro audio controls unlocked.'**
+  String get professionalModeUnlocked;
+
+  /// No description provided for @quickDspControls.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick DSP Controls'**
+  String get quickDspControls;
+
+  /// No description provided for @eqEngineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer Engine'**
+  String get eqEngineTitle;
+
+  /// No description provided for @eqEngineSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct biquad parametric filtering'**
+  String get eqEngineSubtitle;
+
+  /// No description provided for @truePeakLimiterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'True Peak Limiter'**
+  String get truePeakLimiterTitle;
+
+  /// No description provided for @truePeakLimiterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Zero inter-sample clipping'**
+  String get truePeakLimiterSubtitle;
+
+  /// No description provided for @viperDdcTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ViPER-DDC Headphone Correction'**
+  String get viperDdcTitle;
+
+  /// No description provided for @settingsSectionSoundPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound & Playback'**
+  String get settingsSectionSoundPlayback;
+
+  /// No description provided for @settingsSectionAppearanceGestures.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance & Gestures'**
+  String get settingsSectionAppearanceGestures;
+
+  /// No description provided for @settingsSectionSystemPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'System & Privacy'**
+  String get settingsSectionSystemPrivacy;
+
+  /// No description provided for @whatChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'What changes?'**
+  String get whatChanges;
+
+  /// No description provided for @expEqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer & DSP'**
+  String get expEqTitle;
+
+  /// No description provided for @expEqPro.
+  ///
+  /// In en, this message translates to:
+  /// **'Parametric 10-Band EQ, Q-factor & Room Correction'**
+  String get expEqPro;
+
+  /// No description provided for @expEqNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Curated Smart Audio Presets'**
+  String get expEqNormal;
+
+  /// No description provided for @expUsbTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'USB DAC & Output'**
+  String get expUsbTitle;
+
+  /// No description provided for @expUsbPro.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect hardware lock, DSD DoP streaming'**
+  String get expUsbPro;
+
+  /// No description provided for @expUsbNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'System AudioTrack (32-bit float)'**
+  String get expUsbNormal;
+
+  /// No description provided for @expCrossfadeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback & Crossfade'**
+  String get expCrossfadeTitle;
+
+  /// No description provided for @expCrossfadePro.
+  ///
+  /// In en, this message translates to:
+  /// **'Fine-grained 0-12s curve & latency calibration'**
+  String get expCrossfadePro;
+
+  /// No description provided for @expCrossfadeNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard 3s smooth crossfade'**
+  String get expCrossfadeNormal;
+
+  /// No description provided for @expGainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gain & Loudness'**
+  String get expGainTitle;
+
+  /// No description provided for @expGainPro.
+  ///
+  /// In en, this message translates to:
+  /// **'ReplayGain dB calibration & manual pre-amp'**
+  String get expGainPro;
+
+  /// No description provided for @expGainNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic perceived loudness leveling'**
+  String get expGainNormal;
+
+  /// No description provided for @expVisualizersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visualizers'**
+  String get expVisualizersTitle;
+
+  /// No description provided for @expVisualizersPro.
+  ///
+  /// In en, this message translates to:
+  /// **'Milkdrop preset interpreter & Custom JSON'**
+  String get expVisualizersPro;
+
+  /// No description provided for @expVisualizersNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic Wave & Radial Frequency styles'**
+  String get expVisualizersNormal;
+
+  /// No description provided for @queueReorderSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Reorder {title}. Position {index} of {count}'**
+  String queueReorderSemantics(String title, int index, int count);
+
+  /// No description provided for @songByArtist.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} by {artist}'**
+  String songByArtist(String title, String artist);
+
   /// No description provided for @customDurationMinutes.
   ///
   /// In en, this message translates to:
@@ -12233,11 +12677,311 @@ abstract class AppLocalizations {
   /// **'PULSR C-90'**
   String get cassettePulsrTape;
 
+  /// No description provided for @dspPitchUpSemitone.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch +1 semitone'**
+  String get dspPitchUpSemitone;
+
+  /// No description provided for @dspPitchDownSemitone.
+  ///
+  /// In en, this message translates to:
+  /// **'Pitch -1 semitone'**
+  String get dspPitchDownSemitone;
+
+  /// No description provided for @dspPitchMeterUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal pitch detection isn\'t available on this build.'**
+  String get dspPitchMeterUnavailable;
+
+  /// No description provided for @castNoLocalItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing castable here — only local files can be cast.'**
+  String get castNoLocalItems;
+
+  /// No description provided for @settingsCastingQueueTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Casting queue to {device}'**
+  String settingsCastingQueueTo(String device);
+
+  /// No description provided for @castCastingTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Casting to {device}'**
+  String castCastingTo(String device);
+
+  /// No description provided for @castToSpeakerDisplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Cast to Speaker / Display'**
+  String get castToSpeakerDisplay;
+
+  /// No description provided for @castManageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to manage Cast volume or disconnect'**
+  String get castManageHint;
+
+  /// No description provided for @castStreamHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream lossless/lossy audio over Wi-Fi'**
+  String get castStreamHint;
+
+  /// No description provided for @downloadsMatchStream.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads match stream'**
+  String get downloadsMatchStream;
+
+  /// No description provided for @sleepTimerEndOfQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep Timer: End of Queue'**
+  String get sleepTimerEndOfQueue;
+
+  /// No description provided for @sleepTimerTracksRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep Timer: {count} tracks remaining'**
+  String sleepTimerTracksRemaining(int count);
+
+  /// No description provided for @sleepTimerMinutesRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep Timer: {minutes}m remaining'**
+  String sleepTimerMinutesRemaining(int minutes);
+
   /// No description provided for @statusCancelled.
   ///
   /// In en, this message translates to:
   /// **'Cancelled'**
   String get statusCancelled;
+
+  /// No description provided for @dockStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dock style'**
+  String get dockStyleTitle;
+
+  /// No description provided for @dockStyleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how the mini player and navigation bar stack'**
+  String get dockStyleSubtitle;
+
+  /// No description provided for @dockStyleDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Side by side'**
+  String get dockStyleDefault;
+
+  /// No description provided for @dockStyleDefaultDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini player above the navigation bar'**
+  String get dockStyleDefaultDesc;
+
+  /// No description provided for @dockStyleSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating pill'**
+  String get dockStyleSystem;
+
+  /// No description provided for @dockStyleSystemDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'A floating media pill above the navigation bar'**
+  String get dockStyleSystemDesc;
+
+  /// No description provided for @dockStyleMiniTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini player in front'**
+  String get dockStyleMiniTop;
+
+  /// No description provided for @dockStyleMiniTopDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation bar peeks behind the mini player'**
+  String get dockStyleMiniTopDesc;
+
+  /// No description provided for @dockStyleNavTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation in front'**
+  String get dockStyleNavTop;
+
+  /// No description provided for @dockStyleNavTopDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini player peeks behind the navigation bar'**
+  String get dockStyleNavTopDesc;
+
+  /// No description provided for @dockStyleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Long-press the mini player to change its dock style'**
+  String get dockStyleHint;
+
+  /// No description provided for @whatsNewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'See what\'s new in v{version}'**
+  String whatsNewSubtitle(String version);
+
+  /// No description provided for @studioMoreInStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'More in Studio mode'**
+  String get studioMoreInStudio;
+
+  /// No description provided for @studioControlsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} studio controls available'**
+  String studioControlsAvailable(int count);
+
+  /// No description provided for @studioSwitchCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Studio'**
+  String get studioSwitchCta;
+
+  /// No description provided for @studioExplainerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What Studio mode adds'**
+  String get studioExplainerTitle;
+
+  /// No description provided for @studioExplainerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect output, the full DSP suite, device profiles, automation and the proxy backend. You can switch back anytime.'**
+  String get studioExplainerBody;
+
+  /// No description provided for @alphabetIndexLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Alphabet index'**
+  String get alphabetIndexLabel;
+
+  /// No description provided for @badgeOn.
+  ///
+  /// In en, this message translates to:
+  /// **'ON'**
+  String get badgeOn;
+
+  /// No description provided for @keepBestQualityForAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep best quality for all'**
+  String get keepBestQualityForAll;
+
+  /// No description provided for @selectedHighestQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected highest quality for {count} groups'**
+  String selectedHighestQuality(int count);
+
+  /// No description provided for @enterSearchValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter search value…'**
+  String get enterSearchValue;
+
+  /// No description provided for @radioSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search station, genre, or URL…'**
+  String get radioSearchHint;
+
+  /// No description provided for @webSessionInterruptedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Web Session Interrupted'**
+  String get webSessionInterruptedTitle;
+
+  /// No description provided for @webSessionInterruptedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The web view handle was detached or reclaimed by the system. Tap below to reload the session.'**
+  String get webSessionInterruptedDesc;
+
+  /// No description provided for @onboardingGesturesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gestures & shortcuts'**
+  String get onboardingGesturesTitle;
+
+  /// No description provided for @onboardingGesturesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'A few swipes and taps make Pulsr feel effortless.'**
+  String get onboardingGesturesDesc;
+
+  /// No description provided for @onboardingGestureSwipeUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe up'**
+  String get onboardingGestureSwipeUpTitle;
+
+  /// No description provided for @onboardingGestureSwipeUpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the full-screen player'**
+  String get onboardingGestureSwipeUpDesc;
+
+  /// No description provided for @onboardingGestureSwipeDownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe down'**
+  String get onboardingGestureSwipeDownTitle;
+
+  /// No description provided for @onboardingGestureSwipeDownDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Restacks the mini player and navigation'**
+  String get onboardingGestureSwipeDownDesc;
+
+  /// No description provided for @onboardingGestureDoubleTapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap artwork'**
+  String get onboardingGestureDoubleTapTitle;
+
+  /// No description provided for @onboardingGestureDoubleTapDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggles your favorite'**
+  String get onboardingGestureDoubleTapDesc;
+
+  /// No description provided for @onboardingGestureLongPressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Long-press mini player'**
+  String get onboardingGestureLongPressTitle;
+
+  /// No description provided for @onboardingGestureLongPressDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Opens the dock-style options'**
+  String get onboardingGestureLongPressDesc;
+
+  /// No description provided for @onboardingPersonalizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make it yours'**
+  String get onboardingPersonalizeTitle;
+
+  /// No description provided for @onboardingPersonalizeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick an accent now — you can change it anytime in Settings.'**
+  String get onboardingPersonalizeDesc;
 }
 
 class _AppLocalizationsDelegate

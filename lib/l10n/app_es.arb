@@ -1,5 +1,135 @@
 {
   "@@locale": "es",
+  "sleepTimerDurationMinutes": "Duración (minutos)",
+  "sleepTimerMinutesHint": "p. ej. 25",
+  "minuteAbbreviation": "min",
+  "sleepTimerInvalidRange": "Introduce un valor de 1 a 720 minutos",
+  "moreOptions": "Opciones",
+  "googleCast": "Google Cast",
+  "autoplay": "Reproducción automática",
+  "trackCount": "{count, plural, =1{1 pista} other{{count} pistas}}",
+  "@trackCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "decades": "Décadas",
+  "libraryManageTabs": "Pestañas",
+  "libraryAtLeastOneTab": "Se requiere al menos una pestaña",
+  "libraryTabsReorder": "{active} de {total} pestañas • Arrastra para reordenar",
+  "@libraryTabsReorder": {
+    "placeholders": {
+      "active": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "libraryTabsLongPress": "{active} de {total} pestañas • Mantén pulsado para organizar",
+  "@libraryTabsLongPress": {
+    "placeholders": {
+      "active": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "libraryInactiveTabs": "Inactivas ({count})",
+  "@libraryInactiveTabs": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "whatsNew": "Novedades",
+  "developer": "Desarrollador",
+  "showMore": "Mostrar más",
+  "showLess": "Mostrar menos",
+  "resetWaveformZoom": "Restablecer zoom de la forma de onda",
+  "dspLabel": "DSP",
+  "queueTab": "Cola",
+  "addTab": "Añadir pestaña",
+  "twoPaneSelectItem": "Selecciona un elemento para ver los detalles",
+  "leAudioRequiresBle": "Los códecs LE Audio (LC3 / Opus) requieren una conexión Bluetooth LE Audio.",
+  "castEntireQueue": "Enviar toda la cola",
+  "roomAveragingTitle": "Promediado de sala de 3 puntos",
+  "roomAveragingSubtitle": "Mide centro, 1 m izquierda y 1 m derecha para una corrección robusta",
+  "roomPositionCenter": "Centro",
+  "roomPositionLeft": "Izquierda",
+  "roomPositionRight": "Derecha",
+  "correctionCurveRange": "Curva de corrección (20 Hz – 20 kHz)",
+  "offsetMinus50Ms": "-50 ms",
+  "offsetPlus50Ms": "+50 ms",
+  "freq20Hz": "20 Hz",
+  "freq100Hz": "100 Hz",
+  "freq1kHz": "1 kHz",
+  "freq10kHz": "10 kHz",
+  "freq20kHz": "20 kHz",
+  "songRemovedFromPlaylist": "{title} eliminada de {playlist}",
+  "@songRemovedFromPlaylist": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "playlist": { "type": "String" }
+    }
+  },
+  "playlistDeleted": "Se eliminó {name}",
+  "@playlistDeleted": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "voiceSearch": "Búsqueda por voz",
+  "voiceSearchUnavailable": "La búsqueda por voz no está disponible",
+  "searchLocalOnlineHint": "Busca música local y en línea...",
+  "noLocalSongsMatch": "Ninguna canción local coincide con \"{query}\"",
+  "@noLocalSongsMatch": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "noOnlineSongsMatch": "Ninguna canción en línea coincide con \"{query}\"",
+  "@noOnlineSongsMatch": {
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "professionalMode": "Modo profesional",
+  "professionalModeUnlocked": "DSP avanzado, streaming bit-perfect y controles de audio pro desbloqueados.",
+  "quickDspControls": "Controles DSP rápidos",
+  "eqEngineTitle": "Motor de ecualización",
+  "eqEngineSubtitle": "Filtrado paramétrico biquad directo",
+  "truePeakLimiterTitle": "Limitador de pico real",
+  "truePeakLimiterSubtitle": "Sin recorte entre muestras",
+  "viperDdcTitle": "Corrección de auriculares ViPER-DDC",
+  "settingsSectionSoundPlayback": "Sonido y reproducción",
+  "settingsSectionAppearanceGestures": "Apariencia y gestos",
+  "settingsSectionSystemPrivacy": "Sistema y privacidad",
+  "whatChanges": "¿Qué cambia?",
+  "expEqTitle": "Ecualizador y DSP",
+  "expEqPro": "EQ paramétrico de 10 bandas, factor Q y corrección de sala",
+  "expEqNormal": "Ajustes de audio inteligentes seleccionados",
+  "expUsbTitle": "DAC USB y salida",
+  "expUsbPro": "Bloqueo de hardware bit-perfect, streaming DSD DoP",
+  "expUsbNormal": "AudioTrack del sistema (float de 32 bits)",
+  "expCrossfadeTitle": "Reproducción y crossfade",
+  "expCrossfadePro": "Curva de 0-12 s detallada y calibración de latencia",
+  "expCrossfadeNormal": "Crossfade suave estándar de 3 s",
+  "expGainTitle": "Ganancia y sonoridad",
+  "expGainPro": "Calibración ReplayGain en dB y preamplificador manual",
+  "expGainNormal": "Nivelación automática de sonoridad percibida",
+  "expVisualizersTitle": "Visualizadores",
+  "expVisualizersPro": "Intérprete de presets Milkdrop y JSON personalizado",
+  "expVisualizersNormal": "Estilos Classic Wave y Radial Frequency",
+  "queueReorderSemantics": "Reordenar {title}. Posición {index} de {count}",
+  "@queueReorderSemantics": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "index": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "songByArtist": "{title} de {artist}",
+  "@songByArtist": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "artist": { "type": "String" }
+    }
+  },
   "customDurationMinutes": "Duración personalizada (minutos).",
   "partialBatchDetected": "Lote parcial detectado",
   "somethingWentWrong": "Algo salió mal",
@@ -3961,5 +4091,58 @@
   "bpBypassesAndroidMixer": "Omite el mezclador de Android y el DSP para salida bit-matched (USB requiere Android 14+, cableado requiere directo)",
   "settingsResultsCount": "{count, plural, =1{1 ajuste encontrado} other{{count} ajustes encontrados}}",
   "cassettePulsrTape": "PULSR C-90",
-  "statusCancelled": "Cancelado"
+  "dspPitchUpSemitone": "Tono +1 semitono",
+  "dspPitchDownSemitone": "Tono -1 semitono",
+  "dspPitchMeterUnavailable": "La detección de tono vocal no está disponible en esta compilación.",
+  "castNoLocalItems": "No hay nada que transmitir: solo se pueden transmitir archivos locales.",
+  "settingsCastingQueueTo": "Transmitiendo la cola a {device}",
+  "castCastingTo": "Transmitiendo a {device}",
+  "castToSpeakerDisplay": "Transmitir a altavoz / pantalla",
+  "castManageHint": "Toca para gestionar el volumen de Cast o desconectar",
+  "castStreamHint": "Transmite audio con o sin pérdida por Wi-Fi",
+  "downloadsMatchStream": "Las descargas coinciden con la transmisión",
+  "sleepTimerEndOfQueue": "Temporizador: fin de la cola",
+  "sleepTimerTracksRemaining": "Temporizador: {count} pistas restantes",
+  "sleepTimerMinutesRemaining": "Temporizador: {minutes} min restantes",
+  "statusCancelled": "Cancelado",
+  "dockStyleTitle": "Estilo del dock",
+  "dockStyleSubtitle": "Elige cómo se apilan el mini reproductor y la barra de navegación",
+  "dockStyleDefault": "Lado a lado",
+  "dockStyleDefaultDesc": "Mini reproductor sobre la barra de navegación",
+  "dockStyleSystem": "Píldora flotante",
+  "dockStyleSystemDesc": "Una píldora multimedia flotante sobre la barra de navegación",
+  "dockStyleMiniTop": "Mini reproductor delante",
+  "dockStyleMiniTopDesc": "La barra de navegación asoma detrás del mini reproductor",
+  "dockStyleNavTop": "Navegación delante",
+  "dockStyleNavTopDesc": "El mini reproductor asoma detrás de la barra de navegación",
+  "dockStyleHint": "Mantén pulsado el mini reproductor para cambiar el estilo del dock",
+  "whatsNewSubtitle": "Mira las novedades de la v{version}",
+  "@whatsNewSubtitle": {"placeholders": {"version": {"type": "String"}}},
+  "studioMoreInStudio": "Más en modo Estudio",
+  "studioControlsAvailable": "{count} controles de estudio disponibles",
+  "@studioControlsAvailable": {"placeholders": {"count": {"type": "int"}}},
+  "studioSwitchCta": "Cambiar a Estudio",
+  "studioExplainerTitle": "Qué añade el modo Estudio",
+  "studioExplainerBody": "Salida Bit-Perfect, la suite DSP completa, perfiles de dispositivo, automatización y el backend proxy. Puedes volver cuando quieras.",
+  "alphabetIndexLabel": "Índice alfabético",
+  "badgeOn": "SÍ",
+  "keepBestQualityForAll": "Conservar la mejor calidad para todo",
+  "selectedHighestQuality": "Se seleccionó la mejor calidad para {count} grupos",
+  "@selectedHighestQuality": {"placeholders": {"count": {"type": "int"}}},
+  "enterSearchValue": "Introduce un valor de búsqueda…",
+  "radioSearchHint": "Busca emisora, género o URL…",
+  "webSessionInterruptedTitle": "Sesión web interrumpida",
+  "webSessionInterruptedDesc": "El sistema desacopló o recuperó el control de la vista web. Toca abajo para recargar la sesión.",
+  "onboardingGesturesTitle": "Gestos y atajos",
+  "onboardingGesturesDesc": "Unos pocos gestos hacen que Pulsr sea muy fácil de usar.",
+  "onboardingGestureSwipeUpTitle": "Desliza hacia arriba",
+  "onboardingGestureSwipeUpDesc": "Abre el reproductor a pantalla completa",
+  "onboardingGestureSwipeDownTitle": "Desliza hacia abajo",
+  "onboardingGestureSwipeDownDesc": "Reorganiza el mini reproductor y la navegación",
+  "onboardingGestureDoubleTapTitle": "Doble toque en la carátula",
+  "onboardingGestureDoubleTapDesc": "Activa o desactiva el favorito",
+  "onboardingGestureLongPressTitle": "Mantén pulsado el mini reproductor",
+  "onboardingGestureLongPressDesc": "Abre las opciones de estilo del dock",
+  "onboardingPersonalizeTitle": "Hazlo tuyo",
+  "onboardingPersonalizeDesc": "Elige un color ahora; puedes cambiarlo cuando quieras en Ajustes."
 }

@@ -111,7 +111,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   // FIX-C6: Flag to track if proxy password was loaded, preventing overwrites
   @override
   bool _proxyPasswordLoaded = false;
+  @override
+  int _proxyPasswordGen = 0;
+  @override
+  Future<String>? _inFlightProxyPasswordRead;
   final Mutex _migrationMutex = Mutex();
+  final Mutex _loadMutex = Mutex();
+  int _loadPreferencesGen = 0;
 
   /// FIX-H07: Track dirty fields modified while an async load is in flight.
   final Set<String> _dirtyFields = <String>{};
@@ -162,18 +168,30 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   Future<String> getProxyPassword() async {
     if (_proxyPasswordLoaded || _proxyPassword.isNotEmpty) return _proxyPassword;
-    try {
-      final pass = await _secureStorage.read(key: _keyProxyPasswordSecure);
-      if (pass != null) {
-        _proxyPassword = pass;
+    if (_inFlightProxyPasswordRead != null) return _inFlightProxyPasswordRead!;
+    final gen = _proxyPasswordGen;
+    late final Future<String> future;
+    future = () async {
+      try {
+        final pass = await _secureStorage.read(key: _keyProxyPasswordSecure);
+        if (gen == _proxyPasswordGen) {
+          if (pass != null) {
+            _proxyPassword = pass;
+          }
+          _proxyPasswordLoaded = true;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to read proxy password from secure storage',
+            error: e, stackTrace: st, category: 'SettingsCubit');
+      } finally {
+        if (identical(_inFlightProxyPasswordRead, future)) {
+          _inFlightProxyPasswordRead = null;
+        }
       }
-      _proxyPasswordLoaded = true;
-    } catch (e, st) {
-      // FIX-A05: Log secure storage read failure
-      ErrorLogger.log('Failed to read proxy password from secure storage',
-          error: e, stackTrace: st, category: 'SettingsCubit');
-    }
-    return _proxyPassword;
+      return _proxyPassword;
+    }();
+    _inFlightProxyPasswordRead = future;
+    return future;
   }
 
   SettingsCubit({
@@ -257,6 +275,18 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   }
 
   Future<void> reloadSettings() async {
+    _cachedPrefs = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      _cachedPrefs = prefs;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reload SharedPreferences from disk',
+          error: e, stackTrace: st, category: 'SettingsCubit');
+    }
+    _proxyPasswordLoaded = false;
+    _proxyPassword = '';
+    _dirtyFields.clear();
     await _loadPreferences();
   }
 
@@ -674,32 +704,43 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   }
 
   Future<void> _loadPreferences() async {
-    // FIX-H07 / B-07: Snapshot state before await and preserve dirty fields
-    final preLoadState = state;
-    final SharedPreferences prefs;
-    try {
-      prefs = await SharedPreferences.getInstance();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to get SharedPreferences',
-          error: e, stackTrace: st, category: 'Settings');
-      _markPrefsLoaded();
-      return;
-    }
-    String proxyPassword = '';
-    try {
-      proxyPassword = (await _safeSecureRead(_keyProxyPasswordSecure)) ?? '';
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read proxy password from secure storage',
-          error: e, stackTrace: st, category: 'Settings');
-    }
-
-    try {
-      var runningState = preLoadState;
-
-      // FIX-H01: Load preferences in modular chunks with error isolation.
+    final gen = ++_loadPreferencesGen;
+    await _loadMutex.protect(() async {
+      if (isClosed || gen != _loadPreferencesGen) {
+        _markPrefsLoaded();
+        return;
+      }
+      // FIX-H07 / B-07: Snapshot state before await and preserve dirty fields
+      final preLoadState = state;
+      final SharedPreferences prefs;
       try {
-        runningState = _loadThemePrefs(prefs, runningState);
+        prefs = await getPrefs();
       } catch (e, st) {
+        ErrorLogger.log('Failed to get SharedPreferences',
+            error: e, stackTrace: st, category: 'Settings');
+        _markPrefsLoaded();
+        return;
+      }
+      String proxyPassword = '';
+      try {
+        proxyPassword = (await _safeSecureRead(_keyProxyPasswordSecure)) ?? '';
+      } catch (e, st) {
+        ErrorLogger.log('Failed to read proxy password from secure storage',
+            error: e, stackTrace: st, category: 'Settings');
+      }
+
+      if (isClosed || gen != _loadPreferencesGen) {
+        _markPrefsLoaded();
+        return;
+      }
+
+      try {
+        var runningState = preLoadState;
+
+        // FIX-H01: Load preferences in modular chunks with error isolation.
+        try {
+          runningState = _loadThemePrefs(prefs, runningState);
+        } catch (e, st) {
         ErrorLogger.log(
           'Failed to load theme preferences',
           error: e,
@@ -805,6 +846,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       // Emit before the platform round-trips below: main.dart drives themeMode,
       // accent and locale from this state, so deferring it renders the default
       // theme and locale for as long as the native calls take.
+      if (isClosed || gen != _loadPreferencesGen) {
+        _markPrefsLoaded();
+        return;
+      }
       safeEmit(loadedState);
       _dirtyFields.removeAll(reconciledDirty);
 
@@ -864,7 +909,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     } finally {
       _markPrefsLoaded();
     }
-  }
+  });
+}
 
   @override
   Future<void> setGapless(bool value) async {

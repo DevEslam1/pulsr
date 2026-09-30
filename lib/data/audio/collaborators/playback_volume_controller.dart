@@ -27,6 +27,11 @@ class PlaybackVolumeController {
   Completer<void>? _transitionCompleter;
   bool _isDisposed = false;
 
+  /// BUG-07: bumped whenever a transition starts or the controller is disposed.
+  /// A timer callback from a superseded / disposed transition bails out before
+  /// touching the player again.
+  int _transitionGeneration = 0;
+
   double get userVolume => _userVolume;
   String get replayGainMode => _replayGainMode;
   double get preampWithRg => _preampWithRg;
@@ -146,6 +151,7 @@ class PlaybackVolumeController {
   }) async {
     if (_isDisposed) return;
     final clamped = targetVolume.clamp(0.0, 1.0);
+    _transitionGeneration++;
     _transitionTimer?.cancel();
     _transitionTimer = null;
 
@@ -178,30 +184,44 @@ class PlaybackVolumeController {
     }
     final completer = Completer<void>();
     _transitionCompleter = completer;
+    final generation = _transitionGeneration;
+
     _transitionTimer = Timer.periodic(stepDuration, (timer) async {
-      if (_isDisposed) {
-        timer.cancel();
-        if (!completer.isCompleted) completer.complete();
-        return;
-      }
-      stepIndex++;
-      final current = (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
-      if (_isDisposed) {
-        timer.cancel();
-        if (!completer.isCompleted) completer.complete();
-        return;
-      }
+      // BUG-07: bail before touching the player if a newer transition started
+      // or the controller was disposed while this timer was pending.
       try {
-        await player.setVolume(current);
+        if (_isDisposed || generation != _transitionGeneration) {
+          timer.cancel();
+          if (generation == _transitionGeneration) _transitionTimer = null;
+          if (!completer.isCompleted) completer.complete();
+          return;
+        }
+        stepIndex++;
+        final current =
+            (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
+        if (_isDisposed || generation != _transitionGeneration) {
+          timer.cancel();
+          if (generation == _transitionGeneration) _transitionTimer = null;
+          if (!completer.isCompleted) completer.complete();
+          return;
+        }
+        try {
+          await player.setVolume(current);
+        } catch (_) {
+          timer.cancel();
+          if (generation == _transitionGeneration) _transitionTimer = null;
+          if (!completer.isCompleted) completer.complete();
+          return;
+        }
+
+        if (stepIndex >= steps) {
+          timer.cancel();
+          if (generation == _transitionGeneration) _transitionTimer = null;
+          if (!completer.isCompleted) completer.complete();
+        }
       } catch (_) {
         timer.cancel();
-        if (!completer.isCompleted) completer.complete();
-        return;
-      }
-
-      if (stepIndex >= steps) {
-        timer.cancel();
-        _transitionTimer = null;
+        if (generation == _transitionGeneration) _transitionTimer = null;
         if (!completer.isCompleted) completer.complete();
       }
     });
@@ -225,9 +245,12 @@ class PlaybackVolumeController {
 
   /// Lifecycle teardown hook (Prompt 1.3).
   void dispose() {
+    // BUG-07: mark disposed and invalidate any in-flight transition timer
+    // before cancelling it, so a callback already in flight cannot setVolume.
+    _isDisposed = true;
+    _transitionGeneration++;
     _transitionTimer?.cancel();
     _transitionTimer = null;
-    _isDisposed = true;
     if (_transitionCompleter != null && !_transitionCompleter!.isCompleted) {
       _transitionCompleter!.complete();
     }

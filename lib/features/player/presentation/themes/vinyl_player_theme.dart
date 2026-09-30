@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -116,16 +117,15 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     final p = context.palette;
     final song = state.currentSong;
     final activeColor = widget.props.activeColor;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
-        context.select<
-            SettingsCubit,
-            ({
-              NowPlayingDoubleTapAction nowPlayingDoubleTap,
-              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-            })>((c) => (
-              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-            ));
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
+        SettingsCubit,
+        ({
+          NowPlayingDoubleTapAction nowPlayingDoubleTap,
+          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+        })>((c) => (
+          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+        ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -140,24 +140,21 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         // Dynamic vertical spacing ratio for balanced, centered content distribution
         final double heightRatio =
             (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
-        final double spacingTrackToSeek =
-            (isTablet ? 10.0 : 6.0) * heightRatio;
+        final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
         final double spacingSeekToControls =
             (isTablet ? 12.0 : 8.0) * heightRatio;
         final double spacingControlsToDock =
             (isTablet ? 12.0 : 8.0) * heightRatio;
-        final double spacingBelowDock =
-            (isTablet ? 8.0 : 4.0) * heightRatio;
-        final double switcherTopPad =
-            (isTablet ? 4.0 : 2.0) * heightRatio;
-        final double switcherBottomPad =
-            (isTablet ? 6.0 : 3.0) * heightRatio;
+        final double spacingBelowDock = (isTablet ? 8.0 : 4.0) * heightRatio;
+        final double switcherTopPad = (isTablet ? 4.0 : 2.0) * heightRatio;
+        final double switcherBottomPad = (isTablet ? 6.0 : 3.0) * heightRatio;
 
         final double pillBarWidth = math.min(
           constraints.maxWidth - (isTablet ? 64 : 28),
           isTablet ? 440.0 : 336.0,
         );
-        final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+        final double pillBarHeight =
+            (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
         final viewSwitcher = PlayerViewSwitcher(
           state: state,
@@ -201,291 +198,308 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                   final pivotOffset = Offset(w * 0.81, h * 0.19);
                   final armLength = w * 0.46;
 
-
                   return Semantics(
                     button: true,
                     label: state.isPlaying
                         ? context.l10n.pause
                         : context.l10n.play,
+                    onTap: () => cubit.togglePlayPause(),
                     excludeSemantics: true,
                     child: GestureDetector(
-                    onTap: () => cubit.togglePlayPause(),
-                    onDoubleTap: () {
-                      switch (nowPlayingDoubleTap) {
-                        case NowPlayingDoubleTapAction.toggleFavorite:
-                          final s = state.currentSong;
-                          if (s != null) cubit.toggleFavorite(s.id);
-                          break;
-                        case NowPlayingDoubleTapAction.toggleLyrics:
-                          cubit.toggleLyricsVisibility();
-                          break;
-                        case NowPlayingDoubleTapAction.none:
-                          break;
-                      }
-                    },
-                    onHorizontalDragEnd: (details) {
-                      if (nowPlayingArtworkSwipe ==
-                              NowPlayingArtworkSwipeAction.nextPrev &&
-                          details.primaryVelocity != null) {
-                        if (details.primaryVelocity! < -200) {
-                          cubit.next();
-                        } else if (details.primaryVelocity! > 200) {
-                          cubit.previous();
+                      onTap: () => cubit.togglePlayPause(),
+                      onDoubleTap: () {
+                        switch (nowPlayingDoubleTap) {
+                          case NowPlayingDoubleTapAction.toggleFavorite:
+                            final s = state.currentSong;
+                            if (s != null) cubit.toggleFavorite(s.id);
+                            break;
+                          case NowPlayingDoubleTapAction.toggleLyrics:
+                            cubit.toggleLyricsVisibility();
+                            break;
+                          case NowPlayingDoubleTapAction.none:
+                            break;
                         }
-                      }
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF14151C),
-                        borderRadius: BorderRadius.circular(AppRadii.r22),
-                        border: Border.all(
-                          color: const Color(0xFF282B37),
-                          width: 1.5,
+                      },
+                      onHorizontalDragEnd: (details) {
+                        if (nowPlayingArtworkSwipe ==
+                                NowPlayingArtworkSwipeAction.nextPrev &&
+                            details.primaryVelocity != null) {
+                          if (details.primaryVelocity! < -200) {
+                            cubit.next();
+                          } else if (details.primaryVelocity! > 200) {
+                            cubit.previous();
+                          }
+                        }
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: PlayerMaterialColors.plinthSurface,
+                          borderRadius: BorderRadius.circular(AppRadii.r22),
+                          border: Border.all(
+                            color: PlayerMaterialColors.plinthBorder,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              blurRadius: 28,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 12),
+                            ),
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.08),
+                              blurRadius: 32,
+                              spreadRadius: -4,
+                            ),
+                          ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            blurRadius: 28,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 12),
-                          ),
-                          BoxShadow(
-                            color: activeColor.withValues(alpha: 0.08),
-                            blurRadius: 32,
-                            spreadRadius: -4,
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          // 1. Plinth Studio Branding & Active Status
-                          PositionedDirectional(
-                            top: 14,
-                            start: 16,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 7,
-                                  height: 7,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            // 1. Plinth Studio Branding & Active Status
+                            PositionedDirectional(
+                              top: 14,
+                              start: 16,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: state.isPlaying
+                                          ? activeColor
+                                          : Colors.white24,
+                                      boxShadow: state.isPlaying
+                                          ? [
+                                              BoxShadow(
+                                                color: activeColor.withValues(
+                                                    alpha: 0.8),
+                                                blurRadius: 6,
+                                                spreadRadius: 1,
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.s6),
+                                  Text(
+                                    context.l10n.vinylDirectDrive,
+                                    style: const TextStyle(
+                                      fontSize: AppFontSize.micro,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: AppTracking.wide,
+                                      color: Colors.white38,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // 2. Platter Strobe Rim
+                            PositionedDirectional(
+                              start: vinylLeft - 4,
+                              top: vinylTop - 4,
+                              width: vinylSize + 8,
+                              height: vinylSize + 8,
+                              child: CustomPaint(
+                                painter: _PlatterStrobePainter(),
+                              ),
+                            ),
+
+                            // 3. Spinning Vinyl Record
+                            PositionedDirectional(
+                              start: vinylLeft,
+                              top: vinylTop,
+                              width: vinylSize,
+                              height: vinylSize,
+                              child: RotationTransition(
+                                turns: _rotationController,
+                                child: Container(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: state.isPlaying
-                                        ? activeColor
-                                        : Colors.white24,
-                                    boxShadow: state.isPlaying
-                                        ? [
-                                            BoxShadow(
-                                              color: activeColor
-                                                  .withValues(alpha: 0.8),
-                                              blurRadius: 6,
-                                              spreadRadius: 1,
-                                            ),
-                                          ]
-                                        : null,
+                                    color: PlayerMaterialColors.recordBase,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.5),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const SizedBox(width: AppSpacing.s6),
-                                Text(
-                                  context.l10n.vinylDirectDrive,
-                                  style: const TextStyle(
-                                    fontSize: AppFontSize.micro,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: AppTracking.wide,
-                                    color: Colors.white38,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // 2. Platter Strobe Rim
-                          PositionedDirectional(
-                            start: vinylLeft - 4,
-                            top: vinylTop - 4,
-                            width: vinylSize + 8,
-                            height: vinylSize + 8,
-                            child: CustomPaint(
-                              painter: _PlatterStrobePainter(),
-                            ),
-                          ),
-
-                          // 3. Spinning Vinyl Record
-                          PositionedDirectional(
-                            start: vinylLeft,
-                            top: vinylTop,
-                            width: vinylSize,
-                            height: vinylSize,
-                            child: RotationTransition(
-                              turns: _rotationController,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(0xFF0C0D11),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.5),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 6),
+                                  child: CustomPaint(
+                                    painter: _VinylGroovesPainter(
+                                      activeColor: activeColor,
                                     ),
-                                  ],
-                                ),
-                                child: CustomPaint(
-                                  painter: _VinylGroovesPainter(
-                                    activeColor: activeColor,
-                                  ),
-                                  child: Center(
-                                    // Center Album Artwork
-                                    child: Container(
-                                      width: vinylSize * 0.44,
-                                      height: vinylSize * 0.44,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.white.withValues(alpha: 0.3),
-                                          width: 1.5,
+                                    child: Center(
+                                      // Center Album Artwork
+                                      child: Hero(
+                                        tag: 'now_playing_art_vinyl',
+                                        child: Container(
+                                          width: vinylSize * 0.44,
+                                          height: vinylSize * 0.44,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.3),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              if (song != null)
+                                                CachedArtwork(
+                                                  id: song.id,
+                                                  remoteUrl:
+                                                      song.remoteArtworkUrl,
+                                                  type: ArtworkType.AUDIO,
+                                                  size: vinylSize * 0.44,
+                                                  borderRadius: 999,
+                                                  highQuality: true,
+                                                  fallbackIcon:
+                                                      Icons.music_note_rounded,
+                                                ),
+                                              // Center Spindle Hole
+                                              Container(
+                                                width: 18,
+                                                height: 18,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  gradient: RadialGradient(
+                                                    colors: [
+                                                      Colors.grey.shade400,
+                                                      Colors.grey.shade800,
+                                                      AppColors.darkSurface,
+                                                    ],
+                                                    stops: const [
+                                                      0.0,
+                                                      0.6,
+                                                      1.0
+                                                    ],
+                                                  ),
+                                                  border: Border.all(
+                                                    color: Colors.white30,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          if (song != null)
-                                            CachedArtwork(
-                                              id: song.id,
-                                              remoteUrl: song.remoteArtworkUrl,
-                                              type: ArtworkType.AUDIO,
-                                              size: vinylSize * 0.44,
-                                              borderRadius: 999,
-                                              highQuality: true,
-                                              fallbackIcon:
-                                                  Icons.music_note_rounded,
-                                            ),
-                                          // Center Spindle Hole
-                                          Container(
-                                            width: 18,
-                                            height: 18,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              gradient: RadialGradient(
-                                                colors: [
-                                                  Colors.grey.shade400,
-                                                  Colors.grey.shade800,
-                                                  AppColors.darkSurface,
-                                                ],
-                                                stops: const [0.0, 0.6, 1.0],
-                                              ),
-                                              border: Border.all(
-                                                color: Colors.white30,
-                                                width: 1,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
 
-                          // 4. Animated Tonearm Assembly Layer
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: RepaintBoundary(
-                                child: BlocSelector<PlayerCubit, PlayerState, int>(
-                                  selector: (s) => s.duration.inMilliseconds > 0
-                                      ? ((s.position.inMilliseconds /
-                                                  s.duration.inMilliseconds) *
-                                              120)
-                                          .round()
-                                      : 0,
-                                  builder: (context, step) {
-                                    final progress = (step / 120.0).clamp(0.0, 1.0);
-                                    final playAngle = 0.35 + (progress * 0.14);
-                                    return AnimatedBuilder(
-                                      animation: _tonearmAnimation,
-                                      builder: (context, child) {
-                                        final currentAngle = -0.06 +
-                                            ((playAngle - (-0.06)) *
-                                                _tonearmAnimation.value);
+                            // 4. Animated Tonearm Assembly Layer
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: RepaintBoundary(
+                                  child: BlocSelector<PlayerCubit, PlayerState,
+                                      int>(
+                                    selector: (s) => s.duration.inMilliseconds >
+                                            0
+                                        ? ((s.position.inMilliseconds /
+                                                    s.duration.inMilliseconds) *
+                                                120)
+                                            .round()
+                                        : 0,
+                                    builder: (context, step) {
+                                      final progress =
+                                          (step / 120.0).clamp(0.0, 1.0);
+                                      final playAngle =
+                                          0.35 + (progress * 0.14);
+                                      return AnimatedBuilder(
+                                        animation: _tonearmAnimation,
+                                        builder: (context, child) {
+                                          final currentAngle = -0.06 +
+                                              ((playAngle - (-0.06)) *
+                                                  _tonearmAnimation.value);
 
-                                        return CustomPaint(
-                                          painter: _TonearmPainter(
-                                            pivot: pivotOffset,
-                                            angle: currentAngle,
-                                            activeColor: activeColor,
-                                            armLength: armLength,
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
+                                          return CustomPaint(
+                                            painter: _TonearmPainter(
+                                              pivot: pivotOffset,
+                                              angle: currentAngle,
+                                              activeColor: activeColor,
+                                              armLength: armLength,
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
 
-                          // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby)
-                          PositionedDirectional(
-                            bottom: 12,
-                            start: 14,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-
-                                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                                  decoration: BoxDecoration(
-                                    color: state.isPlaying
-                                        ? activeColor.withValues(alpha: 0.15)
-                                        : const Color(0xFF181A22),
-                                    borderRadius: BorderRadius.circular(AppRadii.r6),
-                                    border: Border.all(
+                            // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby)
+                            PositionedDirectional(
+                              bottom: 12,
+                              start: 14,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.xs,
+                                        vertical: AppSpacing.xxs),
+                                    decoration: BoxDecoration(
                                       color: state.isPlaying
-                                          ? activeColor.withValues(alpha: 0.5)
-                                          : const Color(0xFF2B2E3C),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        state.isPlaying
-                                            ? Icons.speed_rounded
-                                            : Icons.pause_circle_outline_rounded,
-                                        size: 11,
+                                          ? activeColor.withValues(alpha: 0.15)
+                                          : PlayerMaterialColors.rpmBadgeFill,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.r6),
+                                      border: Border.all(
                                         color: state.isPlaying
-                                            ? activeColor
-                                            : Colors.white38,
+                                            ? activeColor.withValues(alpha: 0.5)
+                                            : PlayerMaterialColors
+                                                .rpmBadgeBorder,
+                                        width: 1,
                                       ),
-                                      const SizedBox(width: AppSpacing.xxs),
-                                      Text(
-                                        state.isPlaying
-                                            ? context.l10n.vinylSpeedRpm
-                                            : context.l10n.dspStandby,
-                                        style: TextStyle(
-                                          fontSize: AppFontSize.micro,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: AppTracking.overline,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          state.isPlaying
+                                              ? Icons.speed_rounded
+                                              : Icons
+                                                  .pause_circle_outline_rounded,
+                                          size: 11,
                                           color: state.isPlaying
                                               ? activeColor
                                               : Colors.white38,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: AppSpacing.xxs),
+                                        Text(
+                                          state.isPlaying
+                                              ? context.l10n.vinylSpeedRpm
+                                              : context.l10n.dspStandby,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.micro,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: AppTracking.overline,
+                                            color: state.isPlaying
+                                                ? activeColor
+                                                : Colors.white38,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                     ),
                   );
                 },
@@ -520,7 +534,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
             Padding(
               padding: EdgeInsets.symmetric(
-
                 horizontal: isTablet ? 28 : 16,
                 vertical: AppSpacing.s2,
               ),
@@ -551,7 +564,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   onTap: () {
                                     if (song != null) {
                                       HapticFeedback.lightImpact();
-                                      AddToPlaylistSheet.show(context, song: song);
+                                      AddToPlaylistSheet.show(context,
+                                          song: song);
                                     }
                                   },
                                   child: Center(
@@ -569,15 +583,19 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       // Center: Title & Artist (Symmetric & Centered)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s10),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               MarqueeText(
-                                text: song?.title ?? context.l10n.noTrackSelected,
+                                text:
+                                    song?.title ?? context.l10n.noTrackSelected,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
+                                  fontSize: isTablet
+                                      ? AppFontSize.headline
+                                      : AppFontSize.title,
                                   fontWeight: FontWeight.w900,
                                   color: p.textPrimary,
                                   height: 1.22,
@@ -586,10 +604,13 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                               ),
                               const SizedBox(height: AppSpacing.xxs),
                               MarqueeText(
-                                text: song?.artist ?? context.l10n.unknownArtist,
+                                text:
+                                    song?.artist ?? context.l10n.unknownArtist,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
+                                  fontSize: isTablet
+                                      ? AppFontSize.callout
+                                      : AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600,
                                   color: p.textSecondary,
                                 ),
@@ -600,7 +621,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       ),
 
                       // Right Symmetrical Action: Animated Favorite Button
-                      SizedBox(width: AppSpacing.xxl,
+                      SizedBox(
+                        width: AppSpacing.xxl,
                         height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.06),
@@ -664,7 +686,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               hasPrevious: state.hasPreviousNeighbour,
               hasNext: state.hasNextNeighbour,
               primaryColor: activeColor,
-              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
+              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) *
+                  heightRatio.clamp(0.85, 1.10),
               onPlayPause: () => cubit.togglePlayPause(),
               onNext: () => cubit.next(),
               onPrevious: () => cubit.previous(),
@@ -687,7 +710,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         );
 
         if (isLandscape) {
-          final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+          final bool isSplitContentMode =
+              state.isLyricsVisible || state.isQueueVisible;
 
           final Widget leftPaneContent = isSplitContentMode
               ? Center(
@@ -717,9 +741,12 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     MarqueeText(
-                                      text: song?.title ?? context.l10n.noTrackSelected,
+                                      text: song?.title ??
+                                          context.l10n.noTrackSelected,
                                       style: TextStyle(
-                                        fontSize: isTablet ? AppFontSize.headline : 16.0,
+                                        fontSize: isTablet
+                                            ? AppFontSize.headline
+                                            : 16.0,
                                         fontWeight: FontWeight.w800,
                                         color: p.textPrimary,
                                         letterSpacing: AppTracking.title,
@@ -727,11 +754,13 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                     ),
                                     const SizedBox(height: 2),
                                     MarqueeText(
-                                      text: (song?.artist != null && song!.artist.trim().isNotEmpty)
+                                      text: (song?.artist != null &&
+                                              song!.artist.trim().isNotEmpty)
                                           ? song.artist.trim()
                                           : context.l10n.unknownArtist,
                                       style: TextStyle(
-                                        fontSize: isTablet ? AppFontSize.body : 13.0,
+                                        fontSize:
+                                            isTablet ? AppFontSize.body : 13.0,
                                         fontWeight: FontWeight.w600,
                                         color: p.textSecondary,
                                       ),
@@ -756,7 +785,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                     inactiveColor: p.textSecondary,
                                     iconSize: 20,
                                     onTap: () {
-                                      if (song != null) cubit.toggleFavorite(song.id);
+                                      if (song != null) {
+                                        cubit.toggleFavorite(song.id);
+                                      }
                                     },
                                   ),
                                 ),
@@ -771,7 +802,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   clipBehavior: Clip.antiAlias,
                                   child: InkWell(
                                     onTap: () {
-                                      if (song != null) SongInfoSheet.show(context, song: song);
+                                      if (song != null) {
+                                        SongInfoSheet.show(context, song: song);
+                                      }
                                     },
                                     child: Center(
                                       child: Icon(
@@ -787,7 +820,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                             ],
                           ),
                         ),
-                        SizedBox(height: isTablet ? AppSpacing.md : AppSpacing.sm),
+                        SizedBox(
+                            height: isTablet ? AppSpacing.md : AppSpacing.sm),
                         // Seek Bar
                         PlayerSeekBar(
                           duration: state.duration,
@@ -798,7 +832,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           loopPointB: state.abPointB,
                           onSeek: (pos) => cubit.seek(pos),
                         ),
-                        SizedBox(height: isTablet ? AppSpacing.md : AppSpacing.sm),
+                        SizedBox(
+                            height: isTablet ? AppSpacing.md : AppSpacing.sm),
                         // Playback Controls
                         PlayerControls(
                           isPlaying: state.isPlaying,
@@ -850,7 +885,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       child: AnimatedSwitcher(
                         duration: context.motionMs(260),
                         child: KeyedSubtree(
-                          key: ValueKey('left_pane_${isSplitContentMode ? "split" : "deck"}'),
+                          key: ValueKey(
+                              'left_pane_${isSplitContentMode ? "split" : "deck"}'),
                           child: leftPaneContent,
                         ),
                       ),
@@ -874,7 +910,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                         },
                         child: state.isLyricsVisible
                             ? LyricsView(
-                                key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                key: ValueKey(
+                                    'lyrics_${song?.id}_${song?.remoteId}'),
                                 lyrics: state.lyrics,
                                 isLoading: state.isLoadingLyrics,
                                 activeColor: activeColor,
@@ -904,7 +941,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
+                padding: const EdgeInsets.only(
+                    top: AppSpacing.xxs, bottom: AppSpacing.s2),
                 child: Center(
                   child: Container(
                     width: 38,
@@ -920,7 +958,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               // Top App Bar - Symmetrical Left/Right Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
-
                   horizontal: isTablet ? 28 : 20,
                   vertical: AppSpacing.s2,
                 ),
@@ -946,7 +983,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           },
                           child: Center(
                             child: Icon(
-                              Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
+                              Icons.keyboard_arrow_down_rounded,
+                              semanticLabel: context.l10n.close,
                               size: isTablet ? 26 : 24,
                               color: p.textPrimary,
                             ),
@@ -958,7 +996,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     // Center: "PLAYING FROM" / Album Header
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1005,7 +1044,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   .titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
+                                    fontSize: isTablet
+                                        ? AppFontSize.body
+                                        : AppFontSize.bodySmall,
                                     color: p.textPrimary,
                                   ),
                             ),
@@ -1031,7 +1072,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           },
                           child: Center(
                             child: Icon(
-                              Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
+                              Icons.more_horiz_rounded,
+                              semanticLabel: context.l10n.songInfo,
                               size: isTablet ? 24 : 22,
                               color: p.textPrimary,
                             ),
@@ -1063,21 +1105,20 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     final double maxAllowed = isTablet ? 560.0 : 420.0;
                     final double rawSize =
                         math.min(availableWidth, availableHeight);
-                    final double deckSize = rawSize <= 0
-                        ? 0.0
-                        : math.min(rawSize, maxAllowed);
+                    final double deckSize =
+                        rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
 
                     return Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: (state.isLyricsVisible ||
-                                  state.isQueueVisible)
-                              ? (isTablet ? 560.0 : double.infinity)
-                              : deckSize,
-                          maxHeight: (state.isLyricsVisible ||
-                                  state.isQueueVisible)
-                              ? double.infinity
-                              : deckSize,
+                          maxWidth:
+                              (state.isLyricsVisible || state.isQueueVisible)
+                                  ? (isTablet ? 560.0 : double.infinity)
+                                  : deckSize,
+                          maxHeight:
+                              (state.isLyricsVisible || state.isQueueVisible)
+                                  ? double.infinity
+                                  : deckSize,
                         ),
                         child: centerDisplay,
                       ),
@@ -1099,7 +1140,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       },
     );
   }
-
 }
 
 // -----------------------------------------------------------------------------
@@ -1120,10 +1160,10 @@ class _VinylGroovesPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF181A22),
-          Color(0xFF101116),
-          Color(0xFF090A0D),
-          Color(0xFF14151C),
+          PlayerMaterialColors.recordSheenCenter,
+          PlayerMaterialColors.recordSheenMid,
+          PlayerMaterialColors.recordSheenDeep,
+          PlayerMaterialColors.recordSheenRim,
         ],
         stops: const [0.3, 0.65, 0.92, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
@@ -1179,7 +1219,7 @@ class _VinylGroovesPainter extends CustomPainter {
 
     // Outer rim bead
     final rimPaint = Paint()
-      ..color = const Color(0xFF2B2E3C)
+      ..color = PlayerMaterialColors.recordRim
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawCircle(center, radius - 1, rimPaint);
@@ -1286,15 +1326,15 @@ class _TonearmPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF2C2F3C),
-          Color(0xFF1B1D26),
-          Color(0xFF0F1015),
+          PlayerMaterialColors.gimbalHighlight,
+          PlayerMaterialColors.gimbalMid,
+          PlayerMaterialColors.gimbalShadow,
         ],
       ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius));
     canvas.drawCircle(pivot, _gimbalRadius, basePaint);
 
     final baseRimPaint = Paint()
-      ..color = const Color(0xFF424658)
+      ..color = PlayerMaterialColors.gimbalRim
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(pivot, _gimbalRadius, baseRimPaint);
@@ -1311,7 +1351,10 @@ class _TonearmPainter extends CustomPainter {
   void _drawCounterweight(Canvas canvas) {
     final stemPaint = Paint()
       ..shader = const LinearGradient(
-        colors: [Color(0xFF8B8E9B), Color(0xFF535664)],
+        colors: [
+          PlayerMaterialColors.counterweightStemLight,
+          PlayerMaterialColors.counterweightStemDark,
+        ],
       ).createShader(const Rect.fromLTWH(-2.5, -34, 5, 34))
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
@@ -1328,10 +1371,10 @@ class _TonearmPainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Color(0xFF9EA2B2),
-          Color(0xFFE2E4EB),
-          Color(0xFF5A5D6C),
-          Color(0xFF383A46),
+          PlayerMaterialColors.counterweightEdge,
+          PlayerMaterialColors.counterweightHighlight,
+          PlayerMaterialColors.counterweightMid,
+          PlayerMaterialColors.counterweightShadow,
         ],
         stops: [0.0, 0.35, 0.75, 1.0],
       ).createShader(weightRect);
@@ -1341,7 +1384,7 @@ class _TonearmPainter extends CustomPainter {
     );
 
     final calibRect = const Rect.fromLTWH(-10, -18, 20, 4);
-    final calibPaint = Paint()..color = const Color(0xFF14151B);
+    final calibPaint = Paint()..color = PlayerMaterialColors.calibrationStrip;
     canvas.drawRect(calibRect, calibPaint);
 
     final tickPaint = Paint()
@@ -1395,7 +1438,7 @@ class _TonearmPainter extends CustomPainter {
 
   void _drawHeadshell(Canvas canvas, double l) {
     final collarPaint = Paint()
-      ..color = const Color(0xFFC0C3D0)
+      ..color = PlayerMaterialColors.collarMetal
       ..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(-3, l * 0.90), _collarRadius, collarPaint);
 
@@ -1413,7 +1456,10 @@ class _TonearmPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF323544), Color(0xFF161820)],
+        colors: [
+          PlayerMaterialColors.headshellHighlight,
+          PlayerMaterialColors.headshellShadow,
+        ],
       ).createShader(
           Rect.fromLTWH(headshellEnd.dx - 6, headshellStart.dy, 12, 22));
     canvas.drawPath(headshellPath, headshellPaint);
@@ -1463,14 +1509,15 @@ class _TonearmPainter extends CustomPainter {
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
     canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);
 
-    final centerScrewPaint = Paint()..color = const Color(0xFF1A1C24);
+    final centerScrewPaint = Paint()
+      ..color = PlayerMaterialColors.pivotCenterScrew;
     canvas.drawCircle(Offset.zero, _pivotCenterScrewRadius, centerScrewPaint);
   }
 
   void _drawArmRest(Canvas canvas, Offset pos) {
     // Rest post
     final postPaint = Paint()
-      ..color = const Color(0xFF282B36)
+      ..color = PlayerMaterialColors.armRestPost
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -1482,7 +1529,7 @@ class _TonearmPainter extends CustomPainter {
 
     // Rest cradle clip (small curved fork)
     final clipPaint = Paint()
-      ..color = const Color(0xFF4A4E60)
+      ..color = PlayerMaterialColors.armRestClip
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8;
     canvas.drawArc(

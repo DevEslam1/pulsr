@@ -406,7 +406,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                     Icon(Icons.show_chart_rounded, size: 18, color: p.primary),
                                     const SizedBox(width: AppSpacing.xs),
                                     Text(
-                                      'Correction Curve (20 Hz – 20 kHz)',
+                                      context.l10n.correctionCurveRange,
                                       style: TextStyle(
                                         color: p.textPrimary,
                                         fontSize: AppFontSize.caption,
@@ -442,11 +442,11 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('20 Hz', style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text('100 Hz', style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text('1 kHz', style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text('10 kHz', style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text('20 kHz', style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq20Hz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq100Hz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq1kHz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq10kHz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq20kHz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
                               ],
                             ),
                           ],

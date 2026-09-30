@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
+import 'package:mutex/mutex.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/db/app_database.dart';
@@ -22,12 +23,23 @@ class PlayerTransportController {
   final void Function()? _debouncedPersistQueueSlots;
   final void Function({bool force})? _updateWidgetThrottled;
 
+  final Mutex _transportMutex = Mutex();
+
   // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
   // controller instances (e.g. test + prod) never share throttle state.
   final Stopwatch _seekStopwatch = Stopwatch()..start();
   int _lastSeekMs = 0;
+  int? _lastSeekRequestMs;
   Timer? _seekThrottleTimer;
   Duration? _pendingSeek;
+
+  /// True when a seek was requested within the last ~1.5s. Used to suppress
+  /// automatic seeks (e.g. SponsorBlock) while the user is scrubbing.
+  bool get isUserSeeking {
+    final last = _lastSeekRequestMs;
+    if (last == null) return false;
+    return _seekStopwatch.elapsedMilliseconds - last < 1500;
+  }
 
   PlayerTransportController({
     required PulsrAudioHandler audioHandler,
@@ -50,67 +62,73 @@ class PlayerTransportController {
         _updateWidgetThrottled = updateWidgetThrottled;
 
   Future<void> play() async {
-    try {
-      _onUserPausedIntentionally?.call(false);
-      await _audioHandler.play();
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: true, errorMessage: null)));
+    await _transportMutex.protect(() async {
+      try {
+        _onUserPausedIntentionally?.call(false);
+        await _audioHandler.play();
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: true, errorMessage: null)));
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Play failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to start playback')));
+        }
       }
-    } catch (e, st) {
-      ErrorLogger.log('Play failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to start playback')));
-      }
-    }
+    });
   }
 
   Future<void> pause() async {
-    try {
-      _onUserPausedIntentionally?.call(true);
-      final s = _getState();
-      _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: false)));
-      await _audioHandler.pause();
-    } catch (e, st) {
-      ErrorLogger.log('Pause failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
+    await _transportMutex.protect(() async {
+      try {
+        _onUserPausedIntentionally?.call(true);
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to pause playback')));
+        _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: false)));
+        await _audioHandler.pause();
+      } catch (e, st) {
+        ErrorLogger.log('Pause failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to pause playback')));
+        }
       }
-    }
+    });
   }
 
   Future<void> togglePlayPause() async {
     HapticFeedback.lightImpact();
-    try {
-      final state = _getState();
-      final enginePlaying = _audioHandler.playbackState.value.playing;
-      final shouldPause = state.isPlaying || enginePlaying;
+    await _transportMutex.protect(() async {
+      try {
+        final state = _getState();
+        final enginePlaying = _audioHandler.playbackState.value.playing;
+        final shouldPause = state.isPlaying || enginePlaying;
 
-      if (shouldPause) {
-        _onUserPausedIntentionally?.call(true);
-        _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: false)));
-        await _audioHandler.pause();
-      } else {
-        if (state.currentSong == null && state.queue.isEmpty) return;
-        _onUserPausedIntentionally?.call(false);
-        // Optimistically reflect play; the engine observer confirms it.
-        if (!state.isPlaying) {
-          _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: true)));
+        if (shouldPause) {
+          _onUserPausedIntentionally?.call(true);
+          _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: false)));
+          await _audioHandler.pause();
+        } else {
+          if (state.currentSong == null && state.queue.isEmpty) return;
+          _onUserPausedIntentionally?.call(false);
+          // Optimistically reflect play; the engine observer confirms it.
+          if (!state.isPlaying) {
+            _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: true)));
+          }
+          await _audioHandler.play();
         }
-        await _audioHandler.play();
+      } catch (e, st) {
+        ErrorLogger.log('Toggle play/pause failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Playback action failed')));
+        }
       }
-    } catch (e, st) {
-      ErrorLogger.log('Toggle play/pause failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Playback action failed')));
-      }
-    }
+    });
   }
 
   Future<void> seek(Duration position) {
@@ -124,6 +142,7 @@ class PlayerTransportController {
     _emit(state.copyWith(playback: state.playback.copyWith(position: target)));
 
     final nowMs = _seekStopwatch.elapsedMilliseconds;
+    _lastSeekRequestMs = nowMs;
     if (nowMs - _lastSeekMs < PlayerConstants.seekThrottleMs) {
       _pendingSeek = target;
       _seekThrottleTimer?.cancel();

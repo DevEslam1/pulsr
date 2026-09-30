@@ -97,8 +97,14 @@ class QueueScreen extends StatelessWidget {
                     final songsRes =
                         await getIt<GetSongsUseCase>().getAllSongs();
                     if (!context.mounted) break;
-                    final all = songsRes.fold(
-                        (l) => <SongsTableData>[], (r) => r);
+                    final all =
+                        songsRes.fold<List<SongsTableData>?>((l) => null, (r) => r);
+                    if (all == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(context.l10n.somethingWentWrong)),
+                      );
+                      break;
+                    }
                     if (all.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(context.l10n.autoDjEmpty)),
@@ -166,7 +172,7 @@ class QueueScreen extends StatelessWidget {
                 PopupMenuItem(value: 'autodj', child: Row(children: [const Icon(Icons.auto_awesome_rounded), const SizedBox(width: AppSpacing.xs), Text(context.l10n.autoMix)])),
                 PopupMenuItem(value: 'save', child: Row(children: [const Icon(Icons.playlist_add), const SizedBox(width: AppSpacing.xs), Text(context.l10n.saveAsPlaylist)])),
                 const PopupMenuDivider(),
-                PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: p.error), const SizedBox(width: AppSpacing.xs), Text(context.l10n.clearQueueConfirm.split('?').first, style: TextStyle(color: p.error))])),
+                PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: p.error), const SizedBox(width: AppSpacing.xs), Text(context.l10n.clearQueue, style: TextStyle(color: p.error))])),
               ],
             );
           }),
@@ -285,7 +291,8 @@ class QueueScreen extends StatelessWidget {
                       ),
                       child: Semantics(
                         button: true,
-                        label: '${song.title} by ${song.artist}',
+                        label: context.l10n
+                            .songByArtist(song.title, song.artist),
                         child: ListTile(
                           leading: Stack(
                             clipBehavior: Clip.none,
@@ -376,7 +383,8 @@ class QueueScreen extends StatelessWidget {
                               ReorderableDragStartListener(
                                 index: index,
                                 child: Semantics(
-                                  label: 'Reorder ${song.title}',
+                                  label: context.l10n.queueReorderSemantics(
+                                      song.title, index + 1, queue.length),
                                   child: Container(
                                     padding: const EdgeInsets.all(AppSpacing.xs),
                                     constraints: const BoxConstraints(

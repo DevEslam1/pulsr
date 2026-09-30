@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,6 +16,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/mini_player.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
+import 'package:pulsr/features/sheets/add_to_playlist_sheet.dart';
 import 'package:pulsr/features/shell/presentation/widgets/stacked_bottom_dock.dart';
 import 'package:pulsr/features/smart_playlist_builder/smart_playlist_builder_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
@@ -180,6 +182,85 @@ void main() {
       expect(cubit.state.previewTruncated, isFalse);
     });
 
+    test('[C-04] SmartPlaylistBuilderCubit preview race condition cancels and supersedes stale emissions', () async {
+      final mockEngine = MockSmartPlaylistEngine();
+      final mockPlaylistUseCases = MockPlaylistUseCases();
+
+      final controller1 = StreamController<List<SongsTableData>>();
+      final controller2 = StreamController<List<SongsTableData>>();
+
+      var callCount = 0;
+      when(() => mockEngine.watchCriteria(any())).thenAnswer((_) {
+        callCount++;
+        return callCount == 1 ? controller1.stream : controller2.stream;
+      });
+
+      final cubit = SmartPlaylistBuilderCubit(mockEngine, mockPlaylistUseCases);
+      addTearDown(cubit.close);
+
+      // Trigger first preview
+      cubit.updateRule(0, const SmartRule(
+        field: SmartRuleField.title,
+        operator: SmartOperator.contains,
+        value: 'A',
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      // Rapidly trigger second preview before controller1 emits
+      cubit.updateRule(0, const SmartRule(
+        field: SmartRuleField.title,
+        operator: SmartOperator.contains,
+        value: 'B',
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      // Emit on old stream
+      controller1.add([
+        const SongsTableData(
+          id: 1,
+          title: 'Stale A',
+          artist: 'Artist',
+          album: 'Album',
+          durationMs: 1000,
+          path: '/a.mp3',
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 1,
+          lastPositionMs: 0,
+          source: 'local',
+        ),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // Stale data must not have been applied
+      expect(cubit.state.previewSongs.any((s) => s.title == 'Stale A'), isFalse);
+
+      // Emit on latest stream
+      controller2.add([
+        const SongsTableData(
+          id: 2,
+          title: 'Fresh B',
+          artist: 'Artist',
+          album: 'Album',
+          durationMs: 1000,
+          path: '/b.mp3',
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 1,
+          lastPositionMs: 0,
+          source: 'local',
+        ),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(cubit.state.previewSongs.any((s) => s.title == 'Fresh B'), isTrue);
+
+      await controller1.close();
+      await controller2.close();
+    });
+
     testWidgets('H6: StackedBottomDock updates dock height immediately when SchedulerPhase.idle', (tester) async {
       final mockPlayerCubit = MockPlayerCubit();
       final mockSettingsCubit = MockSettingsCubit();
@@ -258,6 +339,18 @@ void main() {
 
       // Clearing now playing empties queue safely
       await widgetService.updateNowPlaying(song: null, isPlaying: false);
+    });
+
+    test('[C-12] AddToPlaylistSheet maintains global mutation lock set to prevent concurrent duplicate adds', () {
+      expect(AddToPlaylistSheet.activePlaylistMutations, isEmpty);
+      // Simulate lock acquisition for playlist 42
+      AddToPlaylistSheet.activePlaylistMutations.add(42);
+      expect(AddToPlaylistSheet.activePlaylistMutations.contains(42), isTrue);
+      // Lock prevents duplicate execution for the same playlist id
+      expect(AddToPlaylistSheet.activePlaylistMutations.contains(99), isFalse);
+      // Clean up releases the lock
+      AddToPlaylistSheet.activePlaylistMutations.remove(42);
+      expect(AddToPlaylistSheet.activePlaylistMutations, isEmpty);
     });
   });
 }

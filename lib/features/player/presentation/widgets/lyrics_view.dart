@@ -87,16 +87,23 @@ class _LyricsViewState extends State<LyricsView> {
   void _setupTapCallback() {
     _lyricController.setOnTapLineCallback((position) {
       HapticFeedback.selectionClick();
+      if (!mounted) return;
+      final target = position +
+          _audibleOffset +
+          Duration(milliseconds: _manualOffsetMs);
+      final effectiveSeek = target.isNegative ? Duration.zero : target;
+
       if (widget.onLineTapped != null) {
-        widget.onLineTapped!(position);
+        widget.onLineTapped!(effectiveSeek);
       } else {
         try {
-          context.read<PlayerCubit>().seek(position);
+          context.read<PlayerCubit>().seek(effectiveSeek);
         } catch (e, st) {
           ErrorLogger.log('Lyrics tap seek failed',
               error: e, stackTrace: st, category: 'Lyrics');
         }
       }
+      _updateProgress(effectiveSeek);
     });
   }
 
@@ -244,7 +251,7 @@ class _LyricsViewState extends State<LyricsView> {
                         await _adjustManualOffset(-50);
                         setSheet(() {});
                       },
-                      child: const Text('-50 ms'),
+                      child: Text(context.l10n.offsetMinus50Ms),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     OutlinedButton(
@@ -252,7 +259,7 @@ class _LyricsViewState extends State<LyricsView> {
                         await _adjustManualOffset(50);
                         setSheet(() {});
                       },
-                      child: const Text('+50 ms'),
+                      child: Text(context.l10n.offsetPlus50Ms),
                     ),
                   ],
                 ),
@@ -572,10 +579,7 @@ class _LyricsViewState extends State<LyricsView> {
     }
 
     if (widget.lyrics.isEmpty) {
-      String noLyricsText = 'No lyrics found';
-      try {
-        noLyricsText = context.l10n.noLyricsFound;
-      } catch (_) {}
+      final String noLyricsText = context.l10n.noLyricsFound;
 
       return Center(
         child: Container(

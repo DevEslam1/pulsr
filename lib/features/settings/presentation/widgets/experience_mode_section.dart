@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
@@ -43,43 +44,39 @@ class ExperienceModeSection extends StatelessWidget {
         ),
         SizedBox(
           width: double.infinity,
-          child: SegmentedButton<ExperienceMode>(
-            showSelectedIcon: true,
-            style: const ButtonStyle(
-              visualDensity: VisualDensity.compact,
-            ),
+          child: PulsrSegmentedControl(
             segments: [
-              ButtonSegment<ExperienceMode>(
-                value: ExperienceMode.normal,
-                label: Text(l10n.experienceModeNormal),
-                icon: const Icon(Icons.auto_awesome_rounded),
+              PulsrSegment(
+                label: l10n.experienceModeNormal,
+                icon: Icons.auto_awesome_rounded,
               ),
-              ButtonSegment<ExperienceMode>(
-                value: ExperienceMode.professional,
-                label: Text(l10n.experienceModeProfessional),
-                icon: const Icon(Icons.tune_rounded),
+              PulsrSegment(
+                label: l10n.experienceModeProfessional,
+                icon: Icons.tune_rounded,
               ),
             ],
-            selected: {mode},
-            onSelectionChanged: (selection) {
-              if (selection.isNotEmpty) {
-                final newMode = selection.first;
-                cubit.setExperienceMode(newMode);
-                if (newMode == ExperienceMode.professional) {
-                  PulsrToast.show(
-                    context,
-                    title: 'Professional Mode',
-                    message: 'Advanced DSP, bit-perfect streaming, and pro audio controls unlocked.',
-                    icon: Icons.tune_rounded,
-                  );
-                }
+            selectedIndex: isPro ? 1 : 0,
+            onChanged: (i) {
+              final newMode = i == 1
+                  ? ExperienceMode.professional
+                  : ExperienceMode.normal;
+              cubit.setExperienceMode(newMode);
+              if (newMode == ExperienceMode.professional) {
+                PulsrToast.show(
+                  context,
+                  title: l10n.professionalMode,
+                  message: l10n.professionalModeUnlocked,
+                  icon: Icons.tune_rounded,
+                );
               }
             },
           ),
         ),
         const SizedBox(height: AppSpacing.s10),
-        SizedBox(
-          height: 38,
+        AnimatedSize(
+          duration: context.motionMs(200),
+          curve: context.motionCurve(Curves.easeOutCubic),
+          alignment: Alignment.topLeft,
           child: AnimatedSwitcher(
             duration: context.motionMs(200),
             child: Text(
@@ -92,8 +89,6 @@ class ExperienceModeSection extends StatelessWidget {
                 fontSize: AppFontSize.label,
                 height: 1.35,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
@@ -186,35 +181,98 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
   bool _expanded = false;
 
   @override
+  void didUpdateWidget(covariant _WhatChangesExpander oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Collapse so stale Pro/Normal copy is never left showing after a switch.
+    if (oldWidget.isPro != widget.isPro && _expanded) {
+      _expanded = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final changes = [
       (
-        'Equalizer & DSP',
-        'Parametric 10-Band EQ, Q-factor & Room Correction',
-        'Curated Smart Audio Presets',
+        context.l10n.expEqTitle,
+        context.l10n.expEqPro,
+        context.l10n.expEqNormal,
       ),
       (
-        'USB DAC & Output',
-        'Bit-Perfect hardware lock, DSD DoP streaming',
-        'System AudioTrack (32-bit float)',
+        context.l10n.expUsbTitle,
+        context.l10n.expUsbPro,
+        context.l10n.expUsbNormal,
       ),
       (
-        'Playback & Crossfade',
-        'Fine-grained 0-12s curve & latency calibration',
-        'Standard 3s smooth crossfade',
+        context.l10n.expCrossfadeTitle,
+        context.l10n.expCrossfadePro,
+        context.l10n.expCrossfadeNormal,
       ),
       (
-        'Gain & Loudness',
-        'ReplayGain dB calibration & manual pre-amp',
-        'Automatic perceived loudness leveling',
+        context.l10n.expGainTitle,
+        context.l10n.expGainPro,
+        context.l10n.expGainNormal,
       ),
       (
-        'Visualizers',
-        'Milkdrop preset interpreter & Custom JSON',
-        'Classic Wave & Radial Frequency styles',
+        context.l10n.expVisualizersTitle,
+        context.l10n.expVisualizersPro,
+        context.l10n.expVisualizersNormal,
       ),
     ];
+
+    final Widget changesBody = Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.sm,
+        0,
+        AppSpacing.sm,
+        AppSpacing.xs,
+      ),
+      child: Column(
+        children: [
+          Divider(height: 1, color: p.hairline.withValues(alpha: 0.4)),
+          const SizedBox(height: AppSpacing.xs),
+          for (final item in changes) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 13,
+                    color: widget.isPro ? p.accent : p.textTertiary,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${item.$1}: ',
+                            style: TextStyle(
+                              fontSize: AppFontSize.tiny,
+                              fontWeight: FontWeight.w800,
+                              color: p.textPrimary,
+                            ),
+                          ),
+                          TextSpan(
+                            text: widget.isPro ? item.$2 : item.$3,
+                            style: TextStyle(
+                              fontSize: AppFontSize.tiny,
+                              color: p.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.xs),
@@ -225,7 +283,10 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
       ),
       child: Column(
         children: [
-          InkWell(
+          Semantics(
+            button: true,
+            expanded: _expanded,
+            child: InkWell(
             borderRadius: BorderRadius.circular(AppRadii.r10),
             onTap: () {
               HapticFeedback.selectionClick();
@@ -246,7 +307,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      "What changes?",
+                      context.l10n.whatChanges,
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
@@ -267,64 +328,17 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
               ),
             ),
           ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity),
-            secondChild: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.sm,
-                0,
-                AppSpacing.sm,
-                AppSpacing.xs,
-              ),
-              child: Column(
-                children: [
-                  Divider(height: 1, color: p.hairline.withValues(alpha: 0.4)),
-                  const SizedBox(height: AppSpacing.xs),
-                  for (final item in changes) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline_rounded,
-                            size: 13,
-                            color: widget.isPro ? p.accent : p.textTertiary,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: '${item.$1}: ',
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.tiny,
-                                      fontWeight: FontWeight.w800,
-                                      color: p.textPrimary,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: widget.isPro ? item.$2 : item.$3,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.tiny,
-                                      color: p.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            crossFadeState:
-                _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          ),
+          // Only the visible content is laid out; collapsed content is not
+          // built with unbounded height (see settings_screen section note).
+          AnimatedSize(
             duration: context.motionMs(240),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            child: _expanded
+                ? changesBody
+                : const SizedBox(width: double.infinity),
           ),
         ],
       ),

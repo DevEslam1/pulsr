@@ -253,15 +253,19 @@ class SongInfoSheet extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                context.l10n.qualityAndCodec,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.caption,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: AppTracking.wide,
-                                  color: p.textSecondary,
+                              Expanded(
+                                child: Text(
+                                  context.l10n.qualityAndCodec,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: AppTracking.wide,
+                                    color: p.textSecondary,
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: AppSpacing.sm),
                               AudioQualityBadge(
                                   song: song,
                                   activeColor: p.accent,
@@ -634,8 +638,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
   void _save() {
     final raw = _controller.text.trim();
     if (raw.isEmpty) {
-      Navigator.of(context, rootNavigator: true)
-          .pop(widget.currentBpm != null ? '' : null);
+      Navigator.of(context, rootNavigator: true).pop('');
       return;
     }
     final bpm = double.tryParse(raw);
@@ -745,7 +748,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
   late final PerSongEqStore _eqStore;
   late final PerSongVolumeStore _volStore;
   late final BpmOverrideStore _bpmStore;
-  late final List<HeadphoneProfile> _headphoneProfiles;
+  List<HeadphoneProfile> _headphoneProfiles = const [];
   late double _currentSliderVol;
 
   @override
@@ -772,7 +775,21 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
       _eqStore.ready,
       _volStore.ready,
       _bpmStore.ready,
-    ]).then((_) {
+      HeadphoneProfilesRepository().loadProfiles(),
+    ]).then((results) {
+      if (mounted) {
+        setState(() {
+          final loadedProfiles = results[4] as List<HeadphoneProfile>?;
+          if (loadedProfiles != null && loadedProfiles.isNotEmpty) {
+            _headphoneProfiles = loadedProfiles;
+          } else {
+            _headphoneProfiles = HeadphoneProfilesRepository().profiles;
+          }
+          _currentSliderVol =
+              _volStore.getGainDbForTrack(widget.song.id.toString());
+        });
+      }
+    }).catchError((_) {
       if (mounted) {
         setState(() {
           _currentSliderVol =
@@ -803,37 +820,50 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
       context,
       builder: (_) => _BpmOverrideDialog(currentBpm: currentBpm),
     );
+    // null indicates cancellation / dialog dismissal; no state or store changes.
     if (result == null || !context.mounted) return;
-    await _persistBpmChoice(
-        context, playerCubit, result.isEmpty ? null : result);
+
+    // Empty string indicates clearing the BPM override; non-empty persists new BPM.
+    if (result.isEmpty) {
+      if (currentBpm != null) {
+        await _clearBpmChoice(context, playerCubit);
+      }
+    } else {
+      await _persistBpmChoice(context, playerCubit, result);
+    }
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  Future<void> _clearBpmChoice(
+    BuildContext context,
+    PlayerCubit? playerCubit,
+  ) async {
+    await _bpmStore.setBpmForTrack(widget.song.id.toString(), null);
+    await playerCubit?.setTrackBpm(widget.song, null);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.bpmCleared)),
+      );
     }
   }
 
   Future<void> _persistBpmChoice(
     BuildContext context,
     PlayerCubit? playerCubit,
-    String? raw,
+    String raw,
   ) async {
-    double? bpm;
-    if (raw != null) {
-      bpm = double.tryParse(raw);
-      if (bpm == null ||
-          !bpm.isFinite ||
-          bpm < BpmOverrideStore.minBpm ||
-          bpm > BpmOverrideStore.maxBpm) {
-        return;
-      }
+    final bpm = double.tryParse(raw);
+    if (bpm == null ||
+        !bpm.isFinite ||
+        bpm < BpmOverrideStore.minBpm ||
+        bpm > BpmOverrideStore.maxBpm) {
+      return;
     }
     await _bpmStore.setBpmForTrack(widget.song.id.toString(), bpm);
     await playerCubit?.setTrackBpm(widget.song, bpm);
-    if (context.mounted && bpm == null) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.bpmCleared)),
-      );
-    }
   }
 
   @override

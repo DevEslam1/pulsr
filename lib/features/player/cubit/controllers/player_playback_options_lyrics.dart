@@ -183,4 +183,49 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     }
     return service.detect(info);
   }
+
+  // ──────────────────────────────────────────────
+  // Overlays
+  // ──────────────────────────────────────────────
+  void toggleLyrics() => toggleLyricsVisibility();
+
+  void toggleLyricsVisibility() {
+    HapticFeedback.lightImpact();
+    final s = _getState();
+    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
+  }
+
+  void toggleQueue() => toggleQueueVisibility();
+
+  void toggleQueueVisibility() {
+    HapticFeedback.lightImpact();
+    final s = _getState();
+    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
+  }
+
+  void resetOverlayViews() {
+    final s = _getState();
+    if (s.isLyricsVisible || s.isQueueVisible) {
+      _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: false, isQueueVisible: false)));
+    }
+  }
+
+  void setExpanded(bool expanded) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
+  Future<void> setTrackBpm(SongsTableData song, double? bpm) => _audioHandler.setTrackBpm(song, bpm);
+  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
+  void setSilenceSkipSensitivity(int sensitivity) {
+    final clamped = sensitivity.clamp(0, 100);
+    final s = _getState();
+    _emit(s.copyWith(playback: s.playback.copyWith(silenceSkipSensitivity: clamped)));
+    unawaited(_applySilenceSkipSensitivity(clamped));
+  }
+
+  Future<void> _applySilenceSkipSensitivity(int value) async {
+    try {
+      await _audioHandler.setSilenceSkipSensitivity(value);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply silence-skip sensitivity',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+    }
+  }
 }

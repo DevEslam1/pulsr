@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 
 /// Real-time interactive Equalizer Curve visualizer utilizing centripetal
 /// Catmull-Rom spline interpolation, dB reference grid lines, frequency
@@ -48,17 +49,21 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     final isInteractive = widget.onGainChanged != null;
 
     Widget visualizer = RepaintBoundary(
-      child: CustomPaint(
-        size: Size(double.infinity, widget.height),
-        painter: _CatmullRomEqPainter(
-          gains: widget.gains,
-          color: widget.activeColor,
-          spectrumData: widget.spectrumData,
-          frequencies: widget.frequencies,
-          maxGain: widget.maxGain,
-          showGrid: widget.showGrid,
-          showLabels: widget.showLabels && widget.height >= 70,
-          selectedBandIndex: _activeDraggingBand ?? widget.selectedBandIndex,
+      child: Semantics(
+        label: context.l10n.equalizer,
+        value: '${widget.gains.length} ${context.l10n.bandsLabel}',
+        child: CustomPaint(
+          size: Size(double.infinity, widget.height),
+          painter: _CatmullRomEqPainter(
+            gains: widget.gains,
+            color: widget.activeColor,
+            spectrumData: widget.spectrumData,
+            frequencies: widget.frequencies,
+            maxGain: widget.maxGain,
+            showGrid: widget.showGrid,
+            showLabels: widget.showLabels && widget.height >= 70,
+            selectedBandIndex: _activeDraggingBand ?? widget.selectedBandIndex,
+          ),
         ),
       ),
     );

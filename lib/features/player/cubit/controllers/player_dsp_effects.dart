@@ -67,6 +67,29 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         if (state.isDspEffectsActive) {
           _dspSnapshot = state;
         }
+        final disableOps = <Future<void> Function()>[
+          () => _audioHandler.setSpatializerEnabled(false),
+          () => _audioHandler.setVirtualizerEnabled(false),
+          () => _audioHandler.setDynamicsPreset(DynamicsPreset.off, enabled: false),
+          () => _audioHandler.setCrossfeed(false),
+          () => _audioHandler.setLookaheadLimiter(false),
+          () => _audioHandler.setReverb(false),
+          () => _audioHandler.setSaturation(false),
+          () => _audioHandler.setStereoWidth(false),
+          () => _audioHandler.setLoudnessContour(false),
+          () => _audioHandler.setSubCrossover(false),
+          () => _audioHandler.setDynamicEq(false),
+          () => _audioHandler.setViperDdc(false),
+          () => _audioHandler.setArbitraryEq(false),
+          () => _audioHandler.setLiveProg(false),
+          () => _audioHandler.setDynamicBass(enabled: false),
+          () => _audioHandler.setVolumeBoost(0.0),
+        ];
+
+        for (final op in disableOps) {
+          await op();
+        }
+
         _emit(state.copyWith(
           dsp: state.dsp.copyWith(
             isSpatializerEnabled: false,
@@ -87,22 +110,6 @@ extension PlayerDspEffectsExtension on PlayerDspController {
             volumeBoost: 0.0,
           ),
         ));
-        await _audioHandler.setSpatializerEnabled(false);
-        await _audioHandler.setVirtualizerEnabled(false);
-        await _audioHandler.setDynamicsPreset(DynamicsPreset.off, enabled: false);
-        await _audioHandler.setCrossfeed(false);
-        await _audioHandler.setLookaheadLimiter(false);
-        await _audioHandler.setReverb(false);
-        await _audioHandler.setSaturation(false);
-        await _audioHandler.setStereoWidth(false);
-        await _audioHandler.setLoudnessContour(false);
-        await _audioHandler.setSubCrossover(false);
-        await _audioHandler.setDynamicEq(false);
-        await _audioHandler.setViperDdc(false);
-        await _audioHandler.setArbitraryEq(false);
-        await _audioHandler.setLiveProg(false);
-        await _audioHandler.setDynamicBass(enabled: false);
-        await _audioHandler.setVolumeBoost(0.0);
       } else {
         final snap = _dspSnapshot;
         if (snap != null && snap.isDspEffectsActive) {
@@ -207,9 +214,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     }
   }
 
-  Future<void> setVolumeBoost(double value) {
-    final state = _getState();
-    final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
+  double _calculateSafeVolumeBoost(double value, double preampDb) {
     var safeValue = value.clamp(0.0, 1.0);
     if ((preampDb + safeValue * 10.0) > 6.0) {
       safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
@@ -221,11 +226,23 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         );
       }
     }
+    return safeValue;
+  }
+
+  Future<void> setVolumeBoost(double value) {
     return applyDspEffect(
       featureName: 'Volume Boost',
-      guardCondition: safeValue > 0.01,
-      updateDsp: (dsp) => dsp.copyWith(volumeBoost: safeValue),
-      applyAudioHandler: () => _audioHandler.setVolumeBoost(safeValue),
+      guardCondition: value > 0.01,
+      updateDsp: (dsp) {
+        final currentPreamp = _getState().selectedHeadphoneProfile?.preampGain ?? 0.0;
+        final safe = _calculateSafeVolumeBoost(value, currentPreamp);
+        return dsp.copyWith(volumeBoost: safe);
+      },
+      applyAudioHandler: () async {
+        final currentPreamp = _getState().selectedHeadphoneProfile?.preampGain ?? 0.0;
+        final safe = _calculateSafeVolumeBoost(value, currentPreamp);
+        await _audioHandler.setVolumeBoost(safe);
+      },
     );
   }
 
@@ -525,7 +542,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     bands[index] = sanitized;
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
-      requiresGuard: false,
+      requiresGuard: true,
+      guardCondition: _getState().isDynamicEqEnabled,
+      showErrorOnGuard: false,
       updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
       applyAudioHandler: () => _audioHandler.setDynamicEqBand(index, sanitized),
     );
@@ -537,7 +556,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       ..add(const DynamicEqBandConfig());
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
-      requiresGuard: false,
+      requiresGuard: true,
+      guardCondition: _getState().isDynamicEqEnabled,
+      showErrorOnGuard: false,
       updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
       applyAudioHandler: () => _audioHandler.addDynamicEqBand(),
     );
@@ -549,7 +570,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     final bands = List<DynamicEqBandConfig>.from(currentBands)..removeAt(index);
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
-      requiresGuard: false,
+      requiresGuard: true,
+      guardCondition: _getState().isDynamicEqEnabled,
+      showErrorOnGuard: false,
       updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
       applyAudioHandler: () => _audioHandler.removeDynamicEqBand(index),
     );
@@ -665,5 +688,54 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         bypass: bypass,
         gainCompensationDb: gainCompensationDb,
       );
+
+  Future<void> startAbComparison() async {
+    _abRevertTimer?.cancel();
+    _abComparisonActive = true;
+    _abRevertTimer = Timer(const Duration(seconds: 10), () {
+      unawaited(endAbComparison());
+    });
+    return _audioHandler.startAbComparison();
+  }
+
+  Future<void> endAbComparison() {
+    _abRevertTimer?.cancel();
+    _abRevertTimer = null;
+    // H7: A concurrent user "stop" and the auto-revert timer would otherwise
+    // both reach the handler and tear down the comparison twice.
+    if (!_abComparisonActive) return Future.value();
+    _abComparisonActive = false;
+    return _audioHandler.endAbComparison();
+  }
+
+  Future<void> setBandMode(int count) async {
+    if (count == 10 || count == 32) {
+      await _audioHandler.set32BandMode(count == 32);
+    } else if (count == 64) {
+      await _audioHandler.equalizerManager.setBandMode(64);
+    } else {
+      return;
+    }
+    final state = _getState();
+    _emit(state.copyWith(dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+  }
+
+  Future<void> switchComparisonSlot(ComparisonSlot slot) async {
+    await _audioHandler.switchComparisonSlot(slot);
+    final state = _getState();
+    _emit(state.copyWith(dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+  }
+
+  String exportPresetToJson() => _audioHandler.exportPresetToJson();
+
+  Future<bool> importPresetFromJson(String jsonStr) async {
+    final ok = await _audioHandler.importPresetFromJson(jsonStr);
+    if (ok) {
+      final state = _getState();
+      _emit(state.copyWith(
+          dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
+    }
+    return ok;
+  }
 }
 

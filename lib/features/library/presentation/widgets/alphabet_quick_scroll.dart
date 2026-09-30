@@ -6,6 +6,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 
 /// Interactive vertical alphabet quick-scroll rail for Library lists.
 ///
@@ -71,10 +72,31 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
     });
   }
 
+  /// Screen-reader / switch step: move to the next or previous available
+  /// letter without needing a drag gesture.
+  void _stepLetter(int delta) {
+    final letters = widget.availableLetters;
+    if (letters.isEmpty) return;
+    final current = _draggedLetter ?? widget.activeLetter;
+    final idx = current == null ? -1 : letters.indexOf(current);
+    final next = (idx < 0 ? 0 : idx + delta).clamp(0, letters.length - 1);
+    final letter = letters[next];
+    setState(() => _draggedLetter = letter);
+    widget.onLetterSelected(letter);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final currentLetter = _draggedLetter ?? widget.activeLetter;
+    final letters = widget.availableLetters;
+    final letterIndex =
+        currentLetter == null ? -1 : letters.indexOf(currentLetter);
+    final increasedLetter = (letterIndex >= 0 && letterIndex + 1 < letters.length)
+        ? letters[letterIndex + 1]
+        : (currentLetter ?? '');
+    final decreasedLetter =
+        letterIndex > 0 ? letters[letterIndex - 1] : (currentLetter ?? '');
 
     return RepaintBoundary(
       child: Stack(
@@ -115,7 +137,14 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
           // Vertical Alphabet Rail
           LayoutBuilder(
             builder: (context, constraints) {
-              return GestureDetector(
+              return Semantics(
+                label: context.l10n.alphabetIndexLabel,
+                value: currentLetter ?? '',
+                increasedValue: increasedLetter,
+                decreasedValue: decreasedLetter,
+                onIncrease: () => _stepLetter(1),
+                onDecrease: () => _stepLetter(-1),
+                child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragDown: (details) =>
                     _handleTouch(details.localPosition, constraints.maxHeight),
@@ -128,7 +157,9 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                 onTapDown: (details) =>
                     _handleTouch(details.localPosition, constraints.maxHeight),
                 onTapUp: (_) => _handleTouchEnd(),
-                child: Container(
+                child: SizedBox(
+                  width: AppSpacing.s44,
+                  child: Container(
                   width: 20,
                   alignment: Alignment.center,
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -147,7 +178,7 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                             child: Text(
                               letter,
                               style: TextStyle(
-                                fontSize: 9.5,
+                                fontSize: AppFontSize.tiny,
                                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
                                 color: isSelected ? p.accent : p.textTertiary,
                               ),
@@ -158,6 +189,8 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                     }).toList(growable: false),
                   ),
                 ),
+                ),
+              ),
               );
             },
           ),

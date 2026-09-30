@@ -1333,6 +1333,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       onBackgroundReleaseRequested: () {
         AudioMemoryManager.trimStreamCache(_streamCache);
       },
+      onPreloadRejected: (key, sizeBytes) {
+        debugPrint(
+            '[AudioHandler] Preload rejected for $key ($sizeBytes bytes)');
+      },
     );
 
     _preloadScheduler = SmartPreloadScheduler(

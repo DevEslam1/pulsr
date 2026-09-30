@@ -56,7 +56,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     with PlayerQueueOps, PlayerTransportControls, PlayerDspControls, PlayerPlaybackOptions {
   final PulsrAudioHandler _audioHandler;
   final IMusicRepository _repository;
-  final SettingsCubit? _settingsCubit;
+  SettingsCubit? _settingsCubit;
+  StreamSubscription<dynamic>? _settingsSub;
 
   @override
   @visibleForTesting
@@ -76,12 +77,15 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   late final PlayerWidgetBridge widgetBridge;
 
   bool _userPausedIntentionally = false;
+  static const String _sponsorSkipMessage = 'Skipped sponsor segment';
+  Timer? _sponsorSkipClearTimer;
   // Monotonic counter bumped whenever the queue is mutated; used to invalidate
   // the home-widget "up next" title cache on reorder.
   int _queueVersion = 0;
   final AsyncGuard _trackChangedGuard = AsyncGuard();
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
+  bool _effectsSynced = false;
 
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
 
@@ -139,6 +143,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       isClosed: () => isClosed,
       onLoadLyrics: (song, {isOfflineOnly = false}) =>
           metadataController.loadLyrics(song, isOfflineOnly: isOfflineOnly),
+      // B5: route Quran Mode DSP through the same Bit-Perfect conflict gate and
+      // engine-resync recovery the DSP controller uses.
+      dspBlockedReason: () => dspController.dspBlockedReason(),
+      syncAudioEffects: _syncAudioEffects,
     );
     dspController = PlayerDspController(
       audioHandler: _audioHandler,
@@ -209,14 +217,18 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     unawaited(queueController.restoreQueueSlots());
     _listenToSettings();
     _listenToAudioService();
-    _syncAudioEffects(force: true);
     unawaited(_audioHandler.effectsReady.then((_) async {
-      if (isClosed) return;
+      if (isClosed || _effectsSynced) return;
+      _effectsSynced = true;
       _syncAudioEffects(force: true);
       await _audioHandler.setVolume(_audioHandler.volume);
     }).catchError((Object e, StackTrace st) {
       ErrorLogger.log('Post-init effects re-sync failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed && !_effectsSynced) {
+        _effectsSynced = true;
+        _syncAudioEffects(force: true);
+      }
     }));
   }
 
@@ -284,6 +296,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   }
 
   void _listenToSettings() {
+    _settingsSub?.cancel();
+    _settingsSub = null;
     final settingsCubit = _settingsCubit;
     if (settingsCubit != null) {
       _audioHandler.setCrossfadeDuration(
@@ -292,7 +306,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
                 (settingsCubit.state.crossfadeSeconds * 1000).round()),
       );
       _audioHandler.setGaplessEnabled(settingsCubit.state.gaplessPlayback);
-      autoSub(settingsCubit.stream, (settingsState) {
+      _settingsSub = autoSub(settingsCubit.stream, (settingsState) {
         _audioHandler.setCrossfadeDuration(
           Duration(
               milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
@@ -306,27 +320,35 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             unawaited(dspController.maybeFollowTrackSampleRate(song));
           }
         }
+        _syncAudioEffects();
       });
     }
   }
 
-  static const int _maxNegativeIdEntries = 1000;
+  void attachSettingsCubit(SettingsCubit settingsCubit) {
+    if (isClosed) return;
+    _settingsCubit = settingsCubit;
+    dspController.attachSettingsCubit(settingsCubit);
+    _listenToSettings();
+    _syncAudioEffects(force: true);
+  }
+
   final Map<String, int> _remoteIdToNegativeId = {};
   int _nextAssignedNegativeId = -2;
+
+  @visibleForTesting
+  int resolveMediaItemId(String id) => _resolveMediaItemId(id);
 
   int _resolveMediaItemId(String id) {
     final parsed = int.tryParse(id);
     if (parsed != null) return parsed;
     final cached = _remoteIdToNegativeId[id];
     if (cached != null) return cached;
-    if (_remoteIdToNegativeId.length >= _maxNegativeIdEntries) {
-      _remoteIdToNegativeId.remove(_remoteIdToNegativeId.keys.first);
+    final assigned = _nextAssignedNegativeId--;
+    if (_nextAssignedNegativeId > -2) {
+      // Guard against potential integer overflow wrap-around
+      _nextAssignedNegativeId = -2;
     }
-    // Map non-numeric IDs into collision-free negative integer space (never colliding on 0 or positive DB IDs)
-    final h = -(id.hashCode.abs() % 1000000000 + 2);
-    final assigned = !_remoteIdToNegativeId.containsValue(h)
-        ? h
-        : _nextAssignedNegativeId--;
     _remoteIdToNegativeId[id] = assigned;
     return assigned;
   }
@@ -542,13 +564,26 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
     Stream<Duration> positionUpdates;
     try {
-      positionUpdates = _audioHandler.compensatedPositionStream;
+      positionUpdates = _audioHandler.compensatedPositionStream.onErrorResume(
+        (error, stackTrace) {
+          ErrorLogger.log(
+            'compensatedPositionStream error, falling back to positionStream',
+            error: error,
+            stackTrace: stackTrace,
+            category: 'PlayerCubit',
+          );
+          return _audioHandler.positionStream;
+        },
+      );
+    } on StateError {
+      rethrow;
     } catch (_) {
       positionUpdates = _audioHandler.positionStream;
     }
     autoSub(positionUpdates.throttleTime(PlayerConstants.positionThrottleDuration, trailing: true), (pos) {
       safeEmit(state.copyWith(playback: state.playback.copyWith(position: pos)));
       if (state.isPlaying) widgetBridge.updateWidgetProgressThrottled(state);
+      _maybeSkipSponsorSegment(pos);
     });
 
     autoSub(_audioHandler.errorStream, (err) {
@@ -568,6 +603,35 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
     autoSub(_audioHandler.audioSessionIdStream, (id) {
       safeEmit(state.copyWith(playback: state.playback.copyWith(audioSessionId: id)));
+    });
+  }
+
+  /// B1: evaluates SponsorBlock on every throttled position tick and seeks past
+  /// skippable segments. Only YT Music-sourced tracks have segments; the manager
+  /// enforces a 1.5s cooldown and [isUserSeeking] prevents fighting a scrub.
+  void _maybeSkipSponsorSegment(Duration pos) {
+    if (isClosed || !state.isPlaying) return;
+    final song = state.currentSong;
+    if (song == null || song.source != SongSource.youtube) return;
+    if (transportController.isUserSeeking) return;
+    final target = metadataController.evaluateSponsorBlockSkip(
+      pos,
+      isPlaying: state.isPlaying,
+    );
+    if (target == null) return;
+    unawaited(transportController.seek(target));
+    _showSponsorSkipNotice();
+  }
+
+  void _showSponsorSkipNotice() {
+    final s = state;
+    safeEmit(s.copyWith(
+      playback: s.playback.copyWith(errorMessage: _sponsorSkipMessage),
+    ));
+    _sponsorSkipClearTimer?.cancel();
+    _sponsorSkipClearTimer = Timer(const Duration(seconds: 2), () {
+      if (isClosed) return;
+      if (state.errorMessage == _sponsorSkipMessage) clearError();
     });
   }
 
@@ -621,6 +685,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       ErrorLogger.log('PlayerCubit close queueController failed',
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
+    _sponsorSkipClearTimer?.cancel();
+    _sponsorSkipClearTimer = null;
+    _settingsSub?.cancel();
+    _settingsSub = null;
     _remoteIdToNegativeId.clear();
     await super.close();
   }

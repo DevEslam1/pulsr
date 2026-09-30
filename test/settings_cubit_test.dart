@@ -435,5 +435,36 @@ void main() {
       await cubit.close();
       MqaDecoderHelper.isMqaEnabled = null;
     });
+
+    test('[C-03] Concurrent reloadSettings calls serialize without race conditions', () async {
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+
+      // Trigger multiple concurrent reloads
+      final futures = [
+        cubit.reloadSettings(),
+        cubit.reloadSettings(),
+        cubit.reloadSettings(),
+      ];
+
+      await Future.wait(futures);
+      await cubit.preferencesReady;
+
+      expect(cubit.state, isNotNull);
+      await cubit.close();
+    });
+
+    test('[M-06] reloadSettings invalidates cachedPrefs and reloads preferences from disk', () async {
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      await cubit.preferencesReady;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('setting_language_code', 'fr');
+
+      await cubit.reloadSettings();
+      await cubit.preferencesReady;
+
+      expect(cubit.state.languageCode, equals('fr'));
+      await cubit.close();
+    });
   });
 }

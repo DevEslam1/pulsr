@@ -60,14 +60,12 @@ class PlayerControls extends StatelessWidget {
             ? l10n.repeatAll
             : l10n.repeatOff;
 
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -129,58 +127,75 @@ class PlayerControls extends StatelessWidget {
                   HapticFeedback.mediumImpact();
                   onPlayPause();
                 },
-                child: AnimatedContainer(
-                  duration: context.motionMs(200),
+                // BUG-26: the A/B ring lives in its own overlay layer so it
+                // never conflicts with the gradient fill of the button.
+                child: SizedBox(
                   width: mainButtonSize,
                   height: mainButtonSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color.lerp(primaryColor, Colors.white, 0.18) ??
-                            primaryColor,
-                        primaryColor,
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(
-                            alpha: isPlaying ? 0.45 : 0.25),
-                        blurRadius: isPlaying ? 24 : 16,
-                        spreadRadius: isPlaying ? 2 : 0,
-                        offset: const Offset(0, 6),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AnimatedContainer(
+                        duration: context.motionMs(200),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color.lerp(primaryColor, Colors.white, 0.18) ??
+                                  primaryColor,
+                              primaryColor,
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: primaryColor.withValues(
+                                  alpha: isPlaying ? 0.45 : 0.25),
+                              blurRadius: isPlaying ? 24 : 16,
+                              spreadRadius: isPlaying ? 2 : 0,
+                              offset: const Offset(0, 6),
+                            ),
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: context.motionMs(180),
+                            transitionBuilder: (child, anim) => ScaleTransition(
+                              scale: anim,
+                              child: child,
+                            ),
+                            child: Icon(
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              key: ValueKey(isPlaying),
+                              color: onPrimaryColor,
+                              size: mainButtonSize * 0.52,
+                            ),
+                          ),
+                        ),
                       ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
+                      IgnorePointer(
+                        child: AnimatedContainer(
+                          duration: context.motionMs(200),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: abLoopActive
+                                  ? p.accent
+                                  : Colors.white.withValues(alpha: 0.25),
+                              width: abLoopActive ? 2.2 : 1.2,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
-                    border: Border.all(
-                      color: abLoopActive
-                          ? p.accent
-                          : Colors.white.withValues(alpha: 0.25),
-                      width: abLoopActive ? 2.2 : 1.2,
-                    ),
-                  ),
-                  child: Center(
-                    child: AnimatedSwitcher(
-                      duration: context.motionMs(180),
-                      transitionBuilder: (child, anim) => ScaleTransition(
-                        scale: anim,
-                        child: child,
-                      ),
-                      child: Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        key: ValueKey(isPlaying),
-                        color: onPrimaryColor,
-                        size: mainButtonSize * 0.52,
-                      ),
-                    ),
                   ),
                 ).animate(target: isPlaying ? 1 : 0).scale(
                       duration: context.motionMs(140),
@@ -261,7 +276,6 @@ class PlayerControls extends StatelessWidget {
               ),
             ),
           ],
-        ),
         ),
       ),
     );

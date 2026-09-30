@@ -38,7 +38,6 @@ class _RecentsScreenState extends State<RecentsScreen> {
   Timer? _searchDebounce;
   static const int _persistedHistoryLimit = 100;
   static const int _maxHistoryLimit = 500;
-  static const String _showLessLabel = 'Show less';
   int _historyLimit = _persistedHistoryLimit;
   bool _hasMore = true;
   bool _userExpanded = false;
@@ -176,10 +175,19 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         controller: _searchController,
                         hintText:
                             '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
+                        // BUG-09: actually debounce keystrokes instead of
+                        // rebuilding the whole list on every character.
                         onChanged: (val) {
-                          if (mounted) setState(() => _searchQuery = val);
+                          _searchDebounce?.cancel();
+                          _searchDebounce = Timer(
+                            const Duration(milliseconds: 300),
+                            () {
+                              if (mounted) setState(() => _searchQuery = val);
+                            },
+                          );
                         },
                         onClear: () {
+                          _searchDebounce?.cancel();
                           if (mounted) setState(() => _searchQuery = '');
                         },
                       ),
@@ -395,7 +403,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                               const SizedBox(width: AppSpacing.sm),
                             TextButton.icon(
                               icon: const Icon(Icons.expand_less_rounded),
-                              label: const Text(_showLessLabel),
+                              label: Text(context.l10n.showLess),
                               onPressed: () {
                                 setState(() {
                                   _userExpanded = false;

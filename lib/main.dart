@@ -820,7 +820,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                                 // MediaQuery.textScalerOf so nothing clips.
                                 minScaleFactor: 0.8,
                                 maxScaleFactor: 2.0,
-                                child: child ?? const SizedBox.shrink(),
+                                child: _AppOrientationSystemUiObserver(
+                                  child: child ?? const SizedBox.shrink(),
+                                ),
                               ),
                             );
                           },
@@ -847,4 +849,72 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       ),
     );
   }
+}
+
+/// Global system UI observer mounted in [MaterialApp.builder] to ensure all
+/// screens across the entire application remain in immersive full-screen mode
+/// in landscape orientation (hiding status and navigation letterbox bars),
+/// and gracefully return to edge-to-edge with transparent system bars in portrait.
+class _AppOrientationSystemUiObserver extends StatefulWidget {
+  final Widget child;
+  const _AppOrientationSystemUiObserver({required this.child});
+
+  @override
+  State<_AppOrientationSystemUiObserver> createState() =>
+      _AppOrientationSystemUiObserverState();
+}
+
+class _AppOrientationSystemUiObserverState
+    extends State<_AppOrientationSystemUiObserver>
+    with WidgetsBindingObserver {
+  Orientation? _lastOrientation;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final orientation = MediaQuery.orientationOf(context);
+    if (orientation != _lastOrientation) {
+      _lastOrientation = orientation;
+      _applySystemUi(orientation);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _lastOrientation != null) {
+      _applySystemUi(_lastOrientation!);
+    }
+  }
+
+  void _applySystemUi(Orientation orientation) {
+    if (orientation == Orientation.landscape) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarContrastEnforced: false,
+          systemStatusBarContrastEnforced: false,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -14,6 +13,7 @@ import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../../core/responsive/layout_delegate.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../bottom_nav_bar.dart';
+import 'dock_style_picker_sheet.dart';
 
 enum DockStackMode {
   /// Default: MiniPlayer is placed above BottomNavBar in vertical order.
@@ -38,21 +38,26 @@ class _ModalGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isKeyboardOpen = keyboardInset > 0;
     return ValueListenableBuilder<bool>(
       valueListenable: PulsrModalTracker.isModalOpen,
-      builder: (context, modalOpen, _) => AnimatedSlide(
-        duration: context.motionMs(260),
-        curve: context.motionCurve(Curves.easeInOutCubic),
-        offset: modalOpen ? const Offset(0, 1.4) : Offset.zero,
-        child: AnimatedOpacity(
-          duration: context.motionMs(220),
-          curve: context.motionCurve(Curves.easeOut),
-          opacity: modalOpen ? 0.0 : 1.0,
-          child: RepaintBoundary(
-            child: IgnorePointer(ignoring: modalOpen, child: child),
+      builder: (context, modalOpen, _) {
+        final shouldHide = modalOpen || isKeyboardOpen;
+        return AnimatedSlide(
+          duration: context.motion(PulsrDurations.layout),
+          curve: context.motionCurve(Curves.easeInOutCubic),
+          offset: shouldHide ? const Offset(0, 1.4) : Offset.zero,
+          child: AnimatedOpacity(
+            duration: context.motion(PulsrDurations.state),
+            curve: context.motionCurve(Curves.easeOut),
+            opacity: shouldHide ? 0.0 : 1.0,
+            child: RepaintBoundary(
+              child: IgnorePointer(ignoring: shouldHide, child: child),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -75,12 +80,27 @@ class StackedBottomDock extends StatefulWidget {
     this.layoutMode,
   });
 
+  static double computeDockHeight({
+    required bool hasSong,
+    required DockStackMode mode,
+    required double navBarTotalHeight,
+    double keyboardInset = 0.0,
+    bool isKeyboardVisible = false,
+  }) =>
+      StackedBottomDockState.computeDockHeight(
+        hasSong: hasSong,
+        mode: mode,
+        navBarTotalHeight: navBarTotalHeight,
+        keyboardInset: keyboardInset,
+        isKeyboardVisible: isKeyboardVisible,
+      );
+
   @override
-  State<StackedBottomDock> createState() => _StackedBottomDockState();
+  State<StackedBottomDock> createState() => StackedBottomDockState();
 }
 
-class _StackedBottomDockState extends State<StackedBottomDock> {
-  static const Duration _animDuration = Duration(milliseconds: 320);
+class StackedBottomDockState extends State<StackedBottomDock> {
+  static const Duration _animDuration = PulsrDurations.page;
   static const Curve _animCurve = Curves.easeOutCubic;
   static const double _peekOffset = PulsrLayoutMetrics.peekOffset;
   static const double _miniPlayerHeight = PulsrLayoutMetrics.miniPlayerHeight;
@@ -91,39 +111,29 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
   double? _lastReportedHeight;
   bool? _lastReportedMiniPlayer;
-  // B-27: Deduplicate addPostFrameCallback so updateDock is called at most once per frame
-  double? _pendingDockHeight;
-  bool? _pendingMiniPlayer;
-  bool _postFrameCallbackScheduled = false;
+  double? _targetDockHeight;
+  bool? _targetMiniPlayer;
+  bool _pendingUpdate = false;
 
   void _maybeUpdateDock({required double height, required bool miniPlayer}) {
     if (_lastReportedHeight == height && _lastReportedMiniPlayer == miniPlayer) return;
-    _pendingDockHeight = height;
-    _pendingMiniPlayer = miniPlayer;
+    _targetDockHeight = height;
+    _targetMiniPlayer = miniPlayer;
 
-    // H6: If scheduler is idle, update dock tracker immediately without 1-frame latency
-    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.idle) {
-      _lastReportedHeight = height;
-      _lastReportedMiniPlayer = miniPlayer;
-      _pendingDockHeight = null;
-      _pendingMiniPlayer = null;
-      PulsrDockTracker.updateDock(height: height, miniPlayer: miniPlayer);
-      return;
-    }
+    if (_pendingUpdate) return;
+    _pendingUpdate = true;
 
-    if (_postFrameCallbackScheduled) return;
-    _postFrameCallbackScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _postFrameCallbackScheduled = false;
+      _pendingUpdate = false;
       if (!mounted) return;
-      if (_pendingDockHeight != null && _pendingMiniPlayer != null) {
-        final h = _pendingDockHeight!;
-        final mp = _pendingMiniPlayer!;
-        _pendingDockHeight = null;
-        _pendingMiniPlayer = null;
-        _lastReportedHeight = h;
-        _lastReportedMiniPlayer = mp;
-        PulsrDockTracker.updateDock(height: h, miniPlayer: mp);
+      final h = _targetDockHeight;
+      final mp = _targetMiniPlayer;
+      if (h != null && mp != null) {
+        if (_lastReportedHeight != h || _lastReportedMiniPlayer != mp) {
+          _lastReportedHeight = h;
+          _lastReportedMiniPlayer = mp;
+          PulsrDockTracker.updateDock(height: h, miniPlayer: mp);
+        }
       }
     });
   }
@@ -132,7 +142,10 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     required bool hasSong,
     required DockStackMode mode,
     required double navBarTotalHeight,
+    double keyboardInset = 0.0,
+    bool isKeyboardVisible = false,
   }) {
+    if (isKeyboardVisible || keyboardInset > 0) return 0.0;
     if (!hasSong) return navBarTotalHeight;
     if (mode == DockStackMode.system) {
       return navBarTotalHeight + _miniPlayerHeight + 4.0;
@@ -148,10 +161,14 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
 
   void _syncDock({required bool hasSong}) {
     if (!mounted) return;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final effectiveLayoutMode =
         widget.layoutMode ?? PulsrLayoutDelegate.of(context).layoutMode;
     if (effectiveLayoutMode == ShellLayoutMode.bottomNavWide) {
-      _maybeUpdateDock(height: 56.0, miniPlayer: hasSong);
+      _maybeUpdateDock(
+        height: keyboardInset > 0 ? 0.0 : 56.0,
+        miniPlayer: keyboardInset > 0 ? false : hasSong,
+      );
       return;
     }
 
@@ -162,31 +179,46 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
       hasSong: hasSong,
       mode: widget.mode,
       navBarTotalHeight: navBarTotalHeight,
+      keyboardInset: keyboardInset,
     );
-    _maybeUpdateDock(height: dockHeight, miniPlayer: hasSong);
+    _maybeUpdateDock(
+      height: dockHeight,
+      miniPlayer: keyboardInset > 0 ? false : hasSong,
+    );
   }
 
   bool? _lastKnownHasSong;
   int? _lastKnownSongId;
+  double? _lastKnownKeyboardInset;
   Timer? _dockSyncDebounceTimer;
+
+  @visibleForTesting
+  Timer? get dockSyncDebounceTimer => _dockSyncDebounceTimer;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!mounted) return;
     try {
       final currentSong = context.read<PlayerCubit>().state.currentSong;
       final songId = currentSong?.id;
       final hasSong = currentSong != null;
-      if (_lastKnownSongId != songId || _lastKnownHasSong != hasSong) {
+      final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+      if (_lastKnownSongId != songId ||
+          _lastKnownHasSong != hasSong ||
+          _lastKnownKeyboardInset != keyboardInset) {
         final isFirstSync = _lastKnownHasSong == null;
         _lastKnownSongId = songId;
         _lastKnownHasSong = hasSong;
+        _lastKnownKeyboardInset = keyboardInset;
         _dockSyncDebounceTimer?.cancel();
+        _dockSyncDebounceTimer = null;
         if (isFirstSync) {
           _syncDock(hasSong: hasSong);
         } else {
           _dockSyncDebounceTimer = Timer(const Duration(milliseconds: 50), () {
             if (!mounted) return;
+            _dockSyncDebounceTimer = null;
             _syncDock(hasSong: hasSong);
           });
         }
@@ -200,6 +232,8 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   void didUpdateWidget(covariant StackedBottomDock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mode != widget.mode) {
+      _dockSyncDebounceTimer?.cancel();
+      _dockSyncDebounceTimer = null;
       try {
         final currentSong = context.read<PlayerCubit>().state.currentSong;
         final hasSong = currentSong != null;
@@ -218,10 +252,9 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
   void dispose() {
     _dockSyncDebounceTimer?.cancel();
     _dockSyncDebounceTimer = null;
-    // FIX-H14: Clear pending dock state and update dock tracker immediately
-    _postFrameCallbackScheduled = false;
-    _pendingDockHeight = null;
-    _pendingMiniPlayer = null;
+    _pendingUpdate = false;
+    _targetDockHeight = null;
+    _targetMiniPlayer = null;
     _lastReportedHeight = null;
     _lastReportedMiniPlayer = null;
     PulsrDockTracker.updateDock(height: 0.0, miniPlayer: false);
@@ -257,6 +290,17 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
     } else {
       widget.onOpenNowPlaying();
     }
+  }
+
+  /// Discoverable alternative to the swipe-only dock-mode cycling: a long-press
+  /// on the mini player opens an explicit chooser.
+  void _showDockStylePicker() {
+    HapticFeedback.mediumImpact();
+    DockStylePickerSheet.show(
+      context,
+      current: widget.mode,
+      onSelected: _setMode,
+    );
   }
 
   @override
@@ -442,6 +486,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           onTap: widget.onOpenNowPlaying,
           onSwipeDown: _handleSwipeDown,
           onSwipeUp: _handleSwipeUp,
+          onLongPress: _showDockStylePicker,
         );
 
         if (isStacked && !isMiniBehind) {

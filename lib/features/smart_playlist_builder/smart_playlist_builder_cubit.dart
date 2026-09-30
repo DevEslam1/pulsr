@@ -108,6 +108,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   Future<void> _executePreview() async {
     if (isClosed) return;
     _debounceTimer?.cancel();
+    final gen = ++_previewGen;
     final oldSub = _previewSub;
     _previewSub = null;
     if (oldSub != null) {
@@ -120,8 +121,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
             error: e, stackTrace: st, category: 'SmartPlaylist');
       }
     }
-    if (isClosed) return;
-    final gen = ++_previewGen;
+    if (isClosed || gen != _previewGen) return;
 
     final queryLimit = (state.criteria.limit == null || state.criteria.limit! > previewCap)
         ? previewCap + 1
@@ -163,13 +163,28 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       return false;
     }
 
+    // M4: Boolean rules (isFavorite/isLossless) are edited through a Yes/No
+    // dropdown. A freshly-added rule carries an empty value while the dropdown
+    // renders "No", so an empty value must not be rejected — normalise it to
+    // 'false' (matching what the user sees) instead of blocking the save.
+    final normalizedRules = <SmartRule>[];
     for (int i = 0; i < state.criteria.rules.length; i++) {
       final rule = state.criteria.rules[i];
+      final isBoolField = rule.field == SmartRuleField.isFavorite ||
+          rule.field == SmartRuleField.isLossless;
+      if (isBoolField) {
+        normalizedRules.add(rule.value.trim().isEmpty
+            ? rule.copyWith(value: 'false')
+            : rule);
+        continue;
+      }
       if (rule.value.trim().isEmpty) {
         safeEmit(state.copyWith(errorMessage: 'Please enter a value for rule #${i + 1}'));
         return false;
       }
+      normalizedRules.add(rule);
     }
+    final criteria = state.criteria.copyWith(rules: normalizedRules);
 
     safeEmit(state.copyWith(isSubmitting: true, errorMessage: null));
 
@@ -178,14 +193,14 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
         final res = await _playlistUseCases.updateSmartPlaylist(
           state.editingPlaylistId!,
           name,
-          state.criteria.toJsonString(),
+          criteria.toJsonString(),
         );
         return _finishSave(res.isRight(), res.getLeft().toNullable()?.message);
       }
       final res = await _playlistUseCases.createPlaylist(
         name,
         isSmart: true,
-        smartCriteria: state.criteria.toJsonString(),
+        smartCriteria: criteria.toJsonString(),
       );
       return _finishSave(res.isRight(), res.getLeft().toNullable()?.message);
     } catch (e, st) {

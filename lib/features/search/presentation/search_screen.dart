@@ -70,14 +70,24 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _derivedArtistsCache = const [];
   List<String> _derivedAlbumsCache = const [];
 
-  bool _isOnlineAvailable(BuildContext context) {
-    final offlineOnly =
-        context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+  /// Resolves whether online (YouTube Music) search is available.
+  ///
+  /// [listen] must stay `true` only while building (so the screen rebuilds when
+  /// offline-only mode toggles). Event handlers/`onChanged` callbacks must pass
+  /// `listen: false`: calling `context.watch` outside build throws
+  /// "Tried to listen to a value exposed with provider, from outside of the
+  /// widget tree" and would abort the search before it starts.
+  bool _isOnlineAvailable(BuildContext context, {bool listen = true}) {
+    final settings =
+        listen ? context.watch<SettingsCubit?>() : context.read<SettingsCubit?>();
+    final offlineOnly = settings?.state.offlineOnlyMode ?? false;
     return AppConfig.ytmEnabled && !offlineOnly;
   }
 
-  int _effectiveTab(BuildContext context) {
-    if (!_isOnlineAvailable(context)) return 1; // Fallback to Local only
+  int _effectiveTab(BuildContext context, {bool listen = true}) {
+    if (!_isOnlineAvailable(context, listen: listen)) {
+      return 1; // Fallback to Local only
+    }
     return _selectedTab;
   }
 
@@ -132,8 +142,9 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onQueryChanged(BuildContext context, String value, {bool immediate = false}) {
-    final showOnline = _isOnlineAvailable(context);
-    final effTab = _effectiveTab(context);
+    // Event handler: read (never watch) providers here.
+    final showOnline = _isOnlineAvailable(context, listen: false);
+    final effTab = _effectiveTab(context, listen: false);
 
     if (effTab == 0) {
       // Unified view: search both Local and Online simultaneously
@@ -156,7 +167,11 @@ class _SearchScreenState extends State<SearchScreen> {
   void _scheduleSuggestions(BuildContext context, String value) {
     _suggestTimer?.cancel();
     final trimmed = value.trim();
-    if (trimmed.isEmpty || _effectiveTab(context) == 2) {
+    // Autocomplete is a Local-tab affordance. On the unified "All" tab it would
+    // otherwise *replace* the local+online result sections with a short local
+    // suggestion list, leaving the All tab apparently empty until the user
+    // switches tabs (which clears the suggestions).
+    if (trimmed.isEmpty || _effectiveTab(context, listen: false) != 1) {
       if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
       return;
     }
@@ -185,13 +200,13 @@ class _SearchScreenState extends State<SearchScreen> {
     _suggestTimer?.cancel();
     if (_suggestions.isNotEmpty) setState(() => _suggestions = const []);
     context.read<SearchCubit>().clearQuery();
-    if (_isOnlineAvailable(context)) {
+    if (_isOnlineAvailable(context, listen: false)) {
       context.read<YtmSearchCubit?>()?.clearQuery();
     }
     _searchFocus.requestFocus();
   }
 
-  void _onTabChanged(int index) {
+  void _onTabChanged(BuildContext context, int index) {
     if (_selectedTab == index) return;
     _suggestTimer?.cancel();
     setState(() {
@@ -200,6 +215,9 @@ class _SearchScreenState extends State<SearchScreen> {
     });
     final query = _searchController.text;
     if (query.trim().isNotEmpty) {
+      // Use the builder context (below SearchScreen's own YtmSearchCubit
+      // provider) — the State's context sits above it, so reading the online
+      // cubit there returns null and the Online tab would never search.
       _onQueryChanged(context, query, immediate: true);
     }
   }
@@ -259,7 +277,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         margin: EdgeInsets.symmetric(
                             horizontal: Adaptive.pagePadding(context)),
                         selectedIndex: _selectedTab.clamp(0, 2),
-                        onChanged: _onTabChanged,
+                        onChanged: (i) => _onTabChanged(context, i),
                         segments: [
                           PulsrSegment(
                             label: context.l10n.all,
@@ -291,22 +309,28 @@ class _SearchScreenState extends State<SearchScreen> {
                               ? context.l10n.searchOnline
                               : effTab == 1
                                   ? context.l10n.searchPlaceholder
-                                  : 'Search local & online music...',
+                                  : context.l10n.searchLocalOnlineHint,
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: ValueListenableBuilder<TextEditingValue>(
                             valueListenable: _searchController,
                             builder: (context, val, _) {
                               if (val.text.isEmpty) {
+                                // No silent dead button: the mic only exists
+                                // when a speech recognizer is actually wired.
+                                if (!AppConfig.voiceSearchEnabled) {
+                                  return const SizedBox.shrink();
+                                }
                                 return IconButton(
                                   icon: Icon(Icons.mic_rounded,
                                       color: p.textTertiary),
-                                  tooltip: 'Voice Search',
+                                  tooltip: context.l10n.voiceSearch,
                                   onPressed: () {
                                     HapticFeedback.lightImpact();
                                     PulsrToast.show(
                                       context,
-                                      message: 'Voice search active - speak now',
+                                      message:
+                                          context.l10n.voiceSearchUnavailable,
                                       icon: Icons.mic_rounded,
                                     );
                                   },
@@ -371,7 +395,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
                     // ---------- Search Content Body ----------
                     Expanded(
-                      child: _suggestions.isNotEmpty && _searchController.text.trim().isNotEmpty
+                      child: effTab == 1 &&
+                              _suggestions.isNotEmpty &&
+                              _searchController.text.trim().isNotEmpty
                           ? _buildSuggestionsList(context, p)
                           : _searchController.text.trim().isEmpty
                               ? _buildEmptySearchBody(context, state, p, showOnline, effTab)
@@ -674,8 +700,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildLocalBody(BuildContext context, SearchState state,
       PlayerCubit playerCubit, PulsrPalette p) {
-    if (state.isLoading) {
+    // Only show the skeleton when there is nothing to show yet; keeping the
+    // previous results visible prevents flicker on every keystroke.
+    if (state.isLoading && state.results.isEmpty) {
       return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
+    }
+    final errorMessage = state.errorMessage;
+    if (errorMessage != null && state.results.isEmpty) {
+      return EmptyStateWidget(
+        icon: Icons.error_outline_rounded,
+        title: context.l10n.somethingWentWrong,
+        subtitle: errorMessage,
+        primaryActionLabel: context.l10n.retry,
+        primaryActionIcon: Icons.refresh_rounded,
+        onPrimaryAction: () =>
+            context.read<SearchCubit>().onQueryChanged(state.query),
+      );
     }
     if (state.results.isEmpty) {
       return EmptyStateWidget(
@@ -868,7 +908,12 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
             final localEmpty = localState.results.isEmpty;
             final onlineEmpty = isOffline || (ytmState.results.isEmpty && ytmState.hasSearched);
 
-            if (localDone && onlineDone && localEmpty && onlineEmpty && ytmState.errorMessage == null) {
+            if (localDone &&
+                onlineDone &&
+                localEmpty &&
+                onlineEmpty &&
+                ytmState.errorMessage == null &&
+                localState.errorMessage == null) {
               return EmptyStateWidget(
                 icon: Icons.search_off_rounded,
                 title: context.l10n.noResultsFound,
@@ -916,7 +961,16 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
 
-                  if (localState.isLoading)
+                  if (localState.errorMessage != null && localResults.isEmpty)
+                    _buildErrorSectionCard(
+                      context: context,
+                      errorMessage: localState.errorMessage!,
+                      onRetry: () => context
+                          .read<SearchCubit>()
+                          .onQueryChanged(widget.query),
+                      p: p,
+                    )
+                  else if (localState.isLoading && localResults.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       child: SkeletonList(itemCount: 3),
@@ -925,7 +979,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     _buildEmptySectionCard(
                       context: context,
                       icon: Icons.library_music_outlined,
-                      message: 'No local songs match "${widget.query}"',
+                      message: context.l10n.noLocalSongsMatch(widget.query),
                       p: p,
                     )
                   else ...[
@@ -951,8 +1005,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                             ),
                             label: Text(
                               _expandLocal
-                                  ? 'Show less'
-                                  : 'Show all ${localResults.length} local songs',
+                                  ? context.l10n.showLess
+                                  : context.l10n.showMore,
                               style: TextStyle(
                                 color: p.accent,
                                 fontSize: AppFontSize.caption,
@@ -991,7 +1045,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                       message: context.l10n.offlineOnlyMode,
                       p: p,
                     )
-                  else if (ytmState.isLoading)
+                  else if (ytmState.isLoading && onlineTracks.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       child: SkeletonList(itemCount: 4),
@@ -1007,7 +1061,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     _buildEmptySectionCard(
                       context: context,
                       icon: Icons.search_off_rounded,
-                      message: 'No online songs match "${widget.query}"',
+                      message: context.l10n.noOnlineSongsMatch(widget.query),
                       p: p,
                     )
                   else ...[
@@ -1034,8 +1088,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                             ),
                             label: Text(
                               _expandOnline
-                                  ? 'Show less'
-                                  : 'Show all ${onlineSongs.length} online results',
+                                  ? context.l10n.showLess
+                                  : context.l10n.showMore,
                               style: TextStyle(
                                 color: p.accent,
                                 fontSize: AppFontSize.caption,

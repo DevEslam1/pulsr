@@ -8,6 +8,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../data/db/app_database.dart';
 import '../../../../domain/services/cast_service.dart';
 import '../../cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -140,6 +141,21 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
     super.dispose();
   }
 
+  /// B12: only real local files can be handed to a cast receiver. YT Music
+  /// sentinels (`ytmusic://`) and HTTP streams are not castable.
+  bool _isCastableLocal(SongsTableData song) {
+    if (song.source != SongSource.local && song.isDownloaded != true) {
+      return false;
+    }
+    final path = song.path;
+    if (path.isEmpty) return false;
+    final lower = path.toLowerCase();
+    if (lower.startsWith('http') || lower.startsWith('ytmusic://')) {
+      return false;
+    }
+    return true;
+  }
+
   String _mimeFor(String path) {
     final lower = path.toLowerCase();
     if (lower.endsWith('.mp3')) return 'audio/mpeg';
@@ -170,6 +186,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
   Future<void> _castCurrentQueue() async {
     if (_busy) return;
     HapticFeedback.mediumImpact();
+    final l10n = context.l10n;
     final playerState = context.read<PlayerCubit>().state;
     final queue = playerState.queue;
     if (queue.isEmpty) {
@@ -180,9 +197,25 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       }
       return;
     }
+    // B12: filter to castable local files, remapping the start index to the
+    // filtered list so mixed queues cast correctly.
+    final castable = <SongsTableData>[];
+    var startIndex = 0;
+    for (final s in queue) {
+      if (!_isCastableLocal(s)) continue;
+      if (playerState.currentSong != null &&
+          s.id == playerState.currentSong!.id) {
+        startIndex = castable.length;
+      }
+      castable.add(s);
+    }
+    if (castable.isEmpty) {
+      _showToast(context.l10n.castNoLocalItems);
+      return;
+    }
     setState(() => _busy = true);
     try {
-      final items = queue.map((s) => <String, dynamic>{
+      final items = castable.map((s) => <String, dynamic>{
         'path': s.path,
         'title': s.title,
         'artist': s.artist,
@@ -192,12 +225,12 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       }).toList();
       final result = await _service.castQueue(
         queueItems: items,
-        startIndex: playerState.currentIndex.clamp(0, queue.length - 1),
+        startIndex: startIndex.clamp(0, castable.length - 1),
         startPositionMs: playerState.position.inMilliseconds,
       );
       _showToast(result.success
-          ? 'Casting queue to ${_session.deviceName ?? "device"}'
-          : (result.error ?? 'Queue cast failed'));
+          ? l10n.settingsCastingQueueTo(_session.deviceName ?? 'device')
+          : (result.error ?? l10n.settingsCastFailed));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -210,6 +243,10 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
     final song = context.read<PlayerCubit>().state.currentSong;
     if (song == null) {
       _showToast(l10n.settingsNothingToCast);
+      return;
+    }
+    if (!_isCastableLocal(song)) {
+      _showToast(l10n.castNoLocalItems);
       return;
     }
     setState(() => _busy = true);
@@ -482,8 +519,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                         ),
                         onPressed: _busy ? null : _castCurrentQueue,
                         icon: const Icon(Icons.queue_music_rounded, size: 18),
-                        label: const Text('Cast Entire Queue',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        label: Text(context.l10n.castEntireQueue,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -544,88 +581,87 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              Container(
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
+              Material(
+                color: p.surfaceContainer,
+                borderRadius: BorderRadius.circular(AppRadii.r18),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadii.r18),
-                  border: Border.all(color: p.hairline),
+                  side: BorderSide(color: p.hairline),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.r18),
-                  child: Column(
-                    children: [
-                      if (_sdk) ...[
-                        for (int i = 0; i < _routes.length; i++) ...[
-                          if (i > 0)
-                            Divider(
-                                height: 1,
-                                thickness: 1,
-                                color: p.hairline.withValues(alpha: 0.5)),
-                          ListTile(
-                            leading: Icon(
-                              _routes[i].selected
-                                  ? Icons.cast_connected_rounded
-                                  : Icons.tv_rounded,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    if (_sdk) ...[
+                      for (int i = 0; i < _routes.length; i++) ...[
+                        if (i > 0)
+                          Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: p.hairline.withValues(alpha: 0.5)),
+                        ListTile(
+                          leading: Icon(
+                            _routes[i].selected
+                                ? Icons.cast_connected_rounded
+                                : Icons.tv_rounded,
+                            color: _routes[i].selected
+                                ? p.accent
+                                : p.textPrimary,
+                          ),
+                          title: Text(
+                            _routes[i].name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
                               color: _routes[i].selected
                                   ? p.accent
                                   : p.textPrimary,
                             ),
-                            title: Text(
-                              _routes[i].name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: _routes[i].selected
-                                    ? p.accent
-                                    : p.textPrimary,
-                              ),
-                            ),
-                            trailing: _routes[i].selected
-                                ? Icon(Icons.check_circle_rounded,
-                                    color: p.accent, size: 20)
-                                : null,
-                            onTap: _busy ? null : () => _connect(_routes[i]),
                           ),
-                        ],
-                      ] else ...[
-                        for (int i = 0; i < _devices.length; i++) ...[
-                          if (i > 0)
-                            Divider(
-                                height: 1,
-                                thickness: 1,
-                                color: p.hairline.withValues(alpha: 0.5)),
-                          ListTile(
-                            leading: Icon(Icons.cast_rounded, color: p.textPrimary),
-                            title: Text(
-                              _devices[i].name,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: p.textPrimary,
-                              ),
+                          trailing: _routes[i].selected
+                              ? Icon(Icons.check_circle_rounded,
+                                  color: p.accent, size: 20)
+                              : null,
+                          onTap: _busy ? null : () => _connect(_routes[i]),
+                        ),
+                      ],
+                    ] else ...[
+                      for (int i = 0; i < _devices.length; i++) ...[
+                        if (i > 0)
+                          Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: p.hairline.withValues(alpha: 0.5)),
+                        ListTile(
+                          leading: Icon(Icons.cast_rounded, color: p.textPrimary),
+                          title: Text(
+                            _devices[i].name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: p.textPrimary,
                             ),
-                            subtitle: Text(
-                              _devices[i].model.isNotEmpty
-                                  ? _devices[i].model
-                                  : _devices[i].host,
-                              style: TextStyle(
-                                  color: p.textSecondary, fontSize: AppFontSize.label),
-                            ),
-                            onTap: _busy
-                                ? null
-                                : () async {
-                                    setState(() => _busy = true);
-                                    try {
-                                      await _service.castTo(_devices[i].id);
-                                    } finally {
-                                      if (mounted) {
-                                        setState(() => _busy = false);
-                                      }
+                          ),
+                          subtitle: Text(
+                            _devices[i].model.isNotEmpty
+                                ? _devices[i].model
+                                : _devices[i].host,
+                            style: TextStyle(
+                                color: p.textSecondary, fontSize: AppFontSize.label),
+                          ),
+                          onTap: _busy
+                              ? null
+                              : () async {
+                                  setState(() => _busy = true);
+                                  try {
+                                    await _service.castTo(_devices[i].id);
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _busy = false);
                                     }
-                                  },
-                          ),
-                        ],
+                                  }
+                                },
+                        ),
                       ],
                     ],
-                  ),
+                  ],
                 ),
               ),
             ],

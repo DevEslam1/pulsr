@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/services/playlist_suggestions_service.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
@@ -15,9 +16,11 @@ import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
+import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../domain/usecases/get_songs_usecase.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
@@ -51,7 +54,6 @@ class ClassicPlayerTheme extends StatefulWidget {
 class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
   final ValueNotifier<double?> _dragVolumeNotifier = ValueNotifier<double?>(null);
   final ScrollController _queueScrollController = ScrollController();
-  bool _autoplayActive = false;
 
   @override
   void dispose() {
@@ -123,7 +125,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                 colors: [
                   Color.lerp(bgColor, Colors.black, 0.45) ?? bgColor,
                   p.bg,
-                  const Color(0xFF080910),
+                  p.deepShade,
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -185,6 +187,10 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
         // 2. Main Foreground Layout
         SafeArea(
+          top: false,
+          bottom: false,
+          left: !context.isLandscape,
+          right: !context.isLandscape,
           child: Column(
             children: [
               // Top Pull-down Handle Indicator & Top App Bar (hidden in landscape for immersive edge-to-edge view)
@@ -754,10 +760,13 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               ],
                             );
 
+                      final insets = MediaQuery.paddingOf(context);
+                      final horizontalPad = math.max(16.0, math.max(insets.left, insets.right));
+
                       return Padding(
                         padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 32 : 16,
-                          vertical: 4,
+                          horizontal: isTablet ? math.max(32.0, horizontalPad) : horizontalPad,
+                          vertical: isShortLandscape ? 4.0 : 8.0,
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
@@ -825,60 +834,68 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                       );
                     }
 
-                    // â”€â”€ Portrait Mode (Phone & Tablet) â”€â”€
+                    // ── Portrait / Tablet Left Column Mode ──
                     return Column(
                       children: [
                         // View Switcher Bar (Track | Lyrics | Queue)
-                        Padding(
-                          padding: EdgeInsets.only(
-                            top: switcherTopPad,
-                            bottom: switcherBottomPad,
-                          ),
-                          child: viewSwitcher,
-                        ),
+                        // Only show on phone portrait where the switcher controls the single screen.
+                        // On landscape (e.g. tablet split view), the right pane handles Lyrics/Queue/DSP,
+                        // so the left column displays the album artwork on top without a redundant switcher.
+                        if (!context.isLandscape)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: switcherTopPad,
+                              bottom: switcherBottomPad,
+                            ),
+                            child: viewSwitcher,
+                          )
+                        else
+                          SizedBox(height: isTablet ? AppSpacing.sm : AppSpacing.xs),
 
-                        // Center Display Area
+                        // Center Display Area (Hero Artwork)
                         Expanded(
                           child: LayoutBuilder(
                             builder: (context, artConstraints) {
                               final double availableWidth =
-                                  artConstraints.maxWidth - (isTablet ? 64.0 : 32.0);
+                                  artConstraints.maxWidth - (isTablet ? 48.0 : 32.0);
                               final double availableHeight =
-                                  artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
-                              final double maxAllowed = isTablet ? 560.0 : 420.0;
+                                  artConstraints.maxHeight - (isTablet ? 20.0 : 12.0);
+                              final double maxAllowed = isTablet
+                                  ? (context.isLandscape ? 400.0 : 560.0)
+                                  : 420.0;
                               final double rawSize = math.min(availableWidth, availableHeight);
                               final double dynamicArtSize = rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
 
                               return Center(
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
-                                    maxWidth: (state.isLyricsVisible || state.isQueueVisible)
+                                    maxWidth: (state.isLyricsVisible || state.isQueueVisible) && !context.isLandscape
                                         ? (isTablet ? 560.0 : double.infinity)
                                         : dynamicArtSize,
-                                    maxHeight: (state.isLyricsVisible || state.isQueueVisible)
+                                    maxHeight: (state.isLyricsVisible || state.isQueueVisible) && !context.isLandscape
                                         ? double.infinity
                                         : dynamicArtSize,
                                   ),
                                   child: AnimatedSwitcher(
                                     duration: context.motionMs(280),
-                                    child: state.isLyricsVisible
-                                        ? LyricsView(
-                                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                                            lyrics: state.lyrics,
-                                            isLoading: state.isLoadingLyrics,
-                                            activeColor: activeColor,
-                                            source: state.lyricsSource,
-                                          )
-                                        : state.isQueueVisible
-                                            ? _buildContinuePlayingQueue(
+                                    child: (context.isLandscape || (!state.isLyricsVisible && !state.isQueueVisible))
+                                        ? heroArtwork
+                                        : (state.isLyricsVisible
+                                            ? LyricsView(
+                                                key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                                lyrics: state.lyrics,
+                                                isLoading: state.isLoadingLyrics,
+                                                activeColor: activeColor,
+                                                source: state.lyricsSource,
+                                              )
+                                            : _buildContinuePlayingQueue(
                                                 key: const ValueKey('portrait_queue_view'),
                                                 context: context,
                                                 state: state,
                                                 cubit: cubit,
                                                 activeColor: activeColor,
                                                 p: p,
-                                              )
-                                            : heroArtwork,
+                                              )),
                                   ),
                                 ),
                               );
@@ -886,9 +903,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                           ),
                         ),
 
-                        if (showVisualizer) visualizer,
+                        if (showVisualizer && !context.isLandscape) visualizer,
 
-                        buildControlsColumn(includeVolume: false),
+                        buildControlsColumn(includeVolume: context.isLandscape || isTablet),
                       ],
                     );
                   },
@@ -1100,12 +1117,40 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
               Expanded(
                 child: _ActionPillButton(
                   icon: Icons.all_inclusive_rounded,
-                  isActive: _autoplayActive,
+                  isActive: false,
                   activeColor: activeColor,
-                  tooltip: 'Autoplay',
-                  onTap: () {
+                  tooltip: context.l10n.autoplay,
+                  onTap: () async {
                     PulsrHaptics.confirm();
-                    setState(() => _autoplayActive = !_autoplayActive);
+                    final seed = state.currentSong;
+                    if (seed == null) return;
+                    final songsRes =
+                        await getIt<GetSongsUseCase>().getAllSongs();
+                    if (!context.mounted) return;
+                    final all = songsRes.fold<List<SongsTableData>?>(
+                        (l) => null, (r) => r);
+                    if (all == null || all.isEmpty) return;
+                    final exclude = state.queue.map((s) => s.id).toSet();
+                    final dj = getIt<PlaylistSuggestionsService>()
+                        .buildAutoDjQueue(seed, all,
+                            limit: 10, excludeIds: exclude);
+                    if (!context.mounted) return;
+                    if (dj.isEmpty) {
+                      PulsrToast.show(
+                        context,
+                        message: context.l10n.autoDjEmpty,
+                        icon: Icons.all_inclusive_rounded,
+                      );
+                    } else {
+                      await cubit.addAllToQueue(dj);
+                      if (context.mounted) {
+                        PulsrToast.show(
+                          context,
+                          message: context.l10n.autoDjAdded(dj.length),
+                          icon: Icons.all_inclusive_rounded,
+                        );
+                      }
+                    }
                   },
                 ),
               ),
@@ -1135,17 +1180,17 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
               Text(
                 context.l10n.queue,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: AppFontSize.bodyLarge,
                   fontWeight: FontWeight.w800,
                   color: p.textPrimary,
-                  letterSpacing: -0.2,
+                  letterSpacing: AppTracking.title,
                 ),
               ),
               const Spacer(),
               Text(
-                '${queue.length} tracks',
+                context.l10n.trackCount(queue.length),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w600,
                   color: p.textSecondary,
                 ),
@@ -1184,62 +1229,63 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                       final s = queue[index];
                       final isCurrent = index == state.currentIndex;
 
-                      return Container(
+                      return Padding(
                         key: ValueKey('queue_${s.id}_$index'),
-                        margin: const EdgeInsets.symmetric(vertical: 2.5),
-                        decoration: BoxDecoration(
+                        padding: const EdgeInsets.symmetric(vertical: 2.5),
+                        child: Material(
                           color: isCurrent
                               ? activeColor.withValues(alpha: isDark ? 0.16 : 0.10)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(AppRadii.r10),
-                        ),
-                        child: ListTile(
-                          dense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadii.r8),
-                            child: CachedArtwork(
-                              id: s.id,
-                              remoteUrl: s.remoteArtworkUrl,
-                              type: ArtworkType.AUDIO,
-                              size: 42,
-                              borderRadius: 8,
-                            ),
-                          ),
-                          title: Text(
-                            s.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                              color: isCurrent ? activeColor : p.textPrimary,
-                              fontSize: AppFontSize.bodySmall,
-                            ),
-                          ),
-                          subtitle: Text(
-                            s.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.caption,
-                            ),
-                          ),
-                          trailing: ReorderableDragStartListener(
-                            index: index,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Icon(
-                                Icons.menu_rounded,
-                                color: p.textSecondary.withValues(alpha: 0.6),
-                                size: 20,
+                          clipBehavior: Clip.antiAlias,
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              child: CachedArtwork(
+                                id: s.id,
+                                remoteUrl: s.remoteArtworkUrl,
+                                type: ArtworkType.AUDIO,
+                                size: 42,
+                                borderRadius: 8,
                               ),
                             ),
+                            title: Text(
+                              s.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                                color: isCurrent ? activeColor : p.textPrimary,
+                                fontSize: AppFontSize.bodySmall,
+                              ),
+                            ),
+                            subtitle: Text(
+                              s.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.caption,
+                              ),
+                            ),
+                            trailing: ReorderableDragStartListener(
+                              index: index,
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Icon(
+                                  Icons.menu_rounded,
+                                  color: p.textSecondary.withValues(alpha: 0.6),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                            onTap: () {
+                              PulsrHaptics.selection();
+                              cubit.playSong(s);
+                            },
                           ),
-                          onTap: () {
-                            PulsrHaptics.selection();
-                            cubit.playSong(s);
-                          },
                         ),
                       );
                     },
@@ -1367,7 +1413,7 @@ class _ActionPillButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadii.r20),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: PulsrDurations.state,
             curve: Curves.easeOutCubic,
             height: 38,
             alignment: Alignment.center,

@@ -331,12 +331,13 @@ class _RadioScreenState extends State<RadioScreen> {
                     controller: _searchController,
                     style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                     decoration: InputDecoration(
-                      hintText: 'Search station, genre, or URL…',
+                      hintText: context.l10n.radioSearchHint,
                       hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                       prefixIcon: Icon(Icons.search_rounded, color: p.textSecondary, size: 20),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                              tooltip: context.l10n.clear,
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');

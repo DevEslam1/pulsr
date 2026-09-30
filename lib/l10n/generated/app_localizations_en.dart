@@ -9,6 +9,258 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get sleepTimerDurationMinutes => 'Duration (minutes)';
+
+  @override
+  String get sleepTimerMinutesHint => 'e.g. 25';
+
+  @override
+  String get minuteAbbreviation => 'min';
+
+  @override
+  String get sleepTimerInvalidRange => 'Enter a value from 1 to 720 minutes';
+
+  @override
+  String get moreOptions => 'Options';
+
+  @override
+  String get googleCast => 'Google Cast';
+
+  @override
+  String get autoplay => 'Autoplay';
+
+  @override
+  String trackCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tracks',
+      one: '1 track',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get decades => 'Decades';
+
+  @override
+  String get libraryManageTabs => 'Tabs';
+
+  @override
+  String get libraryAtLeastOneTab => 'At least one tab is required';
+
+  @override
+  String libraryTabsReorder(int active, int total) {
+    return '$active of $total tabs • Drag to reorder';
+  }
+
+  @override
+  String libraryTabsLongPress(int active, int total) {
+    return '$active of $total tabs • Long-press to organize';
+  }
+
+  @override
+  String libraryInactiveTabs(int count) {
+    return 'Inactive ($count)';
+  }
+
+  @override
+  String get whatsNew => 'What\'s New';
+
+  @override
+  String get developer => 'Developer';
+
+  @override
+  String get showMore => 'Show more';
+
+  @override
+  String get showLess => 'Show less';
+
+  @override
+  String get resetWaveformZoom => 'Reset waveform zoom';
+
+  @override
+  String get dspLabel => 'DSP';
+
+  @override
+  String get queueTab => 'Queue';
+
+  @override
+  String get addTab => 'Add tab';
+
+  @override
+  String get twoPaneSelectItem => 'Select an item to view details';
+
+  @override
+  String get leAudioRequiresBle =>
+      'LE Audio codecs (LC3 / Opus) require a Bluetooth LE Audio connection.';
+
+  @override
+  String get castEntireQueue => 'Cast Entire Queue';
+
+  @override
+  String get roomAveragingTitle => '3-Point Room Averaging';
+
+  @override
+  String get roomAveragingSubtitle =>
+      'Measures Center, 1m Left, and 1m Right for robust correction';
+
+  @override
+  String get roomPositionCenter => 'Center';
+
+  @override
+  String get roomPositionLeft => 'Left';
+
+  @override
+  String get roomPositionRight => 'Right';
+
+  @override
+  String get correctionCurveRange => 'Correction Curve (20 Hz – 20 kHz)';
+
+  @override
+  String get offsetMinus50Ms => '-50 ms';
+
+  @override
+  String get offsetPlus50Ms => '+50 ms';
+
+  @override
+  String get freq20Hz => '20 Hz';
+
+  @override
+  String get freq100Hz => '100 Hz';
+
+  @override
+  String get freq1kHz => '1 kHz';
+
+  @override
+  String get freq10kHz => '10 kHz';
+
+  @override
+  String get freq20kHz => '20 kHz';
+
+  @override
+  String songRemovedFromPlaylist(String title, String playlist) {
+    return '$title removed from $playlist';
+  }
+
+  @override
+  String playlistDeleted(String name) {
+    return 'Deleted $name';
+  }
+
+  @override
+  String get voiceSearch => 'Voice search';
+
+  @override
+  String get voiceSearchUnavailable => 'Voice search is unavailable';
+
+  @override
+  String get searchLocalOnlineHint => 'Search local & online music...';
+
+  @override
+  String noLocalSongsMatch(String query) {
+    return 'No local songs match \"$query\"';
+  }
+
+  @override
+  String noOnlineSongsMatch(String query) {
+    return 'No online songs match \"$query\"';
+  }
+
+  @override
+  String get professionalMode => 'Professional Mode';
+
+  @override
+  String get professionalModeUnlocked =>
+      'Advanced DSP, bit-perfect streaming, and pro audio controls unlocked.';
+
+  @override
+  String get quickDspControls => 'Quick DSP Controls';
+
+  @override
+  String get eqEngineTitle => 'Equalizer Engine';
+
+  @override
+  String get eqEngineSubtitle => 'Direct biquad parametric filtering';
+
+  @override
+  String get truePeakLimiterTitle => 'True Peak Limiter';
+
+  @override
+  String get truePeakLimiterSubtitle => 'Zero inter-sample clipping';
+
+  @override
+  String get viperDdcTitle => 'ViPER-DDC Headphone Correction';
+
+  @override
+  String get settingsSectionSoundPlayback => 'Sound & Playback';
+
+  @override
+  String get settingsSectionAppearanceGestures => 'Appearance & Gestures';
+
+  @override
+  String get settingsSectionSystemPrivacy => 'System & Privacy';
+
+  @override
+  String get whatChanges => 'What changes?';
+
+  @override
+  String get expEqTitle => 'Equalizer & DSP';
+
+  @override
+  String get expEqPro => 'Parametric 10-Band EQ, Q-factor & Room Correction';
+
+  @override
+  String get expEqNormal => 'Curated Smart Audio Presets';
+
+  @override
+  String get expUsbTitle => 'USB DAC & Output';
+
+  @override
+  String get expUsbPro => 'Bit-Perfect hardware lock, DSD DoP streaming';
+
+  @override
+  String get expUsbNormal => 'System AudioTrack (32-bit float)';
+
+  @override
+  String get expCrossfadeTitle => 'Playback & Crossfade';
+
+  @override
+  String get expCrossfadePro =>
+      'Fine-grained 0-12s curve & latency calibration';
+
+  @override
+  String get expCrossfadeNormal => 'Standard 3s smooth crossfade';
+
+  @override
+  String get expGainTitle => 'Gain & Loudness';
+
+  @override
+  String get expGainPro => 'ReplayGain dB calibration & manual pre-amp';
+
+  @override
+  String get expGainNormal => 'Automatic perceived loudness leveling';
+
+  @override
+  String get expVisualizersTitle => 'Visualizers';
+
+  @override
+  String get expVisualizersPro => 'Milkdrop preset interpreter & Custom JSON';
+
+  @override
+  String get expVisualizersNormal => 'Classic Wave & Radial Frequency styles';
+
+  @override
+  String queueReorderSemantics(String title, int index, int count) {
+    return 'Reorder $title. Position $index of $count';
+  }
+
+  @override
+  String songByArtist(String title, String artist) {
+    return '$title by $artist';
+  }
+
+  @override
   String get customDurationMinutes => 'Custom duration (minutes).';
 
   @override
@@ -6806,5 +7058,181 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cassettePulsrTape => 'PULSR C-90';
 
   @override
+  String get dspPitchUpSemitone => 'Pitch +1 semitone';
+
+  @override
+  String get dspPitchDownSemitone => 'Pitch -1 semitone';
+
+  @override
+  String get dspPitchMeterUnavailable =>
+      'Vocal pitch detection isn\'t available on this build.';
+
+  @override
+  String get castNoLocalItems =>
+      'Nothing castable here — only local files can be cast.';
+
+  @override
+  String settingsCastingQueueTo(String device) {
+    return 'Casting queue to $device';
+  }
+
+  @override
+  String castCastingTo(String device) {
+    return 'Casting to $device';
+  }
+
+  @override
+  String get castToSpeakerDisplay => 'Cast to Speaker / Display';
+
+  @override
+  String get castManageHint => 'Tap to manage Cast volume or disconnect';
+
+  @override
+  String get castStreamHint => 'Stream lossless/lossy audio over Wi-Fi';
+
+  @override
+  String get downloadsMatchStream => 'Downloads match stream';
+
+  @override
+  String get sleepTimerEndOfQueue => 'Sleep Timer: End of Queue';
+
+  @override
+  String sleepTimerTracksRemaining(int count) {
+    return 'Sleep Timer: $count tracks remaining';
+  }
+
+  @override
+  String sleepTimerMinutesRemaining(int minutes) {
+    return 'Sleep Timer: ${minutes}m remaining';
+  }
+
+  @override
   String get statusCancelled => 'Cancelled';
+
+  @override
+  String get dockStyleTitle => 'Dock style';
+
+  @override
+  String get dockStyleSubtitle =>
+      'Choose how the mini player and navigation bar stack';
+
+  @override
+  String get dockStyleDefault => 'Side by side';
+
+  @override
+  String get dockStyleDefaultDesc => 'Mini player above the navigation bar';
+
+  @override
+  String get dockStyleSystem => 'Floating pill';
+
+  @override
+  String get dockStyleSystemDesc =>
+      'A floating media pill above the navigation bar';
+
+  @override
+  String get dockStyleMiniTop => 'Mini player in front';
+
+  @override
+  String get dockStyleMiniTopDesc =>
+      'Navigation bar peeks behind the mini player';
+
+  @override
+  String get dockStyleNavTop => 'Navigation in front';
+
+  @override
+  String get dockStyleNavTopDesc =>
+      'Mini player peeks behind the navigation bar';
+
+  @override
+  String get dockStyleHint =>
+      'Long-press the mini player to change its dock style';
+
+  @override
+  String whatsNewSubtitle(String version) {
+    return 'See what\'s new in v$version';
+  }
+
+  @override
+  String get studioMoreInStudio => 'More in Studio mode';
+
+  @override
+  String studioControlsAvailable(int count) {
+    return '$count studio controls available';
+  }
+
+  @override
+  String get studioSwitchCta => 'Switch to Studio';
+
+  @override
+  String get studioExplainerTitle => 'What Studio mode adds';
+
+  @override
+  String get studioExplainerBody =>
+      'Bit-Perfect output, the full DSP suite, device profiles, automation and the proxy backend. You can switch back anytime.';
+
+  @override
+  String get alphabetIndexLabel => 'Alphabet index';
+
+  @override
+  String get badgeOn => 'ON';
+
+  @override
+  String get keepBestQualityForAll => 'Keep best quality for all';
+
+  @override
+  String selectedHighestQuality(int count) {
+    return 'Selected highest quality for $count groups';
+  }
+
+  @override
+  String get enterSearchValue => 'Enter search value…';
+
+  @override
+  String get radioSearchHint => 'Search station, genre, or URL…';
+
+  @override
+  String get webSessionInterruptedTitle => 'Web Session Interrupted';
+
+  @override
+  String get webSessionInterruptedDesc =>
+      'The web view handle was detached or reclaimed by the system. Tap below to reload the session.';
+
+  @override
+  String get onboardingGesturesTitle => 'Gestures & shortcuts';
+
+  @override
+  String get onboardingGesturesDesc =>
+      'A few swipes and taps make Pulsr feel effortless.';
+
+  @override
+  String get onboardingGestureSwipeUpTitle => 'Swipe up';
+
+  @override
+  String get onboardingGestureSwipeUpDesc => 'Opens the full-screen player';
+
+  @override
+  String get onboardingGestureSwipeDownTitle => 'Swipe down';
+
+  @override
+  String get onboardingGestureSwipeDownDesc =>
+      'Restacks the mini player and navigation';
+
+  @override
+  String get onboardingGestureDoubleTapTitle => 'Double-tap artwork';
+
+  @override
+  String get onboardingGestureDoubleTapDesc => 'Toggles your favorite';
+
+  @override
+  String get onboardingGestureLongPressTitle => 'Long-press mini player';
+
+  @override
+  String get onboardingGestureLongPressDesc => 'Opens the dock-style options';
+
+  @override
+  String get onboardingPersonalizeTitle => 'Make it yours';
+
+  @override
+  String get onboardingPersonalizeDesc =>
+      'Pick an accent now — you can change it anytime in Settings.';
 }

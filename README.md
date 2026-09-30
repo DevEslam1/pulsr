@@ -67,16 +67,17 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Audiophile Playback Controls**: Gapless playback with encoder-delay trims, crossfade transitions (curves + BPM sync), variable pitch/playback speed, A-B loop, per-track delay, long-form bookmarks, silence skip, SponsorBlock auto-skip, and sleep timer (duration / end of track / after N tracks / end of queue).
 
 ### 💎 2. Aura Dynamic Design System
-- **Album-Art Color Extraction**: Dynamic UI palettes generated in real time from album artwork using `palette_generator`.
-- **8 Now Playing Themes**:
-  1. *Classic Glassmorphism*: Deep blur overlays and ambient neon glow.
-  2. *Minimalist*: Clean typography and distraction-free audio controls.
-  3. *Card Deck*: Tactile card elevation with swipeable queue gestures.
-  4. *Modern Vinyl / Circle*: Rotating vinyl turntable with acoustic concentric rings.
-  5. *Retro Cassette Deck*: Spinning spools and a magnetic tape counter.
-  6. *Full-Bleed Waveform*: Audio-reactive glowing waveform backdrop.
-  7. *Karaoke Lyrics Immersion*: Magnified, lyrics-first singing view.
-  8. *Custom Theme Studio*: Build, export and share your own player theme.
+- **Album-Art Color Extraction**: Dynamic UI palettes generated in real time from album artwork using `palette_generator`, with Material You system seeds and custom accent fallback.
+- **8 Now Playing Themes** (`PlayerThemeMode` in `lib/features/settings/cubit/settings_state.dart`, mapped in `lib/features/player/presentation/themes/theme_registry.dart`):
+  1. *Classic*: Deep blur overlays and ambient neon glow.
+  2. *Card Deck*: Tactile card elevation with swipeable queue gestures.
+  3. *Circle / Modern Vinyl*: Rotating vinyl turntable with acoustic concentric rings.
+  4. *Minimalist*: Clean typography and distraction-free audio controls.
+  5. *Retro Vinyl*: Classic turntable variant (`vinyl_player_theme.dart`).
+  6. *Retro Cassette Deck*: Spinning spools and a magnetic tape counter.
+  7. *Full-Bleed Waveform*: Audio-reactive glowing waveform backdrop.
+  8. *Lyrics Focus / Karaoke Immersion*: Magnified, lyrics-first singing view.
+- **Custom Theme Studio**: `custom_theme_builder_screen.dart` — build, export and share your own radius/glow/accent overrides on top of any of the 8 modes (accent, radius, glow toggles in `SettingsState`).
 - **AMOLED Pure Black & Light Modes**: True `#000000` AMOLED mode plus a high-contrast accessibility theme.
 - **Edge-to-Edge Experience**: Fully transparent status bar and gesture navigation bar on Android 14+.
 - **Theme Scheduler**: Optional automatic light/dark switching by time of day.
@@ -88,8 +89,8 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Intelligent Search**: FTS5 full-text search with Arabic diacritic/Latin accent normalization plus whole-library fuzzy fallback.
 - **Smart Auto-Playlists**: *Most Played, Recently Added, Recently Played, Forgotten Gems, Top Rated, Long Tracks* — plus a rule builder with combined criteria including BPM.
 - **Library Power Tools**: Duplicate finder with keep/delete resolution, missing-artwork online backfill, full-library statistics, an artwork wall, and **CUE sheet playback** (single-file album images expand into virtual tracks).
-- **Three Independent Queues**: Persisted queue slots with drag reorder, add-next/add-last, and YTM session position restore.
-- **Internet Radio**: Add HTTP/HTTPS stream URLs (with `.m3u` stream-list import) and play them with a dedicated radio management screen.
+- **Three Independent Queue Slots (0–2)**: Persisted via `QueueSlotCodec` (`lib/features/player/cubit/queue_slot_codec.dart`, `maxSlotIndex = 2`) with drag reorder, add-next/add-last, debounced off-isolate JSON persistence, and YTM session position restore.
+- **Internet Radio**: Add HTTP/HTTPS stream URLs (with `.m3u` stream-list import) and play them with a dedicated radio management screen (`lib/features/radio/`, `lib/domain/models/radio_station.dart`).
 
 ### 🎤 4. Millisecond Synced LRC Lyrics
 - **Kinetic Karaoke Autoscroll**: Millisecond-precision scrolling that tracks the active vocal line, with a dedicated full-screen karaoke view.
@@ -114,14 +115,15 @@ Pulsr comes with an interactive landing website located in [`website/`](website/
 - **Data Safety**: All library indexes, ratings, and playlists remain strictly on your device unless you opt into cloud sync.
 
 ### 📡 8. Pulsr Pure & Pulsr Plus (Optional Online)
-- **Pulsr Pure**: The Play-Store build ships with the `INTERNET` permission removed at the manifest level, no Firebase/Sentry, and no YouTube code.
-- **Pulsr Plus (`ENABLE_YTM=true`)**: Optional account sign-in, search, browse, real radio/mixes, streaming and offline downloads, gated behind a build flag so production builds never expose it.
-- **Downloads Manager**: Queue/pause/resume/retry with storage stats and MediaStore export, plus proxy/Wi-Fi-only/adaptive-quality controls.
+- **Flavors** (`android/app/build.gradle.kts`): `dev` (`.plus`, Pulsr Plus), `prod` (Pulsr Music / Pure), `ytm` (`.ytm`, off-Play distribution). `dev`/`ytm` compile `src/ytmEnabled` (NewPipeExtractor v0.26.5 + Cast SDK); `prod` compiles only `src/ytmDisabled` stubs and is guarded by `validateProdIsolation` + `scripts/check_prod_flavor.py`.
+- **Pulsr Pure**: The Play-Store `prod` build with `ENABLE_YTM=false` ships with the `INTERNET` permission removed at the manifest level (`src/prod/AndroidManifest.xml`), no Firebase/Sentry, no DownloadService, and no YouTube code. Verified at runtime via `AppConfig.verifyPureNoInternet()`.
+- **Pulsr Plus (`ENABLE_YTM=true`, `dev`/`ytm` flavors)**: Optional account sign-in, search, browse, real radio/mixes, streaming and offline downloads, gated behind a build flag so production builds never expose it.
+- **Downloads Manager** (`lib/features/downloads/`, `lib/domain/models/download_task.dart`): Queue/pause/resume/retry with storage stats and MediaStore export, plus proxy/Wi-Fi-only/adaptive-quality controls.
 
 ### 🔄 9. Sync, Scrobble & Automate
-- **Scrobbling**: Direct-API Last.fm and ListenBrainz scrobbling with a resilient offline queue and a listening-stats dashboard.
-- **Optional Cloud Backup**: Google sign-in to sync favorites and playlists to Firestore — inactive in Pure builds, opt-in elsewhere.
-- **Device Profiles**: Auto-apply EQ, effects and output settings per connected device, with Bluetooth/headphone automation triggers.
+- **Scrobbling** (`lib/core/services/scrobbler_service.dart`): Last.fm, Libre.fm, ListenBrainz and custom webhook endpoints with a resilient offline queue, throttle, secure-storage credential migration, and a listening-stats dashboard.
+- **Optional Cloud Backup**: Google sign-in to sync favorites and playlists to Firestore — inactive in Pure builds, opt-in elsewhere. Local JSON export/import via `ExportBackupUseCase`/`ImportBackupUseCase` (`lib/domain/usecases/backup_usecases.dart`, 10 MB cap), plus Android `backup_rules.xml` / `data_extraction_rules.xml`.
+- **Device Profiles**: Auto-apply EQ, effects and output settings per connected device, with Bluetooth/headphone automation triggers (`lib/domain/services/device_profile_service.dart`, `lib/core/services/automation_trigger_service.dart`).
 - **Settings Profiles**: Save and recall complete configuration bundles.
 
 ### 🌍 10. Localization
@@ -173,10 +175,10 @@ Pulsr is architected around **Clean Architecture** and the **BLoC (Cubit)** stat
 ```
 
 ### Tech Stack Summary
-- **UI Framework**: [Flutter 3.x](https://flutter.dev) & [Dart 3.x](https://dart.dev)
+- **UI Framework**: [Flutter 3.x](https://flutter.dev) & [Dart 3.x](https://dart.dev) (requires Flutter `>= 3.29.0`)
 - **State Management**: [`flutter_bloc`](https://pub.dev/packages/flutter_bloc) (Cubit)
-- **Database & Persistence**: [`drift`](https://pub.dev/packages/drift) (Type-safe SQLite) + [`shared_preferences`](https://pub.dev/packages/shared_preferences)
-- **Audio Engine**: [`just_audio`](https://pub.dev/packages/just_audio), [`audio_service`](https://pub.dev/packages/audio_service), [`audio_session`](https://pub.dev/packages/audio_session)
+- **Database & Persistence**: [`drift`](https://pub.dev/packages/drift) (Type-safe SQLite) + [`shared_preferences`](https://pub.dev/packages/shared_preferences) + [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage)
+- **Audio Engine**: vendored [`just_audio`](https://pub.dev/packages/just_audio) (`third_party/just_audio` — adds `NativeDspAudioProcessor` to the ExoPlayer sink), [`audio_service`](https://pub.dev/packages/audio_service), [`audio_session`](https://pub.dev/packages/audio_session), [`mutex`](https://pub.dev/packages/mutex) for pipeline serialization
 - **Media Indexing**: [`on_audio_query`](https://pub.dev/packages/on_audio_query) + direct Storage File Scanner
 - **Dynamic Palette**: [`palette_generator`](https://pub.dev/packages/palette_generator)
 - **Animations**: [`flutter_animate`](https://pub.dev/packages/flutter_animate)
@@ -193,48 +195,59 @@ Pulsr is architected around **Clean Architecture** and the **BLoC (Cubit)** stat
 pulsr/
 ├── assets/
 │   ├── app_icon/             # High-res SVG and PNG app icons
-│   ├── eq_profiles/          # AutoEQ headphone JSON calibrations
+│   ├── eq_profiles/          # headphone_profiles.json (AutoEQ calibrations)
 │   └── fonts/                # Manrope variable typography
 ├── docs/
-│   ├── PULSR_FEATURES_SPEC.md      # Master feature spec + gap audit & remediation status
-│   ├── AUDIO_INTERRUPT_MATRIX.md   # Audio focus & ducking test matrix
-│   └── PLAY_CONSOLE_READINESS.md   # Google Play data safety & compliance audit
-├── RUNBOOK.md                      # Build, release & troubleshooting runbook
+│   └── adr/                  # 6 Architecture Decision Records (001–006)
+├── DESIGN.md                       # Design system single source of truth
+├── RUNBOOK.md                      # YTM streaming-latency runbook + verification gates
 ├── lib/
 │   ├── core/
-│   │   ├── config/           # App constants & Sentry crash config
-│   │   ├── constants/        # Color tokens, radii, metrics
-│   │   ├── di/               # GetIt dependency injection setup
+│   │   ├── bloc/             # Shared BlocObserver / base cubits
+│   │   ├── config/           # AppConfig (ENV, FLAVOR, ENABLE_YTM, Sentry gates)
+│   │   ├── constants/        # Colors, radii, spacing, typography, icons, timing
+│   │   ├── di/               # GetIt + injectable setup
+│   │   ├── errors/           # AppError sealed taxonomy + resolvers
+│   │   ├── motion/           # PulsrMotion tokens (context.motionMs)
+│   │   ├── network/          # HTTP overrides, proxy, connectivity monitor
+│   │   ├── performance/      # GPU budget, frame guards
+│   │   ├── responsive/       # Breakpoints + adaptive helpers
 │   │   ├── router/           # GoRouter route definitions
-│   │   ├── services/         # File intent handler & restore detection
-│   │   └── theme/            # AuraTheme tokens & DynamicThemeCubit
+│   │   ├── services/         # YTM, scrobbler, auth, lyrics, artwork cache, intents
+│   │   ├── telemetry/        # PlaybackLatencyTracker, Sentry wrappers
+│   │   ├── theme/            # AuraTheme + PulsrPalette + DynamicThemeCubit
+│   │   ├── utils/            # Adaptive, LRC/CUE parsers, formatters
+│   │   └── widgets/          # 36 shared widgets (sheets, dialogs, sliders, tiles)
 │   ├── data/
-│   │   ├── audio/            # JustAudio handler, Equalizer DSP & queue
-│   │   ├── db/               # Drift SQLite schema & DAOs
-│   │   ├── models/           # Song, Album, Artist, Playlist models
-│   │   ├── repositories/     # Concrete MusicRepository implementation
-│   │   └── scanner/          # MediaStore & direct file scanner
+│   │   ├── audio/            # PulsrAudioHandler, DSP, queue, YTM resolvers
+│   │   ├── db/               # Drift SQLite schema, tables, DAOs, health check
+│   │   ├── lyrics/           # Lyrics offset store
+│   │   ├── repositories/     # MusicRepository, prefs, downloads, smart playlists
+│   │   ├── scanner/          # MediaStore & direct file scanner
+│   │   └── visualizer/       # Milkdrop / visualizer preset stores
 │   ├── domain/
-│   │   ├── entities/         # Core domain entities
+│   │   ├── boundaries.dart   # Bounded-context interfaces
+│   │   ├── interfaces/       # Widget pusher, scrobble sink, proxy, lyrics, artwork
+│   │   ├── models/           # Song/Album/Artist/Playlist, EQ, lyrics, radio, downloads, Quran
 │   │   ├── repositories/     # Abstract repository interfaces
-│   │   └── usecases/         # Business logic & query use cases
+│   │   ├── services/         # AutoEQ, room correction, hires, cast/USB, smart plan
+│   │   └── usecases/         # 19 use cases (search, playlists, backup, folders, downloads)
 │   ├── features/
-│   │   ├── home/             # Dashboard, recent tracks & quick picks
-│   │   ├── library/          # Songs, Albums, Artists, Folders tabs
-│   │   ├── player/           # Now Playing screen, 4 themes, DSP sheets
-│   │   ├── playlists/        # Custom & Smart playlist manager
-│   │   ├── queue/            # Interactive queue manager
-│   │   ├── search/           # Instant fuzzy search
-│   │   ├── settings/         # Equalizer, backup/restore, blacklist
-│   │   └── tag_editor/       # In-place ID3 tag & cover art editor
-│   ├── l10n/                 # ARB localizations (EN, ES, AR)
+│   │   ├── home/ · library/ · search/ · playlists/ · playlist_detail/
+│   │   ├── album_detail/ · artist_detail/ · genre_detail/ · year_detail/ · folder_detail/
+│   │   ├── player/           # PlayerCubit facade + controllers/ + managers/ + 8 themes + widgets
+│   │   ├── queue/ · sheets/ · shell/ · smart_playlist_builder/
+│   │   ├── settings/         # SettingsCubit/State + category screens + widgets
+│   │   ├── tag_editor/       # In-place ID3 tag & cover art editor
+│   │   ├── downloads/ · radio/ · quran_mode/ · onboarding/ · splash/
+│   │   ├── auth/ · ytm_search/ · ytm_browse/ · widgets/
+│   ├── l10n/                 # ARB localizations (EN, ES, AR) + generated Dart
 │   └── main.dart             # App entrypoint & initialization
-├── test/                     # Unit, Cubit & Repository tests
-├── website/                  # Landing website & interactive sandbox
-│   ├── assets/               # Branding vectors
-│   ├── index.html            # Landing page markup
-│   ├── styles.css            # Aura glassmorphism stylesheet
-│   └── app.js                # Interactive player & EQ canvas logic
+├── test/                     # ~255 *_test.dart files (unit, Cubit, fuzz, perf, a11y, security)
+├── website/                  # Landing website (index.html, styles.css, app.js, assets/)
+│   └── assets/               # Branding vectors
+├── android/                  # dev (.plus) / prod (Pure) / ytm (.ytm) flavors + native DSP (C++)
+├── third_party/just_audio/   # Vendored just_audio fork (NativeDspAudioProcessor sink)
 └── pubspec.yaml              # Package dependencies & assets config
 ```
 
@@ -244,13 +257,9 @@ pulsr/
 
 | Document | Purpose |
 |---|---|
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records (Controllers, AppError taxonomy, Concurrency, WeakReference caching) |
-| [`docs/PULSR_FEATURES_SPEC.md`](docs/PULSR_FEATURES_SPEC.md) | Master spec for every feature, its functions and wiring, plus the prioritized gap audit and remediation status. |
-| [`docs/POWERAMP_COMPARISON.md`](docs/POWERAMP_COMPARISON.md) | Feature-by-feature comparison against Poweramp v3. |
-| [`docs/POWERAMP_PARITY_PLAN.md`](docs/POWERAMP_PARITY_PLAN.md) | Execution-ready plan to close the Poweramp gaps (workstreams, native contracts, tests). |
-| [`docs/AUDIO_INTERRUPT_MATRIX.md`](docs/AUDIO_INTERRUPT_MATRIX.md) | Audio focus, interruption and ducking test matrix. |
-| [`docs/PLAY_CONSOLE_READINESS.md`](docs/PLAY_CONSOLE_READINESS.md) | Google Play data-safety and permission compliance audit. |
-| [`RUNBOOK.md`](RUNBOOK.md) | Build, release and troubleshooting runbook. |
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records: 001 player decomposition, 002 AppError taxonomy, 003 concurrency, 004 artwork cache, 005 DSP chain, 006 queue slots |
+| [`DESIGN.md`](DESIGN.md) | Design system single source of truth (tokens, motion, components, a11y) |
+| [`RUNBOOK.md`](RUNBOOK.md) | YTM tap-to-sound latency runbook + verification gates |
 
 ---
 
@@ -260,24 +269,24 @@ Pulsr underwent an exhaustive 11-dimension architectural audit and hardening spr
 
 | Dimension | Score | Key Hardening Highlights | Verification Suite |
 |---|:---:|---|---|
-| **Architecture** | **10/10** | Monolithic `PlayerCubit` decomposed into 5 single-responsibility controllers (< 400 lines each); formal bounded context interfaces in `lib/domain/boundaries.dart`. | `test/architecture/player_controller_decomposition_test.dart` |
+| **Architecture** | **10/10** | `PlayerCubit` facade + 13 files under `player/cubit/controllers/` + `managers/` (transport, queue + `QueueSlotCodec` slots 0–2, DSP/effects/profiles, metadata, playback-options/lyrics/Quran, widget bridge); formal bounded context interfaces in `lib/domain/boundaries.dart` + `lib/domain/interfaces/`. | `test/architecture/player_controller_decomposition_test.dart` |
 | **Bug Density** | **10/10** | 10,000-iteration fuzzer over LRC, CUE, M3U, AutoEQ parsers; randomized property-based invariant testing. | `test/fuzz/parser_fuzz_test.dart`, `test/property/state_property_test.dart` |
 | **State Management** | **10/10** | Elimination of redundant rebuilds; formal state machines for `TagEditorCubit` and `YtmSearchState.phase`; single-source-of-truth emissions. | `test/perf/rebuild_audit_test.dart` |
-| **Error Handling** | **10/10** | Exhaustive sealed class taxonomy `AppError` replacing string errors; centralized `resolveAppError` mapper with compile-time pattern matching. | `test/errors/app_error_taxonomy_test.dart` |
+| **Error Handling** | **10/10** | Exhaustive sealed class taxonomy `AppError` (`Network/Storage/Audio/Ytm/Permission/Generic` + `resolveAppError`) replacing string errors; centralized mapper with compile-time pattern matching. | `test/errors/app_error_taxonomy_test.dart` |
 | **Performance** | **10/10** | Bounded cache ceilings; sub-millisecond queue slice generation on 10,000-item queues; 60fps frame budget preservation. | `test/perf/frame_budget_test.dart` |
 | **Memory Safety** | **10/10** | Dual-tier LRU + `WeakReference` artwork cache preventing OOM; explicit disposal audits across controllers and stream subscriptions. | `test/lifecycle/disposal_audit_test.dart` |
 | **Concurrency** | **10/10** | Monotonic generation counters (`_mediaItemResolutionGen`, `_localMatchSwapGen`) and mutex locks eliminating race conditions during rapid skipping. | `test/concurrency/concurrency_hardening_test.dart` |
 | **Code Hygiene** | **10/10** | Zero raw `print()` calls; strict empty catch ratchet; `prefer_final_locals` enforced; all controllers strictly < 400 lines. | `test/code_hygiene_test.dart` |
 | **Security** | **10/10** | Encrypted `FlutterSecureStorage` with plaintext wipe; IPv6-mapped IPv4 SSRF defense; ReDoS regex guards; JSON recursion depth caps; Web login sandbox hardening. | `test/security/security_hardening_test.dart` |
 | **Accessibility** | **10/10** | WCAG 2.1 AA luminance contrast ($\ge 4.5:1$); minimum 48x48 touch targets; decorative visualizers excluded from semantics; full 2.0x Dynamic Type scaling. | `test/a11y/accessibility_compliance_test.dart` |
-| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 4 Architecture Decision Records (ADRs) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
+| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 6 Architecture Decision Records (ADRs) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
 
 ---
 
 ## 🚀 Getting Started & Build Guide
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`>= 3.24.0` / Dart `>= 3.5.0`)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`>= 3.29.0` / Dart `>= 3.0.0 < 4.0.0`, per `pubspec.yaml`)
 - [Android Studio](https://developer.android.com/studio) with Android SDK & NDK
 - Java Development Kit (JDK 17)
 
@@ -301,7 +310,7 @@ flutter run
 ```
 
 ### 4. Run Automated Tests
-Execute unit tests, Cubit state tests, and repository mocks (800+ tests):
+Execute unit tests, Cubit state tests, and repository mocks (~255 `*_test.dart` files: unit, Cubit, fuzz, property, perf, a11y, security, concurrency):
 ```bash
 flutter test
 ```

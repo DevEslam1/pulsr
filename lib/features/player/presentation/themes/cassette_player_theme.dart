@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -80,7 +81,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   @override
   void didUpdateWidget(covariant CassettePlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.props.state.playbackSpeed != oldWidget.props.state.playbackSpeed) {
+    if (widget.props.state.playbackSpeed !=
+        oldWidget.props.state.playbackSpeed) {
       _updateSpoolSpeed();
       if (_spoolController.isAnimating) {
         _spoolController.repeat();
@@ -102,16 +104,15 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
     final p = context.palette;
     final song = state.currentSong;
     final activeColor = widget.props.activeColor;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
-        context.select<
-            SettingsCubit,
-            ({
-              NowPlayingDoubleTapAction nowPlayingDoubleTap,
-              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-            })>((c) => (
-              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-            ));
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
+        SettingsCubit,
+        ({
+          NowPlayingDoubleTapAction nowPlayingDoubleTap,
+          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+        })>((c) => (
+          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+        ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -125,24 +126,21 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
         final double heightRatio =
             (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
-        final double spacingTrackToSeek =
-            (isTablet ? 10.0 : 6.0) * heightRatio;
+        final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
         final double spacingSeekToControls =
             (isTablet ? 12.0 : 8.0) * heightRatio;
         final double spacingControlsToDock =
             (isTablet ? 12.0 : 8.0) * heightRatio;
-        final double spacingBelowDock =
-            (isTablet ? 8.0 : 4.0) * heightRatio;
-        final double switcherTopPad =
-            (isTablet ? 4.0 : 2.0) * heightRatio;
-        final double switcherBottomPad =
-            (isTablet ? 6.0 : 3.0) * heightRatio;
+        final double spacingBelowDock = (isTablet ? 8.0 : 4.0) * heightRatio;
+        final double switcherTopPad = (isTablet ? 4.0 : 2.0) * heightRatio;
+        final double switcherBottomPad = (isTablet ? 6.0 : 3.0) * heightRatio;
 
         final double pillBarWidth = math.min(
           constraints.maxWidth - (isTablet ? 64 : 28),
           isTablet ? 440.0 : 336.0,
         );
-        final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+        final double pillBarHeight =
+            (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
         final viewSwitcher = PlayerViewSwitcher(
           state: state,
@@ -175,9 +173,11 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.s14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E2028),
+                  color: PlayerMaterialColors.cassetteShell,
                   borderRadius: BorderRadius.circular(AppRadii.r20),
-                  border: Border.all(color: const Color(0xFF323646), width: 3),
+                  border: Border.all(
+                      color: PlayerMaterialColors.cassetteShellBorder,
+                      width: 3),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.5),
@@ -192,7 +192,6 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
                       decoration: BoxDecoration(
                         color: activeColor.withValues(alpha: 0.2),
@@ -227,9 +226,10 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     // Cassette Center Window with Spinning Spools
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F1116),
+                          color: PlayerMaterialColors.cassetteWindow,
                           borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: Colors.white12),
                         ),
@@ -244,14 +244,15 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                               height: 36,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.05),
-                                borderRadius: BorderRadius.circular(AppRadii.r6),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r6),
                                 border: Border.all(color: Colors.white10),
                               ),
                               child: Center(
                                 child: Container(
                                   height: 12,
                                   width: 50,
-                                  color: const Color(0xFF5A3825),
+                                  color: PlayerMaterialColors.cassetteTape,
                                 ),
                               ),
                             ),
@@ -333,7 +334,6 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
             Padding(
               padding: EdgeInsets.symmetric(
-
                 horizontal: isTablet ? 28 : 16,
                 vertical: AppSpacing.s2,
               ),
@@ -364,7 +364,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                   onTap: () {
                                     if (song != null) {
                                       HapticFeedback.lightImpact();
-                                      AddToPlaylistSheet.show(context, song: song);
+                                      AddToPlaylistSheet.show(context,
+                                          song: song);
                                     }
                                   },
                                   child: Center(
@@ -382,15 +383,19 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       // Center: Title & Artist (Symmetric & Centered)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s10),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               MarqueeText(
-                                text: song?.title ?? context.l10n.noTrackSelected,
+                                text:
+                                    song?.title ?? context.l10n.noTrackSelected,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
+                                  fontSize: isTablet
+                                      ? AppFontSize.headline
+                                      : AppFontSize.title,
                                   fontWeight: FontWeight.w900,
                                   color: p.textPrimary,
                                   height: 1.22,
@@ -399,10 +404,13 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                               ),
                               const SizedBox(height: AppSpacing.xxs),
                               MarqueeText(
-                                text: song?.artist ?? context.l10n.unknownArtist,
+                                text:
+                                    song?.artist ?? context.l10n.unknownArtist,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
+                                  fontSize: isTablet
+                                      ? AppFontSize.callout
+                                      : AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600,
                                   color: p.textSecondary,
                                 ),
@@ -413,7 +421,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       ),
 
                       // Right Symmetrical Action: Animated Favorite Button
-                      SizedBox(width: AppSpacing.xxl,
+                      SizedBox(
+                        width: AppSpacing.xxl,
                         height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.06),
@@ -477,7 +486,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               hasPrevious: state.hasPreviousNeighbour,
               hasNext: state.hasNextNeighbour,
               primaryColor: activeColor,
-              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
+              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) *
+                  heightRatio.clamp(0.85, 1.10),
               onPlayPause: () => cubit.togglePlayPause(),
               onNext: () => cubit.next(),
               onPrevious: () => cubit.previous(),
@@ -500,7 +510,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         );
 
         if (isLandscape) {
-          final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+          final bool isSplitContentMode =
+              state.isLyricsVisible || state.isQueueVisible;
 
           final Widget leftPaneContent = isSplitContentMode
               ? Center(
@@ -555,7 +566,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                       child: AnimatedSwitcher(
                         duration: context.motionMs(260),
                         child: KeyedSubtree(
-                          key: ValueKey('left_pane_${isSplitContentMode ? "split" : "cassette"}'),
+                          key: ValueKey(
+                              'left_pane_${isSplitContentMode ? "split" : "cassette"}'),
                           child: leftPaneContent,
                         ),
                       ),
@@ -579,7 +591,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                         },
                         child: state.isLyricsVisible
                             ? LyricsView(
-                                key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                key: ValueKey(
+                                    'lyrics_${song?.id}_${song?.remoteId}'),
                                 lyrics: state.lyrics,
                                 isLoading: state.isLoadingLyrics,
                                 activeColor: activeColor,
@@ -609,7 +622,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
+                padding: const EdgeInsets.only(
+                    top: AppSpacing.xxs, bottom: AppSpacing.s2),
                 child: Center(
                   child: Container(
                     width: 38,
@@ -625,7 +639,6 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               // Top App Bar - Symmetrical Left/Right Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
-
                   horizontal: isTablet ? 28 : 20,
                   vertical: AppSpacing.s2,
                 ),
@@ -651,7 +664,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                           },
                           child: Center(
                             child: Icon(
-                              Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
+                              Icons.keyboard_arrow_down_rounded,
+                              semanticLabel: context.l10n.close,
                               size: isTablet ? 26 : 24,
                               color: p.textPrimary,
                             ),
@@ -663,7 +677,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     // Center: "PLAYING FROM" / Album Header
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -710,7 +725,9 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                   .titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
+                                    fontSize: isTablet
+                                        ? AppFontSize.body
+                                        : AppFontSize.bodySmall,
                                     color: p.textPrimary,
                                   ),
                             ),
@@ -736,7 +753,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                           },
                           child: Center(
                             child: Icon(
-                              Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
+                              Icons.more_horiz_rounded,
+                              semanticLabel: context.l10n.songInfo,
                               size: isTablet ? 24 : 22,
                               color: p.textPrimary,
                             ),
@@ -775,14 +793,14 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     return Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: (state.isLyricsVisible ||
-                                  state.isQueueVisible)
-                              ? (isTablet ? 560.0 : double.infinity)
-                              : cassetteW,
-                          maxHeight: (state.isLyricsVisible ||
-                                  state.isQueueVisible)
-                              ? double.infinity
-                              : cassetteH,
+                          maxWidth:
+                              (state.isLyricsVisible || state.isQueueVisible)
+                                  ? (isTablet ? 560.0 : double.infinity)
+                                  : cassetteW,
+                          maxHeight:
+                              (state.isLyricsVisible || state.isQueueVisible)
+                                  ? double.infinity
+                                  : cassetteH,
                         ),
                         child: centerDisplay,
                       ),
@@ -821,7 +839,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             width: 22,
             height: 22,
             decoration: const BoxDecoration(
-              color: Color(0xFF0F1116),
+              color: PlayerMaterialColors.cassetteWindow,
               shape: BoxShape.circle,
             ),
             child: CustomPaint(painter: _SpoolTeethPainter()),
@@ -830,7 +848,6 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
       ),
     );
   }
-
 }
 
 class _SpoolTeethPainter extends CustomPainter {
@@ -862,4 +879,3 @@ class _SpoolTeethPainter extends CustomPainter {
 // -----------------------------------------------------------------------------
 // Sub-widgets
 // -----------------------------------------------------------------------------
-

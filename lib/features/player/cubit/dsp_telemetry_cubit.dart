@@ -1,23 +1,48 @@
 // lib/features/player/cubit/dsp_telemetry_cubit.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../domain/models/dsp_telemetry.dart';
 
 class DspTelemetryCubit extends Cubit<DspTelemetry> {
   final AudioEffectsChannel _channel;
   final Duration pollingInterval;
+  final Duration retryInterval;
   Timer? _pollingTimer;
+  Timer? _retryTimer;
   int _listenerCount = 0;
+  int _consecutiveFailures = 0;
+  bool _didLogFailure = false;
+
+  /// B3: after this many consecutive failed polls the timer is parked so a
+  /// broken channel (non-Android, engine not ready, test fakes) cannot fire an
+  /// unhandled async error on every 200ms tick.
+  static const int _maxConsecutiveFailures = 3;
 
   DspTelemetryCubit({
     AudioEffectsChannel? channel,
     this.pollingInterval = const Duration(milliseconds: 200),
+    this.retryInterval = const Duration(seconds: 3),
   })  : _channel = channel ?? AudioEffectsChannel(),
         super(const DspTelemetry.zero());
 
+  @visibleForTesting
+  bool get isRetryTimerActive => _retryTimer != null && _retryTimer!.isActive;
+
+  @visibleForTesting
+  bool get isPollingTimerActive => _pollingTimer != null && _pollingTimer!.isActive;
+
+  @visibleForTesting
+  int get consecutiveFailures => _consecutiveFailures;
+
+  @visibleForTesting
+  int get listenerCount => _listenerCount;
+
   /// Increments consumer reference count and starts polling if first subscriber.
   void subscribe() {
+    if (isClosed) return;
     _listenerCount++;
     if (_listenerCount == 1 && _pollingTimer == null) {
       _startPolling();
@@ -26,24 +51,45 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
 
   /// Decrements consumer reference count and stops polling when zero.
   void unsubscribe() {
-    _listenerCount = (_listenerCount - 1).clamp(0, 9999);
+    if (_listenerCount <= 0) return;
+    _listenerCount--;
     if (_listenerCount == 0) {
       _stopPolling();
     }
   }
 
   void _startPolling() {
-    _pollingTimer?.cancel();
+    _stopTimer();
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _consecutiveFailures = 0;
+    _didLogFailure = false;
     _pollingTimer = Timer.periodic(pollingInterval, (_) {
-      _fetchTelemetry();
+      unawaited(_fetchTelemetry());
     });
-    _fetchTelemetry();
+    unawaited(_fetchTelemetry());
+  }
+
+  /// Cancels the timer only; keeps the current emitted value and listener count.
+  void _stopTimer() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   void _stopPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
-    emit(const DspTelemetry.zero());
+    _stopTimer();
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    if (!isClosed) emit(const DspTelemetry.zero());
+  }
+
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    if (isClosed || _listenerCount == 0) return;
+    _retryTimer = Timer(retryInterval, () {
+      if (isClosed || _listenerCount == 0) return;
+      unawaited(_fetchTelemetry());
+    });
   }
 
   Future<void> refreshOnce() async {
@@ -51,16 +97,44 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   }
 
   Future<void> _fetchTelemetry() async {
-    final telemetry = await _channel.getTelemetry();
-    if (!isClosed) {
+    try {
+      final telemetry = await _channel.getTelemetry();
+      if (isClosed) return;
+      _consecutiveFailures = 0;
+      _didLogFailure = false;
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      // A successful poll after the timer was parked resumes normal emission.
+      if (_pollingTimer == null && _listenerCount > 0) {
+        _startPolling();
+        return;
+      }
       emit(telemetry);
+    } catch (e, st) {
+      _consecutiveFailures++;
+      if (!_didLogFailure) {
+        _didLogFailure = true;
+        ErrorLogger.log(
+          'DSP telemetry poll failed (backing off after '
+          '$_maxConsecutiveFailures failures)',
+          error: e,
+          stackTrace: st,
+          category: 'DspTelemetry',
+        );
+      }
+      if (_consecutiveFailures >= _maxConsecutiveFailures) {
+        if (!isClosed) emit(const DspTelemetry.zero());
+        _stopTimer();
+        _scheduleRetry();
+      }
     }
   }
 
   @override
   Future<void> close() {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
+    _stopTimer();
+    _retryTimer?.cancel();
+    _retryTimer = null;
     return super.close();
   }
 }

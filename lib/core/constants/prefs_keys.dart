@@ -30,6 +30,8 @@ class PrefsKeys {
   // the '_enabled' suffixed value was a dead duplicate (orphan 20-01).
   static const String dynamicThemingEnabled = 'setting_dynamic_theme';
   static const String playerThemeMode = 'setting_player_theme_mode';
+  // Mini-player dock stacking style (DockStackMode.name). See StackedBottomDock.
+  static const String dockStackMode = 'setting_dock_stack_mode';
   static const String playbackSpeed = 'setting_playback_speed';
   static const String playbackPitch = 'setting_playback_pitch';
   static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';

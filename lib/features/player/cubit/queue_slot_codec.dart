@@ -81,26 +81,46 @@ class QueueSlotCodec {
 
   /// Validates the top-level document. Returns null when corrupt/oversized
   /// (DoS guard: three slots + activeSlot + schemaVersion key).
+  /// Rejects documents with schema versions beyond [currentSchemaVersion]
+  /// or negative versions, and automatically migrates legacy documents.
   static Map<String, dynamic>? decodeDocument(Object? decoded) {
     if (decoded is! Map) return null;
     if (decoded.length > maxDocumentKeys) return null;
     final map = Map<String, dynamic>.from(decoded);
-    final version = map['schemaVersion'];
-    if (version != null && (version is! int || version > currentSchemaVersion || version < 1)) {
-      return null;
+    final rawVersion = map['schemaVersion'];
+    if (rawVersion != null) {
+      if (rawVersion is! num) return null;
+      if (rawVersion is double && rawVersion.toInt() != rawVersion) return null;
+      final version = rawVersion.toInt();
+      if (version < 0 || version > currentSchemaVersion) {
+        return null;
+      }
+      if (version == 0) {
+        return migrateDocument(map);
+      }
+      map['schemaVersion'] = version;
+      return map;
     }
-    if (version == null) {
-      return migrateDocument(map);
-    }
-    return map;
+    return migrateDocument(map);
   }
 
   /// Migrates older schema payloads up to [currentSchemaVersion].
   static Map<String, dynamic> migrateDocument(Map<String, dynamic> document) {
     final doc = Map<String, dynamic>.from(document);
-    final version = doc['schemaVersion'] as int? ?? 0;
+    final rawVersion = doc['schemaVersion'];
+    final int version;
+    if (rawVersion == null) {
+      version = 0;
+    } else if (rawVersion is num && rawVersion.toInt() == rawVersion) {
+      version = rawVersion.toInt();
+    } else {
+      version = -1;
+    }
+    if (version < 0 || version > currentSchemaVersion) {
+      throw ArgumentError('Incompatible or invalid schema version: $rawVersion');
+    }
     if (version == 0) {
-      doc['schemaVersion'] = 1;
+      doc['schemaVersion'] = currentSchemaVersion;
     }
     return doc;
   }
@@ -120,13 +140,19 @@ class QueueSlotCodec {
     final rawIds = slotData['songIds'];
     if (rawIds is! List) return null;
     if (rawIds.length > maxQueueSize) return null;
-    final songIds = rawIds.whereType<int>().toList();
-    if (songIds.isEmpty) return null;
 
     final rawOnline = slotData['onlineSongs'];
     final onlineSongsById = rawOnline is List
         ? decodeOnlineSongs(rawOnline)
         : const <int, SongsTableData>{};
+
+    // FIX-H-17: Validate song IDs. Negative IDs are reserved for online songs
+    // and must be present in onlineSongsById; arbitrary orphan negative IDs are dropped.
+    final songIds = rawIds
+        .whereType<int>()
+        .where((id) => id > 0 || (id < 0 && onlineSongsById.containsKey(id)))
+        .toList();
+    if (songIds.isEmpty) return null;
 
     final rawIndex = slotData['currentIndex'];
     final currentIndex = rawIndex is int ? rawIndex : 0;
@@ -153,7 +179,7 @@ class QueueSlotCodec {
     for (final item in raw) {
       if (item is Map) {
         final id = item['id'];
-        if (id is int) {
+        if (id is int && id < 0) {
           map[id] = SongsTableData(
             id: id,
             title: item['title']?.toString() ?? 'Unknown',

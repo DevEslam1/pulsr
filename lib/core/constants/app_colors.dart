@@ -16,6 +16,10 @@ abstract class AppColors {
   static const Color warning = Color(0xFFFFB300);
   static const Color info = Color(0xFF40A9FF);
 
+  /// Dark ink placed on a bright accent/artwork fill to guarantee contrast.
+  /// Single source for the ubiquitous `Color(0xFF101223)` "on-bright" text.
+  static const Color onBright = Color(0xFF101223);
+
   // Brand & feature accents. These are intentionally fixed (not theme-driven)
   // because they identify a source/tier rather than a UI surface.
   static const Color dacGold = Color(0xFFFFD700); // Hi-Res / USB DAC tier
@@ -33,6 +37,27 @@ abstract class AppColors {
   static const Color darkSurface = Color(0xFF14172B);
   static const Color mint = Color(0xFF1DE9B6);
   static const Color azure = Color(0xFF00B0FF);
+
+  // Library tab identity tints. Fixed (source-category identity), not surfaces.
+  static const Color tabDownloaded = Color(0xFF26A69A);
+  static const Color tabAlbums = Color(0xFFFF9800);
+  static const Color tabArtists = Color(0xFFAB47BC);
+  static const Color tabFavorites = Color(0xFFEF5350);
+  static const Color tabFolders = Color(0xFFFFB300);
+  static const Color tabGenres = Color(0xFF29B6F6);
+  static const Color tabYears = Color(0xFF5C6BC0);
+
+  // Settings category tints. Fixed identity colours for the category tiles.
+  static const Color catAudio = Color(0xFFFF9500);
+  static const Color catPlayback = Color(0xFFAF52DE);
+  static const Color catAppearance = Color(0xFFFF2D55);
+  static const Color catGestures = Color(0xFF007AFF);
+  static const Color catProfiles = Color(0xFF5856D6);
+  static const Color catLibrary = Color(0xFF34C759);
+  static const Color catOnline = Color(0xFF5AC8FA);
+  static const Color catStorage = Color(0xFFFFCC00);
+  static const Color catPrivacy = Color(0xFF30B0C7);
+  static const Color catAbout = Color(0xFF8E8E93);
 
   // Dark surfaces (kept for legacy widgets)
   static const Color background = Color(0xFF0B0B0F);

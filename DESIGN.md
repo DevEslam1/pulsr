@@ -272,7 +272,7 @@ Center(child: ConstrainedBox(
 | `SkeletonBox/Line/List/Grid`, `SkeletonShimmer` | `core/widgets/shimmer_skeleton.dart` | loading |
 | `StaggeredReveal` | `core/widgets/staggered_reveal.dart` | sort/re-flow entrance |
 | `EntityByIdLoader<T>` | `core/widgets/entity_by_id_loader.dart` | id-based deep links |
-| `SettingSliderRow` | `features/settings/.../settings_slider_row.dart` | labelled slider |
+| `SettingSliderRow` | `features/settings/presentation/widgets/settings_slider_row.dart` | labelled slider |
 
 ---
 

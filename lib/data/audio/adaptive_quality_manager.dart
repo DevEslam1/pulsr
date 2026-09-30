@@ -22,7 +22,7 @@ class AdaptiveQualityPolicy {
   int _consecutiveUnderruns = 0;
   int _consecutiveHealthy = 0;
 
-  AdaptiveQualityPolicy({this.underrunThreshold = 2, this.healthyThreshold = 3});
+  AdaptiveQualityPolicy({this.underrunThreshold = 2, this.healthyThreshold = 4});
 
   factory AdaptiveQualityPolicy.withAggressiveness(
       AdaptiveAggressiveness aggressiveness) {

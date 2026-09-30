@@ -27,6 +27,7 @@ import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
+import 'player_theme_metrics.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -130,26 +131,28 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
             final isLandscape =
                 PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
-            final double heightRatio =
-                (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
-            final double spacingTrackToSeek =
-                (isTablet ? 10.0 : 6.0) * heightRatio;
-            final double spacingSeekToControls =
-                (isTablet ? 12.0 : 8.0) * heightRatio;
-            final double spacingControlsToDock =
-                (isTablet ? 12.0 : 8.0) * heightRatio;
-            final double spacingBelowDock =
-                (isTablet ? 8.0 : 4.0) * heightRatio;
-            final double switcherTopPad =
-                (isTablet ? 4.0 : 2.0) * heightRatio;
-            final double switcherBottomPad =
-                (isTablet ? 6.0 : 3.0) * heightRatio;
+            final m = PlayerThemeMetrics.of(
+
+              isTablet: isTablet,
+
+              isLandscape: isLandscape,
+
+              constraints: constraints,
+
+            );
+
+            final double spacingTrackToSeek = m.spacingTrackToSeek;
+            final double spacingSeekToControls = m.spacingSeekToControls;
+            final double spacingControlsToDock = m.spacingControlsToDock;
+            final double spacingBelowDock = m.spacingBelowDock;
+            final double switcherTopPad = m.switcherTopPad;
+            final double switcherBottomPad = m.switcherBottomPad;
 
             final double pillBarWidth = math.min(
               constraints.maxWidth - (isTablet ? 64 : 28),
               isTablet ? 440.0 : 336.0,
             );
-            final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+            final double pillBarHeight = m.pillBarHeight;
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -219,6 +222,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             isTablet: isTablet,
                             waveController: _waveController,
                             audioSessionId: state.audioSessionId,
+                            artworkHeroTag: 'now_playing_art_waveform',
                           ),
               ),
             );
@@ -406,7 +410,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   hasPrevious: state.hasPreviousNeighbour,
                   hasNext: state.hasNextNeighbour,
                   primaryColor: activeColor,
-                  mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
+                  mainButtonSize: m.mainButtonSize,
                   onPlayPause: () => cubit.togglePlayPause(),
                   onNext: () => cubit.next(),
                   onPrevious: () => cubit.previous(),
@@ -435,7 +439,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   ? Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: isTablet ? 440.0 : 380.0,
+                          maxWidth: m.paneMaxWidth,
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -474,6 +478,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             isTablet: isTablet,
                             waveController: _waveController,
                             audioSessionId: state.audioSessionId,
+                            artworkHeroTag: 'now_playing_art_waveform',
                           ),
                         ),
                       ],
@@ -735,6 +740,10 @@ class _WaveformHeroStage extends StatelessWidget {
   final AnimationController waveController;
   final int? audioSessionId;
 
+  /// B21: shared-element tag applied to the artwork only. Null for the landscape
+  /// instance so a route can never contain two Heroes with the same tag.
+  final String? artworkHeroTag;
+
   const _WaveformHeroStage({
     super.key,
     required this.song,
@@ -744,7 +753,16 @@ class _WaveformHeroStage extends StatelessWidget {
     required this.isTablet,
     required this.waveController,
     this.audioSessionId,
+    this.artworkHeroTag,
   });
+
+  Widget _wrapArtworkHero(Widget child) {
+    final tag = artworkHeroTag;
+    // Landscape renders two stage instances; only the phone/portrait mini player
+    // has a matching Hero, so never tag in landscape to avoid duplicate tags.
+    if (tag == null || isLandscape) return child;
+    return Hero(tag: tag, child: child);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -849,7 +867,7 @@ class _WaveformHeroStage extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: song != null
-                    ? CachedArtwork(
+                    ? _wrapArtworkHero(CachedArtwork(
                         id: song.id,
                         remoteUrl: song.remoteArtworkUrl,
                         type: ArtworkType.AUDIO,
@@ -857,7 +875,7 @@ class _WaveformHeroStage extends StatelessWidget {
                         borderRadius: 28,
                         highQuality: true,
                         fallbackIcon: Icons.music_note_rounded,
-                      )
+                      ))
                     : Container(
                         color: Colors.black26,
                         child: Icon(

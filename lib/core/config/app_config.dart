@@ -24,6 +24,14 @@ class AppConfig {
   static const bool ytmEnabled =
       bool.fromEnvironment('ENABLE_YTM', defaultValue: false);
 
+  /// In-app voice search. There is no on-device speech recognizer wired up, so
+  /// the mic affordance is hidden entirely unless this is explicitly enabled
+  /// (which requires a speech-to-text dependency). The Android assistant /
+  /// external `pulsr://voice-search` entry points are unaffected and always
+  /// handled by [FileIntentHandler.handleVoiceSearch].
+  static const bool voiceSearchEnabled =
+      bool.fromEnvironment('ENABLE_VOICE_SEARCH', defaultValue: false);
+
   static AppEnvironment get environment {
     final lowerFlavor = flavor.toLowerCase();
     if (lowerFlavor == 'prod') {

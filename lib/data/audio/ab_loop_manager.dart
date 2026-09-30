@@ -74,7 +74,14 @@ class AbLoopManager {
     if (_scopeSongId != null && songId != null && songId != _scopeSongId) {
       return null;
     }
-    if (_b != null && pos >= _b! - const Duration(milliseconds: 50)) return _a;
+    // BUG-20: tighter 20ms tolerance reduces premature wraps, and requiring
+    // pos > A avoids wrapping when the reported position is still before A.
+    if (_b != null &&
+        _a != null &&
+        pos >= _b! - const Duration(milliseconds: 20) &&
+        pos > _a!) {
+      return _a;
+    }
     return null;
   }
 

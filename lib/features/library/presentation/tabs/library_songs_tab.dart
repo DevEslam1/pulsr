@@ -6,10 +6,18 @@ mixin LibrarySongsTab on State<LibraryScreen> {
   /// tracks (staggered inside [warmStreams]) rather than just the first, since
   /// a user often taps a little way down a freshly opened list.
   bool _warmedHeadOnline = false;
+  // BUG-04: identity signature of the list head, so a rescan that inserts new
+  // online tracks at the top re-arms the pre-warm instead of short-circuiting
+  // forever on `_warmedHeadOnline`.
+  int? _warmedHeadSignature;
 
   void _warmHeadOnlineIfNeeded(
       List<SongsTableData> songs, PlayerCubit playerCubit) {
-    if (_warmedHeadOnline || songs.isEmpty) return;
+    if (songs.isEmpty) return;
+    final signature = Object.hashAll(songs.take(20).map((s) => s.id));
+    if (_warmedHeadOnline && _warmedHeadSignature == signature) return;
+    _warmedHeadOnline = true;
+    _warmedHeadSignature = signature;
     final online = [
       for (final s in songs)
         if (s.source == SongSource.youtube &&
@@ -18,7 +26,6 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           s,
     ];
     if (online.isEmpty) return;
-    _warmedHeadOnline = true;
     playerCubit.warmStreams(online, count: 3);
   }
 
@@ -152,10 +159,6 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       );
     }
 
-    // The A–Z rail only makes sense when the list is ordered by title and screen height >= 500dp.
-    final showAlphabet = songs.length >= 15 &&
-        state.sortBy == 'title' &&
-        MediaQuery.sizeOf(context).height >= 500;
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 
     final trackCols = PulsrAdaptiveGrid.songColumns(context);
@@ -220,7 +223,13 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       );
     }
 
-    return RefreshIndicator(
+    // BUG-13: gate the A–Z rail on the space actually available to the list
+    // area, not the full window height.
+    return LayoutBuilder(builder: (context, constraints) {
+      final showAlphabet = songs.length >= 15 &&
+          state.sortBy == 'title' &&
+          constraints.maxHeight >= 500;
+      return RefreshIndicator(
       color: p.accent,
       backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
@@ -282,7 +291,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
             ),
         ],
       ),
-    );
+      );
+    });
   }
 
   // ================= DOWNLOADED =================

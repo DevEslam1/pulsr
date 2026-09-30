@@ -1,6 +1,10 @@
 // lib/core/motion/pulsr_motion.dart
 import 'package:flutter/material.dart';
 
+import 'motion_durations.dart';
+
+export 'motion_durations.dart';
+
 /// Centralized motion tokens.
 ///
 /// Every animation in the app should resolve its duration through
@@ -32,6 +36,23 @@ abstract class PulsrMotion {
 
   /// 600ms — expressive entrance choreography.
   static const Duration expressive = Duration(milliseconds: 600);
+
+  // ── Canonical semantic tokens (see [PulsrDurations]) ─────────────────────
+  // Prefer these five in new code; they map the whole app onto one rhythm.
+  /// 120ms — direct-manipulation feedback (tap, press, selection).
+  static const Duration tap = PulsrDurations.tap;
+
+  /// 200ms — small state changes (fades, chips, status swaps).
+  static const Duration state = PulsrDurations.state;
+
+  /// 260ms — layout changes (reflows, positioned moves, size changes).
+  static const Duration layout = PulsrDurations.layout;
+
+  /// 320ms — page/surface transitions (routes, sheets, dock mode changes).
+  static const Duration page = PulsrDurations.page;
+
+  /// 400ms — ambient/expressive motion (hero artwork, decorative loops).
+  static const Duration ambient = PulsrDurations.ambient;
 
   /// Whether animations should play at all for the given context.
   ///

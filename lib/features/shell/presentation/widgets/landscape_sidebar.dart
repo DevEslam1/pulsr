@@ -48,31 +48,14 @@ class LandscapeSidebar extends StatefulWidget {
     this.modeOverride,
   });
 
-  @override
-  State<LandscapeSidebar> createState() => _LandscapeSidebarState();
-}
-
-class _LandscapeSidebarState extends State<LandscapeSidebar> {
-  bool _isPeeking = false;
-  Timer? _peekTimer;
-
-  void _triggerPeek() {
-    _peekTimer?.cancel();
-    setState(() => _isPeeking = true);
-    _peekTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _isPeeking = false);
-    });
-  }
-
-  @override
-  void dispose() {
-    _peekTimer?.cancel();
-    super.dispose();
-  }
-
-  SidebarRailMode _resolveMode(BuildContext context) {
-    if (widget.modeOverride != null) return widget.modeOverride!;
-    if (widget.isExtended || _isPeeking) return SidebarRailMode.expanded;
+  static SidebarRailMode resolveMode({
+    required BuildContext context,
+    SidebarRailMode? modeOverride,
+    bool isExtended = false,
+    bool isPeeking = false,
+  }) {
+    if (modeOverride != null) return modeOverride;
+    if (isExtended || isPeeking) return SidebarRailMode.expanded;
 
     final breakpoint = PulsrBreakpoint.of(context);
     final isLandscape = PulsrBreakpoint.isLandscape(context);
@@ -88,6 +71,70 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
         return isLandscape ? SidebarRailMode.iconOnly : SidebarRailMode.hidden;
     }
   }
+
+  @override
+  State<LandscapeSidebar> createState() => LandscapeSidebarState();
+}
+
+class LandscapeSidebarState extends State<LandscapeSidebar> {
+  bool _isPeeking = false;
+  Timer? _peekTimer;
+  Orientation? _lastOrientation;
+
+  @visibleForTesting
+  bool get isPeeking => _isPeeking;
+
+  @visibleForTesting
+  void triggerPeek() => _triggerPeek();
+
+  void _triggerPeek() {
+    _peekTimer?.cancel();
+    setState(() => _isPeeking = true);
+    _peekTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _isPeeking = false);
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final orientation = MediaQuery.orientationOf(context);
+    if (_lastOrientation != null && _lastOrientation != orientation) {
+      if (_isPeeking) {
+        _peekTimer?.cancel();
+        _peekTimer = null;
+        _isPeeking = false;
+      }
+    }
+    _lastOrientation = orientation;
+  }
+
+  @override
+  void didUpdateWidget(LandscapeSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExtended != oldWidget.isExtended ||
+        widget.modeOverride != oldWidget.modeOverride) {
+      if (_isPeeking) {
+        _peekTimer?.cancel();
+        _peekTimer = null;
+        _isPeeking = false;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _peekTimer?.cancel();
+    super.dispose();
+  }
+
+  SidebarRailMode _resolveMode(BuildContext context) =>
+      LandscapeSidebar.resolveMode(
+        context: context,
+        modeOverride: widget.modeOverride,
+        isExtended: widget.isExtended,
+        isPeeking: _isPeeking,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +170,9 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
     final destinations = pulsrDestinations(context);
     final primaryItems = destinations.where((d) => d.index <= 2);
     final secondaryItems = destinations.where((d) => d.index >= 3);
+    final safePadding = MediaQuery.paddingOf(context);
+    final leftInset = safePadding.left;
+    final totalWidth = width > 0 ? (width + leftInset) : 0.0;
 
     return MouseRegion(
       onEnter: (_) {
@@ -133,19 +183,26 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
         child: AnimatedContainer(
           duration: context.motionMs(240),
           curve: context.motionCurve(Curves.easeOutCubic),
-          width: width,
+          width: totalWidth,
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             color: p.surface,
-            border: Border(
-              right: BorderSide(
+            border: BorderDirectional(
+              end: BorderSide(
                 color: p.hairline.withValues(alpha: p.isDark ? 0.35 : 0.16),
                 width: 1,
               ),
             ),
           ),
           child: ClipRect(
-            child: LayoutBuilder(
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(start: leftInset),
+              child: SafeArea(
+                top: true,
+                bottom: true,
+                left: false,
+                right: false,
+                child: LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -189,7 +246,6 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
                                   p: p,
                                   onTap: () {
                                     if (widget.currentIndex != item.index) {
-                                      HapticFeedback.selectionClick();
                                       widget.onDestinationSelected(item.index);
                                     }
                                   },
@@ -225,7 +281,6 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
                                   p: p,
                                   onTap: () {
                                     if (widget.currentIndex != item.index) {
-                                      HapticFeedback.selectionClick();
                                       widget.onDestinationSelected(item.index);
                                     }
                                   },
@@ -259,7 +314,9 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
                                   showCompactLabel: showCompactLabel,
                                   p: p,
                                   trailingBadge:
-                                      isExtended && widget.isSideInspectorOpen ? 'ON' : null,
+                                      isExtended && widget.isSideInspectorOpen
+                                          ? context.l10n.badgeOn
+                                          : null,
                                   onTap: () {
                                     HapticFeedback.selectionClick();
                                     widget.onToggleSideInspector!();
@@ -286,7 +343,9 @@ class _LandscapeSidebarState extends State<LandscapeSidebar> {
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

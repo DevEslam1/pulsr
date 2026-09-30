@@ -59,6 +59,46 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   PlaylistUseCases get _useCases =>
       widget.playlistUseCases ?? getIt<PlaylistUseCases>();
 
+  /// Memoized so the `StreamBuilder` does not resubscribe on every rebuild.
+  /// Cleared on retry to force a fresh subscription.
+  Stream<_PlaylistSongsResult>? _songsStream;
+
+  Stream<_PlaylistSongsResult> _resolveSongsStream() {
+    final cached = _songsStream;
+    if (cached != null) return cached;
+    final useCases = _useCases;
+    final Stream<_PlaylistSongsResult> stream;
+    if (playlist.isSmart && playlist.smartCriteria != null) {
+      SmartCriteria? criteria;
+      try {
+        criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
+      } catch (_) {
+        criteria = null;
+      }
+      if (criteria != null) {
+        stream = useCases
+            .watchSmartPlaylistSongs(criteria)
+            .map((songs) => _PlaylistSongsResult(songs: songs));
+      } else {
+        stream = Stream.value(
+          const _PlaylistSongsResult(songs: <SongsTableData>[]),
+        );
+      }
+    } else {
+      stream = useCases.watchPlaylistSongs(playlist.id).map(
+            (res) => res.fold(
+              (failure) => _PlaylistSongsResult(error: failure.message),
+              (songs) => _PlaylistSongsResult(songs: songs),
+            ),
+          );
+    }
+    return _songsStream = stream;
+  }
+
+  void _retryLoad() {
+    setState(() => _songsStream = null);
+  }
+
   void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,7 +144,19 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       return;
     }
     final exportUseCase = getIt<PlaylistExportUseCase>();
-    await exportUseCase.exportToFile(playlist.name, songs);
+    try {
+      await exportUseCase.exportToFile(playlist.name, songs);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.exportFailed),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -188,31 +240,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final p = context.palette;
     final playlistUseCases = _useCases;
 
-    final Stream<_PlaylistSongsResult> songsStream;
-    if (playlist.isSmart && playlist.smartCriteria != null) {
-      SmartCriteria? criteria;
-      try {
-        criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
-      } catch (_) {
-        criteria = null;
-      }
-      if (criteria != null) {
-        songsStream = playlistUseCases
-            .watchSmartPlaylistSongs(criteria)
-            .map((songs) => _PlaylistSongsResult(songs: songs));
-      } else {
-        songsStream = Stream.value(
-          const _PlaylistSongsResult(songs: <SongsTableData>[]),
-        );
-      }
-    } else {
-      songsStream = playlistUseCases.watchPlaylistSongs(playlist.id).map(
-            (res) => res.fold(
-              (failure) => _PlaylistSongsResult(error: failure.message),
-              (songs) => _PlaylistSongsResult(songs: songs),
-            ),
-          );
-    }
+    final Stream<_PlaylistSongsResult> songsStream = _resolveSongsStream();
 
     return StreamBuilder<_PlaylistSongsResult>(
       stream: songsStream,
@@ -272,11 +300,13 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       final isSmart = playlist.isSmart;
                       final smartCriteria = playlist.smartCriteria;
                       final songIds = songs.map((s) => s.id).toList();
+                      final deletedMessage =
+                          context.l10n.playlistDeleted(plName);
                       await playlistUseCases.deletePlaylist(playlist.id);
                       if (context.mounted) Navigator.pop(context);
                       messenger.showSnackBar(
                         SnackBar(
-                          content: Text('$plName - $undoLabel?'),
+                          content: Text(deletedMessage),
                           action: SnackBarAction(
                             label: undoLabel,
                             onPressed: () async {
@@ -373,7 +403,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           title: context.l10n.playlistLoadFailed,
                           subtitle: loadError,
                           primaryActionLabel: context.l10n.retry,
-                          onPrimaryAction: () => setState(() {}),
+                          onPrimaryAction: _retryLoad,
                         )
                       : songs.isEmpty
                       ? EmptyStateWidget(
@@ -487,8 +517,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                           ScaffoldMessenger.of(context).clearSnackBars();
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(
-                                              content: Text(
-                                                  '${song.title} removed from ${playlist.name}'),
+                                              content: Text(context.l10n
+                                                  .songRemovedFromPlaylist(
+                                                      song.title,
+                                                      playlist.name)),
                                               action: SnackBarAction(
                                                 label: context.l10n.undo,
                                                 onPressed: () {

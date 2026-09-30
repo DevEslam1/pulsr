@@ -38,11 +38,15 @@ class AddToPlaylistSheet extends StatefulWidget {
     );
   }
 
+  @visibleForTesting
+  static Set<int> get activePlaylistMutations => _AddToPlaylistSheetState._activePlaylistMutations;
+
   @override
   State<AddToPlaylistSheet> createState() => _AddToPlaylistSheetState();
 }
 
 class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
+  static final Set<int> _activePlaylistMutations = <int>{};
   bool _isMutating = false;
 
   List<SongsTableData> get _allSongs =>
@@ -76,31 +80,37 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
           return null;
         }, (id) => id);
         if (createdId == null) return;
-        // Await the insert inside the try so `_isMutating` is not cleared before
-        // the write completes (the previous async `fold` callback was dropped).
-        final insertResult = _allSongs.length == 1
-            ? await _useCases.addSongToPlaylist(createdId, widget.song.id)
-            : await _useCases.addSongsToPlaylist(
-                createdId, _allSongs.map((s) => s.id).toList());
-        if (!context.mounted) return;
-        final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
-        if (insertFailure != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(insertFailure)),
-          );
-          return;
-        }
-        if (context.mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _allSongs.length == 1
-                    ? '${widget.song.title}: ${context.l10n.addedToPlaylist} ($name)'
-                    : '${context.l10n.addedToPlaylist} (${_allSongs.length}): $name',
+        if (_activePlaylistMutations.contains(createdId)) return;
+        _activePlaylistMutations.add(createdId);
+        try {
+          // Await the insert inside the try so `_isMutating` is not cleared before
+          // the write completes (the previous async `fold` callback was dropped).
+          final insertResult = _allSongs.length == 1
+              ? await _useCases.addSongToPlaylist(createdId, widget.song.id)
+              : await _useCases.addSongsToPlaylist(
+                  createdId, _allSongs.map((s) => s.id).toList());
+          if (!context.mounted) return;
+          final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
+          if (insertFailure != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(insertFailure)),
+            );
+            return;
+          }
+          if (context.mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  _allSongs.length == 1
+                      ? '${widget.song.title}: ${context.l10n.addedToPlaylist} ($name)'
+                      : '${context.l10n.addedToPlaylist} (${_allSongs.length}): $name',
+                ),
               ),
-            ),
-          );
+            );
+          }
+        } finally {
+          _activePlaylistMutations.remove(createdId);
         }
       } finally {
         if (mounted) setState(() => _isMutating = false);
@@ -110,14 +120,15 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
 
   Future<void> _addToExistingPlaylist(
       BuildContext context, PlaylistsTableData playlist) async {
-    if (_isMutating) return;
+    if (_isMutating || _activePlaylistMutations.contains(playlist.id)) return;
+    _activePlaylistMutations.add(playlist.id);
     setState(() => _isMutating = true);
     try {
       final insertResult = _allSongs.length == 1
           ? await _useCases.addSongToPlaylist(playlist.id, widget.song.id)
           : await _useCases.addSongsToPlaylist(
               playlist.id, _allSongs.map((s) => s.id).toList());
-      if (!context.mounted) return;
+      if (!context.mounted || !_isMutating) return;
       final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
       if (insertFailure != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -125,7 +136,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
         );
         return;
       }
-      if (context.mounted) {
+      if (context.mounted && _isMutating) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -136,6 +147,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
         );
       }
     } finally {
+      _activePlaylistMutations.remove(playlist.id);
       if (mounted) setState(() => _isMutating = false);
     }
   }
@@ -167,12 +179,15 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                 child: Icon(Icons.add_rounded, color: p.accent, size: 20),
               ),
             ),
-      child: IgnorePointer(
-        ignoring: _isMutating,
-        child: Stack(
-          children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: screenHeight * 0.65),
+      child: Stack(
+        children: [
+          IgnorePointer(
+            ignoring: _isMutating,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: 140,
+                maxHeight: screenHeight * 0.65,
+              ),
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsetsDirectional.fromSTEB(
@@ -194,7 +209,38 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                         ),
                       );
                     }
-                    final playlists = snapshot.data
+                    final result = snapshot.data;
+                    final hasError =
+                        snapshot.hasError || (result != null && result.isLeft());
+                    if (hasError) {
+                      return Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(Icons.error_outline_rounded,
+                                  size: 48, color: p.error),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                context.l10n.somethingWentWrong,
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              TextButton.icon(
+                                onPressed: () => setState(() {}),
+                                icon: const Icon(Icons.refresh_rounded,
+                                    size: 18),
+                                label: Text(context.l10n.retry),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    final playlists = result
                             ?.fold((l) => <PlaylistsTableData>[], (r) => r)
                             .where((p) => !p.isSmart)
                             .toList() ??
@@ -282,19 +328,52 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                 ),
               ),
             ),
-            if (_isMutating)
-              Positioned.fill(
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: p.accent,
-                    ),
+          ),
+          if (_isMutating)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.25),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: p.accent,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () {
+                          if (mounted) {
+                            setState(() => _isMutating = false);
+                          }
+                        },
+                        child: Text(
+                          context.l10n.cancel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

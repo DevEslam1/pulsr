@@ -3089,6 +3089,21 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "verifyState" -> {
+                    val stateMap = HashMap<String, Any?>()
+                    stateMap["eqEnabled"] = isEqEnabled
+                    stateMap["preampDb"] = eqPreampDb
+                    stateMap["sessionId"] = currentAudioSessionId
+                    stateMap["isNativeDspLoaded"] = isNativeDspLoaded
+                    stateMap["isBitPerfectBypassActive"] = isBitPerfectBypassActive
+                    stateMap["bandCount"] = eqBandCount
+                    result.success(stateMap)
+                }
+
+                "sendWarmupBuffer" -> {
+                    result.success(true)
+                }
+
                 else -> result.notImplemented()
             }
     }

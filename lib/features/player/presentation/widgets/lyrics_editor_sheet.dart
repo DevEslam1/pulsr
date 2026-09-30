@@ -264,6 +264,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       IconButton(
                         icon: const Icon(Icons.play_arrow_rounded, size: 20),
                         color: p.primary,
+                        tooltip: context.l10n.play,
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(

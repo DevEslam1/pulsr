@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/channels.dart';
@@ -82,11 +83,28 @@ class AudioVisualizer extends StatefulWidget {
     return 0;
   }
 
+  static bool? _isTestingOverride;
+
+  @visibleForTesting
+  static set isTestingOverride(bool? value) => _isTestingOverride = value;
+
+  @visibleForTesting
+  static bool get isTesting {
+    if (_isTestingOverride != null) return _isTestingOverride!;
+    if (const bool.fromEnvironment('FLUTTER_TEST')) return true;
+    try {
+      if (!kIsWeb && Platform.environment['FLUTTER_TEST'] == 'true') {
+        return true;
+      }
+    } catch (_) {}
+    return WidgetsBinding.instance is! WidgetsFlutterBinding;
+  }
+
   @override
-  State<AudioVisualizer> createState() => _AudioVisualizerState();
+  State<AudioVisualizer> createState() => AudioVisualizerState();
 }
 
-class _AudioVisualizerState extends State<AudioVisualizer>
+class AudioVisualizerState extends State<AudioVisualizer>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const MethodChannel _methodChannel =
       MethodChannel(PulsrChannels.visualizer);
@@ -194,9 +212,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     }
   }
 
-  bool get _isTesting =>
-      const bool.fromEnvironment('FLUTTER_TEST') ||
-      WidgetsBinding.instance.runtimeType.toString().contains('Test');
+  bool get _isTesting => AudioVisualizer.isTesting;
 
   void _startAnimation() {
     if (!context.motionEnabled || _isTesting) {
@@ -258,9 +274,21 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         _initVisualizer();
         _restartNativeStream();
       } else {
-        _stopAnimation();
         _stopNativeStream();
-        _clearData();
+        if (widget.style == VisualizerStyle.off) {
+          _stopAnimation();
+          _clearData();
+        } else {
+          // Allow smooth decay to baseline on pause
+          for (int i = 0; i < _numBands; i++) {
+            _targetData[i] = 0.0;
+          }
+          if (_isDecayedToBaseline()) {
+            _stopAnimation();
+          } else {
+            _startAnimation();
+          }
+        }
       }
     }
   }
@@ -339,43 +367,73 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     }
   }
 
-  void _onTick() {
-    if (!mounted || !context.motionEnabled || !TickerMode.valuesOf(context).enabled || !_isAppActive || !widget.isPlaying) return;
-
-    final now = DateTime.now();
-    final staleMs = now.difference(_lastNativeDataTime).inMilliseconds;
-    final isStale = widget.preferSimulated || staleMs > 250;
-
-    if (isStale && widget.isPlaying && widget.style != VisualizerStyle.off) {
-      if (!widget.preferSimulated &&
-          Platform.isAndroid &&
-          _lastNativeDataTime.millisecondsSinceEpoch > 0 &&
-          staleMs > 1500) {
-        // Native stream stopped delivering samples; decay to zero to avoid misleading synthetic animation
-        for (int i = 0; i < _numBands; i++) {
-          _targetData[i] = 0.0;
-        }
-      } else {
-        final t = now.millisecondsSinceEpoch / 1000.0;
-        final seed = AudioVisualizer.resolveSeed(
-          trackSeed: widget.trackSeed,
-          trackId: widget.trackId,
-          trackPath: widget.trackPath,
-          audioSessionId: widget.audioSessionId,
-        );
-        final seedOffset = (seed.abs() % 100) / 100.0;
-        for (int i = 0; i < _numBands; i++) {
-          final phase = i * 0.25 + seedOffset;
-          final wave1 = math.sin(t * (3.5 + (seed.abs() % 4) * 0.1) + phase);
-          final wave2 =
-              math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
-          final sim = ((wave1 + wave2) / 4.0 + 0.35).clamp(0.05, 0.85);
-          _targetData[i] = sim;
-        }
+  bool _isDecayedToBaseline() {
+    for (int i = 0; i < _numBands; i++) {
+      if (_currentData[i] > 0.001 || _targetData[i] > 0.001) {
+        return false;
       }
-    } else if (!widget.isPlaying) {
+    }
+    return true;
+  }
+
+  @visibleForTesting
+  bool get isDecayedToBaseline => _isDecayedToBaseline();
+
+  @visibleForTesting
+  void onTickForTesting() => _onTick();
+
+  @visibleForTesting
+  List<double> get currentDataForTesting => List.unmodifiable(_currentData);
+
+  @visibleForTesting
+  void setBarDataForTesting(int index, double val) {
+    _currentData[index] = val;
+    _dataNotifier.value = List.from(_currentData);
+  }
+
+  void _onTick() {
+    if (!mounted || !context.motionEnabled || !TickerMode.valuesOf(context).enabled || !_isAppActive) return;
+
+    if (!widget.isPlaying) {
+      if (_isDecayedToBaseline()) {
+        _stopAnimation();
+        return;
+      }
       for (int i = 0; i < _numBands; i++) {
         _targetData[i] = 0.0;
+      }
+    } else {
+      final now = DateTime.now();
+      final staleMs = now.difference(_lastNativeDataTime).inMilliseconds;
+      final isStale = widget.preferSimulated || staleMs > 250;
+
+      if (isStale && widget.style != VisualizerStyle.off) {
+        if (!widget.preferSimulated &&
+            Platform.isAndroid &&
+            _lastNativeDataTime.millisecondsSinceEpoch > 0 &&
+            staleMs > 1500) {
+          // Native stream stopped delivering samples; decay to zero to avoid misleading synthetic animation
+          for (int i = 0; i < _numBands; i++) {
+            _targetData[i] = 0.0;
+          }
+        } else {
+          final t = now.millisecondsSinceEpoch / 1000.0;
+          final seed = AudioVisualizer.resolveSeed(
+            trackSeed: widget.trackSeed,
+            trackId: widget.trackId,
+            trackPath: widget.trackPath,
+            audioSessionId: widget.audioSessionId,
+          );
+          final seedOffset = (seed.abs() % 100) / 100.0;
+          for (int i = 0; i < _numBands; i++) {
+            final phase = i * 0.25 + seedOffset;
+            final wave1 = math.sin(t * (3.5 + (seed.abs() % 4) * 0.1) + phase);
+            final wave2 =
+                math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
+            final sim = ((wave1 + wave2) / 4.0 + 0.35).clamp(0.05, 0.85);
+            _targetData[i] = sim;
+          }
+        }
       }
     }
 
@@ -390,13 +448,20 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       final next = current + (target - current) * coeff;
 
       if ((next - current).abs() > 0.001) {
-        _currentData[i] = next;
+        _currentData[i] = next <= 0.001 ? 0.0 : next;
+        hasChanged = true;
+      } else if (current > 0.0 && target == 0.0) {
+        _currentData[i] = 0.0;
         hasChanged = true;
       }
     }
 
     if (hasChanged) {
       _dataNotifier.value = List.from(_currentData);
+    }
+
+    if (!widget.isPlaying && _isDecayedToBaseline()) {
+      _stopAnimation();
     }
   }
 

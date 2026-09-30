@@ -100,17 +100,29 @@ extension EqualizerPresetOps on EqualizerManager {
     isAbComparisonActive = false;
     if (_abComparisonGains.isNotEmpty) {
       final targetFreqs = activeFrequencies;
+      // BUG-11: preserve any per-band edits the user made while the comparison
+      // was active. Only bands still holding the pre-comparison value are
+      // restored; bands the user moved keep their live value.
+      final merged = List<double>.from(_abComparisonGains);
+      final live = currentPreset.gains;
+      for (int i = 0; i < merged.length && i < live.length; i++) {
+        if (live[i] != _abComparisonGains[i]) {
+          merged[i] = live[i];
+        }
+      }
+      if (!listEquals(merged, currentPreset.gains)) {
+        currentPreset = currentPreset.copyWith(gains: merged);
+        comparisonSlots[activeComparisonSlot] = currentPreset;
+      }
       if (PlatformCapabilities.isAndroid) {
         // Restore BOTH EQ paths (mirrors applyCurrentPreset's dual push).
         final futures = <Future<void>>[];
-        for (int i = 0;
-            i < targetFreqs.length && i < _abComparisonGains.length;
-            i++) {
+        for (int i = 0; i < targetFreqs.length && i < merged.length; i++) {
           futures.add(
             _effectsChannel.setNativeEqBand(
               i,
               targetFreqs[i],
-              _abComparisonGains[i],
+              merged[i],
               1.414,
             ),
           );
@@ -120,12 +132,12 @@ extension EqualizerPresetOps on EqualizerManager {
           // HAL postEq holds the interpolated 10-band curve in 32/64-band mode.
           await _effectsChannel.setEqBandGains(
             EqPreset.interpolateGains(
-              _abComparisonGains,
+              merged,
               targetFrequencies: customFrequencies,
             ),
           );
         } else {
-          await _effectsChannel.setEqBandGains(_abComparisonGains);
+          await _effectsChannel.setEqBandGains(merged);
         }
       }
       _abComparisonGains = [];

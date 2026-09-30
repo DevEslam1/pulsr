@@ -64,6 +64,17 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     final s = _getState();
     if (enabled == s.isQuranModeEnabled) return;
     if (enabled) {
+      // B5: Quran Mode pushes EQ/reverb/saturation/dynamics to the engine, so it
+      // must respect the Bit-Perfect/AAudio/DoP guardrail invariant.
+      final reason = _dspBlockedReason?.call();
+      if (reason != null) {
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(
+            errorMessage: 'Quran Mode blocked: $reason',
+          ),
+        ));
+        return;
+      }
       final snapshot = _captureQuranRestoreSnapshot(s);
       await _persistQuranSnapshot(snapshot);
       _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: true)));
@@ -91,13 +102,34 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
 
   Future<void> setQuranAmbience(double v) async {
     final s = _getState();
+    // B5: reverb is a DSP write, so honour the Bit-Perfect guardrail while
+    // Quran Mode is driving the ambience.
+    if (s.isQuranModeEnabled) {
+      final reason = _dspBlockedReason?.call();
+      if (reason != null) {
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(errorMessage: 'Reverb blocked: $reason'),
+        ));
+        return;
+      }
+    }
     // Only enable reverb when Quran Mode is actively enabled and slider has a positive value.
     // If set to 0 or if Quran mode is inactive, do not unconditionally force reverb on.
     final enable = s.isQuranModeEnabled ? (v > 0.001) : s.isReverbEnabled;
     _emit(s.copyWith(
       dsp: s.dsp.copyWith(isReverbEnabled: enable, reverbWetDry: v),
     ));
-    await _audioHandler.setReverb(enable, wetDry: v);
+    try {
+      await _audioHandler.setReverb(enable, wetDry: v);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set Quran ambience',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');
+      _syncAudioEffects?.call();
+      final cur = _getState();
+      _emit(cur.copyWith(
+        playback: cur.playback.copyWith(errorMessage: 'Failed to set ambience'),
+      ));
+    }
   }
 
   Future<void> _restoreFromSnapshot(QuranRestoreSnapshot snapshot) async {
@@ -154,6 +186,11 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           error: e,
           stackTrace: st,
           category: 'PlayerPlaybackOptionsQuran');
+      _syncAudioEffects?.call();
+      final cur = _getState();
+      _emit(cur.copyWith(
+        playback: cur.playback.copyWith(errorMessage: 'Failed to restore audio settings'),
+      ));
     }
   }
 
@@ -198,22 +235,29 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         profile.dynamicsPreset,
         enabled: profile.dynamicsEnabled,
       );
-      await setPlaybackSpeed(profile.playbackSpeed);
+      // B13: Quran speed is transient — never persist it as this track's
+      // remembered speed.
+      await setPlaybackSpeed(profile.playbackSpeed, persist: false);
     } catch (e, st) {
       ErrorLogger.log('Failed to apply Quran profile',
           error: e,
           stackTrace: st,
           category: 'PlayerPlaybackOptionsQuran');
+      _syncAudioEffects?.call();
+      final cur = _getState();
+      _emit(cur.copyWith(
+        playback: cur.playback.copyWith(errorMessage: 'Failed to apply Quran profile'),
+      ));
     }
   }
 
+  /// B7: re-applies the *current style's* Quran profile. The only caller is the
+  /// QuranModePanel "Reset profile" button, which runs while Quran Mode is
+  /// enabled; restoring the pre-Quran snapshot here was the exact opposite of
+  /// the label. Snapshot restore stays exclusive to [setQuranModeEnabled](false).
   Future<void> reapplyQuranProfile() async {
-    final snapshot = await loadQuranSnapshot();
-    if (snapshot != null) {
-      await _restoreFromSnapshot(snapshot);
-      return;
-    }
     final s = _getState();
+    if (!s.isQuranModeEnabled) return;
     final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
     await _applyQuranProfile(profile);
   }

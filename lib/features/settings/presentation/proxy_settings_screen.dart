@@ -124,17 +124,6 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   }
 
   void _syncControllersWithState(SettingsState state) {
-    final anyFieldFocused = _hostFocusNode.hasFocus ||
-        _portFocusNode.hasFocus ||
-        _usernameFocusNode.hasFocus ||
-        _passwordFocusNode.hasFocus ||
-        _bypassFocusNode.hasFocus;
-    if (anyFieldFocused) {
-      _enabled = state.proxyEnabled;
-      _type = state.proxyType;
-      return;
-    }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!_hostFocusNode.hasFocus && _hostController.text != state.proxyHost) {
@@ -152,11 +141,17 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       // Password lives in secure storage (not in SettingsState) — rehydrate it
       // so switching pool entries never leaves a stale password behind.
       if (!_passwordFocusNode.hasFocus) {
-        context.read<SettingsCubit>().getProxyPassword().then((pw) {
-          if (mounted && !_passwordFocusNode.hasFocus && _passwordController.text != pw) {
-            _passwordController.text = pw;
+        if (!state.hasProxyPassword) {
+          if (_passwordController.text.isNotEmpty) {
+            _passwordController.text = '';
           }
-        });
+        } else {
+          context.read<SettingsCubit>().getProxyPassword().then((pw) {
+            if (mounted && !_passwordFocusNode.hasFocus && _passwordController.text != pw) {
+              _passwordController.text = pw;
+            }
+          });
+        }
       }
       _enabled = state.proxyEnabled;
       _type = state.proxyType;
@@ -164,7 +159,12 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   }
 
   Future<void> _saveSettings() async {
-    if (!_formKey.currentState!.validate()) return;
+    // The form may not have been built yet on the very first frame, in which
+    // case [_formKey.currentState] is null. Only block the save when a form
+    // exists and actually fails validation; otherwise persist the controller
+    // values so the user's edits are never silently dropped.
+    final form = _formKey.currentState;
+    if (form != null && !form.validate()) return;
 
     final port = int.tryParse(_portController.text.trim()) ?? 8080;
     final cubit = context.read<SettingsCubit>();
@@ -198,7 +198,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
   }
 
   Future<void> _runTest() async {
-    if (!_formKey.currentState!.validate()) return;
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) return;
 
     setState(() {
       _isTesting = true;
@@ -519,7 +520,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
           prev.proxyUsername != curr.proxyUsername ||
           prev.proxyBypassHosts != curr.proxyBypassHosts ||
           prev.proxyEnabled != curr.proxyEnabled ||
-          prev.proxyType != curr.proxyType,
+          prev.proxyType != curr.proxyType ||
+          prev.hasProxyPassword != curr.hasProxyPassword,
       listener: (context, state) {
         _syncControllersWithState(state);
       },

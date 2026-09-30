@@ -76,6 +76,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     }
 
     final pass = password ?? '';
+    _proxyPasswordGen++;
+    _inFlightProxyPasswordRead = null;
     _proxyPassword = pass;
     // FIX-C6: Reset / set _proxyPasswordLoaded whenever user sets proxy credentials
     _proxyPasswordLoaded = true;
@@ -374,6 +376,13 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
   // ignore: unused_element
   bool get _proxyPasswordLoaded;
   set _proxyPasswordLoaded(bool value);
+
+  int get _proxyPasswordGen;
+  set _proxyPasswordGen(int value);
+
+  // ignore: unused_element
+  Future<String>? get _inFlightProxyPasswordRead;
+  set _inFlightProxyPasswordRead(Future<String>? value);
 
   // Requires: provided by the composing class (same library).
   ProxyConfig get activeProxyConfig;

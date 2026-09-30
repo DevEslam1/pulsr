@@ -410,7 +410,9 @@ class YtmAccountService {
       await _secureStorage.delete(key: _cookieSecureKey);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('ytm_session_cookies');
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Folds a pasted or scraped cookie blob into one well-formed `Cookie` header
@@ -574,7 +576,9 @@ class YtmAccountService {
     unawaited(() async {
       try {
         await _warmSession();
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     }());
   }
 
@@ -591,7 +595,9 @@ class YtmAccountService {
     await _deleteStoredCookies();
     try {
       await YtmOAuthService.shared.signOut();
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accountNamePrefKey);
     await prefs.remove(_accountAvatarPrefKey);
@@ -605,14 +611,18 @@ class YtmAccountService {
       if (getIt.isRegistered<YtmUrlCache>()) {
         getIt<YtmUrlCache>().clear();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
 
     // The WebView jar first: the native store re-reads it whenever its own prefs
     // are empty, so clearing native before the jar leaves a window (and, if the
     // jar survives, a cold start) in which the session comes straight back.
     try {
       await _deleteSessionWebViewCookies();
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     try {
       final ytmService = getIt<YtmService>();
       // Marks the native store signed out, expires the tracked cookie names in
@@ -621,7 +631,9 @@ class YtmAccountService {
       await ytmService.clearNativeSession();
       await ytmService.syncCookies('');
       await ytmService.invalidatePoToken();
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Cookie scopes owned by the YTM sign-in flow, as `(url, domain)` pairs.
@@ -668,13 +680,17 @@ class YtmAccountService {
           // One bad scope must not abandon the rest.
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     if (deletedAny) return;
     // Scoped deletion unsupported on this platform — fall back to a full wipe
     // rather than leaving session cookies behind.
     try {
       await CookieManager.instance().deleteAllCookies();
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   Future<void> _warmSession() async {
@@ -701,7 +717,9 @@ class YtmAccountService {
         }
         try {
           _harvestSessionState(json);
-        } catch (_) {}
+        } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
         // Set-Cookie is now ingested for every 2xx in _postWithRetry, so this
         // path no longer needs its own copy.
         debugPrint('[YTM_ACCOUNT] Session warmed successfully');
@@ -812,7 +830,9 @@ class YtmAccountService {
     // refreshed jar so the two layers never drift apart.
     try {
       unawaited(getIt<YtmService>().syncCookies(merged));
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH, SAPISID3PHASH, or SAPISID1PHASH.
@@ -1085,7 +1105,9 @@ class YtmAccountService {
         }
       } on YtmException {
         rethrow;
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     }
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
@@ -1156,7 +1178,9 @@ class YtmAccountService {
             if (setCookie != null && setCookie.isNotEmpty) {
               try {
                 _ingestSetCookies(setCookie);
-              } catch (_) {}
+              } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
             }
           }
         }
@@ -1548,7 +1572,9 @@ class YtmAccountService {
         _cookies = nativeCookies;
         unawaited(_persistCookies(nativeCookies));
       }
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
 
     final headers = _buildHeaders();
     final cleanRawId =
@@ -2121,7 +2147,9 @@ class YtmAccountService {
         await getIt<YtmService>()
             .ensurePoTokenReady()
             .timeout(const Duration(seconds: 2));
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     }();
     await sessionWarm;
     await tokenReady;
@@ -2154,7 +2182,9 @@ class YtmAccountService {
             .timeout(const Duration(seconds: 2));
         guestPoToken = poState?['streamingPoToken'] as String?;
         guestVisitorData = poState?['visitorData'] as String?;
-      } catch (_) {}
+      } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
     }();
 
     Future<Map<String, dynamic>?>? accountMint;
@@ -3340,6 +3370,8 @@ class YtmAccountService {
     loginState.dispose();
     try {
       _innertubeClient.close();
-    } catch (_) {}
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
   }
 }

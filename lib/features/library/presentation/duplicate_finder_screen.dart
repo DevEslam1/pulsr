@@ -5,6 +5,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/services/duplicate_finder_service.dart';
 import '../../../core/services/missing_artwork_service.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
@@ -44,19 +45,30 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Future<void> _scan() async {
     if (mounted) setState(() => _isScanning = true);
-    var songs = const <SongsTableData>[];
-    if (getIt.isRegistered<IMusicRepository>()) {
-      final res = await getIt<IMusicRepository>().getAllSongs();
-      songs = res.fold((_) => const <SongsTableData>[], (list) => list);
+    try {
+      var songs = const <SongsTableData>[];
+      if (getIt.isRegistered<IMusicRepository>()) {
+        final res = await getIt<IMusicRepository>().getAllSongs();
+        songs = res.fold((_) => const <SongsTableData>[], (list) => list);
+      }
+      final duplicates = await _finder.findDuplicates(songs);
+      if (!mounted) return;
+      setState(() {
+        _duplicateGroups = duplicates;
+        _keptSongByGroup
+            .removeWhere((key, _) => !duplicates.any((g) => g.key == key));
+      });
+    } catch (e, st) {
+      // BUG-17: never let a scan failure leave the spinner running forever.
+      ErrorLogger.log('Duplicate scan failed',
+          error: e, stackTrace: st, category: 'DuplicateFinder');
+      if (mounted) {
+        PulsrToast.show(context,
+            message: context.l10n.browseFailedToFetch, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isScanning = false);
     }
-    final duplicates = await _finder.findDuplicates(songs);
-    if (!mounted) return;
-    setState(() {
-      _duplicateGroups = duplicates;
-      _keptSongByGroup
-          .removeWhere((key, _) => !duplicates.any((g) => g.key == key));
-      _isScanning = false;
-    });
   }
 
   Future<void> _fetchMissingArtwork() async {
@@ -114,7 +126,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (!mounted) return;
     PulsrToast.show(
       context,
-      message: 'Selected highest quality for $updatedCount groups',
+                            message: context.l10n.selectedHighestQuality(updatedCount),
       icon: Icons.auto_awesome_rounded,
     );
   }
@@ -240,7 +252,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             if (_duplicateGroups.isNotEmpty)
               IconButton(
                 icon: Icon(Icons.auto_awesome_rounded, color: p.accent),
-                tooltip: 'Keep best quality for all',
+                        tooltip: context.l10n.keepBestQualityForAll,
                 constraints: const BoxConstraints(
                   minWidth: AppSpacing.minTouchTarget,
                   minHeight: AppSpacing.minTouchTarget,

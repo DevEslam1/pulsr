@@ -49,7 +49,10 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     super.initState();
     _playlistUseCases = getIt<PlaylistUseCases>();
     _getSongsUseCase = getIt<GetSongsUseCase>();
-    _songsStream = _getSongsUseCase.watchSongs().distinct().asBroadcastStream();
+    _songsStream = _getSongsUseCase
+        .watchSongs()
+        .distinct()
+        .asBroadcastStream(onCancel: (sub) => sub.cancel());
     _loadInitialPlaylistSongs();
   }
 
@@ -490,27 +493,51 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   }
 
   Future<void> _applyChanges() async {
+    if (_isSaving) return;
     setState(() => _isSaving = true);
 
     final toAdd = _selectedSongIds.difference(_initialSongIds).toList();
     final toRemove = _initialSongIds.difference(_selectedSongIds).toList();
 
-    if (toAdd.isNotEmpty) {
-      await _playlistUseCases.addSongsToPlaylist(widget.playlist.id, toAdd);
+    String? failureMessage;
+    try {
+      if (toAdd.isNotEmpty) {
+        final res = await _playlistUseCases
+            .addSongsToPlaylist(widget.playlist.id, toAdd);
+        failureMessage = res.fold<String?>((f) => f.message, (_) => null);
+      }
+
+      if (failureMessage == null) {
+        for (final songId in toRemove) {
+          final res = await _playlistUseCases
+              .removeSongFromPlaylist(widget.playlist.id, songId);
+          failureMessage = res.fold<String?>((f) => f.message, (_) => null);
+          if (failureMessage != null) break;
+        }
+      }
+    } catch (e) {
+      failureMessage = e.toString();
     }
 
-    for (final songId in toRemove) {
-      await _playlistUseCases.removeSongFromPlaylist(widget.playlist.id, songId);
-    }
+    if (!mounted) return;
 
-    if (mounted) {
-      Navigator.of(context).pop(true);
+    if (failureMessage != null) {
+      setState(() => _isSaving = false);
       PulsrToast.show(
         context,
-        message:
-            '${context.l10n.browsePlaylistUpdated} (+${toAdd.length}, -${toRemove.length})',
-        icon: Icons.check_circle_rounded,
+        message: failureMessage,
+        icon: Icons.error_outline_rounded,
+        isError: true,
       );
+      return;
     }
+
+    Navigator.of(context).pop(true);
+    PulsrToast.show(
+      context,
+      message:
+          '${context.l10n.browsePlaylistUpdated} (+${toAdd.length}, -${toRemove.length})',
+      icon: Icons.check_circle_rounded,
+    );
   }
 }

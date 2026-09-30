@@ -9,6 +9,262 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String get sleepTimerDurationMinutes => 'Duración (minutos)';
+
+  @override
+  String get sleepTimerMinutesHint => 'p. ej. 25';
+
+  @override
+  String get minuteAbbreviation => 'min';
+
+  @override
+  String get sleepTimerInvalidRange => 'Introduce un valor de 1 a 720 minutos';
+
+  @override
+  String get moreOptions => 'Opciones';
+
+  @override
+  String get googleCast => 'Google Cast';
+
+  @override
+  String get autoplay => 'Reproducción automática';
+
+  @override
+  String trackCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pistas',
+      one: '1 pista',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get decades => 'Décadas';
+
+  @override
+  String get libraryManageTabs => 'Pestañas';
+
+  @override
+  String get libraryAtLeastOneTab => 'Se requiere al menos una pestaña';
+
+  @override
+  String libraryTabsReorder(int active, int total) {
+    return '$active de $total pestañas • Arrastra para reordenar';
+  }
+
+  @override
+  String libraryTabsLongPress(int active, int total) {
+    return '$active de $total pestañas • Mantén pulsado para organizar';
+  }
+
+  @override
+  String libraryInactiveTabs(int count) {
+    return 'Inactivas ($count)';
+  }
+
+  @override
+  String get whatsNew => 'Novedades';
+
+  @override
+  String get developer => 'Desarrollador';
+
+  @override
+  String get showMore => 'Mostrar más';
+
+  @override
+  String get showLess => 'Mostrar menos';
+
+  @override
+  String get resetWaveformZoom => 'Restablecer zoom de la forma de onda';
+
+  @override
+  String get dspLabel => 'DSP';
+
+  @override
+  String get queueTab => 'Cola';
+
+  @override
+  String get addTab => 'Añadir pestaña';
+
+  @override
+  String get twoPaneSelectItem =>
+      'Selecciona un elemento para ver los detalles';
+
+  @override
+  String get leAudioRequiresBle =>
+      'Los códecs LE Audio (LC3 / Opus) requieren una conexión Bluetooth LE Audio.';
+
+  @override
+  String get castEntireQueue => 'Enviar toda la cola';
+
+  @override
+  String get roomAveragingTitle => 'Promediado de sala de 3 puntos';
+
+  @override
+  String get roomAveragingSubtitle =>
+      'Mide centro, 1 m izquierda y 1 m derecha para una corrección robusta';
+
+  @override
+  String get roomPositionCenter => 'Centro';
+
+  @override
+  String get roomPositionLeft => 'Izquierda';
+
+  @override
+  String get roomPositionRight => 'Derecha';
+
+  @override
+  String get correctionCurveRange => 'Curva de corrección (20 Hz – 20 kHz)';
+
+  @override
+  String get offsetMinus50Ms => '-50 ms';
+
+  @override
+  String get offsetPlus50Ms => '+50 ms';
+
+  @override
+  String get freq20Hz => '20 Hz';
+
+  @override
+  String get freq100Hz => '100 Hz';
+
+  @override
+  String get freq1kHz => '1 kHz';
+
+  @override
+  String get freq10kHz => '10 kHz';
+
+  @override
+  String get freq20kHz => '20 kHz';
+
+  @override
+  String songRemovedFromPlaylist(String title, String playlist) {
+    return '$title eliminada de $playlist';
+  }
+
+  @override
+  String playlistDeleted(String name) {
+    return 'Se eliminó $name';
+  }
+
+  @override
+  String get voiceSearch => 'Búsqueda por voz';
+
+  @override
+  String get voiceSearchUnavailable => 'La búsqueda por voz no está disponible';
+
+  @override
+  String get searchLocalOnlineHint => 'Busca música local y en línea...';
+
+  @override
+  String noLocalSongsMatch(String query) {
+    return 'Ninguna canción local coincide con \"$query\"';
+  }
+
+  @override
+  String noOnlineSongsMatch(String query) {
+    return 'Ninguna canción en línea coincide con \"$query\"';
+  }
+
+  @override
+  String get professionalMode => 'Modo profesional';
+
+  @override
+  String get professionalModeUnlocked =>
+      'DSP avanzado, streaming bit-perfect y controles de audio pro desbloqueados.';
+
+  @override
+  String get quickDspControls => 'Controles DSP rápidos';
+
+  @override
+  String get eqEngineTitle => 'Motor de ecualización';
+
+  @override
+  String get eqEngineSubtitle => 'Filtrado paramétrico biquad directo';
+
+  @override
+  String get truePeakLimiterTitle => 'Limitador de pico real';
+
+  @override
+  String get truePeakLimiterSubtitle => 'Sin recorte entre muestras';
+
+  @override
+  String get viperDdcTitle => 'Corrección de auriculares ViPER-DDC';
+
+  @override
+  String get settingsSectionSoundPlayback => 'Sonido y reproducción';
+
+  @override
+  String get settingsSectionAppearanceGestures => 'Apariencia y gestos';
+
+  @override
+  String get settingsSectionSystemPrivacy => 'Sistema y privacidad';
+
+  @override
+  String get whatChanges => '¿Qué cambia?';
+
+  @override
+  String get expEqTitle => 'Ecualizador y DSP';
+
+  @override
+  String get expEqPro =>
+      'EQ paramétrico de 10 bandas, factor Q y corrección de sala';
+
+  @override
+  String get expEqNormal => 'Ajustes de audio inteligentes seleccionados';
+
+  @override
+  String get expUsbTitle => 'DAC USB y salida';
+
+  @override
+  String get expUsbPro => 'Bloqueo de hardware bit-perfect, streaming DSD DoP';
+
+  @override
+  String get expUsbNormal => 'AudioTrack del sistema (float de 32 bits)';
+
+  @override
+  String get expCrossfadeTitle => 'Reproducción y crossfade';
+
+  @override
+  String get expCrossfadePro =>
+      'Curva de 0-12 s detallada y calibración de latencia';
+
+  @override
+  String get expCrossfadeNormal => 'Crossfade suave estándar de 3 s';
+
+  @override
+  String get expGainTitle => 'Ganancia y sonoridad';
+
+  @override
+  String get expGainPro =>
+      'Calibración ReplayGain en dB y preamplificador manual';
+
+  @override
+  String get expGainNormal => 'Nivelación automática de sonoridad percibida';
+
+  @override
+  String get expVisualizersTitle => 'Visualizadores';
+
+  @override
+  String get expVisualizersPro =>
+      'Intérprete de presets Milkdrop y JSON personalizado';
+
+  @override
+  String get expVisualizersNormal => 'Estilos Classic Wave y Radial Frequency';
+
+  @override
+  String queueReorderSemantics(String title, int index, int count) {
+    return 'Reordenar $title. Posición $index de $count';
+  }
+
+  @override
+  String songByArtist(String title, String artist) {
+    return '$title de $artist';
+  }
+
+  @override
   String get customDurationMinutes => 'Duración personalizada (minutos).';
 
   @override
@@ -6840,5 +7096,187 @@ class AppLocalizationsEs extends AppLocalizations {
   String get cassettePulsrTape => 'PULSR C-90';
 
   @override
+  String get dspPitchUpSemitone => 'Tono +1 semitono';
+
+  @override
+  String get dspPitchDownSemitone => 'Tono -1 semitono';
+
+  @override
+  String get dspPitchMeterUnavailable =>
+      'La detección de tono vocal no está disponible en esta compilación.';
+
+  @override
+  String get castNoLocalItems =>
+      'No hay nada que transmitir: solo se pueden transmitir archivos locales.';
+
+  @override
+  String settingsCastingQueueTo(String device) {
+    return 'Transmitiendo la cola a $device';
+  }
+
+  @override
+  String castCastingTo(String device) {
+    return 'Transmitiendo a $device';
+  }
+
+  @override
+  String get castToSpeakerDisplay => 'Transmitir a altavoz / pantalla';
+
+  @override
+  String get castManageHint =>
+      'Toca para gestionar el volumen de Cast o desconectar';
+
+  @override
+  String get castStreamHint => 'Transmite audio con o sin pérdida por Wi-Fi';
+
+  @override
+  String get downloadsMatchStream =>
+      'Las descargas coinciden con la transmisión';
+
+  @override
+  String get sleepTimerEndOfQueue => 'Temporizador: fin de la cola';
+
+  @override
+  String sleepTimerTracksRemaining(int count) {
+    return 'Temporizador: $count pistas restantes';
+  }
+
+  @override
+  String sleepTimerMinutesRemaining(int minutes) {
+    return 'Temporizador: $minutes min restantes';
+  }
+
+  @override
   String get statusCancelled => 'Cancelado';
+
+  @override
+  String get dockStyleTitle => 'Estilo del dock';
+
+  @override
+  String get dockStyleSubtitle =>
+      'Elige cómo se apilan el mini reproductor y la barra de navegación';
+
+  @override
+  String get dockStyleDefault => 'Lado a lado';
+
+  @override
+  String get dockStyleDefaultDesc =>
+      'Mini reproductor sobre la barra de navegación';
+
+  @override
+  String get dockStyleSystem => 'Píldora flotante';
+
+  @override
+  String get dockStyleSystemDesc =>
+      'Una píldora multimedia flotante sobre la barra de navegación';
+
+  @override
+  String get dockStyleMiniTop => 'Mini reproductor delante';
+
+  @override
+  String get dockStyleMiniTopDesc =>
+      'La barra de navegación asoma detrás del mini reproductor';
+
+  @override
+  String get dockStyleNavTop => 'Navegación delante';
+
+  @override
+  String get dockStyleNavTopDesc =>
+      'El mini reproductor asoma detrás de la barra de navegación';
+
+  @override
+  String get dockStyleHint =>
+      'Mantén pulsado el mini reproductor para cambiar el estilo del dock';
+
+  @override
+  String whatsNewSubtitle(String version) {
+    return 'Mira las novedades de la v$version';
+  }
+
+  @override
+  String get studioMoreInStudio => 'Más en modo Estudio';
+
+  @override
+  String studioControlsAvailable(int count) {
+    return '$count controles de estudio disponibles';
+  }
+
+  @override
+  String get studioSwitchCta => 'Cambiar a Estudio';
+
+  @override
+  String get studioExplainerTitle => 'Qué añade el modo Estudio';
+
+  @override
+  String get studioExplainerBody =>
+      'Salida Bit-Perfect, la suite DSP completa, perfiles de dispositivo, automatización y el backend proxy. Puedes volver cuando quieras.';
+
+  @override
+  String get alphabetIndexLabel => 'Índice alfabético';
+
+  @override
+  String get badgeOn => 'SÍ';
+
+  @override
+  String get keepBestQualityForAll => 'Conservar la mejor calidad para todo';
+
+  @override
+  String selectedHighestQuality(int count) {
+    return 'Se seleccionó la mejor calidad para $count grupos';
+  }
+
+  @override
+  String get enterSearchValue => 'Introduce un valor de búsqueda…';
+
+  @override
+  String get radioSearchHint => 'Busca emisora, género o URL…';
+
+  @override
+  String get webSessionInterruptedTitle => 'Sesión web interrumpida';
+
+  @override
+  String get webSessionInterruptedDesc =>
+      'El sistema desacopló o recuperó el control de la vista web. Toca abajo para recargar la sesión.';
+
+  @override
+  String get onboardingGesturesTitle => 'Gestos y atajos';
+
+  @override
+  String get onboardingGesturesDesc =>
+      'Unos pocos gestos hacen que Pulsr sea muy fácil de usar.';
+
+  @override
+  String get onboardingGestureSwipeUpTitle => 'Desliza hacia arriba';
+
+  @override
+  String get onboardingGestureSwipeUpDesc =>
+      'Abre el reproductor a pantalla completa';
+
+  @override
+  String get onboardingGestureSwipeDownTitle => 'Desliza hacia abajo';
+
+  @override
+  String get onboardingGestureSwipeDownDesc =>
+      'Reorganiza el mini reproductor y la navegación';
+
+  @override
+  String get onboardingGestureDoubleTapTitle => 'Doble toque en la carátula';
+
+  @override
+  String get onboardingGestureDoubleTapDesc => 'Activa o desactiva el favorito';
+
+  @override
+  String get onboardingGestureLongPressTitle =>
+      'Mantén pulsado el mini reproductor';
+
+  @override
+  String get onboardingGestureLongPressDesc =>
+      'Abre las opciones de estilo del dock';
+
+  @override
+  String get onboardingPersonalizeTitle => 'Hazlo tuyo';
+
+  @override
+  String get onboardingPersonalizeDesc =>
+      'Elige un color ahora; puedes cambiarlo cuando quieras en Ajustes.';
 }

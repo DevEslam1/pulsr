@@ -36,17 +36,16 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
     if (index == _lastScrolledIndex || index < 0) return;
     _lastScrolledIndex = index;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        final targetOffset = (index * 68.0 - 100.0).clamp(
-          0.0,
-          _scrollController.position.maxScrollExtent,
-        );
-        _scrollController.animateTo(
-          targetOffset,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-        );
-      }
+      if (!mounted || !_scrollController.hasClients) return;
+      final targetOffset = (index * 68.0 - 100.0).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        targetOffset,
+        duration: context.motionMs(300),
+        curve: context.motionCurve(Curves.easeOutCubic),
+      );
     });
   }
 
@@ -90,15 +89,19 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                     horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                 child: Row(
                   children: [
-                    Text(
-                      context.l10n.queue,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: AppFontSize.bodyLarge,
-                        color: p.textPrimary,
+                    Expanded(
+                      child: Text(
+                        context.l10n.queue,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: AppFontSize.bodyLarge,
+                          color: p.textPrimary,
+                        ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: AppSpacing.xs),
                     ...List.generate(3, (slotIndex) {
                       final isSelected = state.activeQueueSlot == slotIndex;
                       return Padding(
@@ -127,7 +130,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                 fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w800,
                                 color:
-                                    isSelected ? Colors.white : p.textSecondary,
+                                    isSelected ? p.onAccent : p.textSecondary,
                               ),
                             ),
                           ),

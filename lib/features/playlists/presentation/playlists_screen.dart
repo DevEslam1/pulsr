@@ -432,24 +432,26 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         final columns = Adaptive.gridColumns(context, minItemWidth: 170);
         final isTwoPane = context.isTwoPanePlaylist;
 
+        // Resolve the two-pane selection without mutating state during build;
+        // the field is updated in a post-frame callback when it differs.
+        final PlaylistsTableData? resolvedSelection;
         if (isTwoPane) {
-          if (_selectedPlaylist == null) {
-            if (userPlaylists.isNotEmpty) {
-              _selectedPlaylist = userPlaylists.first;
-            } else if (smartPlaylists.isNotEmpty) {
-              _selectedPlaylist = smartPlaylists.first;
-            }
-          } else {
-            final exists = userPlaylists.any((x) => x.id == _selectedPlaylist!.id) ||
-                smartPlaylists.any((x) => x.id == _selectedPlaylist!.id);
-            if (!exists) {
-              _selectedPlaylist = userPlaylists.isNotEmpty
+          final current = _selectedPlaylist;
+          final exists = current != null &&
+              (userPlaylists.any((x) => x.id == current.id) ||
+                  smartPlaylists.any((x) => x.id == current.id));
+          resolvedSelection = exists
+              ? current
+              : (userPlaylists.isNotEmpty
                   ? userPlaylists.first
-                  : (smartPlaylists.isNotEmpty ? smartPlaylists.first : null);
-            }
-          }
-        } else if (_selectedPlaylist != null) {
-          _selectedPlaylist = null;
+                  : (smartPlaylists.isNotEmpty ? smartPlaylists.first : null));
+        } else {
+          resolvedSelection = null;
+        }
+        if (resolvedSelection?.id != _selectedPlaylist?.id) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _selectedPlaylist = resolvedSelection);
+          });
         }
 
         final playlistListWidget = _buildPlaylistListContent(
@@ -514,10 +516,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     else
                       VerticalDivider(width: 1, thickness: 1, color: p.hairline),
                     Expanded(
-                      child: _selectedPlaylist != null
+                      child: resolvedSelection != null
                           ? PlaylistDetailScreen(
-                              key: ValueKey('playlist_${_selectedPlaylist!.id}'),
-                              playlist: _selectedPlaylist!,
+                              key: ValueKey('playlist_${resolvedSelection.id}'),
+                              playlist: resolvedSelection,
                               isEmbedded: true,
                             )
                           : Center(
@@ -705,7 +707,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   final count = state.smartPlaylistCounts[pl.id] ?? 0;
                   return StaggeredReveal(
                     index: index,
-                    groupKey: smartPlaylists.length,
+                    // BUG-24: a stable group key prevents every row from
+                    // re-animating when the list length changes on add/remove.
+                    groupKey: 'smart_playlists',
                     child: _PlaylistCard(
                     name: pl.name,
                     subtitle:
@@ -850,7 +854,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     final pl = userPlaylists[index];
                     return StaggeredReveal(
                       index: index,
-                      groupKey: userPlaylists.length,
+                      groupKey: 'user_playlists',
                       child: _PlaylistCard(
                       name: pl.name,
                       subtitle: context.l10n.browseOfflinePlaylist,
@@ -1248,7 +1252,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                 ],
 
                 // ── ADDED PLAYLISTS SECTION ─────────────────────────────
-                if (online.customPlaylists.isNotEmpty) ...[
+                if (online.customPlaylists.isNotEmpty ||
+                    online.customStatus == YtmFetchStatus.error ||
+                    online.customStatus == YtmFetchStatus.loading) ...[
                   Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
                         24, Adaptive.pagePadding(context), 10),
@@ -1259,34 +1265,76 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           ?.copyWith(color: p.textTertiary),
                     ),
                   ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      addAutomaticKeepAlives: false,
-                      addRepaintBoundaries: true,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 1.0,
+                  // BUG-08: surface custom-playlist fetch failures (previously
+                  // the error state was never rendered).
+                  if (online.customStatus == YtmFetchStatus.error &&
+                      online.customPlaylists.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context),
+                          vertical: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline_rounded,
+                                color: p.error, size: 22),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                online.customError ??
+                                    context.l10n.browseFailedToFetch,
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      itemCount: online.customPlaylists.length,
-                      itemBuilder: (context, i) {
-                        final pl = online.customPlaylists[i];
-                        return _OnlinePlaylistCard(
-                          entry: pl,
-                          onTap: () =>
-                              context.push('/online-playlist', extra: pl),
-                          onDownload: () =>
-                              _downloadCustomPlaylist(context, pl),
-                          onRemove: () => cubit.removeCustomPlaylist(pl.id),
-                        );
-                      },
+                    )
+                  else if (online.customStatus == YtmFetchStatus.loading &&
+                      online.customPlaylists.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: const SkeletonList(itemCount: 2),
+                    )
+                  else if (online.customPlaylists.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 14,
+                          childAspectRatio: 1.0,
+                        ),
+                        itemCount: online.customPlaylists.length,
+                        itemBuilder: (context, i) {
+                          final pl = online.customPlaylists[i];
+                          return _OnlinePlaylistCard(
+                            entry: pl,
+                            onTap: () =>
+                                context.push('/online-playlist', extra: pl),
+                            onDownload: () =>
+                                _downloadCustomPlaylist(context, pl),
+                            onRemove: () => cubit.removeCustomPlaylist(pl.id),
+                          );
+                        },
+                      ),
                     ),
-                  ),
                 ],
 
                 // Add YouTube Playlist Button

@@ -77,9 +77,47 @@ void main() {
         isNull,
       );
       expect(
+        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 2}),
+        isNull,
+      );
+      expect(
+        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': -1}),
+        isNull,
+      );
+      expect(
+        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 1.5}),
+        isNull,
+      );
+      expect(
         QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 'invalid'}),
         isNull,
       );
+      // Migrates legacy documents with schemaVersion 0 or null
+      final docV0 = QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 0});
+      expect(docV0, isNotNull);
+      expect(docV0!['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
+
+      final docNoV = QueueSlotCodec.decodeDocument({'0': 1});
+      expect(docNoV, isNotNull);
+      expect(docNoV!['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
+
+      // Accepts valid schemaVersion
+      final docV1 = QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 1});
+      expect(docV1, isNotNull);
+      expect(docV1!['schemaVersion'], 1);
+    });
+
+    test('[M-23] migrateDocument validates upper bound and rejects future versions', () {
+      expect(
+        () => QueueSlotCodec.migrateDocument({'schemaVersion': 999}),
+        throwsArgumentError,
+      );
+      expect(
+        () => QueueSlotCodec.migrateDocument({'schemaVersion': -1}),
+        throwsArgumentError,
+      );
+      final migrated0 = QueueSlotCodec.migrateDocument({'schemaVersion': 0});
+      expect(migrated0['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
     });
 
     test('slotIndexForKey accepts only 0..2', () {
@@ -104,6 +142,33 @@ void main() {
       // No usable ids.
       expect(QueueSlotCodec.decodeSlot({'songIds': ['a', 1.5]}, 500), isNull);
       expect(QueueSlotCodec.decodeSlot({}, 500), isNull);
+    });
+
+    test('[H-17] decodeSlot rejects orphan or corrupted negative IDs not in onlineSongs', () {
+      // 1. Negative ID with no matching online song is dropped
+      final withCorruptNegative = QueueSlotCodec.decodeSlot({
+        'songIds': [10, -999, 20],
+        'onlineSongs': [],
+      }, 500);
+      expect(withCorruptNegative, isNotNull);
+      expect(withCorruptNegative!.songIds, equals([10, 20]));
+
+      // 2. Negative ID that matches an online song is preserved
+      final withValidNegative = QueueSlotCodec.decodeSlot({
+        'songIds': [10, -5],
+        'onlineSongs': [
+          {'id': -5, 'title': 'Streamed Track', 'path': 'https://stream'},
+        ],
+      }, 500);
+      expect(withValidNegative, isNotNull);
+      expect(withValidNegative!.songIds, equals([10, -5]));
+
+      // 3. Payload with ONLY corrupted negative IDs returns null (no valid usable IDs)
+      final onlyCorruptNegative = QueueSlotCodec.decodeSlot({
+        'songIds': [-100, -200],
+        'onlineSongs': [],
+      }, 500);
+      expect(onlyCorruptNegative, isNull);
     });
 
     test('mergeInPersistedOrder restores playback order, db first', () {

@@ -1,18 +1,17 @@
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/services/autoeq_service.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../data/audio/equalizer_manager.dart';
+import '../../cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 class AutoEqSearchSheet extends StatefulWidget {
-  final EqualizerManager equalizerManager;
-
-  const AutoEqSearchSheet({super.key, required this.equalizerManager});
+  const AutoEqSearchSheet({super.key});
 
   @override
   State<AutoEqSearchSheet> createState() => _AutoEqSearchSheetState();
@@ -54,6 +53,10 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    // B11: selection is driven by cubit state, which is updated immediately when
+    // a profile is applied (no waiting for the next engine resync).
+    final selectedProfileName =
+        context.watch<PlayerCubit>().state.selectedHeadphoneProfile?.name;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
@@ -128,25 +131,28 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                         separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
                         itemBuilder: (context, index) {
                           final item = _results[index];
-                          final isSelected = widget.equalizerManager
-                                  .selectedHeadphoneProfile?.name ==
-                              item.name;
+                          final isSelected = selectedProfileName == item.name;
 
                           return InkWell(
                             onTap: () async {
                               final profile = item.toHeadphoneProfile();
-                              await widget.equalizerManager
-                                  .setHeadphoneProfile(profile);
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        '${context.l10n.dspAppliedProfile} ${item.name}'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
+                              final cubit = context.read<PlayerCubit>();
+                              await cubit.applyHeadphoneProfile(profile);
+                              if (!context.mounted) return;
+                              // Only confirm when the cubit actually applied the
+                              // profile (a bit-perfect guard may have refused it).
+                              if (cubit.state.selectedHeadphoneProfile?.name !=
+                                  item.name) {
+                                return;
                               }
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      '${context.l10n.dspAppliedProfile} ${item.name}'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
                             },
                             borderRadius: BorderRadius.circular(AppRadii.r16),
                             child: Container(

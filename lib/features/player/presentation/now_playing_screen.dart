@@ -1,6 +1,7 @@
 // lib/features/player/presentation/now_playing_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
@@ -24,18 +25,56 @@ class NowPlayingScreen extends StatefulWidget {
   State<NowPlayingScreen> createState() => _NowPlayingScreenState();
 }
 
-class _NowPlayingScreenState extends State<NowPlayingScreen> {
+class _NowPlayingScreenState extends State<NowPlayingScreen>
+    with WidgetsBindingObserver {
   late final PlayerCubit _playerCubit;
   bool _isPopping = false;
+  Orientation? _lastAppliedOrientation;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _playerCubit = context.read<PlayerCubit>();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final orientation = MediaQuery.orientationOf(context);
+    if (orientation != _lastAppliedOrientation) {
+      _lastAppliedOrientation = orientation;
+      _syncSystemUiForOrientation(orientation);
+    }
+  }
+
+  void _syncSystemUiForOrientation(Orientation orientation) {
+    if (orientation == Orientation.landscape) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarContrastEnforced: false,
+          systemStatusBarContrastEnforced: false,
+        ),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _lastAppliedOrientation != null) {
+      _syncSystemUiForOrientation(_lastAppliedOrientation!);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_isPopping) {
       _playerCubit.resetOverlayViews();
     }
@@ -188,24 +227,18 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   late final Tween<double> _tween;
   late Animation<double> _anim;
   double _dragOffset = 0.0;
-  final Set<int> _activePointerIds = <int>{};
-  bool get _singleTouch => _activePointerIds.length <= 1;
 
-  @override
-  void didUpdateWidget(covariant _SwipeDownToDismiss oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // H-10: Clean stale pointers on rebuild when idle
-    if (_dragOffset == 0.0 && !_animController.isAnimating) {
-      _activePointerIds.clear();
-    }
-  }
+  /// BUG-01: only the vertical dismiss gesture owns this flag. The previous
+  /// Listener-based pointer set counted taps on child buttons as extra
+  /// pointers, silently disabling the dismiss gesture.
+  bool _isDragging = false;
 
   @override
   void initState() {
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 240),
+      duration: PulsrDurations.layout,
     );
     _curvedAnimation = CurvedAnimation(
       parent: _animController,
@@ -213,6 +246,13 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     );
     _tween = Tween<double>(begin: 0.0, end: 0.0);
     _anim = _tween.animate(_curvedAnimation);
+    // BUG-12: once a snap-back finishes, the resting offset must return to 0
+    // so the next drag does not begin from a stale offset.
+    _animController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() => _dragOffset = 0.0);
+      }
+    });
   }
 
   @override
@@ -231,12 +271,18 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragStart(DragStartDetails details) {
-    if (!_singleTouch) return;
+    if (_isDragging) return;
+    // BUG-12: if a snap-back was running, continue from the currently painted
+    // offset instead of jumping back to the pre-animation drag value.
+    if (_animController.isAnimating) {
+      _dragOffset = _anim.value;
+    }
     _animController.stop();
+    _isDragging = true;
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    if (!_singleTouch) return;
+    if (!_isDragging) return;
     if (details.primaryDelta != null) {
       final newOffset = _dragOffset + details.primaryDelta!;
       if (newOffset >= 0) {
@@ -248,15 +294,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragEnd(DragEndDetails details) {
-    if (!_singleTouch) {
-      // Second finger joined mid-gesture — snap back instead of dismissing.
-      if (_dragOffset > 0) {
-        _tween.begin = _dragOffset;
-        _tween.end = 0.0;
-        _animController.forward(from: 0.0);
-      }
-      return;
-    }
+    _isDragging = false;
     final velocity = details.primaryVelocity ?? 0;
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
@@ -268,7 +306,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragCancel() {
-    _activePointerIds.clear();
+    _isDragging = false;
     if (_dragOffset > 0) {
       _tween.begin = _dragOffset;
       _tween.end = 0.0;
@@ -293,39 +331,34 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       customSemanticsActions: {
         dismissAction: widget.onDismiss,
       },
-      child: Listener(
-        onPointerDown: (e) => _activePointerIds.add(e.pointer),
-        onPointerUp: (e) => _activePointerIds.remove(e.pointer),
-        onPointerCancel: (e) => _activePointerIds.remove(e.pointer),
-        child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onVerticalDragStart: _onVerticalDragStart,
-          onVerticalDragUpdate: _onVerticalDragUpdate,
-          onVerticalDragEnd: _onVerticalDragEnd,
-          onVerticalDragCancel: _onVerticalDragCancel,
-          child: AnimatedBuilder(
-            animation: _animController,
-            child: boundChild,
-            builder: (context, child) {
-              // While the controller runs, read the animated value; otherwise
-              // fall back to the live drag offset.
-              final offset =
-                  _animController.isAnimating ? _anim.value : _dragOffset;
-              final progress = (offset / screenHeight).clamp(0.0, 1.0);
-              // Only introduce the (saveLayer-backed) opacity layer while a
-              // dismiss drag is actually in progress.
-              final content = progress > 0.0
-                  ? Opacity(
-                      opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
-                      child: child,
-                    )
-                  : child;
-              return Transform.translate(
-                offset: Offset(0, offset),
-                child: content,
-              );
-            },
-          ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragStart: _onVerticalDragStart,
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
+        onVerticalDragCancel: _onVerticalDragCancel,
+        child: AnimatedBuilder(
+          animation: _animController,
+          child: boundChild,
+          builder: (context, child) {
+            // While the controller runs, read the animated value; otherwise
+            // fall back to the live drag offset.
+            final offset =
+                _animController.isAnimating ? _anim.value : _dragOffset;
+            final progress = (offset / screenHeight).clamp(0.0, 1.0);
+            // Only introduce the (saveLayer-backed) opacity layer while a
+            // dismiss drag is actually in progress.
+            final content = progress > 0.0
+                ? Opacity(
+                    opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+                    child: child,
+                  )
+                : child;
+            return Transform.translate(
+              offset: Offset(0, offset),
+              child: content,
+            );
+          },
         ),
       ),
     );
@@ -337,6 +370,9 @@ class _NowPlayingGestureHintOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (context.isLandscape) {
+      return const SizedBox.shrink();
+    }
     final isTablet = context.isTablet;
     return PositionedDirectional(
       start: isTablet ? 32 : 16,

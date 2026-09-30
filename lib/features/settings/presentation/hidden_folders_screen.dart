@@ -19,14 +19,15 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 class HiddenFoldersScreen extends StatefulWidget {
-  const HiddenFoldersScreen({super.key});
+  final FolderUseCases? folderUseCases;
+  const HiddenFoldersScreen({super.key, this.folderUseCases});
 
   @override
-  State<HiddenFoldersScreen> createState() => _HiddenFoldersScreenState();
+  State<HiddenFoldersScreen> createState() => HiddenFoldersScreenState();
 }
 
-class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
-  final FolderUseCases _folderUseCases = getIt<FolderUseCases>();
+class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
+  late final FolderUseCases _folderUseCases = widget.folderUseCases ?? getIt<FolderUseCases>();
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _customPathController = TextEditingController();
 
@@ -35,6 +36,9 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
   String _searchQuery = '';
   Timer? _searchDebounce;
   int _minFileSizeKb = 0;
+
+  @visibleForTesting
+  Timer? get searchDebounce => _searchDebounce;
 
   @override
   void initState() {
@@ -55,28 +59,39 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
   }
 
   @override
+  void deactivate() {
+    _searchDebounce?.cancel();
+    _searchDebounce = null;
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchDebounce = null;
     _searchController.dispose();
     _customPathController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadFolders() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadFolders({bool showLoading = true}) async {
+    if (showLoading) setState(() => _isLoading = true);
     final result = await _folderUseCases.getFolderHierarchy();
+    if (!mounted) return;
     result.fold(
-      (l) => setState(() => _isLoading = false),
+      (l) {
+        if (showLoading) setState(() => _isLoading = false);
+      },
       (folders) => setState(() {
         _folders = folders;
-        _isLoading = false;
+        if (showLoading) _isLoading = false;
       }),
     );
   }
 
   Future<void> _toggleFolder(String path) async {
     await _folderUseCases.toggleExcludeFolder(path);
-    await _loadFolders();
+    await _loadFolders(showLoading: false);
     if (mounted) {
       context.read<LibraryCubit>().loadFolders();
     }

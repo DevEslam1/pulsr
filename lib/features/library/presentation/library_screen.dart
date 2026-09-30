@@ -138,19 +138,19 @@ enum LibraryTabItem {
       case LibraryTabItem.songs:
         return p.accent;
       case LibraryTabItem.downloaded:
-        return const Color(0xFF26A69A);
+        return AppColors.tabDownloaded;
       case LibraryTabItem.albums:
-        return const Color(0xFFFF9800);
+        return AppColors.tabAlbums;
       case LibraryTabItem.artists:
-        return const Color(0xFFAB47BC);
+        return AppColors.tabArtists;
       case LibraryTabItem.favorites:
-        return const Color(0xFFEF5350);
+        return AppColors.tabFavorites;
       case LibraryTabItem.folders:
-        return AppColors.warning;
+        return AppColors.tabFolders;
       case LibraryTabItem.genres:
-        return const Color(0xFF29B6F6);
+        return AppColors.tabGenres;
       case LibraryTabItem.years:
-        return const Color(0xFF5C6BC0);
+        return AppColors.tabYears;
     }
   }
 }
@@ -359,8 +359,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                '${context.l10n.navLibrary}: at least one tab is required'),
+            content: Text(context.l10n.libraryAtLeastOneTab),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -493,15 +492,18 @@ class _LibraryScreenState extends State<LibraryScreen>
     final index =
         songs.indexWhere((s) => s.title.toUpperCase().startsWith(letter));
     if (index == -1 || !_songsScrollController.hasClients) return;
-    final trackCols = context.trackGridColumns;
+    // BUG-05: use the same column count as the actual list grid, and include the
+    // list's top padding so the target row is not hidden under it.
+    final trackCols = PulsrAdaptiveGrid.songColumns(context);
+    const topPadding = AppSpacing.xs;
     final double target;
     if (trackCols > 1) {
       // Grid rows are fixed mainAxisExtent 72 + 4 spacing.
       final row = index ~/ trackCols;
-      target = row * 76.0;
+      target = topPadding + row * 76.0;
     } else if (songs.length > 500) {
       // Fixed itemExtent path: exact offset, no proportional estimate.
-      target = index * _songRowExtent;
+      target = topPadding + index * _songRowExtent;
     } else {
       final maxScroll = _songsScrollController.position.maxScrollExtent;
       target =
@@ -529,6 +531,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               ? AppBar(
                   leading: IconButton(
                       icon: const Icon(Icons.close_rounded),
+                      tooltip: context.l10n.close,
                       onPressed: cubit.clearSelection),
                   title: Text(
                       context.l10n.selectedCount(state.selectedSongIds.length)),
@@ -593,7 +596,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.add_rounded),
-                      tooltip: '${context.l10n.navLibrary} Tabs',
+                      tooltip: context.l10n.libraryManageTabs,
                       onPressed: () => _showManageTabsSheet(context, state),
                     ),
                     IconButton(
@@ -777,7 +780,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${modalContext.l10n.navLibrary} Tabs',
+                          modalContext.l10n.libraryManageTabs,
                           style: TextStyle(
                             fontSize: AppFontSize.title,
                             fontWeight: FontWeight.w800,
@@ -787,8 +790,12 @@ class _LibraryScreenState extends State<LibraryScreen>
                         const SizedBox(height: AppSpacing.s2),
                         Text(
                           isOrganizeMode
-                              ? '${_activeTabs.length} / ${LibraryTabItem.values.length} tabs • Drag to reorder'
-                              : '${_activeTabs.length} / ${LibraryTabItem.values.length} tabs • Long-press to organize',
+                              ? modalContext.l10n.libraryTabsReorder(
+                                  _activeTabs.length,
+                                  LibraryTabItem.values.length)
+                              : modalContext.l10n.libraryTabsLongPress(
+                                  _activeTabs.length,
+                                  LibraryTabItem.values.length),
                           style: TextStyle(
                             fontSize: AppFontSize.caption,
                             color: p.textSecondary,
@@ -1012,7 +1019,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                               size: 16, color: p.textSecondary),
                           const SizedBox(width: AppSpacing.xs),
                           Text(
-                            '${modalContext.l10n.navLibrary} • Inactive (${inactiveTabs.length})',
+                            modalContext.l10n
+                                .libraryInactiveTabs(inactiveTabs.length),
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.caption,
@@ -1136,6 +1144,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       const Icon(Icons.remove_circle_outline_rounded, size: 20),
                   color: AppColors.error.withValues(alpha: 0.8),
                   splashRadius: 20,
+                  tooltip: context.l10n.remove,
                   onPressed: onRemove,
                 )
               else
@@ -1230,6 +1239,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
                 color: p.accent,
                 splashRadius: 20,
+                tooltip: context.l10n.addTab,
                 onPressed: onAdd,
               ),
             ],

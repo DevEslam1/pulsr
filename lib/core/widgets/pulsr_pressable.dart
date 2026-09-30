@@ -1,7 +1,9 @@
 // lib/core/widgets/pulsr_pressable.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
+import '../theme/aura_theme.dart';
 
 enum PulsrHapticStyle {
   light,
@@ -45,6 +47,7 @@ class _PulsrPressableState extends State<PulsrPressable>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
+  bool _focused = false;
 
   @override
   void initState() {
@@ -115,36 +118,58 @@ class _PulsrPressableState extends State<PulsrPressable>
       return widget.child;
     }
 
-    return GestureDetector(
-      behavior: widget.behavior,
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      onLongPress: widget.onLongPress != null
-          ? () {
-              if (widget.enableHaptics) {
-                switch (widget.hapticStyle) {
-                  case PulsrHapticStyle.heavy:
-                    HapticFeedback.heavyImpact();
-                    break;
-                  default:
-                    HapticFeedback.mediumImpact();
-                    break;
+    return FocusableActionDetector(
+      onShowFocusHighlight: (value) {
+        if (mounted && value != _focused) setState(() => _focused = value);
+      },
+      child: GestureDetector(
+        behavior: widget.behavior,
+        onTapDown: _handleTapDown,
+        onTapUp: _handleTapUp,
+        onTapCancel: _handleTapCancel,
+        onLongPress: widget.onLongPress != null
+            ? () {
+                if (widget.enableHaptics) {
+                  switch (widget.hapticStyle) {
+                    case PulsrHapticStyle.heavy:
+                      HapticFeedback.heavyImpact();
+                      break;
+                    default:
+                      HapticFeedback.mediumImpact();
+                      break;
+                  }
                 }
+                widget.onLongPress?.call();
               }
-              widget.onLongPress?.call();
-            }
-          : null,
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          if (!context.motionEnabled) return child!;
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          );
-        },
-        child: widget.child,
+            : null,
+        child: Stack(
+          children: [
+            AnimatedBuilder(
+              animation: _scaleAnimation,
+              builder: (context, child) {
+                if (!context.motionEnabled) return child!;
+                return Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: child,
+                );
+              },
+              child: widget.child,
+            ),
+            // Keyboard / switch-navigation focus ring.
+            if (_focused)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border:
+                          Border.all(color: context.palette.accent, width: 2),
+                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

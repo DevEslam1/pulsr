@@ -6,6 +6,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../data/db/app_database.dart';
@@ -36,61 +37,85 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   }
 
   Future<void> _loadStats() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastTime = prefs.getInt('last_scrobble_time') ?? 0;
-    final total = prefs.getInt('total_scrobble_count') ?? 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastTime = prefs.getInt('last_scrobble_time') ?? 0;
+      final total = prefs.getInt('total_scrobble_count') ?? 0;
 
-    // Load top artists from music repository play counts
-    final repo = getIt<IMusicRepository>();
-    final songsRes = await repo.getAllSongs();
-    final allSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
-
-    final artistCounts = <String, int>{};
-    for (final song in allSongs) {
-      final count = song.playCount;
-      if (count > 0 && song.artist.isNotEmpty && song.artist != 'Unknown') {
-        artistCounts[song.artist] =
-            (artistCounts[song.artist] ?? 0) + count.toInt();
-      }
-    }
-    final sortedArtists = artistCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    // Real 7-day distribution from scrobble_daily_log
-    Map<String, dynamic> dailyLog = {};
-    final rawDaily = prefs.getString('scrobble_daily_log');
-    if (rawDaily != null && rawDaily.isNotEmpty) {
+      // Load top artists from music repository play counts
+      List<SongsTableData> allSongs = [];
       try {
-        final decoded = jsonDecode(rawDaily);
-        if (decoded is Map) {
-          dailyLog = Map<String, dynamic>.from(decoded);
+        if (getIt.isRegistered<IMusicRepository>()) {
+          final repo = getIt<IMusicRepository>();
+          final songsRes = await repo.getAllSongs();
+          allSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
         }
-      } catch (_) {}
-    }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to load songs for scrobble stats',
+          error: e,
+          stackTrace: st,
+          category: 'ScrobbleStats',
+        );
+      }
 
-    const weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    final now = DateTime.now();
-    final days = List.generate(7, (i) {
-      final d = now.subtract(Duration(days: 6 - i));
-      final key =
-          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-      return (dailyLog[key] as int?) ?? 0;
-    });
+      final artistCounts = <String, int>{};
+      for (final song in allSongs) {
+        final count = song.playCount;
+        if (count > 0 && song.artist.isNotEmpty && song.artist != 'Unknown') {
+          artistCounts[song.artist] =
+              (artistCounts[song.artist] ?? 0) + count.toInt();
+        }
+      }
+      final sortedArtists = artistCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
 
-    final labels = List.generate(7, (i) {
-      final d = now.subtract(Duration(days: 6 - i));
-      return weekdayLetters[d.weekday - 1];
-    });
+      // Real 7-day distribution from scrobble_daily_log
+      Map<String, dynamic> dailyLog = {};
+      final rawDaily = prefs.getString('scrobble_daily_log');
+      if (rawDaily != null && rawDaily.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(rawDaily);
+          if (decoded is Map) {
+            dailyLog = Map<String, dynamic>.from(decoded);
+          }
+        } catch (_) {}
+      }
 
-    if (mounted) {
-      setState(() {
-        _lastScrobbleTime = lastTime;
-        _totalScrobbles = total;
-        _last7DaysScrobbles = days;
-        _dayLabels = labels;
-        _topArtists = sortedArtists.take(5).toList();
-        _isLoading = false;
+      const weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+      final now = DateTime.now();
+      final days = List.generate(7, (i) {
+        final d = now.subtract(Duration(days: 6 - i));
+        final key =
+            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        return (dailyLog[key] as int?) ?? 0;
       });
+
+      final labels = List.generate(7, (i) {
+        final d = now.subtract(Duration(days: 6 - i));
+        return weekdayLetters[d.weekday - 1];
+      });
+
+      if (mounted) {
+        setState(() {
+          _lastScrobbleTime = lastTime;
+          _totalScrobbles = total;
+          _last7DaysScrobbles = days;
+          _dayLabels = labels;
+          _topArtists = sortedArtists.take(5).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to load scrobble stats',
+        error: e,
+        stackTrace: st,
+        category: 'ScrobbleStats',
+      );
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -303,14 +328,15 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   }
 }
 
-class _ScrobbleBarChartPainter extends CustomPainter {
+@visibleForTesting
+class ScrobbleBarChartPainter extends CustomPainter {
   final List<int> data;
   final List<String> labels;
   final Color barColor;
   final Color labelColor;
   final TextDirection textDirection;
 
-  const _ScrobbleBarChartPainter({
+  const ScrobbleBarChartPainter({
     required this.data,
     required this.labels,
     required this.barColor,
@@ -320,21 +346,32 @@ class _ScrobbleBarChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
-    final maxVal = data.fold<int>(1, math.max);
-    final barWidth = (size.width / (data.length * 2)).clamp(12.0, 32.0);
-    final spacing = (size.width - (barWidth * data.length)) / (data.length + 1);
+    if (data.isEmpty || size.width <= 0 || size.height <= 0) return;
+    final maxVal = math.max(data.fold<int>(1, math.max), 1);
+    final availableWidth = size.width;
+    final double barWidth;
+    final double spacing;
+
+    if (data.length == 1) {
+      barWidth = math.min(32.0, availableWidth * 0.4).clamp(4.0, 32.0);
+      spacing = math.max(0.0, (availableWidth - barWidth) / 2);
+    } else {
+      barWidth = (availableWidth / (data.length * 2)).clamp(4.0, 32.0);
+      spacing = math.max(
+          0.0, (availableWidth - (barWidth * data.length)) / (data.length + 1));
+    }
 
     final paint = Paint()
       ..color = barColor
       ..style = PaintingStyle.fill;
 
     final textPainter = TextPainter(textDirection: textDirection);
+    final usableHeight = math.max(10.0, size.height - 30);
 
     for (int i = 0; i < data.length; i++) {
       final val = data[i];
-      final heightRatio = val / maxVal;
-      final barHeight = (size.height - 30) * heightRatio;
+      final heightRatio = (val / maxVal).clamp(0.0, 1.0);
+      final barHeight = usableHeight * heightRatio;
       final x = spacing + i * (barWidth + spacing);
       final y = (size.height - 24) - barHeight;
 
@@ -348,7 +385,9 @@ class _ScrobbleBarChartPainter extends CustomPainter {
         textPainter.text = TextSpan(
           text: labels[i],
           style: TextStyle(
-              color: labelColor, fontSize: AppFontSize.caption, fontWeight: FontWeight.w600),
+              color: labelColor,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w600),
         );
         textPainter.layout();
         textPainter.paint(
@@ -360,7 +399,7 @@ class _ScrobbleBarChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _ScrobbleBarChartPainter oldDelegate) {
+  bool shouldRepaint(covariant ScrobbleBarChartPainter oldDelegate) {
     return oldDelegate.barColor != barColor ||
         oldDelegate.labelColor != labelColor ||
         oldDelegate.textDirection != textDirection ||
@@ -368,3 +407,5 @@ class _ScrobbleBarChartPainter extends CustomPainter {
         !listEquals(oldDelegate.labels, labels);
   }
 }
+
+typedef _ScrobbleBarChartPainter = ScrobbleBarChartPainter;

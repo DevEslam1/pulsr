@@ -80,6 +80,10 @@ class PlayerWidgetBridge {
     _widgetCoordinator.updateThrottled(state, queueVersion, force: force);
   }
 
+  void invalidateNextTitlesCache() {
+    _widgetCoordinator.invalidateNextTitlesCache();
+  }
+
   void updateProgressThrottled(PlayerState state) {
     _widgetCoordinator.updateProgressThrottled(state);
   }
@@ -102,6 +106,7 @@ class PlayerWidgetBridge {
   void dispose() {
     _widgetClickSub?.cancel();
     _scrobbleCoordinator.dispose();
+    _widgetCoordinator.dispose();
   }
 }
 

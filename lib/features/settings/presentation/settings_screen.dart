@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
@@ -23,6 +24,8 @@ import '../../../core/widgets/pulsr_search_field.dart';
 import '../../../core/widgets/pulsr_slider.dart';
 import '../../../core/widgets/pulsr_switch.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
+import '../../shell/presentation/widgets/dock_style_picker_sheet.dart';
+import '../../shell/presentation/widgets/dock_style_controller.dart';
 import '../cubit/settings_accessibility_ext.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
@@ -42,6 +45,7 @@ import 'widgets/settings_hero_card.dart';
 import 'widgets/settings_picker_sheets.dart';
 import 'widgets/settings_section.dart';
 import 'widgets/storage_cache_section.dart';
+import 'widgets/studio_bridge_footer.dart';
 import 'widgets/theme_schedule_row.dart';
 import 'widgets/ytm_account_disconnect_dialog.dart';
 import 'widgets/settings_tiles.dart';
@@ -55,7 +59,7 @@ class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<SettingsScreen> createState() => SettingsScreenState();
 }
 
 class _SettingsCategoryItem {
@@ -83,7 +87,7 @@ class _Category {
   _Category(this.id, this.icon) : key = GlobalKey();
 }
 
-class _SettingsScreenState extends State<SettingsScreen>
+class SettingsScreenState extends State<SettingsScreen>
     with SettingsCategorySectionsA, SettingsCategorySectionsB {
   final ScrollController _scrollController = ScrollController();
   @override
@@ -101,8 +105,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         0.0,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
+        duration: context.motionMs(280),
+        curve: context.motionCurve(Curves.easeOutCubic),
       );
     }
     SharedPreferences.getInstance().then((prefs) {
@@ -136,8 +140,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
             0.0,
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
+            duration: context.motionMs(240),
+            curve: context.motionCurve(Curves.easeOutCubic),
           );
         }
         return;
@@ -151,8 +155,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           if (_scrollController.hasClients) {
             _scrollController.animateTo(
               0.0,
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
+              duration: context.motionMs(240),
+              curve: context.motionCurve(Curves.easeOutCubic),
             );
           }
         }
@@ -186,10 +190,27 @@ class _SettingsScreenState extends State<SettingsScreen>
             ((context.breakpoint >= PulsrBreakpoint.medium &&
                     (context.isLandscape || Adaptive.widthOf(context) >= 700)) ||
                 context.isTwoPane);
+        // H6/M3: A selected category can disappear when Professional mode is
+        // turned off (e.g. `profiles`). Normalise the persisted selection in the
+        // same frame so the master rail highlight and the detail pane can never
+        // disagree, then reset the stale id so it doesn't resurface when
+        // Professional mode is re-enabled.
+        final categories = _getCategories(context, pro: state.isProfessional);
+        var selectedCategoryId = _selectedCategoryId;
+        if (selectedCategoryId != 'all' &&
+            !categories.any((c) => c.id == selectedCategoryId)) {
+          selectedCategoryId = categories.first.id;
+          final corrected = selectedCategoryId;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedCategoryId != corrected) {
+              setState(() => _selectedCategoryId = corrected);
+            }
+          });
+        }
         final effectiveCategoryId =
-            (isTabletView && _selectedCategoryId == 'all')
+            (isTabletView && selectedCategoryId == 'all')
                 ? 'audio'
-                : _selectedCategoryId;
+                : selectedCategoryId;
 
         return Scaffold(
           body: SafeArea(
@@ -277,63 +298,63 @@ class _SettingsScreenState extends State<SettingsScreen>
         title: context.l10n.audioAndSound,
         subtitle: context.l10n.settingsCategoryAudioSubtitle,
         icon: Icons.equalizer_rounded,
-        tintColor: const Color(0xFFFF9500),
+        tintColor: AppColors.catAudio,
       ),
       _SettingsCategoryItem(
         id: 'playback',
         title: context.l10n.playback,
         subtitle: context.l10n.settingsCategoryPlaybackSubtitle,
         icon: Icons.play_circle_outline_rounded,
-        tintColor: const Color(0xFFAF52DE),
+        tintColor: AppColors.catPlayback,
       ),
       _SettingsCategoryItem(
         id: 'appearance',
         title: context.l10n.settingsCategoryAppearance,
         subtitle: context.l10n.settingsCategoryAppearanceSubtitle,
         icon: Icons.palette_outlined,
-        tintColor: const Color(0xFFFF2D55),
+        tintColor: AppColors.catAppearance,
       ),
       _SettingsCategoryItem(
         id: 'gestures',
         title: context.l10n.gestures,
         subtitle: context.l10n.settingsCategoryGesturesSubtitle,
         icon: Icons.swipe_rounded,
-        tintColor: const Color(0xFF007AFF),
+        tintColor: AppColors.catGestures,
       ),
       _SettingsCategoryItem(
         id: 'profiles',
         title: context.l10n.settingsCategoryProfiles,
         subtitle: context.l10n.settingsCategoryProfilesSubtitle,
         icon: Icons.devices_other_rounded,
-        tintColor: const Color(0xFF5856D6),
+        tintColor: AppColors.catProfiles,
       ),
       _SettingsCategoryItem(
         id: 'library',
         title: context.l10n.navLibrary,
         subtitle: context.l10n.settingsCategoryLibrarySubtitle,
         icon: Icons.library_music_outlined,
-        tintColor: const Color(0xFF34C759),
+        tintColor: AppColors.catLibrary,
       ),
       _SettingsCategoryItem(
         id: 'online',
         title: context.l10n.settingsCategoryOnline,
         subtitle: context.l10n.settingsCategoryOnlineSubtitle,
         icon: Icons.cloud_outlined,
-        tintColor: const Color(0xFF5AC8FA),
+        tintColor: AppColors.catOnline,
       ),
       _SettingsCategoryItem(
         id: 'storage',
         title: context.l10n.storageAndCache,
         subtitle: context.l10n.settingsCategoryStorageSubtitle,
         icon: Icons.storage_rounded,
-        tintColor: const Color(0xFFFFCC00),
+        tintColor: AppColors.catStorage,
       ),
       _SettingsCategoryItem(
         id: 'privacy',
         title: context.l10n.settingsCategoryPrivacy,
         subtitle: context.l10n.settingsCategoryPrivacySubtitle,
         icon: Icons.shield_outlined,
-        tintColor: const Color(0xFF30B0C7),
+        tintColor: AppColors.catPrivacy,
       ),
       _SettingsCategoryItem(
         id: 'about',
@@ -341,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         subtitle:
             context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
         icon: Icons.info_outline_rounded,
-        tintColor: const Color(0xFF8E8E93),
+        tintColor: AppColors.catAbout,
       ),
     ];
     // Normal mode hides the advanced "Profiles & Rules" surface (device-profile
@@ -371,7 +392,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     ];
 
     return SizedBox(
-      height: AppSpacing.s38,
+      height: AppSpacing.minTouchTarget,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -763,7 +784,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 Expanded(
                   child: _buildSuperSection(
                     context,
-                    title: 'Sound & Playback',
+                    title: context.l10n.settingsSectionSoundPlayback,
                     icon: Icons.graphic_eq_rounded,
                     isExpanded: _soundPlaybackExpanded,
                     onToggle: () => setState(
@@ -784,7 +805,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     children: [
                       _buildSuperSection(
                         context,
-                        title: 'Appearance & Gestures',
+                        title: context.l10n.settingsSectionAppearanceGestures,
                         icon: Icons.palette_outlined,
                         isExpanded: _appearanceGesturesExpanded,
                         onToggle: () => setState(() =>
@@ -799,7 +820,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                       _buildSuperSection(
                         context,
-                        title: 'System & Privacy',
+                        title: context.l10n.settingsSectionSystemPrivacy,
                         icon: Icons.settings_suggest_rounded,
                         isExpanded: _systemPrivacyExpanded,
                         onToggle: () => setState(() =>
@@ -840,7 +861,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           const SizedBox(height: AppSpacing.sm),
           _buildSuperSection(
             context,
-            title: 'Sound & Playback',
+            title: context.l10n.settingsSectionSoundPlayback,
             icon: Icons.graphic_eq_rounded,
             isExpanded: _soundPlaybackExpanded,
             onToggle: () => setState(
@@ -854,7 +875,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           _buildSuperSection(
             context,
-            title: 'Appearance & Gestures',
+            title: context.l10n.settingsSectionAppearanceGestures,
             icon: Icons.palette_outlined,
             isExpanded: _appearanceGesturesExpanded,
             onToggle: () => setState(() =>
@@ -866,7 +887,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           _buildSuperSection(
             context,
-            title: 'System & Privacy',
+            title: context.l10n.settingsSectionSystemPrivacy,
             icon: Icons.settings_suggest_rounded,
             isExpanded: _systemPrivacyExpanded,
             onToggle: () => setState(
@@ -884,10 +905,13 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
 
     final categories = _getCategories(context, pro: state.isProfessional);
-    final currentCat = categories.firstWhere(
-      (c) => c.id == _selectedCategoryId,
-      orElse: () => categories.first,
-    );
+    // A category can disappear when Professional mode is turned off (e.g.
+    // `profiles`). Fall back to the first available category so the hero
+    // header and body can never disagree or leave an empty titled screen.
+    final selectedId = categories.any((c) => c.id == _selectedCategoryId)
+        ? _selectedCategoryId
+        : categories.first.id;
+    final currentCat = categories.firstWhere((c) => c.id == selectedId);
 
     return AnimatedSwitcher(
       duration: context.motionMs(220),
@@ -904,9 +928,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       ),
       child: KeyedSubtree(
-        key: ValueKey(_selectedCategoryId),
+        key: ValueKey(selectedId),
         child: ListView(
-          key: PageStorageKey('settings_category_$_selectedCategoryId'),
+          key: PageStorageKey('settings_category_$selectedId'),
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsetsDirectional.only(
             bottom: bottomInset,
@@ -917,11 +941,10 @@ class _SettingsScreenState extends State<SettingsScreen>
           children: [
             _buildCategoryHeroHeader(context, currentCat),
             const SizedBox(height: AppSpacing.md),
-            if (_selectedCategoryId == 'audio') ...[
+            if (selectedId == 'audio') ...[
               _experienceModeCard(context),
             ],
-            ..._buildCategoryWidgets(
-                context, _selectedCategoryId, state, cubit),
+            ..._buildCategoryWidgets(context, selectedId, state, cubit),
           ],
         ),
       ),
@@ -1022,19 +1045,30 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             ),
           ),
-          AnimatedCrossFade(
-            firstChild: Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: children,
-              ),
-            ),
-            secondChild: const SizedBox.shrink(),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
+          // NOTE: this used to be an AnimatedCrossFade. That widget always
+          // lays out BOTH children, and its internal
+          // `ClipRect > AnimatedSize > ClipRect` stack lays the hidden child
+          // out with unbounded height. Any section child that cannot resolve
+          // an unbounded height (nested scrollable, flex child, …) then threw
+          // during layout, leaving the whole section's render boxes without a
+          // size and cascading into "RenderBox was not laid out" /
+          // "child.hasSize is not true" / viewport null-check crashes.
+          // A conditional AnimatedSize only lays out the visible content and
+          // collapses without the fragile nested clip layers.
+          AnimatedSize(
             duration: context.motionMs(250),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            child: isExpanded
+                ? Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: children,
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
           ),
         ],
       ),
@@ -1109,7 +1143,33 @@ class _SettingsScreenState extends State<SettingsScreen>
         ],
       );
 
+  /// Normal-mode footer counts surfaced by [StudioBridgeFooter].
+  static const Map<String, int> _studioControlCounts = {
+    'audio': 12,
+    'playback': 6,
+    'appearance': 4,
+    'library': 3,
+    'online': 5,
+    'storage': 2,
+  };
+
   List<Widget> _buildCategoryWidgets(
+    BuildContext context,
+    String catId,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final widgets = [
+      ..._buildCategoryWidgetsInner(context, catId, state, cubit),
+    ];
+    final hidden = _studioControlCounts[catId];
+    if (hidden != null && !state.isProfessional) {
+      widgets.add(StudioBridgeFooter(hiddenControls: hidden));
+    }
+    return widgets;
+  }
+
+  List<Widget> _buildCategoryWidgetsInner(
     BuildContext context,
     String catId,
     SettingsState state,
@@ -1224,14 +1284,14 @@ class _SettingsScreenState extends State<SettingsScreen>
               _navTile(
                 context,
                 Icons.new_releases_outlined,
-                "What's New",
-                'See latest updates in v${AppConfig.appVersion}',
+                context.l10n.whatsNew,
+                context.l10n.whatsNewSubtitle(AppConfig.appVersion),
                 onTap: () => showWhatsNewSheet(context),
               ),
               _navTile(
                 context,
                 Icons.person_outline_rounded,
-                'Developer',
+                context.l10n.developer,
                 AppConfig.developerName,
                 onTap: () => showAboutSheet(context),
               ),

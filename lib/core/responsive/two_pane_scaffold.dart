@@ -1,8 +1,10 @@
 // lib/core/responsive/two_pane_scaffold.dart
 import 'package:flutter/material.dart';
+import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../theme/aura_theme.dart';
+import '../utils/l10n_extensions.dart';
 import '../widgets/pulsr_dock_tracker.dart';
 import 'pulsr_responsive_tokens.dart';
 
@@ -55,7 +57,7 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Select an item to view details',
+            context.l10n.twoPaneSelectItem,
             style: TextStyle(
               color: p.textSecondary,
               fontSize: AppFontSize.callout,
@@ -94,7 +96,16 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
             else if (showDivider)
               VerticalDivider(width: 1, thickness: 1, color: p.hairline),
             Expanded(
-              child: effectiveDetail,
+              child: Container(
+                margin: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppRadii.r20),
+                  border: Border.all(color: p.hairline),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: effectiveDetail,
+              ),
             ),
           ],
         );

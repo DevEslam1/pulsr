@@ -15,7 +15,6 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/error_logger.dart';
-import '../../../../core/utils/yin_pitch_detector.dart';
 
 class KaraokeModeScreen extends StatefulWidget {
   const KaraokeModeScreen({super.key});
@@ -26,17 +25,15 @@ class KaraokeModeScreen extends StatefulWidget {
 
 class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     with WidgetsBindingObserver {
+  // B9: pitch shift uses the real pitch API (setPlaybackPitch, 0.5..2.0) rather
+  // than setSpeed, which changed tempo. The cubic range keeps the multiplier in
+  // the cubit's supported window.
+  static const int _minPitchSemitones = -12;
+  static const int _maxPitchSemitones = 12;
   int _pitchSemitones = 0;
   double _fontSize = 26.0;
   bool _practiceMode = false;
   bool _pitchMeterEnabled = true;
-  final PitchResult _currentPitch = const PitchResult(
-    frequencyHz: 261.6,
-    midiNote: 60.0,
-    noteName: 'C4',
-    probability: 0.88,
-    isVoiced: true,
-  );
   int? _lastScore;
   int _totalTaps = 0;
   int _scoreAccumulator = 0;
@@ -365,17 +362,20 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     ),
                     // Pitch Down
                     IconButton(
-                      tooltip: 'Pitch -1 semitone',
+                      tooltip: context.l10n.dspPitchDownSemitone,
                       icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
-                      onPressed: _pitchSemitones > -3
+                      onPressed: _pitchSemitones > _minPitchSemitones
                           ? () {
                               setState(() => _pitchSemitones--);
-                              context.read<PlayerCubit>().setSpeed(math.pow(2.0, _pitchSemitones / 12.0).toDouble());
+                              context.read<PlayerCubit>().setPlaybackPitch(
+                                  math.pow(2.0, _pitchSemitones / 12.0)
+                                      .toDouble());
                             }
                           : null,
                     ),
                     Text(
-                      '${_pitchSemitones >= 0 ? "+" : ""}$_pitchSemitones st',
+                      '${_pitchSemitones >= 0 ? "+" : ""}$_pitchSemitones st • '
+                      '${math.pow(2.0, _pitchSemitones / 12.0).toStringAsFixed(2)}×',
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
@@ -384,12 +384,14 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     ),
                     // Pitch Up
                     IconButton(
-                      tooltip: 'Pitch +1 semitone',
+                      tooltip: context.l10n.dspPitchUpSemitone,
                       icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
-                      onPressed: _pitchSemitones < 3
+                      onPressed: _pitchSemitones < _maxPitchSemitones
                           ? () {
                               setState(() => _pitchSemitones++);
-                              context.read<PlayerCubit>().setSpeed(math.pow(2.0, _pitchSemitones / 12.0).toDouble());
+                              context.read<PlayerCubit>().setPlaybackPitch(
+                                  math.pow(2.0, _pitchSemitones / 12.0)
+                                      .toDouble());
                             }
                           : null,
                     ),
@@ -422,7 +424,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
 
               // Vocal Pitch Guidance Meter
               if (_pitchMeterEnabled) ...[
-                _VocalPitchMeter(pitch: _currentPitch, palette: p),
+                _PitchMeterUnavailable(palette: p),
                 const SizedBox(height: AppSpacing.sm),
               ],
 
@@ -475,36 +477,24 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   }
 }
 
-class _VocalPitchMeter extends StatelessWidget {
-  final PitchResult pitch;
+/// B9: honest disabled state. The previous widget rendered a hardcoded
+/// `PitchResult` (261.6 Hz / C4) as if it were live microphone data. Microphone
+/// capture is not wired into this build, so the meter says so instead of faking.
+class _PitchMeterUnavailable extends StatelessWidget {
   final PulsrPalette palette;
 
-  const _VocalPitchMeter({
-    required this.pitch,
-    required this.palette,
-  });
+  const _PitchMeterUnavailable({required this.palette});
 
   @override
   Widget build(BuildContext context) {
-    final noteDiffCents =
-        ((pitch.midiNote - pitch.midiNote.round()) * 100).round();
-    final isInTune = noteDiffCents.abs() <= 25;
-    final statusColor = !pitch.isVoiced
-        ? palette.textTertiary
-        : (isInTune
-            ? Colors.greenAccent
-            : (noteDiffCents.abs() <= 50
-                ? Colors.amberAccent
-                : Colors.redAccent));
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: palette.surfaceContainer,
         borderRadius: BorderRadius.circular(AppRadii.r16),
-        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+        border: Border.all(color: palette.hairline),
       ),
       child: Row(
         children: [
@@ -512,13 +502,13 @@ class _VocalPitchMeter extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.15),
+              color: palette.textTertiary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(AppRadii.r8),
             ),
             child: Text(
-              pitch.isVoiced ? pitch.noteName : '--',
+              '--',
               style: TextStyle(
-                color: statusColor,
+                color: palette.textTertiary,
                 fontWeight: FontWeight.w900,
                 fontSize: AppFontSize.bodyLarge,
               ),
@@ -526,50 +516,13 @@ class _VocalPitchMeter extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      pitch.isVoiced
-                          ? '${pitch.frequencyHz.toStringAsFixed(1)} Hz (${noteDiffCents >= 0 ? "+" : ""}$noteDiffCents cents)'
-                          : 'Listening for vocal pitch...',
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: AppFontSize.tiny,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      isInTune && pitch.isVoiced
-                          ? 'IN TUNE'
-                          : (pitch.isVoiced
-                              ? (noteDiffCents > 0 ? 'SHARP' : 'FLAT')
-                              : ''),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: AppFontSize.tiny,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.r4),
-                  child: LinearProgressIndicator(
-                    value: pitch.isVoiced
-                        ? (0.5 + (noteDiffCents / 100.0).clamp(-0.5, 0.5))
-                        : 0.5,
-                    backgroundColor: palette.hairline,
-                    valueColor: AlwaysStoppedAnimation(statusColor),
-                    minHeight: 6,
-                  ),
-                ),
-              ],
+            child: Text(
+              context.l10n.dspPitchMeterUnavailable,
+              style: TextStyle(
+                color: palette.textSecondary,
+                fontSize: AppFontSize.tiny,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

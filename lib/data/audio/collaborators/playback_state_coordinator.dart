@@ -3,6 +3,8 @@ import 'dart:async';
 
 import 'package:rxdart/rxdart.dart';
 
+import '../../../core/utils/error_logger.dart';
+
 /// Coordinates position stream broadcasting (dual-rate), debounced state persistence,
 /// and AudioService PlaybackState updates.
 class PlaybackStateCoordinator {
@@ -20,6 +22,14 @@ class PlaybackStateCoordinator {
   Timer? _saveTimer;
   bool _disposed = false;
 
+  /// BUG-02/21: last position actually persisted, so a paused/unchanged
+  /// position does not keep dirtying the coordinator every tick.
+  Duration _lastSavedPosition = Duration.zero;
+
+  /// BUG-02: most recent position observed, used as the value written when a
+  /// save completes.
+  Duration _lastEmittedPosition = Duration.zero;
+
   /// Standard throttled stream (~250ms) for UI progress bars, scrobbling, and telemetry.
   Stream<Duration> get positionStream => _positionSubject.stream;
 
@@ -36,16 +46,51 @@ class PlaybackStateCoordinator {
     _saveTimer?.cancel();
     _saveTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (_disposed) return;
-      if (_positionDirty) {
-        _positionDirty = false;
-        onSavePositionRequested();
-      }
+      _executeSave();
     });
+  }
+
+  /// Runs a pending position save. Kept synchronous at the call site: the dirty
+  /// flag is cleared before invoking the callback (so callers observing state
+  /// immediately see it clean) and restored if the callback fails, so a failed
+  /// write is retried on the next tick (BUG-10).
+  void _executeSave() {
+    if (_disposed || !_positionDirty) return;
+    _positionDirty = false;
+    final positionAtSave = _lastEmittedPosition;
+    try {
+      onSavePositionRequested().then((_) {
+        if (_lastEmittedPosition == positionAtSave) {
+          _lastSavedPosition = positionAtSave;
+        }
+      }).catchError((Object e, StackTrace st) {
+        _positionDirty = true;
+        if (!_disposed) {
+          ErrorLogger.log(
+            'Failed to persist playback position',
+            error: e,
+            stackTrace: st,
+            category: 'PlaybackStateCoordinator',
+          );
+        }
+      });
+    } catch (e, st) {
+      _positionDirty = true;
+      if (!_disposed) {
+        ErrorLogger.log(
+          'Failed to persist playback position',
+          error: e,
+          stackTrace: st,
+          category: 'PlaybackStateCoordinator',
+        );
+      }
+    }
   }
 
   /// Called on player position stream tick.
   void onPositionTick(Duration pos) {
     if (_disposed) return;
+    _lastEmittedPosition = pos;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // High-rate emission (~16ms granularity for 60 FPS waveform tracking)
@@ -64,7 +109,11 @@ class PlaybackStateCoordinator {
       }
     }
 
-    markPositionDirty();
+    // BUG-02/21: only dirty when the position actually differs from the last
+    // value written, so pausing (or an unchanged tick) stops the 2s disk write.
+    if (pos != _lastSavedPosition) {
+      markPositionDirty();
+    }
   }
 
   /// Marks position as needing persistence on next 2s periodic timer tick.
@@ -77,16 +126,18 @@ class PlaybackStateCoordinator {
 
   void triggerSaveIfDirty() {
     if (_disposed) return;
-    if (_positionDirty) {
-      _positionDirty = false;
-      onSavePositionRequested();
-    }
+    _executeSave();
   }
 
   void dispose() {
+    // BUG-30: mark disposed before cancelling so an in-flight timer callback
+    // bails out immediately.
     _disposed = true;
     _saveTimer?.cancel();
     _saveTimer = null;
+    _positionDirty = false;
+    _lastSavedPosition = Duration.zero;
+    _lastEmittedPosition = Duration.zero;
     if (!_positionSubject.isClosed) {
       _positionSubject.close();
     }

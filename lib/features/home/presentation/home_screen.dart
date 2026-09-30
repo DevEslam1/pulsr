@@ -13,6 +13,7 @@ import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_logo.dart';
+import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -344,25 +345,40 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                               visualDensity: VisualDensity.compact,
                             ),
                           ),
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.s10),
-                          decoration: BoxDecoration(
-                            color: p.accentContainer,
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
-                            border: Border.all(color: p.hairline),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: p.glow,
-                                  blurRadius: 24,
-                                  spreadRadius: -4,
-                                  offset: const Offset(0, 8)),
-                            ],
+                        Semantics(
+                          button: true,
+                          label: context.l10n.settings,
+                          child: PulsrPressable(
+                            pressedScale: 0.94,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              context.push('/settings');
+                            },
+                            child: Tooltip(
+                              message: context.l10n.settings,
+                              child: Container(
+                                padding: const EdgeInsets.all(AppSpacing.s10),
+                                decoration: BoxDecoration(
+                                  color: p.accentContainer,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r16),
+                                  border: Border.all(color: p.hairline),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: p.glow,
+                                        blurRadius: 24,
+                                        spreadRadius: -4,
+                                        offset: const Offset(0, 8)),
+                                  ],
+                                ),
+                                child: PulsrLogo(
+                                    size: 26,
+                                    color: p.accent,
+                                    glowColor: p.glow,
+                                    animate: false),
+                              ),
+                            ),
                           ),
-                          child: PulsrLogo(
-                              size: 26,
-                              color: p.accent,
-                              glowColor: p.glow,
-                              animate: false),
                         ),
                       ],
                     ),
@@ -412,6 +428,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.close, size: 16),
+                              tooltip: context.l10n.close,
                               onPressed: () async {
                                 final prefs = await SharedPreferences.getInstance();
                                 await prefs.setBool('notification_permission_denied', false);
@@ -468,7 +485,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   // ---------- Quick Discovery Tools Row ----------
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
-                    height: 38,
+                    height: AppSpacing.s44,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -1137,7 +1154,10 @@ class _DiscoveryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Material(
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
       color: p.surfaceContainer,
       borderRadius: BorderRadius.circular(AppRadii.r14),
       child: InkWell(
@@ -1168,6 +1188,7 @@ class _DiscoveryChip extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -1417,7 +1438,7 @@ class _QuickDiscoveryHeader extends StatelessWidget {
       ),
       (
         icon: Icons.calendar_month_rounded,
-        label: 'Decades',
+        label: context.l10n.decades,
         color: p.warning,
         onTap: () => context.push('/year'),
       ),
@@ -1430,7 +1451,7 @@ class _QuickDiscoveryHeader extends StatelessWidget {
     ];
 
     return SizedBox(
-      height: 38,
+      height: AppSpacing.s44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),

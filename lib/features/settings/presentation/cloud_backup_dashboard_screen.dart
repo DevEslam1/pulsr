@@ -20,12 +20,18 @@ class CloudBackupDashboardScreen extends StatefulWidget {
       _CloudBackupDashboardScreenState();
 }
 
-class _CloudBackupDashboardScreenState
+class CloudBackupDashboardScreenState
     extends State<CloudBackupDashboardScreen> {
   CloudSyncService? _syncService;
   bool _isSyncing = false;
   bool _syncFavorites = true;
   bool _syncPlaylists = true;
+
+  CloudSyncService? get _service => _syncService;
+  bool get _hasService => _service != null;
+
+  @visibleForTesting
+  CloudSyncService? get syncService => _syncService;
 
   @override
   void initState() {
@@ -41,8 +47,18 @@ class _CloudBackupDashboardScreenState
     _loadSyncScopes();
   }
 
+  Future<void> _onFavoritesSyncChanged(bool v) async {
+    setState(() => _syncFavorites = v);
+    await _service?.setFavoritesSyncEnabled(v);
+  }
+
+  Future<void> _onPlaylistsSyncChanged(bool v) async {
+    setState(() => _syncPlaylists = v);
+    await _service?.setPlaylistsSyncEnabled(v);
+  }
+
   Future<void> _loadSyncScopes() async {
-    final service = _syncService;
+    final service = _service;
     if (service == null) return;
     try {
       final fav = await service.isFavoritesSyncEnabled;
@@ -59,7 +75,7 @@ class _CloudBackupDashboardScreenState
   }
 
   Future<void> _performSync() async {
-    final service = _syncService;
+    final service = _service;
     if (service == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -88,10 +104,12 @@ class _CloudBackupDashboardScreenState
       ErrorLogger.log('Cloud sync error',
           error: e, stackTrace: st, category: 'CloudBackup');
       if (mounted) {
+        final errorDetail = e.toString().replaceFirst(RegExp(r'^(Exception|Error):\s*'), '');
+        final message = '${context.l10n.settingsCloudSyncFailed}: $errorDetail';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(context.l10n.settingsCloudSyncFailed),
-            duration: const Duration(seconds: 2),
+            content: Text(message),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -105,7 +123,7 @@ class _CloudBackupDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final lastSync = _syncService?.lastSyncTime;
+    final lastSync = _service?.lastSyncTime;
     final lastSyncStr =
         lastSync != null ? '${lastSync.toLocal()}'.split('.').first : context.l10n.settingsNeverLabel;
 
@@ -202,20 +220,14 @@ class _CloudBackupDashboardScreenState
             title: context.l10n.cloudSyncFavoritesLabel,
             subtitle: context.l10n.cloudSyncFavoritesDesc,
             value: _syncFavorites,
-            onChanged: (v) async {
-              setState(() => _syncFavorites = v);
-              await _syncService?.setFavoritesSyncEnabled(v);
-            },
+            onChanged: _hasService ? _onFavoritesSyncChanged : null,
           ),
           _SyncScopeTile(
             icon: Icons.queue_music_rounded,
             title: context.l10n.cloudSyncPlaylistsLabel,
             subtitle: context.l10n.cloudSyncPlaylistsDesc,
             value: _syncPlaylists,
-            onChanged: (v) async {
-              setState(() => _syncPlaylists = v);
-              await _syncService?.setPlaylistsSyncEnabled(v);
-            },
+            onChanged: _hasService ? _onPlaylistsSyncChanged : null,
           ),
           const SizedBox(height: AppSpacing.lg),
 
@@ -236,7 +248,7 @@ class _CloudBackupDashboardScreenState
                     fontWeight: FontWeight.w700,
                     fontSize: AppFontSize.callout),
               ),
-              onPressed: (_isSyncing || _syncService == null) ? null : _performSync,
+              onPressed: (_isSyncing || !_hasService) ? null : _performSync,
             ),
           ),
         ],
@@ -246,12 +258,14 @@ class _CloudBackupDashboardScreenState
   }
 }
 
+typedef _CloudBackupDashboardScreenState = CloudBackupDashboardScreenState;
+
 class _SyncScopeTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   const _SyncScopeTile({
     required this.icon,

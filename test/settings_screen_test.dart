@@ -189,5 +189,47 @@ void main() {
       }
       expect(find.text('PLAYBACK'), findsWidgets);
     });
+
+    testWidgets('[H-16] search entry memoization survives unrelated state changes like scan progress', (tester) async {
+      await pumpScreen(tester);
+
+      await tester.enterText(find.byType(TextField), 'crossfade');
+      await settleAnims(tester);
+
+      expect(find.text('Crossfade & Gapless'), findsOneWidget);
+
+      // Mutate an unrelated field on SettingsCubit (e.g. scanResultCount / isScanning)
+      settingsCubit.safeEmit(settingsCubit.state.copyWith(
+        scanResultCount: 999,
+        isScanning: true,
+      ));
+      await tester.pump();
+
+      // Search results remain stable and responsive
+      expect(find.text('Crossfade & Gapless'), findsOneWidget);
+    });
+
+    testWidgets('[M-22] search results list is memoized across rebuilds with identical query', (tester) async {
+      await pumpScreen(tester);
+
+      await tester.enterText(find.byType(TextField), 'crossfade');
+      await settleAnims(tester);
+
+      final state = tester.state<SettingsScreenState>(find.byType(SettingsScreen));
+      final initialResults = state.memoizedSearchResults;
+      expect(initialResults, isNotNull);
+      expect(initialResults, isNotEmpty);
+
+      // Rebuild with same query and state
+      await tester.pump();
+      expect(identical(state.memoizedSearchResults, initialResults), isTrue);
+
+      // Mutate unrelated setting cubit state
+      settingsCubit.safeEmit(settingsCubit.state.copyWith(
+        scanResultCount: 123,
+      ));
+      await tester.pump();
+      expect(identical(state.memoizedSearchResults, initialResults), isTrue);
+    });
   });
 }

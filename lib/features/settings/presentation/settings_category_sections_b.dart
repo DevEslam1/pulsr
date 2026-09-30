@@ -220,6 +220,17 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     );
   }
 
+  List<_SearchItem>? _memoizedFilteredEntries;
+  bool? _memoizedFilteredIsPro;
+  List<_SearchItem>? _memoizedFilteredSourceRef;
+
+  List<_SearchItem>? _memoizedSearchResults;
+  String? _memoizedSearchResultsQuery;
+  List<_SearchItem>? _memoizedSearchResultsSourceRef;
+
+  @visibleForTesting
+  List<dynamic>? get memoizedSearchResults => _memoizedSearchResults;
+
   Widget _buildSearchResultsList(
     BuildContext context,
     SettingsState state,
@@ -230,15 +241,35 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
 
     // Collect all searchable setting entries (Professional-only entries are
     // hidden while in Normal mode so advanced features don't leak via search).
-    final entries = _getSearchableEntries(context, state, cubit)
-        .where((e) => state.isProfessional || !e.pro)
-        .toList();
-    final results = entries.where((e) {
-      return e.title.toLowerCase().contains(query) ||
-          e.subtitle.toLowerCase().contains(query) ||
-          e.category.toLowerCase().contains(query) ||
-          e.keywords.any((k) => k.toLowerCase().contains(query));
-    }).toList();
+    final allEntries = _getSearchableEntries(context, state, cubit);
+    final List<_SearchItem> entries;
+    if (_memoizedFilteredEntries != null &&
+        _memoizedFilteredIsPro == state.isProfessional &&
+        identical(_memoizedFilteredSourceRef, allEntries)) {
+      entries = _memoizedFilteredEntries!;
+    } else {
+      _memoizedFilteredSourceRef = allEntries;
+      _memoizedFilteredIsPro = state.isProfessional;
+      entries = _memoizedFilteredEntries = allEntries
+          .where((e) => state.isProfessional || !e.pro)
+          .toList();
+    }
+
+    final List<_SearchItem> results;
+    if (_memoizedSearchResults != null &&
+        _memoizedSearchResultsQuery == query &&
+        identical(_memoizedSearchResultsSourceRef, entries)) {
+      results = _memoizedSearchResults!;
+    } else {
+      _memoizedSearchResultsQuery = query;
+      _memoizedSearchResultsSourceRef = entries;
+      results = _memoizedSearchResults = entries.where((e) {
+        return e.title.toLowerCase().contains(query) ||
+            e.subtitle.toLowerCase().contains(query) ||
+            e.category.toLowerCase().contains(query) ||
+            e.keywords.any((k) => k.toLowerCase().contains(query));
+      }).toList();
+    }
 
     if (results.isEmpty) {
       final suggestions = [
@@ -471,7 +502,17 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
 
   List<_SearchItem>? _memoizedSearchEntries;
   Locale? _memoizedSearchLocale;
-  SettingsState? _memoizedSearchState;
+  ({
+    bool autoThemeByTime,
+    bool highContrast,
+    bool reduceMotion,
+    Object? playerThemeMode,
+    Object? visualizerStyle,
+    Object? themeColorSource,
+    String languageCode,
+    int minDurationSec,
+    Object? streamingQuality,
+  })? _memoizedRelevantFields;
 
   List<_SearchItem> _getSearchableEntries(
     BuildContext context,
@@ -479,13 +520,24 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     SettingsCubit cubit,
   ) {
     final currentLocale = Localizations.localeOf(context);
+    final relevantFields = (
+      autoThemeByTime: state.autoThemeByTime,
+      highContrast: state.highContrast,
+      reduceMotion: state.reduceMotion,
+      playerThemeMode: state.playerThemeMode,
+      visualizerStyle: state.visualizerStyle,
+      themeColorSource: state.themeColorSource,
+      languageCode: state.languageCode,
+      minDurationSec: state.minDurationSec,
+      streamingQuality: state.streamingQuality,
+    );
     if (_memoizedSearchEntries != null &&
         _memoizedSearchLocale == currentLocale &&
-        _memoizedSearchState == state) {
+        _memoizedRelevantFields == relevantFields) {
       return _memoizedSearchEntries!;
     }
     _memoizedSearchLocale = currentLocale;
-    _memoizedSearchState = state;
+    _memoizedRelevantFields = relevantFields;
     return _memoizedSearchEntries = [
       _SearchItem(
         categoryId: 'appearance',

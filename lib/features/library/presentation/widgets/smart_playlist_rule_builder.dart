@@ -113,6 +113,23 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
     _matchMode = widget.initialMatchMode;
   }
 
+  @override
+  void didUpdateWidget(covariant SmartPlaylistRuleBuilder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // BUG-18: adopt externally-provided rules when the parent swaps the list
+    // instance (e.g. loading a different playlist) instead of keeping stale
+    // local edits. Identity comparison avoids clobbering user edits when the
+    // parent rebuilds with the same list instance.
+    if (!identical(oldWidget.initialRules, widget.initialRules)) {
+      _rules = widget.initialRules.isNotEmpty
+          ? List.from(widget.initialRules)
+          : [SmartRule()];
+    }
+    if (oldWidget.initialMatchMode != widget.initialMatchMode) {
+      _matchMode = widget.initialMatchMode;
+    }
+  }
+
   void _notify() {
     widget.onRulesChanged(List.unmodifiable(_rules));
     widget.onMatchModeChanged?.call(_matchMode);
@@ -273,7 +290,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                 TextFormField(
                   initialValue: rule.value,
                   decoration: InputDecoration(
-                    hintText: 'Enter search value...',
+                    hintText: context.l10n.enterSearchValue,
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                     border: OutlineInputBorder(

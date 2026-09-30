@@ -33,8 +33,6 @@ class AudioQualitySheet extends StatelessWidget {
     required this.activeColor,
   });
 
-  static const String _downloadsMatchStreamLabel = 'Downloads match stream';
-
   static void show(
     BuildContext context,
     SongsTableData song,
@@ -200,7 +198,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          _downloadsMatchStreamLabel,
+                          context.l10n.downloadsMatchStream,
                           style: TextStyle(
                             fontSize: AppFontSize.tiny,
                             color: activeColor,
@@ -851,8 +849,9 @@ class AudioQualitySheet extends StatelessWidget {
                 children: [
                   Text(
                     isConnected
-                        ? 'Casting to ${session.deviceName ?? "Cast Device"}'
-                        : 'Cast to Speaker / Display',
+                        ? context.l10n
+                            .castCastingTo(session.deviceName ?? 'Cast Device')
+                        : context.l10n.castToSpeakerDisplay,
                     style: TextStyle(
                       color: isConnected ? activeColor : p.textPrimary,
                       fontSize: AppFontSize.bodySmall,
@@ -862,8 +861,8 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   Text(
                     isConnected
-                        ? 'Tap to manage Cast volume or disconnect'
-                        : 'Stream lossless/lossy audio over Wi-Fi',
+                        ? context.l10n.castManageHint
+                        : context.l10n.castStreamHint,
                     style: TextStyle(
                       color: p.textSecondary,
                       fontSize: AppFontSize.caption,
@@ -2000,7 +1999,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             Padding(
               padding: const EdgeInsetsDirectional.only(top: AppSpacing.s6),
               child: Text(
-                'LE Audio codecs (LC3 / Opus) require a Bluetooth LE Audio connection.',
+                context.l10n.leAudioRequiresBle,
                 style: TextStyle(
                   fontSize: AppFontSize.tiny,
                   color: p.textTertiary,

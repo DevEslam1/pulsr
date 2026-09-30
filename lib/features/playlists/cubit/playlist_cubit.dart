@@ -172,6 +172,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
   void _subscribePlaylists() {
     _playlistsSub?.cancel();
+    // Re-subscribe / refresh pattern: without this, each reloadPlaylists() would
+    // leave the cancelled subscription registered in the composite, permanently
+    // inflating activeSubscriptionCount (see PulsrCubit.removeFromComposite).
+    removeFromComposite(_playlistsSub);
     _playlistsSub = autoSub(_playlistUseCases.watchPlaylists(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(
@@ -227,12 +231,17 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   Future<void> _loadOnlineCache() async {
+    SharedPreferences? prefs;
     try {
-      final prefs = await SharedPreferences.getInstance();
+      prefs = await SharedPreferences.getInstance();
       if (isClosed) return;
       final raw = prefs.getString(_onlineCacheKey);
       if (raw != null && raw.isNotEmpty) {
-        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map<String, dynamic>) {
+          throw const FormatException('Root of online playlist cache must be a JSON object');
+        }
+        final data = decoded;
         final likedTracks = (data['likedTracks'] as List<dynamic>? ?? [])
             .map((t) => YtmTrack.fromJson(t as Map<String, dynamic>))
             .toList();
@@ -283,25 +292,59 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         ));
       }
     } on FormatException catch (e, st) {
-      ErrorLogger.log('Corrupted JSON in online playlist cache',
+      ErrorLogger.log('Corrupted JSON in online playlist cache, clearing cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
+      try {
+        await prefs?.remove(_onlineCacheKey);
+      } catch (_) {}
     } on TypeError catch (e, st) {
-      ErrorLogger.log('Type schema mismatch in online playlist cache',
+      ErrorLogger.log('Type schema mismatch in online playlist cache, clearing cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
+      try {
+        await prefs?.remove(_onlineCacheKey);
+      } catch (_) {}
     } catch (e, st) {
-      ErrorLogger.log('Failed to load online playlist cache',
+      ErrorLogger.log('Failed to load online playlist cache, clearing cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
+      try {
+        await prefs?.remove(_onlineCacheKey);
+      } catch (_) {}
     }
+  }
+
+  @visibleForTesting
+  static const String onlineCacheKey = _onlineCacheKey;
+
+  @visibleForTesting
+  Future<void> loadOnlineCacheForTesting() => _loadOnlineCache();
+
+  /// H-06: Cap queue size to prevent unbounded memory growth during rapid operations.
+  @visibleForTesting
+  static const int maxCacheSaveQueueSize = 50;
+
+  @visibleForTesting
+  int get cacheSaveQueueLength => _cacheSaveQueue.length;
+
+  @visibleForTesting
+  void enqueueCacheSaveForTesting(Future<void> Function() task) => _enqueueCacheSave(task);
+
+  void _enqueueCacheSave(Future<void> Function() task) {
+    if (_disposed || isClosed) return;
+    if (_cacheSaveQueue.length >= maxCacheSaveQueueSize) {
+      _cacheSaveQueue.removeFirst();
+    }
+    _cacheSaveQueue.add(task);
   }
 
   /// Serializes cache writes so concurrent callers cannot persist a snapshot
   /// taken before another section landed.
   Future<void> _saveOnlineCache() {
     if (_disposed || isClosed) return Future.value();
-    // H-03: Coalesce saves — only 1 queued write is needed since _writeOnlineCache
-    // persists the full latest snapshot.
+    // H-06: Coalesce saves and cap queue size to maxCacheSaveQueueSize.
+    // If a write is already queued, redundant saves are coalesced since
+    // _writeOnlineCache persists the full latest snapshot.
     if (_cacheSaveQueue.isEmpty) {
-      _cacheSaveQueue.add(_writeOnlineCache);
+      _enqueueCacheSave(_writeOnlineCache);
     }
     return _drainCacheSaveQueue();
   }

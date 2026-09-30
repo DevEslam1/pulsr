@@ -67,8 +67,12 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
       _maybeUpdateDock(0.0, false);
       return;
     }
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    _maybeUpdateDock(90.0 + bottomInset, true);
+    final mq = MediaQuery.of(context);
+    final bottomInset = mq.padding.bottom;
+    final isShortHeight = mq.size.height < 500 && mq.orientation == Orientation.landscape;
+    final cardHeight = isShortHeight ? 68.0 : 76.0;
+    final bottomMargin = bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10;
+    _maybeUpdateDock(cardHeight + bottomMargin + 6.0, true);
   }
 
   @override
@@ -107,8 +111,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final settingsState = context.watch<SettingsCubit>().state;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final barHeight = 90.0 + bottomInset;
+    final mq = MediaQuery.of(context);
+    final bottomInset = mq.padding.bottom;
+    final isShortHeight = mq.size.height < 500 && mq.orientation == Orientation.landscape;
+    final cardHeight = isShortHeight ? 68.0 : 76.0;
+    final bottomMargin = bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10;
 
     return BlocListener<PlayerCubit, PlayerState>(
       listenWhen: (prev, curr) =>
@@ -148,27 +155,53 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                   context.read<PulsrAudioHandler>().volume.clamp(0.0, 1.0);
               final l10n = context.l10n;
 
-              return Container(
-                height: barHeight,
-                padding: EdgeInsets.only(bottom: bottomInset),
-                decoration: BoxDecoration(
-                  color: p.surface,
-                  border: Border(
-                    top: BorderSide(color: p.hairline, width: 1),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 16,
-                      offset: const Offset(0, -4),
+              return LayoutBuilder(
+                builder: (context, outerConstraints) {
+                  final availableHeight = outerConstraints.maxHeight.isFinite
+                      ? outerConstraints.maxHeight
+                      : double.infinity;
+                  final effectiveBottomMargin = availableHeight < 80.0
+                      ? 0.0
+                      : bottomMargin;
+                  final maxAllowedHeight = availableHeight.isFinite
+                      ? (availableHeight - effectiveBottomMargin).clamp(48.0, cardHeight)
+                      : cardHeight;
+
+                  return Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.sm,
+                      0,
+                      AppSpacing.sm,
+                      effectiveBottomMargin,
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: AppSpacing.s6),
-                  child: LayoutBuilder(
-                    builder: (context, barConstraints) {
+                    child: Container(
+                      height: maxAllowedHeight,
+                      decoration: BoxDecoration(
+                        color: p.surface.withValues(alpha: p.isDark ? 0.94 : 0.98),
+                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        border: Border.all(
+                          color: p.isDark
+                              ? Colors.white.withValues(alpha: 0.12)
+                              : Colors.black.withValues(alpha: 0.08),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.12),
+                            blurRadius: 18,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: isShortHeight ? AppSpacing.xxs : AppSpacing.s6,
+                          ),
+                          child: LayoutBuilder(
+                            builder: (context, barConstraints) {
                       final totalWidth = barConstraints.maxWidth;
                       final isCompactBar = totalWidth < 600;
                       final leftMaxWidth = isCompactBar
@@ -201,7 +234,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                         id: song.id,
                                         remoteUrl: song.remoteArtworkUrl,
                                         type: ArtworkType.AUDIO,
-                                        size: isCompactBar ? 38 : 50,
+                                        size: isCompactBar ? 38 : (isShortHeight ? 42 : 50),
                                         borderRadius: 10,
                                       ),
                                     ),
@@ -731,11 +764,15 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                 },
               ),
             ),
-          );
-            },
-          );
-        },
-      ),
-    );
+          ),
+        ),
+      );
+    },
+  );
+},
+);
+},
+),
+);
   }
 }

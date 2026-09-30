@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
+import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 
@@ -71,6 +72,32 @@ void main() {
           dynamicEqBands: const [
             DynamicEqBandConfig(frequency: 2000.0, thresholdDb: -24.0),
           ],
+        ),
+      );
+      expect(dspSheetRebuildGate(a, b), isTrue);
+    });
+
+    test('gains-only change does not force a full-sheet rebuild (F-10/B4)', () {
+      final a = const PlayerState();
+      final b = a.copyWith(
+        dsp: a.dsp.copyWith(
+          eqPreset: const EqPreset(
+            name: 'Flat',
+            gains: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          ),
+        ),
+      );
+      expect(dspSheetRebuildGate(a, b), isFalse);
+    });
+
+    test('eqPreset name change still forces a rebuild', () {
+      final a = const PlayerState();
+      final b = a.copyWith(
+        dsp: a.dsp.copyWith(
+          eqPreset: const EqPreset(
+            name: 'Rock',
+            gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          ),
         ),
       );
       expect(dspSheetRebuildGate(a, b), isTrue);

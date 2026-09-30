@@ -13,33 +13,33 @@ Previously, errors throughout the application were represented by raw `String? e
 We introduced a sealed class hierarchy `AppError` in `lib/core/errors/app_error.dart` with 6 exhaustive domain subtypes:
 
 ```dart
-sealed class AppError {
-  final String message;
+sealed class AppError implements Exception {
+  final String code;
+  final String userMessage;
   final Object? cause;
   final StackTrace? stackTrace;
-  final bool isRecoverable;
   ...
 }
 
-class NetworkError extends AppError { ... }
-class PlaybackError extends AppError { ... }
-class StorageError extends AppError { ... }
-class AuthError extends AppError { ... }
-class ParsingError extends AppError { ... }
-class SecurityError extends AppError { ... }
+class NetworkError extends AppError { ... }      // connectivity, DNS, HTTP, timeouts
+class StorageError extends AppError { ... }      // disk IO, SQLite/Drift, file perms
+class AudioError extends AppError { ... }        // pipeline, codec, ExoPlayer/AudioService
+class YtmError extends AppError { ... }          // YTM API, scraping, bot blocks, tokens
+class PermissionError extends AppError { ... }   // storage, notifications, mic, background audio
+class GenericAppError extends AppError { ... }   // unexpected domain failure
 ```
 
 ### Key Features
-- **Central Resolver**: `resolveAppError(Object error, [StackTrace? st])` maps arbitrary platform exceptions, HTTP status codes, socket errors, format exceptions, and secure storage faults into their canonical `AppError` subtype.
+- **Central Resolver**: `resolveAppError(Object error, [StackTrace? st])` maps arbitrary platform exceptions, HTTP status codes, socket errors, format exceptions, and secure storage faults into their canonical `AppError` subtype (plus `YtmErrorClassifier` / `ErrorMessageResolver` for YTM and UI strings).
 - **Exhaustive Matching**: UI widgets and handlers use Dart 3 `switch (error)` expressions to guarantee every error scenario is handled at compile-time:
   ```dart
   final userAction = switch (error) {
-    NetworkError(:final isOffline) => isOffline ? showOfflineBanner() : retryRequest(),
-    AuthError(:final isExpired) => triggerReLogin(),
-    StorageError(:final isDiskFull) => promptFreeStorage(),
-    SecurityError() => alertSecurityViolation(),
-    PlaybackError() => fallbackToAlternativeSource(),
-    ParsingError() => logDiagnosticTelemetry(),
+    NetworkError(:final isTimeout) => isTimeout ? showTimeoutRetry() : showOfflineBanner(),
+    YtmError(:final isBotBlock) => isBotBlock ? showBotBlockWait() : triggerReLogin(),
+    StorageError(:final path) => promptFreeStorage(path),
+    PermissionError(:final permissionName) => requestPermission(permissionName),
+    AudioError(:final trackId) => fallbackToAlternativeSource(trackId),
+    GenericAppError(:final code) => logDiagnosticTelemetry(code),
   };
   ```
 

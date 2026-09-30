@@ -86,6 +86,10 @@ class PulsrLayoutMetrics {
     // (e.g. tablet player left pane or narrow window). They must remain a single column.
     if (width < 620) return false;
 
+    // If the available area is taller than wide (portrait or near-square, e.g. tablet player left pane
+    // in ResponsivePlayerLayout), a horizontal 2-pane split would severely crush both artwork and controls.
+    if (width <= height * 1.15) return false;
+
     // Landscape phone or wide view: split into hero artwork + controls/lyrics/queue
     if (PulsrBreakpoint.isLandscape(context)) return true;
 

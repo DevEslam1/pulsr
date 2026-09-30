@@ -2247,9 +2247,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   Widget _buildDeadWebViewCard(PulsrPalette p) {
-    const sessionInterruptedTitle = 'Web Session Interrupted';
-    const sessionInterruptedDesc =
-        'The web view handle was detached or reclaimed by the system. Tap below to reload the session.';
+    final sessionInterruptedTitle = context.l10n.webSessionInterruptedTitle;
+    final sessionInterruptedDesc = context.l10n.webSessionInterruptedDesc;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),

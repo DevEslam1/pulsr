@@ -38,6 +38,10 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
   /// libraries. Falls back to the window until the query completes.
   List<SongsTableData>? _allSongs;
 
+  /// BUG-15: set when the full-library query fails so the UI can surface a
+  /// retry banner instead of silently showing under-counted stats.
+  String? _loadError;
+
   @override
   void initState() {
     super.initState();
@@ -75,12 +79,20 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     if (repo == null) return;
     final res = await repo.getAllSongs();
     if (!mounted) return;
-    res.fold((_) {}, (songs) {
-      if (mounted) {
-        _lastLoadedAt = DateTime.now();
-        setState(() => _allSongs = songs);
-      }
-    });
+    res.fold(
+      (failure) {
+        if (mounted) setState(() => _loadError = failure.message);
+      },
+      (songs) {
+        if (mounted) {
+          _lastLoadedAt = DateTime.now();
+          setState(() {
+            _allSongs = songs;
+            _loadError = null;
+          });
+        }
+      },
+    );
   }
 
   Future<void> _confirmClearHistory(BuildContext context) async {
@@ -202,6 +214,36 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             return ListView(
               padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
               children: [
+                // BUG-15: surface a failed full-library load with a retry.
+                if (_loadError != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline_rounded,
+                            color: p.error, size: 22),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            '${context.l10n.browseFailedToFetch}: $_loadError',
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _loadAllSongs,
+                          child: Text(context.l10n.retry),
+                        ),
+                      ],
+                    ),
+                  ),
                 // Top Metrics Grid
                 Row(
                   children: [

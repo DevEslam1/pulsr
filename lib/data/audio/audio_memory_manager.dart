@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
+import 'package:pulsr/core/utils/error_logger.dart';
 
 /// Item stored in preloaded stream head cache.
 class PreloadedHead {
@@ -21,6 +22,10 @@ class AudioMemoryManager {
   static const int maxStreamCacheEntries = 64;
   static int maxPreloadBudgetBytes = 32 * 1024 * 1024;
   static const int defaultHeadSizeBytes = 2 * 1024 * 1024; // 2MB default head
+
+  /// BUG-29: entries older than this are treated as stale and evicted, so the
+  /// head cache cannot serve indefinitely-old data.
+  static const Duration headEntryTtl = Duration(minutes: 5);
 
   /// Adapts preload budget based on available system memory heuristic (clamped 16–64MB).
   static void adaptBudgetToSystemRam() {
@@ -44,9 +49,14 @@ class AudioMemoryManager {
   final void Function()? onEvictOldestCacheRequested;
   final void Function()? onBackgroundReleaseRequested;
 
+  /// BUG-13: invoked when a preload is rejected because a single head exceeds
+  /// the whole budget, so the caller can react instead of failing silently.
+  final void Function(String key, int sizeBytes)? onPreloadRejected;
+
   AudioMemoryManager({
     this.onEvictOldestCacheRequested,
     this.onBackgroundReleaseRequested,
+    this.onPreloadRejected,
   });
 
   int get currentPreloadBytes => _currentPreloadBytes;
@@ -75,12 +85,35 @@ class AudioMemoryManager {
     return (_currentPreloadBytes + estimatedBytes) <= maxPreloadBudgetBytes;
   }
 
+  /// Evicts entries older than [headEntryTtl] (BUG-29).
+  void evictExpired() {
+    if (_headCache.isEmpty) return;
+    final cutoff = DateTime.now().subtract(headEntryTtl);
+    final expired = _headCache.entries
+        .where((e) => e.value.timestamp.isBefore(cutoff))
+        .map((e) => e.key)
+        .toList(growable: false);
+    for (final key in expired) {
+      final entry = _headCache.remove(key);
+      if (entry != null) _currentPreloadBytes -= entry.sizeBytes;
+    }
+  }
+
   /// Registers a preloaded stream head and evicts oldest items if exceeding 32MB cap.
   void registerPreload(String key, int sizeBytes) {
+    // BUG-29: drop stale heads before applying the budget.
+    evictExpired();
     // FIX B2: reject a single item larger than the whole budget. Without this,
     // the eviction loop below drains the cache and then still inserts the
     // oversized entry, leaving _currentPreloadBytes permanently over budget.
     if (sizeBytes > maxPreloadBudgetBytes) {
+      // BUG-13: surface the rejection instead of failing silently.
+      onPreloadRejected?.call(key, sizeBytes);
+      ErrorLogger.log(
+        'Preload rejected: "$key" ($sizeBytes bytes) exceeds the '
+        '$maxPreloadBudgetBytes-byte budget',
+        category: 'AudioMemoryManager',
+      );
       return;
     }
     if (_headCache.containsKey(key)) {

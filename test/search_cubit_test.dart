@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:fpdart/fpdart.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -6,15 +7,18 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/folder_usecases.dart';
 import 'package:pulsr/domain/usecases/search_music_usecase.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockSearchMusicUseCase implements SearchMusicUseCase {
   final List<SongsTableData> mockSongs;
+  final Stream<Result<List<SongsTableData>>> Function(String query)? onSearch;
 
-  MockSearchMusicUseCase({this.mockSongs = const []});
+  MockSearchMusicUseCase({this.mockSongs = const [], this.onSearch});
 
   @override
   Stream<Result<List<SongsTableData>>> searchSongs(String query,
       {List<String> excludedFolders = const [], int limit = 50}) {
+    if (onSearch != null) return onSearch!(query);
     return Stream.value(Right(mockSongs));
   }
 }
@@ -287,6 +291,104 @@ void main() {
 
       expect(cubit.state.results.length, equals(120),
           reason: 'all 120 matching tracks must be reachable');
+
+      await cubit.close();
+    });
+
+    test('H-05: new query cancels previous debounce and invalidates in-flight search stream', () async {
+      final controllerA = StreamController<Result<List<SongsTableData>>>();
+      final controllerB = StreamController<Result<List<SongsTableData>>>();
+
+      final mockUseCase = MockSearchMusicUseCase(
+        onSearch: (q) {
+          if (q == 'First') return controllerA.stream;
+          return controllerB.stream;
+        },
+      );
+
+      final cubit = SearchCubit(
+        searchUseCase: mockUseCase,
+        folderUseCases: mockFolderUseCases,
+      );
+
+      // 1. Trigger first search
+      cubit.onQueryChanged('First');
+      // Wait for debounce timer (300ms) to fire
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      expect(cubit.state.isLoading, isTrue);
+
+      // 2. Trigger second search before first search stream emits
+      cubit.onQueryChanged('Second');
+      expect(cubit.state.query, equals('Second'));
+
+      // 3. First search stream emits data AFTER second query was typed
+      controllerA.add(const Right([
+        SongsTableData(
+          id: 1,
+          title: 'First Result',
+          artist: 'Artist 1',
+          album: 'Album 1',
+          durationMs: 1000,
+          path: '/path/1',
+          source: SongSource.local,
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 0,
+          lastPositionMs: 0,
+        ),
+      ]));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // First search result MUST be discarded because generation was bumped and subscription cancelled
+      expect(cubit.state.results, isEmpty);
+
+      // 4. Second search debounce fires and emits
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      controllerB.add(const Right([
+        SongsTableData(
+          id: 2,
+          title: 'Second Result',
+          artist: 'Artist 2',
+          album: 'Album 2',
+          durationMs: 2000,
+          path: '/path/2',
+          source: SongSource.local,
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 0,
+          lastPositionMs: 0,
+        ),
+      ]));
+      await pumpUntil(() => cubit.state.results.isNotEmpty);
+
+      expect(cubit.state.results.length, equals(1));
+      expect(cubit.state.results.first.title, equals('Second Result'));
+
+      await controllerA.close();
+      await controllerB.close();
+      await cubit.close();
+    });
+
+    test('[M-08] historyReady completes and prevents race conditions with early history access', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_history': ['Flutter', 'Dart', 'Audio'],
+      });
+
+      final cubit = SearchCubit(
+        searchUseCase: MockSearchMusicUseCase(),
+        folderUseCases: mockFolderUseCases,
+      );
+
+      // Accessing removeHistoryQuery immediately before history has finished loading
+      await cubit.removeHistoryQuery('Dart');
+      await cubit.historyReady;
+
+      expect(cubit.isHistoryLoaded, isTrue);
+      expect(cubit.state.history, equals(['Flutter', 'Audio']));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList('search_history'), equals(['Flutter', 'Audio']));
 
       await cubit.close();
     });

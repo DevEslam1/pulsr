@@ -1,6 +1,46 @@
-# Pulsr Music — YouTube Music Streaming Latency Runbook
+# Pulsr Music — Build, Release & YouTube Music Streaming Latency Runbook
 
-This document describes the tap-to-audible-sound latency optimization program in Pulsr Music, outlining the architectural pipeline, latency budgets, optimization breakdown, and diagnostic troubleshooting guide.
+This document covers (a) how to build and release the three Android flavors and (b) the tap-to-audible-sound latency optimization program for YouTube Music streaming, outlining the architectural pipeline, latency budgets, optimization breakdown, and diagnostic troubleshooting guide.
+
+---
+
+## 0. Build Flavors, Release & Isolation Gates
+
+`android/app/build.gradle.kts` defines three flavors:
+
+| Flavor | Application ID suffix | Contents |
+|---|---|---|
+| `dev` | `.plus` (Pulsr Plus) | Full YTM stack: `src/ytmEnabled` (NewPipeExtractor v0.26.5 + Cast SDK) |
+| `prod` | _(none)_ (Pulsr Music / Pure) | Play-Store build: only `src/ytmDisabled` stubs; `src/prod/AndroidManifest.xml` removes `INTERNET`, `ACCESS_NETWORK_STATE`/`WIFI_STATE`, and `.DownloadService` |
+| `ytm` | `.ytm` | Off-Play distribution: identical to `prod` but compiles the extractor bridge |
+
+Dart-side gates (`lib/core/config/app_config.dart`, `lib/main.dart`):
+- Production builds **must** pass `--dart-define=ENV=prod`. `AppConfig.validateConfiguration()` throws on `prod` + `ENV=dev` or `prod` + `ENABLE_YTM=true`.
+- `AppConfig.isPure = isProd && !ytmEnabled`. Pure skips Firebase init, all YTM warmups, scrobbler/cloud init, and Sentry (unless a DSN is supplied **and** telemetry is allowed).
+- `AppConfig.isTelemetryAllowed = !isPure && sentryDsn.isNotEmpty`.
+- Runtime purity check: `AppConfig.verifyPureNoInternet()` surfaces a loud toast if a Pure build carries `INTERNET`.
+
+```bash
+# Universal APK (prod / Pure)
+flutter build apk --flavor prod --release --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
+
+# Split per-ABI APKs
+flutter build apk --flavor prod --release --split-per-abi --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
+
+# Play App Bundle (CI also passes --obfuscate --split-debug-info=symbols)
+flutter build appbundle --flavor prod --release --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
+```
+
+Isolation / quality gates (see `.github/workflows/ci.yml`):
+```bash
+cd android && ./gradlew :app:processProdReleaseMainManifest && cd ..
+python3 scripts/check_prod_flavor.py
+./gradlew validateProdIsolation   # run from android/
+flutter analyze --fatal-infos --fatal-warnings
+dart format --output=none --set-exit-if-changed .
+bash scripts/run_audio_suites.sh
+flutter test --coverage; python3 scripts/check_coverage.py
+```
 
 ---
 
@@ -98,14 +138,22 @@ Every track resolution logs a structured telemetry report:
 
 Run the test suite to verify latency gates and flavor isolation:
 ```bash
-# Dart Latency Regression Gate & Unit Tests
+# Dart Latency Regression Gate & Unit Tests (paths verified in test/)
 flutter test test/core/telemetry/latency_regression_gate_test.dart
 flutter test test/data/audio/adaptive_buffer_engine_test.dart
+
+# Concurrency / hardening suites backing the latency pipeline
+flutter test test/concurrency/concurrency_hardening_test.dart
+flutter test test/architecture/player_controller_decomposition_test.dart
 
 # Android Hedged Resolution, Client Winner & OkHttp Tests
 cd android
 ./gradlew :app:testDevDebugUnitTest
 
-# GPL / Play Store Isolation Gate
+# GPL / Play Store Isolation Gate (run from android/)
 ./gradlew validateProdIsolation
+# plus repo-root flavor guard:
+python3 scripts/check_prod_flavor.py
 ```
+
+> Class names referenced in §4 (`PoTokenManager`/`PoTokenStore`, `ClientWinnerStore`, `YtmHttpClient`/`YtmUrlCache`, `JsDecipherCache`) live in the Android extractor bridge (`src/ytmEnabled`) and `lib/core/services/ytm_*.dart` / `lib/data/audio/` resolvers (`hedged_stream_resolver.dart`, `stream_pre_resolver.dart`). `PlaybackLatencyTracker` is at `lib/core/telemetry/playback_latency_tracker.dart`. Resolve exact filenames there if a symbol has moved — the trace field names in §4.1 are the stable contract.
