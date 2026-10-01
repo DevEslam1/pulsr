@@ -37,7 +37,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
     );
   }
 
-  Future<void> playNext(SongsTableData song) => queueController.playNext(song);
+  Future<void> playNext(SongsTableData song) =>
+      queueController.playNext(song);
 
   Future<void> addToQueue(SongsTableData song) =>
       queueController.addToQueue(song);

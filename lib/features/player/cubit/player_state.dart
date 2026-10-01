@@ -206,11 +206,7 @@ abstract class DspSlice with _$DspSlice {
       isArbitraryEqEnabled ||
       isLiveProgEnabled ||
       isDynamicBassEnabled ||
-      volumeBoost > 0.01 ||
-      stereoBalance.abs() > 0.01 ||
-      monoMix ||
-      isDitherEnabled ||
-      isSincResamplerEnabled;
+      volumeBoost > 0.01;
 
   bool get isDspEffectsActive =>
       isVirtualizerEnabled ||
@@ -228,9 +224,7 @@ abstract class DspSlice with _$DspSlice {
       isArbitraryEqEnabled ||
       isLiveProgEnabled ||
       isDynamicBassEnabled ||
-      volumeBoost > 0.01 ||
-      stereoBalance.abs() > 0.01 ||
-      monoMix;
+      volumeBoost > 0.01;
 
   int get activeDspStagesCount {
     int count = 0;
@@ -252,22 +246,13 @@ abstract class DspSlice with _$DspSlice {
     if (isLiveProgEnabled) count++;
     if (isDynamicBassEnabled) count++;
     if (volumeBoost > 0.01) count++;
-    if (stereoBalance.abs() > 0.01) count++;
-    if (monoMix) count++;
-    if (isDitherEnabled) count++;
-    if (isSincResamplerEnabled) count++;
     return count;
   }
 
-  /// Count of active *effects* only. EQ and headphone-profile are treated as
-  /// tone-shaping stages, and dither/resampler live on the output path, so none
-  /// of them count as "effects".
   int get activeDspEffectStagesCount =>
       activeDspStagesCount -
       (isEqEnabled ? 1 : 0) -
-      (selectedHeadphoneProfile != null ? 1 : 0) -
-      (isDitherEnabled ? 1 : 0) -
-      (isSincResamplerEnabled ? 1 : 0);
+      (selectedHeadphoneProfile != null ? 1 : 0);
 }
 
 /// Lightweight composite PlayerState holding the 4 focused state slices.
@@ -307,8 +292,7 @@ abstract class PlayerState with _$PlayerState {
   int get silenceSkipSensitivity => playback.silenceSkipSensitivity;
   int get currentSongRating => playback.currentSongRating;
   String? get currentSongEqOverride => playback.currentSongEqOverride;
-  double get currentSongVolumeOverrideDb =>
-      playback.currentSongVolumeOverrideDb;
+  double get currentSongVolumeOverrideDb => playback.currentSongVolumeOverrideDb;
 
   // ──────────────────────────────────────────────
   // Forwarded Queue Getters
@@ -339,8 +323,7 @@ abstract class PlayerState with _$PlayerState {
   bool get isDynamicsEnabled => dsp.isDynamicsEnabled;
   bool get isDynamicsSupported => dsp.isDynamicsSupported;
   DynamicsPreset get dynamicsPreset => dsp.dynamicsPreset;
-  HeadphoneProfile? get selectedHeadphoneProfile =>
-      dsp.selectedHeadphoneProfile;
+  HeadphoneProfile? get selectedHeadphoneProfile => dsp.selectedHeadphoneProfile;
   bool get isSpatializerSupported => dsp.isSpatializerSupported;
   bool get isSpatializerEnabled => dsp.isSpatializerEnabled;
   double get volumeBoost => dsp.volumeBoost;

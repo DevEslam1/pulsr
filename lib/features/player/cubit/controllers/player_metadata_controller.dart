@@ -38,24 +38,12 @@ class PlayerMetadataController {
         _isClosed = isClosed,
         _isSameTrack = isSameTrack;
 
-  Future<void> loadLyrics(SongsTableData song,
-      {bool isOfflineOnly = false}) async {
-    final gen = _lyricsManager.bumpGeneration();
+  Future<void> loadLyrics(SongsTableData song, {bool isOfflineOnly = false}) async {
     if (_isClosed() || !_isSameTrack(_getState().currentSong, song)) return;
 
     final cached = _lyricsManager.getCachedLyrics(song);
     if (cached != null) {
-      if (_isClosed() ||
-          gen != _lyricsManager.generation ||
-          !_isSameTrack(_getState().currentSong, song)) {
-        return;
-      }
       final s = _getState();
-      if (_isClosed() ||
-          gen != _lyricsManager.generation ||
-          !_isSameTrack(s.currentSong, song)) {
-        return;
-      }
       _emit(s.copyWith(
         lyricsSlice: s.lyricsSlice.copyWith(
           lyrics: cached.lines,
@@ -67,17 +55,7 @@ class PlayerMetadataController {
     }
 
     if (_lyricsManager.hasFreshNegativeCache(song)) {
-      if (_isClosed() ||
-          gen != _lyricsManager.generation ||
-          !_isSameTrack(_getState().currentSong, song)) {
-        return;
-      }
       final s = _getState();
-      if (_isClosed() ||
-          gen != _lyricsManager.generation ||
-          !_isSameTrack(s.currentSong, song)) {
-        return;
-      }
       _emit(s.copyWith(
         lyricsSlice: s.lyricsSlice.copyWith(
           lyrics: const [],
@@ -88,6 +66,7 @@ class PlayerMetadataController {
       return;
     }
 
+    final gen = _lyricsManager.bumpGeneration();
     final result = await _lyricsManager
         .resolveLyrics(
           song,
@@ -99,18 +78,11 @@ class PlayerMetadataController {
         )
         .timeout(PlayerConstants.lyricsTimeout, onTimeout: () => null);
 
-    if (_isClosed() ||
-        gen != _lyricsManager.generation ||
-        !_isSameTrack(_getState().currentSong, song)) {
+    if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) {
       return;
     }
 
     final s = _getState();
-    if (_isClosed() ||
-        gen != _lyricsManager.generation ||
-        !_isSameTrack(s.currentSong, song)) {
-      return;
-    }
     _emit(s.copyWith(
       lyricsSlice: s.lyricsSlice.copyWith(
         lyrics: result?.lines ?? const [],
@@ -120,8 +92,7 @@ class PlayerMetadataController {
     ));
   }
 
-  Future<void> loadSponsorBlock(SongsTableData song,
-      {bool isOfflineOnly = false}) async {
+  Future<void> loadSponsorBlock(SongsTableData song, {bool isOfflineOnly = false}) async {
     try {
       await _sponsorBlockManager
           .loadSegmentsForSong(
@@ -130,28 +101,19 @@ class PlayerMetadataController {
             isStale: () =>
                 _isClosed() || !_isSameTrack(_getState().currentSong, song),
           )
-          .timeout(const Duration(seconds: 10),
-              onTimeout: () => const <SponsorBlockSegment>[]);
+          .timeout(const Duration(seconds: 10), onTimeout: () => const <SponsorBlockSegment>[]);
     } catch (e, st) {
       ErrorLogger.log('Failed to load SponsorBlock for ${song.id}',
           error: e, stackTrace: st, category: 'PlayerMetadataController');
-      rethrow;
     }
   }
-
-  /// Evaluates the current position against the loaded SponsorBlock segments
-  /// and returns the seek target when the position falls inside a skippable
-  /// segment, or null when nothing should be skipped.
-  Duration? evaluateSponsorBlockSkip(Duration pos, {required bool isPlaying}) =>
-      _sponsorBlockManager.checkSkipTarget(pos, isPlaying: isPlaying);
 
   Future<void> loadCueChapters(SongsTableData song) async {
     if (song.cueFile == null || song.cueStartMs == null) {
       final state = _getState();
       if (state.cueChapters.isEmpty && state.currentCueIndex == 0) return;
       _emit(state.copyWith(
-        queueSlice: state.queueSlice
-            .copyWith(cueChapters: const [], currentCueIndex: 0),
+        queueSlice: state.queueSlice.copyWith(cueChapters: const [], currentCueIndex: 0),
       ));
       return;
     }
@@ -169,7 +131,6 @@ class PlayerMetadataController {
     } catch (e, st) {
       ErrorLogger.log('Failed to load cue chapters for ${song.path}',
           error: e, stackTrace: st, category: 'PlayerMetadataController');
-      rethrow;
     }
   }
 
@@ -192,48 +153,28 @@ class PlayerMetadataController {
     } catch (e, st) {
       ErrorLogger.log('Failed to enrich audio quality for ${song.id}',
           error: e, stackTrace: st, category: 'PlayerMetadataController');
-      rethrow;
     }
   }
 
-  Future<void> enrichTrackParallel(SongsTableData song,
-      {bool isOfflineOnly = false}) async {
-    final failures = <String>[];
+  Future<void> enrichTrackParallel(SongsTableData song, {bool isOfflineOnly = false}) async {
     await Future.wait([
-      loadLyrics(song, isOfflineOnly: isOfflineOnly)
-          .catchError((Object e, StackTrace st) {
-        failures.add('lyrics');
+      loadLyrics(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
         ErrorLogger.log('Parallel lyrics failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),
-      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly)
-          .catchError((Object e, StackTrace st) {
-        failures.add('sponsorBlock');
+      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
         ErrorLogger.log('Parallel sponsorBlock failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),
       loadCueChapters(song).catchError((Object e, StackTrace st) {
-        failures.add('cue');
         ErrorLogger.log('Parallel cue chapters failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),
       enrichAudioQuality(song).catchError((Object e, StackTrace st) {
-        failures.add('quality');
         ErrorLogger.log('Parallel audio quality enrichment failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),
     ], eagerError: false);
-
-    if (failures.isNotEmpty && !_isClosed()) {
-      final state = _getState();
-      if (_isSameTrack(state.currentSong, song)) {
-        _emit(state.copyWith(
-          playback: state.playback.copyWith(
-            errorMessage: 'Track enrichment failed (${failures.join(', ')})',
-          ),
-        ));
-      }
-    }
   }
 
   void dispose() {}

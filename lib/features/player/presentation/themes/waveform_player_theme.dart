@@ -8,7 +8,6 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
-import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -27,7 +26,6 @@ import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
-import 'player_theme_metrics.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -96,15 +94,16 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
     final activeColor = widget.props.activeColor;
     final bgColor = widget.props.bgColor;
     final song = state.currentSong;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
-        SettingsCubit,
-        ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-        })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-        ));
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+            ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -127,27 +126,29 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isLandscape =
-                PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
+            final isLandscape = context.isLandscape ||
+                (context.isTwoPane || constraints.maxWidth >= 600);
 
-            final m = PlayerThemeMetrics.of(
-              isTablet: isTablet,
-              isLandscape: isLandscape,
-              constraints: constraints,
-            );
-
-            final double spacingTrackToSeek = m.spacingTrackToSeek;
-            final double spacingSeekToControls = m.spacingSeekToControls;
-            final double spacingControlsToDock = m.spacingControlsToDock;
-            final double spacingBelowDock = m.spacingBelowDock;
-            final double switcherTopPad = m.switcherTopPad;
-            final double switcherBottomPad = m.switcherBottomPad;
+            final double heightRatio =
+                (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
+            final double spacingTrackToSeek =
+                (isTablet ? 10.0 : 6.0) * heightRatio;
+            final double spacingSeekToControls =
+                (isTablet ? 12.0 : 8.0) * heightRatio;
+            final double spacingControlsToDock =
+                (isTablet ? 12.0 : 8.0) * heightRatio;
+            final double spacingBelowDock =
+                (isTablet ? 8.0 : 4.0) * heightRatio;
+            final double switcherTopPad =
+                (isTablet ? 4.0 : 2.0) * heightRatio;
+            final double switcherBottomPad =
+                (isTablet ? 6.0 : 3.0) * heightRatio;
 
             final double pillBarWidth = math.min(
               constraints.maxWidth - (isTablet ? 64 : 28),
               isTablet ? 440.0 : 336.0,
             );
-            final double pillBarHeight = m.pillBarHeight;
+            final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -217,7 +218,6 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             isTablet: isTablet,
                             waveController: _waveController,
                             audioSessionId: state.audioSessionId,
-                            artworkHeroTag: 'now_playing_art_waveform',
                           ),
               ),
             );
@@ -228,6 +228,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                 // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 16,
                     vertical: AppSpacing.s2,
                   ),
@@ -239,8 +240,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                         children: [
                           // Left Action: Download (stream) or Add to Playlist (local)
                           SizedBox(
-                            width: 48,
-                            height: 48,
+                            width: isTablet ? 48 : 44,
+                            height: isTablet ? 48 : 44,
                             child: hasDownload
                                 ? Center(
                                     child: YtmDownloadButton(
@@ -258,15 +259,13 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                       onTap: () {
                                         if (song != null) {
                                           HapticFeedback.lightImpact();
-                                          AddToPlaylistSheet.show(context,
-                                              song: song);
+                                          AddToPlaylistSheet.show(context, song: song);
                                         }
                                       },
                                       child: Center(
                                         child: Icon(
                                           Icons.playlist_add_rounded,
-                                          semanticLabel:
-                                              context.l10n.addToPlaylist,
+                                          semanticLabel: context.l10n.addToPlaylist,
                                           size: isTablet ? 24 : 22,
                                           color: p.textSecondary,
                                         ),
@@ -278,8 +277,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                           // Center: Title & Artist
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s10),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -288,9 +287,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                         context.l10n.noTrackSelected,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet
-                                          ? AppFontSize.headline
-                                          : AppFontSize.title,
+                                      fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                       fontWeight: FontWeight.w900,
                                       color: p.textPrimary,
                                       height: 1.22,
@@ -303,9 +300,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                         context.l10n.unknownArtist,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet
-                                          ? AppFontSize.callout
-                                          : AppFontSize.bodySmall,
+                                      fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                       fontWeight: FontWeight.w600,
                                       color: p.textSecondary,
                                     ),
@@ -316,8 +311,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                           ),
 
                           // Right Symmetrical Action: Animated Favorite Button
-                          SizedBox(
-                            width: AppSpacing.xxl,
+                          SizedBox(width: AppSpacing.xxl,
                             height: 48,
                             child: Material(
                               color: Colors.white.withValues(alpha: 0.06),
@@ -357,12 +351,11 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             const SizedBox(width: AppSpacing.xs),
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s6,
-                                  vertical: AppSpacing.s2),
+
+                                  horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                               decoration: BoxDecoration(
                                 color: activeColor.withValues(alpha: 0.16),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r6),
+                                borderRadius: BorderRadius.circular(AppRadii.r6),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -404,6 +397,9 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 
                 SizedBox(height: spacingSeekToControls),
 
+                // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+                const AdvancedPlaybackBar(),
+
                 // Playback Controls
                 PlayerControls(
                   isPlaying: state.isPlaying,
@@ -412,18 +408,13 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                   hasPrevious: state.hasPreviousNeighbour,
                   hasNext: state.hasNextNeighbour,
                   primaryColor: activeColor,
-                  mainButtonSize: m.mainButtonSize,
+                  mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
                   onPlayPause: () => cubit.togglePlayPause(),
                   onNext: () => cubit.next(),
                   onPrevious: () => cubit.previous(),
                   onToggleShuffle: () => cubit.toggleShuffle(),
                   onToggleRepeat: () => cubit.toggleRepeat(),
                 ),
-
-                if (!isLandscape || constraints.maxHeight >= 480) ...[
-                  // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-                  const AdvancedPlaybackBar(),
-                ],
 
                 SizedBox(height: spacingControlsToDock),
 
@@ -435,124 +426,34 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
             );
 
             if (isLandscape) {
-              final bool isSplitContentMode =
-                  state.isLyricsVisible || state.isQueueVisible;
-
-              final Widget leftPaneContent = isSplitContentMode
-                  ? Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: m.paneMaxWidth,
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom:
-                                      isTablet ? AppSpacing.lg : AppSpacing.md,
-                                ),
-                                child: viewSwitcher,
-                              ),
-                              controlsColumn,
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                          child: viewSwitcher,
-                        ),
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxHeight: (constraints.maxHeight - 56)
-                                .clamp(160.0, isTablet ? 520.0 : 310.0),
-                            maxWidth: (constraints.maxHeight - 56)
-                                .clamp(160.0, isTablet ? 520.0 : 310.0),
-                          ),
-                          child: _WaveformHeroStage(
-                            key: const ValueKey('waveform_hero_stage'),
-                            song: song,
-                            activeColor: activeColor,
-                            isPlaying: state.isPlaying,
-                            isLandscape: isLandscape,
-                            isTablet: isTablet,
-                            waveController: _waveController,
-                            audioSessionId: state.audioSessionId,
-                            artworkHeroTag: 'now_playing_art_waveform',
-                          ),
-                        ),
-                      ],
-                    );
-
               return Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 32 : 16,
-                  vertical: 4,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       flex: 5,
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: context.motionMs(260),
-                          child: KeyedSubtree(
-                            key: ValueKey(
-                                'left_pane_${isSplitContentMode ? "split" : "art"}'),
-                            child: leftPaneContent,
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: switcherTopPad,
+                              bottom: switcherBottomPad,
+                            ),
+                            child: viewSwitcher,
                           ),
-                        ),
+                          Expanded(
+                            child: centerDisplay,
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: isTablet ? 32 : 16),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       flex: 6,
-                      child: SizedBox.expand(
-                        child: AnimatedSwitcher(
-                          duration: context.motionMs(260),
-                          layoutBuilder: (currentChild, previousChildren) {
-                            return Stack(
-                              fit: StackFit.expand,
-                              alignment: Alignment.center,
-                              children: <Widget>[
-                                // BUG-FIX: previous panes are fading out —
-                                // prevent them from stealing touch events.
-                                ...previousChildren.map(
-                                    (c) => IgnorePointer(child: c)),
-                                if (currentChild != null) currentChild,
-                              ],
-                            );
-                          },
-                          child: state.isLyricsVisible
-                              ? LyricsView(
-                                  key: ValueKey(
-                                      'lyrics_${song?.id}_${song?.remoteId}'),
-                                  lyrics: state.lyrics,
-                                  isLoading: state.isLoadingLyrics,
-                                  activeColor: activeColor,
-                                  source: state.lyricsSource,
-                                )
-                              : state.isQueueVisible
-                                  ? const NowPlayingQueueView(
-                                      key: ValueKey('queue_view_waveform'),
-                                    )
-                                  : Center(
-                                      key:
-                                          const ValueKey('track_controls_pane'),
-                                      child: SingleChildScrollView(
-                                        child: controlsColumn,
-                                      ),
-                                    ),
-                        ),
+                      child: SingleChildScrollView(
+                        child: controlsColumn,
                       ),
                     ),
                   ],
@@ -564,8 +465,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
               children: [
                 // Top Pull-down Handle Indicator
                 Padding(
-                  padding: const EdgeInsets.only(
-                      top: AppSpacing.xxs, bottom: AppSpacing.s2),
+                  padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                   child: Center(
                     child: Container(
                       width: 38,
@@ -581,6 +481,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                 // Top App Bar - Symmetrical Left/Right Targets & Centered Header
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 20,
                     vertical: AppSpacing.s2,
                   ),
@@ -589,8 +490,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                     children: [
                       // Dismiss Button
                       SizedBox(
-                        width: 48,
-                        height: 48,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -606,8 +507,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             },
                             child: Center(
                               child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                semanticLabel: context.l10n.close,
+                                Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
                                 size: isTablet ? 26 : 24,
                                 color: p.textPrimary,
                               ),
@@ -619,8 +519,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                       // Center: "PLAYING FROM" / Album Header
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -667,9 +566,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                                     .titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      fontSize: isTablet
-                                          ? AppFontSize.body
-                                          : AppFontSize.bodySmall,
+                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                       color: p.textPrimary,
                                     ),
                               ),
@@ -680,8 +577,8 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
 
                       // More Options Button
                       SizedBox(
-                        width: 48,
-                        height: 48,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -695,8 +592,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
                             },
                             child: Center(
                               child: Icon(
-                                Icons.more_horiz_rounded,
-                                semanticLabel: context.l10n.songInfo,
+                                Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
                                 size: isTablet ? 24 : 22,
                                 color: p.textPrimary,
                               ),
@@ -744,6 +640,7 @@ class _WaveformPlayerThemeState extends State<WaveformPlayerTheme>
       ),
     );
   }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -758,10 +655,6 @@ class _WaveformHeroStage extends StatelessWidget {
   final AnimationController waveController;
   final int? audioSessionId;
 
-  /// B21: shared-element tag applied to the artwork only. Null for the landscape
-  /// instance so a route can never contain two Heroes with the same tag.
-  final String? artworkHeroTag;
-
   const _WaveformHeroStage({
     super.key,
     required this.song,
@@ -771,16 +664,7 @@ class _WaveformHeroStage extends StatelessWidget {
     required this.isTablet,
     required this.waveController,
     this.audioSessionId,
-    this.artworkHeroTag,
   });
-
-  Widget _wrapArtworkHero(Widget child) {
-    final tag = artworkHeroTag;
-    // Landscape renders two stage instances; only the phone/portrait mini player
-    // has a matching Hero, so never tag in landscape to avoid duplicate tags.
-    if (tag == null || isLandscape) return child;
-    return Hero(tag: tag, child: child);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -863,11 +747,11 @@ class _WaveformHeroStage extends StatelessWidget {
                 height: artSize,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(
-                      resolveCustomRadius(context, AppRadii.r28)),
+                          resolveCustomRadius(context, AppRadii.r28)),
                   boxShadow: [
                     BoxShadow(
-                      color: activeColor.withValues(
-                          alpha: isPlaying ? 0.42 : 0.22),
+                      color:
+                          activeColor.withValues(alpha: isPlaying ? 0.42 : 0.22),
                       blurRadius: isPlaying ? 48 : 28,
                       spreadRadius: isPlaying ? 4 : 1,
                       offset: const Offset(0, 12),
@@ -885,7 +769,7 @@ class _WaveformHeroStage extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: song != null
-                    ? _wrapArtworkHero(CachedArtwork(
+                    ? CachedArtwork(
                         id: song.id,
                         remoteUrl: song.remoteArtworkUrl,
                         type: ArtworkType.AUDIO,
@@ -893,7 +777,7 @@ class _WaveformHeroStage extends StatelessWidget {
                         borderRadius: 28,
                         highQuality: true,
                         fallbackIcon: Icons.music_note_rounded,
-                      ))
+                      )
                     : Container(
                         color: Colors.black26,
                         child: Icon(
@@ -1106,3 +990,4 @@ class _FluidAudioWavesPainter extends CustomPainter {
         oldDelegate.baselineY != baselineY;
   }
 }
+

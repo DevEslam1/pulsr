@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
@@ -62,11 +61,16 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   String? _lastFilePath;
   Future<List<double>>? _cachedWaveformFuture;
 
-  /// BUG-03/09/23: bumped whenever the displayed track changes. Reset and
-  /// future creation are kept in one place (build) so a hot-reload rebuild
-  /// cannot reset the future without also resetting the transient drag state,
-  /// and a late waveform result can be detected as stale.
-  int _waveformGeneration = 0;
+  @override
+  void didUpdateWidget(PlayerSeekBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.songId != widget.songId ||
+        oldWidget.filePath != widget.filePath) {
+      _dragValue = null;
+      _tapSeekPending = false;
+      _tapSeekRatio = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,21 +90,17 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         (c) => c.state.crossfadeSeconds,
       );
     } catch (_) {
-      final fallback =
-          getIt.isRegistered<SettingsCubit>() ? getIt<SettingsCubit>() : null;
+      final fallback = getIt.isRegistered<SettingsCubit>() ? getIt<SettingsCubit>() : null;
       crossfadeSec = fallback?.state.crossfadeSeconds ?? 0.0;
     }
 
     if (_lastSongId != effectiveSongId || _lastFilePath != effectiveFilePath) {
       _lastSongId = effectiveSongId;
       _lastFilePath = effectiveFilePath;
-      // BUG-03: reset drag state and the cached future together so they can
-      // never disagree about which track is displayed.
       _dragValue = null;
       _tapSeekPending = false;
       _tapSeekRatio = null;
       _cachedWaveformFuture = null;
-      _waveformGeneration++;
     }
 
     // Check if Waveform Seek Bar is enabled in settings and song ID is available
@@ -114,7 +114,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         songId: effectiveSongId,
         filePath: effectiveFilePath,
       );
-      final generation = _waveformGeneration;
 
       return _withUpNext(
         FutureBuilder<List<double>>(
@@ -122,10 +121,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           initialData: instantSamples,
           future: _cachedWaveformFuture,
           builder: (context, snapshot) {
-            // BUG-09/23: ignore a result that arrived for a superseded track.
-            if (generation != _waveformGeneration) {
-              return _buildStandardSeekBar(context, crossfadeSec);
-            }
             final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
                 ? snapshot.data!
                 : instantSamples;
@@ -161,14 +156,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     }
 
     return _withUpNext(_buildStandardSeekBar(context, crossfadeSec));
-  }
-
-  /// BUG-17: resolve the crossfade label, falling back to a hardcoded string if
-  /// the localization key is missing for the active locale.
-  String _crossfadeLabel(BuildContext context) {
-    final label = context.l10n.browseCrossfade;
-    if (label.isEmpty || label == 'browseCrossfade') return 'Crossfade';
-    return label;
   }
 
   /// Adds the "Up Next" strip below the seek bar (shared by every theme).
@@ -246,14 +233,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     return _PlayerPositionScope(builder: build);
   }
 
-  Widget _buildStandardSeekBar(BuildContext context,
-      [double crossfadeSec = 0.0]) {
+  Widget _buildStandardSeekBar(BuildContext context, [double crossfadeSec = 0.0]) {
     bool isPlaying = false;
     try {
       isPlaying = context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
     } catch (_) {
-      final fallback =
-          getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
+      final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       isPlaying = fallback?.state.isPlaying ?? false;
     }
     return _withPosition((position) {
@@ -292,132 +277,56 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 value: valueLabel,
                 increasedValue: increasedLabel,
                 decreasedValue: decreasedLabel,
-                onIncrease: () => widget.onSeek(clampDuration(
-                    currentDuration + const Duration(seconds: 10))),
-                onDecrease: () => widget.onSeek(clampDuration(
-                    currentDuration - const Duration(seconds: 10))),
-                child: Stack(
-                  children: [
-                    RepaintBoundary(
-                      child: PulsrSlider(
-                        value: effectiveValue,
-                        min: 0.0,
-                        max: maxDuration > 0 ? maxDuration : 1.0,
-                        height: 32,
-                        semanticLabel: semanticLabel,
-                        activeColor: widget.activeColor,
-                        inactiveColor: Theme.of(context).brightness ==
-                                Brightness.dark
-                            ? Colors.white.withValues(alpha: 0.14)
-                            : context.palette.hairline.withValues(alpha: 0.8),
-                        isWavy: true,
-                        animateWave: isPlaying,
-                        onChangeStart: (val) {
-                          _tapSeekPending = true;
-                          _tapSeekRatio =
-                              val.clamp(0.0, maxDuration.toDouble());
-                          setState(() => _dragValue = _tapSeekRatio);
-                        },
-                        onChanged: (val) {
-                          final clampedVal =
-                              val.clamp(0.0, maxDuration.toDouble());
-                          if (_tapSeekRatio != null &&
-                              (clampedVal - _tapSeekRatio!).abs() > 200) {
-                            _tapSeekPending = false;
-                          }
-                          setState(() => _dragValue = clampedVal);
-                        },
-                        onChangeEnd: (val) {
-                          final target =
-                              (_tapSeekPending && _tapSeekRatio != null)
-                                  ? _tapSeekRatio!
-                                      .clamp(0.0, maxDuration.toDouble())
-                                  : val.clamp(0.0, maxDuration.toDouble());
-                          widget.onSeek(Duration(milliseconds: target.round()));
-                          setState(() {
-                            _dragValue = null;
-                            _tapSeekPending = false;
-                            _tapSeekRatio = null;
-                          });
-                        },
-                        onChangeCancel: () {
-                          // BUG-27: tactile confirmation that the drag was cancelled.
-                          HapticFeedback.selectionClick();
-                          if (_tapSeekPending && _tapSeekRatio != null) {
-                            widget.onSeek(
-                                Duration(milliseconds: _tapSeekRatio!.round()));
-                          }
-                          setState(() {
-                            _dragValue = null;
-                            _tapSeekPending = false;
-                            _tapSeekRatio = null;
-                          });
-                        },
-                      ),
-                    ),
-                    // A-B loop region overlaid on the standard scrubber so the
-                    // active loop is visible even when waveforms are disabled.
-                    if (widget.loopPointA != null &&
-                        widget.loopPointB != null &&
-                        maxDuration > 0)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: LayoutBuilder(
-                            builder: (context, c) {
-                              final ratioA =
-                                  (widget.loopPointA!.inMilliseconds /
-                                          maxDuration)
-                                      .clamp(0.0, 1.0);
-                              final ratioB =
-                                  (widget.loopPointB!.inMilliseconds /
-                                          maxDuration)
-                                      .clamp(0.0, 1.0);
-                              final left = (ratioA < ratioB ? ratioA : ratioB) *
-                                  c.maxWidth;
-                              final right =
-                                  (ratioA < ratioB ? ratioB : ratioA) *
-                                      c.maxWidth;
-                              final markerColor = widget.activeColor;
-                              return Stack(
-                                children: [
-                                  Positioned(
-                                    left: left,
-                                    width:
-                                        (right - left).clamp(0.0, c.maxWidth),
-                                    top: 0,
-                                    bottom: 0,
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color:
-                                            markerColor.withValues(alpha: 0.22),
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r4),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    left: left - 1,
-                                    top: 4,
-                                    bottom: 4,
-                                    child: Container(
-                                        width: 2.5, color: markerColor),
-                                  ),
-                                  Positioned(
-                                    left: right - 1.5,
-                                    top: 4,
-                                    bottom: 4,
-                                    child: Container(
-                                        width: 2.5, color: markerColor),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                  ],
+                onIncrease: () => widget.onSeek(
+                    clampDuration(currentDuration + const Duration(seconds: 10))),
+                onDecrease: () => widget.onSeek(
+                    clampDuration(currentDuration - const Duration(seconds: 10))),
+                child: RepaintBoundary(
+                  child: PulsrSlider(
+                    value: effectiveValue,
+                  min: 0.0,
+                  max: maxDuration > 0 ? maxDuration : 1.0,
+                  height: 32,
+                  semanticLabel: semanticLabel,
+                  activeColor: widget.activeColor,
+                  inactiveColor: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white.withValues(alpha: 0.14)
+                      : context.palette.hairline.withValues(alpha: 0.8),
+                  isWavy: true,
+                  animateWave: isPlaying,
+                  onChangeStart: (val) {
+                    _tapSeekPending = true;
+                    _tapSeekRatio = val.clamp(0.0, maxDuration.toDouble());
+                    setState(() => _dragValue = _tapSeekRatio);
+                  },
+                  onChanged: (val) {
+                    final clampedVal = val.clamp(0.0, maxDuration.toDouble());
+                    if (_tapSeekRatio != null && (clampedVal - _tapSeekRatio!).abs() > 200) {
+                      _tapSeekPending = false;
+                    }
+                    setState(() => _dragValue = clampedVal);
+                  },
+                  onChangeEnd: (val) {
+                    final target = (_tapSeekPending && _tapSeekRatio != null)
+                        ? _tapSeekRatio!.clamp(0.0, maxDuration.toDouble())
+                        : val.clamp(0.0, maxDuration.toDouble());
+                    widget.onSeek(Duration(milliseconds: target.round()));
+                    setState(() {
+                      _dragValue = null;
+                      _tapSeekPending = false;
+                      _tapSeekRatio = null;
+                    });
+                  },
+                  onChangeCancel: () {
+                    setState(() {
+                      _dragValue = null;
+                      _tapSeekPending = false;
+                      _tapSeekRatio = null;
+                    });
+                  },
                 ),
               ),
+            ),
               const SizedBox(height: AppSpacing.s2),
               // Timestamps
               RepaintBoundary(
@@ -446,22 +355,16 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           Icon(
                             Icons.auto_awesome_rounded,
                             size: 11,
-                            color:
-                                context.palette.accent.withValues(alpha: 0.75),
+                            color: context.palette.accent.withValues(alpha: 0.75),
                           ),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
-                            // BUG-17: guard against an untranslated key
-                            // surfacing as the raw identifier.
-                            '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${_crossfadeLabel(context)}',
+                            '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
                             style: TextStyle(
-                              color: context.palette.accent
-                                  .withValues(alpha: 0.75),
+                              color: context.palette.accent.withValues(alpha: 0.75),
                               fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
+                              fontFeatures: const [FontFeature.tabularFigures()],
                             ),
                           ),
                         ],
@@ -497,8 +400,7 @@ class _PlayerPositionScope extends StatelessWidget {
     try {
       position = context.select<PlayerCubit, Duration>((c) => c.state.position);
     } catch (_) {
-      final fallback =
-          getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
+      final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       position = fallback?.state.position ?? Duration.zero;
     }
     return builder(position);

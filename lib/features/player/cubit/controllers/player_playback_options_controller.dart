@@ -25,7 +25,6 @@ import '../quran_restore_snapshot.dart';
 
 part 'player_playback_options_lyrics.dart';
 part 'player_playback_options_quran.dart';
-part 'player_playback_options_volume.dart';
 
 /// Owns playback options: sleep timer, speed, pitch, ratings, per-track overrides, AB loop, and overlays.
 class PlayerPlaybackOptionsController {
@@ -35,15 +34,10 @@ class PlayerPlaybackOptionsController {
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
   final bool Function() _isClosed;
-  final Future<void> Function(SongsTableData song, {bool isOfflineOnly})?
-      _onLoadLyrics;
+  final Future<void> Function(SongsTableData song, {bool isOfflineOnly})? _onLoadLyrics;
   final PerSongPlaybackStore _perSongPlaybackStore;
   final PerSongVolumeStore _perSongVolumeStore;
   final PerSongEqStore _perSongEqStore;
-  // B5: brings the Bit-Perfect/AAudio/DoP conflict gate to Quran Mode DSP paths.
-  final String? Function()? _dspBlockedReason;
-  // Recovery hook mirroring PlayerDspController.applyDspEffect's _syncAudioEffects.
-  final void Function()? _syncAudioEffects;
 
   bool get isClosed => _isClosed();
 
@@ -57,10 +51,7 @@ class PlayerPlaybackOptionsController {
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
-    Future<void> Function(SongsTableData song, {bool isOfflineOnly})?
-        onLoadLyrics,
-    String? Function()? dspBlockedReason,
-    void Function()? syncAudioEffects,
+    Future<void> Function(SongsTableData song, {bool isOfflineOnly})? onLoadLyrics,
   })  : _audioHandler = audioHandler,
         _earbudOptimizationService = earbudOptimizationService,
         _hiResAudioService = hiResAudioService,
@@ -70,9 +61,7 @@ class PlayerPlaybackOptionsController {
         _onLoadLyrics = onLoadLyrics,
         _perSongPlaybackStore = perSongPlaybackStore ?? PerSongPlaybackStore(),
         _perSongVolumeStore = perSongVolumeStore ?? PerSongVolumeStore(),
-        _perSongEqStore = perSongEqStore ?? PerSongEqStore(),
-        _dspBlockedReason = dspBlockedReason,
-        _syncAudioEffects = syncAudioEffects;
+        _perSongEqStore = perSongEqStore ?? PerSongEqStore();
 
   // ──────────────────────────────────────────────
   // Sleep Timer
@@ -81,8 +70,7 @@ class PlayerPlaybackOptionsController {
     final duration = Duration(minutes: minutes);
     _audioHandler.startSleepTimer(duration);
     final s = _getState();
-    _emit(s.copyWith(
-        playback: s.playback.copyWith(sleepTimerRemaining: duration)));
+    _emit(s.copyWith(playback: s.playback.copyWith(sleepTimerRemaining: duration)));
   }
 
   void startAbsoluteSleepTimer(DateTime stopTime) {
@@ -101,8 +89,7 @@ class PlayerPlaybackOptionsController {
     final remaining = s.duration > s.position
         ? s.duration - s.position
         : const Duration(minutes: 1);
-    _emit(s.copyWith(
-        playback: s.playback.copyWith(sleepTimerRemaining: remaining)));
+    _emit(s.copyWith(playback: s.playback.copyWith(sleepTimerRemaining: remaining)));
   }
 
   void startAfterNTracksTimer(int trackCount) {
@@ -140,8 +127,7 @@ class PlayerPlaybackOptionsController {
 
   int? get sleepTimerRemainingTracks => _audioHandler.sleepTimerRemainingTracks;
   SleepTimerMode get sleepTimerMode => _audioHandler.sleepTimerMode;
-  bool get isEndOfQueueSleepTimer =>
-      sleepTimerMode == SleepTimerMode.endOfQueue;
+  bool get isEndOfQueueSleepTimer => sleepTimerMode == SleepTimerMode.endOfQueue;
   Stream<int?> get sleepTimerRemainingTracksStream =>
       _audioHandler.sleepTimerRemainingTracksStream;
 
@@ -151,15 +137,12 @@ class PlayerPlaybackOptionsController {
   double get minPlaybackSpeed => _audioHandler.minPlaybackSpeed;
   double get maxPlaybackSpeed => _audioHandler.maxPlaybackSpeed;
 
-  Future<void> setPlaybackSpeed(double speed, {bool persist = true}) async {
+  Future<void> setPlaybackSpeed(double speed) async {
     final s = _getState();
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
     _emit(s.copyWith(playback: s.playback.copyWith(playbackSpeed: clamped)));
     try {
       await _audioHandler.setSpeed(clamped);
-      // B13: Quran Mode applies its own playback speed transiently and must not
-      // poison the user's per-song speed memory for this track.
-      if (!persist) return;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
       // A-01: remember this track's speed for its next resume.
@@ -169,13 +152,10 @@ class PlayerPlaybackOptionsController {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback speed',
-          error: e,
-          stackTrace: st,
-          category: 'PlayerPlaybackOptionsController');
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
       final cur = _getState();
       _emit(cur.copyWith(
-          playback:
-              cur.playback.copyWith(errorMessage: 'Speed change failed')));
+          playback: cur.playback.copyWith(errorMessage: 'Speed change failed')));
     }
   }
 
@@ -194,13 +174,10 @@ class PlayerPlaybackOptionsController {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback pitch',
-          error: e,
-          stackTrace: st,
-          category: 'PlayerPlaybackOptionsController');
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
       final cur = _getState();
       _emit(cur.copyWith(
-          playback:
-              cur.playback.copyWith(errorMessage: 'Pitch change failed')));
+          playback: cur.playback.copyWith(errorMessage: 'Pitch change failed')));
     }
   }
 
@@ -212,8 +189,7 @@ class PlayerPlaybackOptionsController {
     await store.setRating(songId.toString(), rating);
     final s = _getState();
     if (s.currentSong?.id == songId) {
-      _emit(
-          s.copyWith(playback: s.playback.copyWith(currentSongRating: rating)));
+      _emit(s.copyWith(playback: s.playback.copyWith(currentSongRating: rating)));
     }
   }
 
@@ -274,9 +250,65 @@ class PlayerPlaybackOptionsController {
     }
   }
 
+  Future<void> setVolume(double volume) async {
+    try {
+      await _audioHandler.setVolume(volume);
+    } catch (e, st) {
+      ErrorLogger.log('Set volume failed',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
+    }
+  }
+
+  Future<void> adjustVolume(double delta) async {
+    try {
+      final current = _audioHandler.volume;
+      final target = (current + delta).clamp(0.0, 1.0);
+      await _audioHandler.setVolume(target);
+    } catch (e, st) {
+      ErrorLogger.log('Adjust volume failed',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
+    }
+  }
+
   bool _muted = false;
   double _volumeBeforeMute = 1.0;
   bool _isMuting = false;
+
+  /// A-06: Toggle output mute, remembering the pre-mute volume so unmuting
+  /// restores it. Exposed for the global keyboard-shortcut layer.
+  Future<void> toggleMute() async {
+    if (_isMuting) return;
+    _isMuting = true;
+    try {
+      if (_muted) {
+        final targetVol = _volumeBeforeMute > 0.0 ? _volumeBeforeMute : 1.0;
+        await _audioHandler.setVolume(targetVol);
+        _muted = false;
+      } else {
+        final currentVol = _audioHandler.volume;
+        if (currentVol > 0.0) {
+          _volumeBeforeMute = currentVol;
+        }
+        await _audioHandler.setVolume(0.0);
+        _muted = true;
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Toggle mute failed',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
+    } finally {
+      _isMuting = false;
+    }
+  }
+
+  bool get isMuted => _muted;
 
   int _playbackMemoryGen = 0;
 
@@ -297,25 +329,13 @@ class PlayerPlaybackOptionsController {
 
     try {
       if (speed != null) {
-        if (_isClosed() ||
-            gen != _playbackMemoryGen ||
-            _getState().currentSong?.id != song.id) {
-          return;
-        }
+        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
         await _audioHandler.setSpeed(speed);
       }
       if (pitch != null) {
-        if (_isClosed() ||
-            gen != _playbackMemoryGen ||
-            _getState().currentSong?.id != song.id) {
-          return;
-        }
+        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
         await _audioHandler.setPitch(pitch);
-        if (_isClosed() ||
-            gen != _playbackMemoryGen ||
-            _getState().currentSong?.id != song.id) {
-          return;
-        }
+        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore per-song playback memory',
@@ -324,11 +344,7 @@ class PlayerPlaybackOptionsController {
           category: 'PlayerPlaybackOptionsController');
     }
 
-    if (_isClosed() ||
-        gen != _playbackMemoryGen ||
-        _getState().currentSong?.id != song.id) {
-      return;
-    }
+    if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
     final s = _getState();
     if (s.currentSong?.id != song.id) return;
     _emit(s.copyWith(
@@ -341,5 +357,35 @@ class PlayerPlaybackOptionsController {
     ));
   }
 
+  // ──────────────────────────────────────────────
+  // Overlays
+  // ──────────────────────────────────────────────
+  void toggleLyrics() => toggleLyricsVisibility();
+
+  void toggleLyricsVisibility() {
+    HapticFeedback.lightImpact();
+    final s = _getState();
+    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
+  }
+
+  void toggleQueue() => toggleQueueVisibility();
+
+  void toggleQueueVisibility() {
+    HapticFeedback.lightImpact();
+    final s = _getState();
+    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
+  }
+
+  void resetOverlayViews() {
+    final s = _getState();
+    if (s.isLyricsVisible || s.isQueueVisible) {
+      _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: false, isQueueVisible: false)));
+    }
+  }
+
+  void setExpanded(bool expanded) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
+  Future<void> setTrackBpm(SongsTableData song, double? bpm) => _audioHandler.setTrackBpm(song, bpm);
+  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
+  void setSilenceSkipSensitivity(int sensitivity) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(silenceSkipSensitivity: sensitivity)));
   void dispose() {}
 }

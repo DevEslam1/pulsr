@@ -40,11 +40,9 @@ class PlayerLyricsManager {
     }
     final cached = LrcParser.getCachedLyrics(songId: song.id, path: song.path);
     if (cached != null) return false;
-    final cacheTs =
-        LrcParser.getCacheTimestamp(songId: song.id, path: song.path);
+    final cacheTs = LrcParser.getCacheTimestamp(songId: song.id, path: song.path);
     return cacheTs != null &&
-        DateTime.now().difference(cacheTs) <=
-            PlayerConstants.lyricsNegativeCacheTtl;
+        DateTime.now().difference(cacheTs) <= PlayerConstants.lyricsNegativeCacheTtl;
   }
 
   /// Caches a negative lookup result so callers avoid hammering network APIs within TTL.
@@ -78,8 +76,7 @@ class PlayerLyricsManager {
     if (isStale != null && isStale()) return null;
 
     // 2. Query LRCLIB
-    final hasSynced =
-        result != null && result.lines.isNotEmpty && result.isSynced;
+    final hasSynced = result != null && result.lines.isNotEmpty && result.isSynced;
     final lrclib = _lrclibService;
     if (!hasSynced && !isOfflineOnly && lrclib != null) {
       try {

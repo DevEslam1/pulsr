@@ -7,9 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/adaptive.dart';
-import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -117,15 +115,16 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     final p = context.palette;
     final song = state.currentSong;
     final activeColor = widget.props.activeColor;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
-        SettingsCubit,
-        ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-        })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-        ));
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+            ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -134,27 +133,30 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isLandscape =
-            PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
+        final isLandscape = context.isLandscape ||
+            (context.isTwoPane || constraints.maxWidth >= 600);
 
         // Dynamic vertical spacing ratio for balanced, centered content distribution
         final double heightRatio =
             (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
-        final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
+        final double spacingTrackToSeek =
+            (isTablet ? 10.0 : 6.0) * heightRatio;
         final double spacingSeekToControls =
             (isTablet ? 12.0 : 8.0) * heightRatio;
         final double spacingControlsToDock =
             (isTablet ? 12.0 : 8.0) * heightRatio;
-        final double spacingBelowDock = (isTablet ? 8.0 : 4.0) * heightRatio;
-        final double switcherTopPad = (isTablet ? 4.0 : 2.0) * heightRatio;
-        final double switcherBottomPad = (isTablet ? 6.0 : 3.0) * heightRatio;
+        final double spacingBelowDock =
+            (isTablet ? 8.0 : 4.0) * heightRatio;
+        final double switcherTopPad =
+            (isTablet ? 4.0 : 2.0) * heightRatio;
+        final double switcherBottomPad =
+            (isTablet ? 6.0 : 3.0) * heightRatio;
 
         final double pillBarWidth = math.min(
           constraints.maxWidth - (isTablet ? 64 : 28),
           isTablet ? 440.0 : 336.0,
         );
-        final double pillBarHeight =
-            (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+        final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
         final viewSwitcher = PlayerViewSwitcher(
           state: state,
@@ -198,308 +200,291 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                   final pivotOffset = Offset(w * 0.81, h * 0.19);
                   final armLength = w * 0.46;
 
+
                   return Semantics(
                     button: true,
                     label: state.isPlaying
                         ? context.l10n.pause
                         : context.l10n.play,
-                    onTap: () => cubit.togglePlayPause(),
                     excludeSemantics: true,
                     child: GestureDetector(
-                      onTap: () => cubit.togglePlayPause(),
-                      onDoubleTap: () {
-                        switch (nowPlayingDoubleTap) {
-                          case NowPlayingDoubleTapAction.toggleFavorite:
-                            final s = state.currentSong;
-                            if (s != null) cubit.toggleFavorite(s.id);
-                            break;
-                          case NowPlayingDoubleTapAction.toggleLyrics:
-                            cubit.toggleLyricsVisibility();
-                            break;
-                          case NowPlayingDoubleTapAction.none:
-                            break;
+                    onTap: () => cubit.togglePlayPause(),
+                    onDoubleTap: () {
+                      switch (nowPlayingDoubleTap) {
+                        case NowPlayingDoubleTapAction.toggleFavorite:
+                          final s = state.currentSong;
+                          if (s != null) cubit.toggleFavorite(s.id);
+                          break;
+                        case NowPlayingDoubleTapAction.toggleLyrics:
+                          cubit.toggleLyricsVisibility();
+                          break;
+                        case NowPlayingDoubleTapAction.none:
+                          break;
+                      }
+                    },
+                    onHorizontalDragEnd: (details) {
+                      if (nowPlayingArtworkSwipe ==
+                              NowPlayingArtworkSwipeAction.nextPrev &&
+                          details.primaryVelocity != null) {
+                        if (details.primaryVelocity! < -200) {
+                          cubit.next();
+                        } else if (details.primaryVelocity! > 200) {
+                          cubit.previous();
                         }
-                      },
-                      onHorizontalDragEnd: (details) {
-                        if (nowPlayingArtworkSwipe ==
-                                NowPlayingArtworkSwipeAction.nextPrev &&
-                            details.primaryVelocity != null) {
-                          if (details.primaryVelocity! < -200) {
-                            cubit.next();
-                          } else if (details.primaryVelocity! > 200) {
-                            cubit.previous();
-                          }
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: PlayerMaterialColors.plinthSurface,
-                          borderRadius: BorderRadius.circular(AppRadii.r22),
-                          border: Border.all(
-                            color: PlayerMaterialColors.plinthBorder,
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.65),
-                              blurRadius: 28,
-                              spreadRadius: 2,
-                              offset: const Offset(0, 12),
-                            ),
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.08),
-                              blurRadius: 32,
-                              spreadRadius: -4,
-                            ),
-                          ],
+                      }
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF14151C),
+                        borderRadius: BorderRadius.circular(AppRadii.r22),
+                        border: Border.all(
+                          color: const Color(0xFF282B37),
+                          width: 1.5,
                         ),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            // 1. Plinth Studio Branding & Active Status
-                            PositionedDirectional(
-                              top: 14,
-                              start: 16,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: state.isPlaying
-                                          ? activeColor
-                                          : Colors.white24,
-                                      boxShadow: state.isPlaying
-                                          ? [
-                                              BoxShadow(
-                                                color: activeColor.withValues(
-                                                    alpha: 0.8),
-                                                blurRadius: 6,
-                                                spreadRadius: 1,
-                                              ),
-                                            ]
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.s6),
-                                  Text(
-                                    context.l10n.vinylDirectDrive,
-                                    style: const TextStyle(
-                                      fontSize: AppFontSize.micro,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: AppTracking.wide,
-                                      color: Colors.white38,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            // 2. Platter Strobe Rim
-                            PositionedDirectional(
-                              start: vinylLeft - 4,
-                              top: vinylTop - 4,
-                              width: vinylSize + 8,
-                              height: vinylSize + 8,
-                              child: CustomPaint(
-                                painter: _PlatterStrobePainter(),
-                              ),
-                            ),
-
-                            // 3. Spinning Vinyl Record
-                            PositionedDirectional(
-                              start: vinylLeft,
-                              top: vinylTop,
-                              width: vinylSize,
-                              height: vinylSize,
-                              child: RotationTransition(
-                                turns: _rotationController,
-                                child: Container(
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            blurRadius: 28,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 12),
+                          ),
+                          BoxShadow(
+                            color: activeColor.withValues(alpha: 0.08),
+                            blurRadius: 32,
+                            spreadRadius: -4,
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // 1. Plinth Studio Branding & Active Status
+                          PositionedDirectional(
+                            top: 14,
+                            start: 16,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: PlayerMaterialColors.recordBase,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.5),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                    ],
-                                  ),
-                                  child: CustomPaint(
-                                    painter: _VinylGroovesPainter(
-                                      activeColor: activeColor,
-                                    ),
-                                    child: Center(
-                                      // Center Album Artwork
-                                      child: Hero(
-                                        tag: 'now_playing_art_vinyl',
-                                        child: Container(
-                                          width: vinylSize * 0.44,
-                                          height: vinylSize * 0.44,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.3),
-                                              width: 1.5,
+                                    color: state.isPlaying
+                                        ? activeColor
+                                        : Colors.white24,
+                                    boxShadow: state.isPlaying
+                                        ? [
+                                            BoxShadow(
+                                              color: activeColor
+                                                  .withValues(alpha: 0.8),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
                                             ),
-                                          ),
-                                          clipBehavior: Clip.antiAlias,
-                                          child: Stack(
-                                            alignment: Alignment.center,
-                                            children: [
-                                              if (song != null)
-                                                CachedArtwork(
-                                                  id: song.id,
-                                                  remoteUrl:
-                                                      song.remoteArtworkUrl,
-                                                  type: ArtworkType.AUDIO,
-                                                  size: vinylSize * 0.44,
-                                                  borderRadius: 999,
-                                                  highQuality: true,
-                                                  fallbackIcon:
-                                                      Icons.music_note_rounded,
-                                                ),
-                                              // Center Spindle Hole
-                                              Container(
-                                                width: 18,
-                                                height: 18,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  gradient: RadialGradient(
-                                                    colors: [
-                                                      AppColors.discSilver,
-                                                      AppColors.discShadow,
-                                                      AppColors.darkSurface,
-                                                    ],
-                                                    stops: const [
-                                                      0.0,
-                                                      0.6,
-                                                      1.0
-                                                    ],
-                                                  ),
-                                                  border: Border.all(
-                                                    color: Colors.white30,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                          ]
+                                        : null,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.s6),
+                                Text(
+                                  context.l10n.vinylDirectDrive,
+                                  style: const TextStyle(
+                                    fontSize: AppFontSize.micro,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: AppTracking.wide,
+                                    color: Colors.white38,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // 2. Platter Strobe Rim
+                          PositionedDirectional(
+                            start: vinylLeft - 4,
+                            top: vinylTop - 4,
+                            width: vinylSize + 8,
+                            height: vinylSize + 8,
+                            child: CustomPaint(
+                              painter: _PlatterStrobePainter(),
+                            ),
+                          ),
+
+                          // 3. Spinning Vinyl Record
+                          PositionedDirectional(
+                            start: vinylLeft,
+                            top: vinylTop,
+                            width: vinylSize,
+                            height: vinylSize,
+                            child: RotationTransition(
+                              turns: _rotationController,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF0C0D11),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: CustomPaint(
+                                  painter: _VinylGroovesPainter(
+                                    activeColor: activeColor,
+                                  ),
+                                  child: Center(
+                                    // Center Album Artwork
+                                    child: Container(
+                                      width: vinylSize * 0.44,
+                                      height: vinylSize * 0.44,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.3),
+                                          width: 1.5,
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // 4. Animated Tonearm Assembly Layer
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                child: RepaintBoundary(
-                                  child: BlocSelector<PlayerCubit, PlayerState,
-                                      int>(
-                                    selector: (s) => s.duration.inMilliseconds >
-                                            0
-                                        ? ((s.position.inMilliseconds /
-                                                    s.duration.inMilliseconds) *
-                                                120)
-                                            .round()
-                                        : 0,
-                                    builder: (context, step) {
-                                      final progress =
-                                          (step / 120.0).clamp(0.0, 1.0);
-                                      final playAngle =
-                                          0.35 + (progress * 0.14);
-                                      return AnimatedBuilder(
-                                        animation: _tonearmAnimation,
-                                        builder: (context, child) {
-                                          final currentAngle = -0.06 +
-                                              ((playAngle - (-0.06)) *
-                                                  _tonearmAnimation.value);
-
-                                          return CustomPaint(
-                                            painter: _TonearmPainter(
-                                              pivot: pivotOffset,
-                                              angle: currentAngle,
-                                              activeColor: activeColor,
-                                              armLength: armLength,
+                                      clipBehavior: Clip.antiAlias,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          if (song != null)
+                                            CachedArtwork(
+                                              id: song.id,
+                                              remoteUrl: song.remoteArtworkUrl,
+                                              type: ArtworkType.AUDIO,
+                                              size: vinylSize * 0.44,
+                                              borderRadius: 999,
+                                              highQuality: true,
+                                              fallbackIcon:
+                                                  Icons.music_note_rounded,
                                             ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby)
-                            PositionedDirectional(
-                              bottom: 12,
-                              start: 14,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.xs,
-                                        vertical: AppSpacing.xxs),
-                                    decoration: BoxDecoration(
-                                      color: state.isPlaying
-                                          ? activeColor.withValues(alpha: 0.15)
-                                          : PlayerMaterialColors.rpmBadgeFill,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r6),
-                                      border: Border.all(
-                                        color: state.isPlaying
-                                            ? activeColor.withValues(alpha: 0.5)
-                                            : PlayerMaterialColors
-                                                .rpmBadgeBorder,
-                                        width: 1,
+                                          // Center Spindle Hole
+                                          Container(
+                                            width: 18,
+                                            height: 18,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              gradient: RadialGradient(
+                                                colors: [
+                                                  Colors.grey.shade400,
+                                                  Colors.grey.shade800,
+                                                  AppColors.darkSurface,
+                                                ],
+                                                stops: const [0.0, 0.6, 1.0],
+                                              ),
+                                              border: Border.all(
+                                                color: Colors.white30,
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          state.isPlaying
-                                              ? Icons.speed_rounded
-                                              : Icons
-                                                  .pause_circle_outline_rounded,
-                                          size: 11,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // 4. Animated Tonearm Assembly Layer
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: RepaintBoundary(
+                                child: BlocSelector<PlayerCubit, PlayerState, int>(
+                                  selector: (s) => s.duration.inMilliseconds > 0
+                                      ? ((s.position.inMilliseconds /
+                                                  s.duration.inMilliseconds) *
+                                              120)
+                                          .round()
+                                      : 0,
+                                  builder: (context, step) {
+                                    final progress = (step / 120.0).clamp(0.0, 1.0);
+                                    final playAngle = 0.35 + (progress * 0.14);
+                                    return AnimatedBuilder(
+                                      animation: _tonearmAnimation,
+                                      builder: (context, child) {
+                                        final currentAngle = -0.06 +
+                                            ((playAngle - (-0.06)) *
+                                                _tonearmAnimation.value);
+
+                                        return CustomPaint(
+                                          painter: _TonearmPainter(
+                                            pivot: pivotOffset,
+                                            angle: currentAngle,
+                                            activeColor: activeColor,
+                                            armLength: armLength,
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // 5. Bottom Plinth RPM Badge (33⅓ RPM / Standby)
+                          PositionedDirectional(
+                            bottom: 12,
+                            start: 14,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+
+                                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                                  decoration: BoxDecoration(
+                                    color: state.isPlaying
+                                        ? activeColor.withValues(alpha: 0.15)
+                                        : const Color(0xFF181A22),
+                                    borderRadius: BorderRadius.circular(AppRadii.r6),
+                                    border: Border.all(
+                                      color: state.isPlaying
+                                          ? activeColor.withValues(alpha: 0.5)
+                                          : const Color(0xFF2B2E3C),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        state.isPlaying
+                                            ? Icons.speed_rounded
+                                            : Icons.pause_circle_outline_rounded,
+                                        size: 11,
+                                        color: state.isPlaying
+                                            ? activeColor
+                                            : Colors.white38,
+                                      ),
+                                      const SizedBox(width: AppSpacing.xxs),
+                                      Text(
+                                        state.isPlaying
+                                            ? context.l10n.vinylSpeedRpm
+                                            : context.l10n.dspStandby,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.micro,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: AppTracking.overline,
                                           color: state.isPlaying
                                               ? activeColor
                                               : Colors.white38,
                                         ),
-                                        const SizedBox(width: AppSpacing.xxs),
-                                        Text(
-                                          state.isPlaying
-                                              ? context.l10n.vinylSpeedRpm
-                                              : context.l10n.dspStandby,
-                                          style: TextStyle(
-                                            fontSize: AppFontSize.micro,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: AppTracking.overline,
-                                            color: state.isPlaying
-                                                ? activeColor
-                                                : Colors.white38,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
+                    ),
                     ),
                   );
                 },
@@ -534,6 +519,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
             Padding(
               padding: EdgeInsets.symmetric(
+
                 horizontal: isTablet ? 28 : 16,
                 vertical: AppSpacing.s2,
               ),
@@ -545,8 +531,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     children: [
                       // Left Action: Download (stream) or Add to Playlist (local)
                       SizedBox(
-                        width: 48,
-                        height: 48,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: hasDownload
                             ? Center(
                                 child: YtmDownloadButton(
@@ -564,8 +550,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   onTap: () {
                                     if (song != null) {
                                       HapticFeedback.lightImpact();
-                                      AddToPlaylistSheet.show(context,
-                                          song: song);
+                                      AddToPlaylistSheet.show(context, song: song);
                                     }
                                   },
                                   child: Center(
@@ -583,19 +568,15 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       // Center: Title & Artist (Symmetric & Centered)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s10),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               MarqueeText(
-                                text:
-                                    song?.title ?? context.l10n.noTrackSelected,
+                                text: song?.title ?? context.l10n.noTrackSelected,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet
-                                      ? AppFontSize.headline
-                                      : AppFontSize.title,
+                                  fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                   fontWeight: FontWeight.w900,
                                   color: p.textPrimary,
                                   height: 1.22,
@@ -604,13 +585,10 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                               ),
                               const SizedBox(height: AppSpacing.xxs),
                               MarqueeText(
-                                text:
-                                    song?.artist ?? context.l10n.unknownArtist,
+                                text: song?.artist ?? context.l10n.unknownArtist,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: isTablet
-                                      ? AppFontSize.callout
-                                      : AppFontSize.bodySmall,
+                                  fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600,
                                   color: p.textSecondary,
                                 ),
@@ -621,8 +599,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       ),
 
                       // Right Symmetrical Action: Animated Favorite Button
-                      SizedBox(
-                        width: AppSpacing.xxl,
+                      SizedBox(width: AppSpacing.xxl,
                         height: 48,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.06),
@@ -678,6 +655,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
             SizedBox(height: spacingSeekToControls),
 
+            // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+            const AdvancedPlaybackBar(),
+
             // Playback Controls
             PlayerControls(
               isPlaying: state.isPlaying,
@@ -686,19 +666,13 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               hasPrevious: state.hasPreviousNeighbour,
               hasNext: state.hasNextNeighbour,
               primaryColor: activeColor,
-              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) *
-                  heightRatio.clamp(0.85, 1.10),
+              mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
               onPlayPause: () => cubit.togglePlayPause(),
               onNext: () => cubit.next(),
               onPrevious: () => cubit.previous(),
               onToggleShuffle: () => cubit.toggleShuffle(),
               onToggleRepeat: () => cubit.toggleRepeat(),
             ),
-
-            if (!isLandscape || constraints.maxHeight >= 480) ...[
-              // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-              const AdvancedPlaybackBar(),
-            ],
 
             SizedBox(height: spacingControlsToDock),
 
@@ -710,229 +684,34 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         );
 
         if (isLandscape) {
-          final bool isSplitContentMode =
-              state.isLyricsVisible || state.isQueueVisible;
-
-          final Widget leftPaneContent = isSplitContentMode
-              ? Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isTablet ? 440.0 : 380.0,
-                    ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
-                          ),
-                          child: viewSwitcher,
-                        ),
-                        // Track Info Header: Title/Artist, Favorite, More
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    MarqueeText(
-                                      text: song?.title ??
-                                          context.l10n.noTrackSelected,
-                                      style: TextStyle(
-                                        fontSize: isTablet
-                                            ? AppFontSize.headline
-                                            : 16.0,
-                                        fontWeight: FontWeight.w800,
-                                        color: p.textPrimary,
-                                        letterSpacing: AppTracking.title,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    MarqueeText(
-                                      text: (song?.artist != null &&
-                                              song!.artist.trim().isNotEmpty)
-                                          ? song.artist.trim()
-                                          : context.l10n.unknownArtist,
-                                      style: TextStyle(
-                                        fontSize:
-                                            isTablet ? AppFontSize.body : 13.0,
-                                        fontWeight: FontWeight.w600,
-                                        color: p.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 38,
-                                height: 38,
-                                child: Material(
-                                  color: Colors.white.withValues(alpha: 0.06),
-                                  shape: const CircleBorder(),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: PlayerAnimatedFavoriteButton(
-                                    isFavorite: song?.isFavorite == true,
-                                    semanticLabel: song?.isFavorite == true
-                                        ? context.l10n.unlike
-                                        : context.l10n.like,
-                                    favoriteColor: p.favorite,
-                                    inactiveColor: p.textSecondary,
-                                    iconSize: 20,
-                                    onTap: () {
-                                      if (song != null) {
-                                        cubit.toggleFavorite(song.id);
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              SizedBox(
-                                width: 38,
-                                height: 38,
-                                child: Material(
-                                  color: Colors.white.withValues(alpha: 0.06),
-                                  shape: const CircleBorder(),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: InkWell(
-                                    onTap: () {
-                                      if (song != null) {
-                                        SongInfoSheet.show(context, song: song);
-                                      }
-                                    },
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.more_horiz_rounded,
-                                        semanticLabel: context.l10n.songInfo,
-                                        size: 20,
-                                        color: p.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(
-                            height: isTablet ? AppSpacing.md : AppSpacing.sm),
-                        // Seek Bar
-                        PlayerSeekBar(
-                          duration: state.duration,
-                          activeColor: activeColor,
-                          songId: song?.id,
-                          filePath: song?.path,
-                          loopPointA: state.abPointA,
-                          loopPointB: state.abPointB,
-                          onSeek: (pos) => cubit.seek(pos),
-                        ),
-                        SizedBox(
-                            height: isTablet ? AppSpacing.md : AppSpacing.sm),
-                        // Playback Controls
-                        PlayerControls(
-                          isPlaying: state.isPlaying,
-                          isShuffle: state.isShuffle,
-                          repeatMode: state.repeatMode,
-                          hasPrevious: state.hasPreviousNeighbour,
-                          hasNext: state.hasNextNeighbour,
-                          primaryColor: activeColor,
-                          mainButtonSize: isTablet ? 68.0 : 54.0,
-                          onPlayPause: () => cubit.togglePlayPause(),
-                          onNext: () => cubit.next(),
-                          onPrevious: () => cubit.previous(),
-                          onToggleShuffle: () => cubit.toggleShuffle(),
-                          onToggleRepeat: () => cubit.toggleRepeat(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                      child: viewSwitcher,
-                    ),
-                    Expanded(
-                      child: Center(
-                        key: const ValueKey('turntable_view'),
-                        child: turntableDeck,
-                      ),
-                    ),
-                  ],
-                );
-
           return SafeArea(
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 32 : 16,
-                vertical: 4,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     flex: 5,
-                    child: Center(
-                      child: AnimatedSwitcher(
-                        duration: context.motionMs(260),
-                        child: KeyedSubtree(
-                          key: ValueKey(
-                              'left_pane_${isSplitContentMode ? "split" : "deck"}'),
-                          child: leftPaneContent,
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: switcherTopPad,
+                            bottom: switcherBottomPad,
+                          ),
+                          child: viewSwitcher,
                         ),
-                      ),
+                        Expanded(
+                          child: centerDisplay,
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: isTablet ? 32 : 16),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     flex: 6,
-                    child: SizedBox.expand(
-                      child: AnimatedSwitcher(
-                        duration: context.motionMs(260),
-                        layoutBuilder: (currentChild, previousChildren) {
-                          return Stack(
-                            fit: StackFit.expand,
-                            alignment: Alignment.center,
-                            children: <Widget>[
-                              // BUG-FIX: previous panes are fading out —
-                              // prevent them from stealing touch events.
-                              ...previousChildren.map(
-                                  (c) => IgnorePointer(child: c)),
-                              if (currentChild != null) currentChild,
-                            ],
-                          );
-                        },
-                        child: state.isLyricsVisible
-                            ? LyricsView(
-                                key: ValueKey(
-                                    'lyrics_${song?.id}_${song?.remoteId}'),
-                                lyrics: state.lyrics,
-                                isLoading: state.isLoadingLyrics,
-                                activeColor: activeColor,
-                                source: state.lyricsSource,
-                              )
-                            : state.isQueueVisible
-                                ? const NowPlayingQueueView(
-                                    key: ValueKey('queue_view'),
-                                  )
-                                : Center(
-                                    key: const ValueKey('track_controls_pane'),
-                                    child: SingleChildScrollView(
-                                      child: controlsColumn,
-                                    ),
-                                  ),
-                      ),
+                    child: SingleChildScrollView(
+                      child: controlsColumn,
                     ),
                   ),
                 ],
@@ -946,8 +725,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
             children: [
               // Top Pull-down Handle Indicator
               Padding(
-                padding: const EdgeInsets.only(
-                    top: AppSpacing.xxs, bottom: AppSpacing.s2),
+                padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                 child: Center(
                   child: Container(
                     width: 38,
@@ -963,6 +741,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
               // Top App Bar - Symmetrical Left/Right Targets & Centered Header
               Padding(
                 padding: EdgeInsets.symmetric(
+
                   horizontal: isTablet ? 28 : 20,
                   vertical: AppSpacing.s2,
                 ),
@@ -971,8 +750,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                   children: [
                     // Dismiss Button (40x40 circle)
                     SizedBox(
-                      width: 48,
-                      height: 48,
+                      width: isTablet ? 48 : 44,
+                      height: isTablet ? 48 : 44,
                       child: Material(
                         color: Colors.white.withValues(alpha: 0.07),
                         shape: const CircleBorder(),
@@ -988,8 +767,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           },
                           child: Center(
                             child: Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              semanticLabel: context.l10n.close,
+                              Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
                               size: isTablet ? 26 : 24,
                               color: p.textPrimary,
                             ),
@@ -1001,8 +779,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     // Center: "PLAYING FROM" / Album Header
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm),
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1049,9 +826,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                   .titleSmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: isTablet
-                                        ? AppFontSize.body
-                                        : AppFontSize.bodySmall,
+                                    fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                     color: p.textPrimary,
                                   ),
                             ),
@@ -1062,8 +837,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
                     // More Options Button (40x40 circle)
                     SizedBox(
-                      width: 48,
-                      height: 48,
+                      width: isTablet ? 48 : 44,
+                      height: isTablet ? 48 : 44,
                       child: Material(
                         color: Colors.white.withValues(alpha: 0.07),
                         shape: const CircleBorder(),
@@ -1077,8 +852,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                           },
                           child: Center(
                             child: Icon(
-                              Icons.more_horiz_rounded,
-                              semanticLabel: context.l10n.songInfo,
+                              Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
                               size: isTablet ? 24 : 22,
                               color: p.textPrimary,
                             ),
@@ -1110,20 +884,21 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     final double maxAllowed = isTablet ? 560.0 : 420.0;
                     final double rawSize =
                         math.min(availableWidth, availableHeight);
-                    final double deckSize =
-                        rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
+                    final double deckSize = rawSize <= 0
+                        ? 0.0
+                        : math.min(rawSize, maxAllowed);
 
                     return Center(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth:
-                              (state.isLyricsVisible || state.isQueueVisible)
-                                  ? (isTablet ? 560.0 : double.infinity)
-                                  : deckSize,
-                          maxHeight:
-                              (state.isLyricsVisible || state.isQueueVisible)
-                                  ? double.infinity
-                                  : deckSize,
+                          maxWidth: (state.isLyricsVisible ||
+                                  state.isQueueVisible)
+                              ? (isTablet ? 560.0 : double.infinity)
+                              : deckSize,
+                          maxHeight: (state.isLyricsVisible ||
+                                  state.isQueueVisible)
+                              ? double.infinity
+                              : deckSize,
                         ),
                         child: centerDisplay,
                       ),
@@ -1145,6 +920,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
       },
     );
   }
+
 }
 
 // -----------------------------------------------------------------------------
@@ -1165,10 +941,10 @@ class _VinylGroovesPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          PlayerMaterialColors.recordSheenCenter,
-          PlayerMaterialColors.recordSheenMid,
-          PlayerMaterialColors.recordSheenDeep,
-          PlayerMaterialColors.recordSheenRim,
+          Color(0xFF181A22),
+          Color(0xFF101116),
+          Color(0xFF090A0D),
+          Color(0xFF14151C),
         ],
         stops: const [0.3, 0.65, 0.92, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
@@ -1224,7 +1000,7 @@ class _VinylGroovesPainter extends CustomPainter {
 
     // Outer rim bead
     final rimPaint = Paint()
-      ..color = PlayerMaterialColors.recordRim
+      ..color = const Color(0xFF2B2E3C)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawCircle(center, radius - 1, rimPaint);
@@ -1244,11 +1020,11 @@ class _PlatterStrobePainter extends CustomPainter {
     final bevelPaint = Paint()
       ..shader = SweepGradient(
         colors: [
-          AppColors.discSteel,
-          AppColors.discSilver,
-          AppColors.discGraphite,
-          AppColors.discAluminum,
-          AppColors.discSteel,
+          Colors.grey.shade600,
+          Colors.grey.shade400,
+          Colors.grey.shade700,
+          Colors.grey.shade500,
+          Colors.grey.shade600,
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
@@ -1331,20 +1107,20 @@ class _TonearmPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          PlayerMaterialColors.gimbalHighlight,
-          PlayerMaterialColors.gimbalMid,
-          PlayerMaterialColors.gimbalShadow,
+          Color(0xFF2C2F3C),
+          Color(0xFF1B1D26),
+          Color(0xFF0F1015),
         ],
       ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius));
     canvas.drawCircle(pivot, _gimbalRadius, basePaint);
 
     final baseRimPaint = Paint()
-      ..color = PlayerMaterialColors.gimbalRim
+      ..color = const Color(0xFF424658)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(pivot, _gimbalRadius, baseRimPaint);
 
-    final screwPaint = Paint()..color = AppColors.discSilver;
+    final screwPaint = Paint()..color = Colors.grey.shade400;
     for (int i = 0; i < 4; i++) {
       final a = (i * math.pi) / 2 + 0.4;
       final sx = pivot.dx + _screwCircleRadius * math.cos(a);
@@ -1356,10 +1132,7 @@ class _TonearmPainter extends CustomPainter {
   void _drawCounterweight(Canvas canvas) {
     final stemPaint = Paint()
       ..shader = const LinearGradient(
-        colors: [
-          PlayerMaterialColors.counterweightStemLight,
-          PlayerMaterialColors.counterweightStemDark,
-        ],
+        colors: [Color(0xFF8B8E9B), Color(0xFF535664)],
       ).createShader(const Rect.fromLTWH(-2.5, -34, 5, 34))
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
@@ -1376,10 +1149,10 @@ class _TonearmPainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          PlayerMaterialColors.counterweightEdge,
-          PlayerMaterialColors.counterweightHighlight,
-          PlayerMaterialColors.counterweightMid,
-          PlayerMaterialColors.counterweightShadow,
+          Color(0xFF9EA2B2),
+          Color(0xFFE2E4EB),
+          Color(0xFF5A5D6C),
+          Color(0xFF383A46),
         ],
         stops: [0.0, 0.35, 0.75, 1.0],
       ).createShader(weightRect);
@@ -1389,7 +1162,7 @@ class _TonearmPainter extends CustomPainter {
     );
 
     final calibRect = const Rect.fromLTWH(-10, -18, 20, 4);
-    final calibPaint = Paint()..color = PlayerMaterialColors.calibrationStrip;
+    final calibPaint = Paint()..color = const Color(0xFF14151B);
     canvas.drawRect(calibRect, calibPaint);
 
     final tickPaint = Paint()
@@ -1428,10 +1201,10 @@ class _TonearmPainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          AppColors.discSilver,
+          Colors.grey.shade400,
           Colors.white,
-          AppColors.discSteel,
-          AppColors.discShadow,
+          Colors.grey.shade600,
+          Colors.grey.shade800,
         ],
         stops: const [0.0, 0.3, 0.7, 1.0],
       ).createShader(Rect.fromLTWH(-10, 0, 20, l))
@@ -1443,7 +1216,7 @@ class _TonearmPainter extends CustomPainter {
 
   void _drawHeadshell(Canvas canvas, double l) {
     final collarPaint = Paint()
-      ..color = PlayerMaterialColors.collarMetal
+      ..color = const Color(0xFFC0C3D0)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(-3, l * 0.90), _collarRadius, collarPaint);
 
@@ -1461,17 +1234,14 @@ class _TonearmPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          PlayerMaterialColors.headshellHighlight,
-          PlayerMaterialColors.headshellShadow,
-        ],
+        colors: [Color(0xFF323544), Color(0xFF161820)],
       ).createShader(
           Rect.fromLTWH(headshellEnd.dx - 6, headshellStart.dy, 12, 22));
     canvas.drawPath(headshellPath, headshellPaint);
 
     final stylusHousingRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(headshellEnd.dx - 3.5, headshellEnd.dy + 3, 7, 6),
-      const Radius.circular(AppRadii.r2),
+      const Radius.circular(1.5),
     );
     final stylusHousingPaint = Paint()..color = activeColor;
     canvas.drawRRect(stylusHousingRect, stylusHousingPaint);
@@ -1496,7 +1266,7 @@ class _TonearmPainter extends CustomPainter {
       headshellEnd.dy - 10,
     );
     final fingerLiftPaint = Paint()
-      ..color = AppColors.discSilver
+      ..color = Colors.grey.shade400
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round;
@@ -1508,21 +1278,20 @@ class _TonearmPainter extends CustomPainter {
       ..shader = RadialGradient(
         colors: [
           Colors.white,
-          AppColors.discSilver,
-          AppColors.discShadow,
+          Colors.grey.shade400,
+          Colors.grey.shade800,
         ],
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
     canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);
 
-    final centerScrewPaint = Paint()
-      ..color = PlayerMaterialColors.pivotCenterScrew;
+    final centerScrewPaint = Paint()..color = const Color(0xFF1A1C24);
     canvas.drawCircle(Offset.zero, _pivotCenterScrewRadius, centerScrewPaint);
   }
 
   void _drawArmRest(Canvas canvas, Offset pos) {
     // Rest post
     final postPaint = Paint()
-      ..color = PlayerMaterialColors.armRestPost
+      ..color = const Color(0xFF282B36)
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -1534,7 +1303,7 @@ class _TonearmPainter extends CustomPainter {
 
     // Rest cradle clip (small curved fork)
     final clipPaint = Paint()
-      ..color = PlayerMaterialColors.armRestClip
+      ..color = const Color(0xFF4A4E60)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8;
     canvas.drawArc(
