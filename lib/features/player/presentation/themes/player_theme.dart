@@ -16,3 +16,27 @@ class PlayerThemeProps {
     required this.bgColor,
   });
 }
+
+/// InheritedWidget that signals whether a player theme is being rendered
+/// inside the tablet split-view left pane (persistent artwork + controls).
+class PlayerSplitViewScope extends InheritedWidget {
+  final bool isInSplitView;
+
+  const PlayerSplitViewScope({
+    super.key,
+    required this.isInSplitView,
+    required super.child,
+  });
+
+  static bool of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<PlayerSplitViewScope>()
+            ?.isInSplitView ??
+        false;
+  }
+
+  @override
+  bool updateShouldNotify(PlayerSplitViewScope oldWidget) =>
+      isInSplitView != oldWidget.isInSplitView;
+}
+

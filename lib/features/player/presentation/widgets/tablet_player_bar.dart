@@ -296,7 +296,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                               child: CachedArtwork(
                                                 id: song.id,
                                                 remoteUrl:
-                                                    song.remoteArtworkUrl,
+                                                    song.remoteArtworkUrl ??
+                                                        song.artworkUri,
                                                 type: ArtworkType.AUDIO,
                                                 size: isCompactBar
                                                     ? 42

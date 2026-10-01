@@ -26,6 +26,7 @@ import '../widgets/now_playing_queue_view.dart';
 import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
+import '../widgets/player_volume_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -79,7 +80,7 @@ class CardPlayerTheme extends StatelessWidget {
           child: song != null
               ? CachedArtwork(
                   id: song.id,
-                  remoteUrl: song.remoteArtworkUrl,
+                  remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
                   type: ArtworkType.AUDIO,
                   size: double.infinity,
                   highQuality: true,
@@ -114,8 +115,9 @@ class CardPlayerTheme extends StatelessWidget {
         SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isLandscape = context.isLandscape ||
-                  (context.isTwoPane || constraints.maxWidth >= 600);
+              final isInSplitView = PlayerSplitViewScope.of(context);
+              final isLandscape = (context.isLandscape || context.isTwoPane) &&
+                  (constraints.maxWidth > constraints.maxHeight);
 
               final double heightRatio =
                   (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -230,7 +232,8 @@ class CardPlayerTheme extends StatelessWidget {
                                       child: song != null
                                           ? CachedArtwork(
                                               id: song.id,
-                                              remoteUrl: song.remoteArtworkUrl,
+                                              remoteUrl:
+                                                  song.remoteArtworkUrl ?? song.artworkUri,
                                               type: ArtworkType.AUDIO,
                                               size: double.infinity,
                                               borderRadius: 28,
@@ -437,6 +440,11 @@ class CardPlayerTheme extends StatelessWidget {
                       onToggleRepeat: () => cubit.toggleRepeat(),
                     ),
 
+                    if (isInSplitView || isTablet) ...[
+                      const SizedBox(height: AppSpacing.s8),
+                      PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                    ],
+
                     SizedBox(height: spacingControlsToDock),
 
                     // Floating Glass Bottom Action Dock (EQ bar)
@@ -444,6 +452,18 @@ class CardPlayerTheme extends StatelessWidget {
                   ],
                 ),
               );
+
+              if (isInSplitView) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Column(
+                    children: [
+                      Expanded(child: centerDisplay),
+                      bottomGlassCard,
+                    ],
+                  ),
+                );
+              }
 
               if (isLandscape) {
                 return Padding(

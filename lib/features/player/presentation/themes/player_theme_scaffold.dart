@@ -14,6 +14,7 @@ import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
+import '../widgets/player_volume_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 
@@ -52,8 +53,8 @@ class PlayerThemeMetrics {
     BoxConstraints constraints,
   ) {
     final isTablet = context.isTablet;
-    final isLandscape = context.isLandscape ||
-        (context.isTwoPane || constraints.maxWidth >= 600);
+    final isLandscape = (context.isLandscape || context.isTwoPane) &&
+        (constraints.maxWidth > constraints.maxHeight);
 
     final double heightRatio =
         (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -319,6 +320,30 @@ class PlayerThemeScaffold extends StatelessWidget {
                           const AdvancedPlaybackBar(),
                         ],
                       );
+
+                final isInSplitView = PlayerSplitViewScope.of(context);
+                if (isInSplitView) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        Expanded(child: Center(child: body(context, metrics))),
+                        if (trackInfo != null) ...[
+                          trackInfo!(context, metrics),
+                          SizedBox(height: metrics.spacingTrackToSeek),
+                        ],
+                        resolvedSeekBar,
+                        SizedBox(height: metrics.spacingSeekToControls),
+                        resolvedControls,
+                        PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                        SizedBox(height: metrics.spacingControlsToDock),
+                        resolvedDock,
+                        SizedBox(height: metrics.spacingBelowDock),
+                      ],
+                    ),
+                  );
+                }
 
                 if (metrics.isLandscape) {
                   return Padding(

@@ -12,7 +12,6 @@
 #endif
 
 SincResampler::SincResampler() {
-    tempOutBuf_.assign(8192 * MAX_CHANNELS, 0.0f);
     setRates(48000.0, 48000.0);
     setEnabled(false);
     reset();
@@ -63,6 +62,23 @@ void SincResampler::generatePolyphaseTable() {
             }
         }
     }
+
+    // The active-window DC correction depends on the (just normalised) table.
+    recomputeActiveScale();
+}
+
+void SincResampler::recomputeActiveScale() {
+    const int lo = HALF_TAPS - activeHalfTaps_;
+    const int hi = HALF_TAPS + activeHalfTaps_;
+    for (int phaseIdx = 0; phaseIdx < NUM_PHASES; ++phaseIdx) {
+        float sum = 0.0f;
+        for (int tap = lo; tap < hi; ++tap) {
+            sum += polyphaseTable_[phaseIdx][tap];
+        }
+        // Ultra (full window) sums to the already-normalised 1.0 -> scale 1.0
+        // (exact no-op, preserves historical Ultra output bit-for-bit).
+        activeScale_[phaseIdx] = (std::abs(sum) > 1e-6f) ? (1.0f / sum) : 1.0f;
+    }
 }
 
 void SincResampler::setRates(double inRate, double outRate) {
@@ -86,6 +102,8 @@ void SincResampler::setQuality(int quality) {
     quality_ = q;
     linearQuality_ = q == 0;
     activeHalfTaps_ = q == 0 ? 0 : (q == 1 ? 8 : (q == 2 ? 16 : TAPS_PER_PHASE / 2));
+    // The active tap window changed -> refresh the per-phase DC correction.
+    recomputeActiveScale();
     reset();
 }
 
@@ -189,7 +207,9 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
 
                 sum += ringBuf_[ch][ringIndex] * coeffs[tap];
             }
-            out[ch][outFrames] = sum;
+            // Restore unity DC gain for the truncated (quality<Ultra) window;
+            // activeScale_ is 1.0 for Ultra so full-quality output is unchanged.
+            out[ch][outFrames] = sum * activeScale_[phaseIdx];
         }
 
         outFrames++;

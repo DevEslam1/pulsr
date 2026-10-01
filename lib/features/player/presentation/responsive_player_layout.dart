@@ -11,6 +11,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
+import 'themes/player_theme.dart';
 import 'widgets/lyrics_view.dart';
 import 'widgets/now_playing_queue_view.dart';
 import 'widgets/player_controls.dart';
@@ -176,13 +177,16 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     }
 
     // 2. Tablet / Desktop Split-View
-    // Must be an actual tablet or desktop (height >= 550) to prevent landscape phones
-    // (which have width 840-932 but height ~360-430) from triggering the 2-pane tablet split.
-    // Landscape phones render the immersive full-screen player theme directly.
-    final isTabletLandscape = (width >= 840 && mediaQuery.size.height >= 550) ||
-        (Adaptive.isTablet(context) &&
-            width >= 720 &&
-            mediaQuery.size.height >= 550);
+    // Must be an actual tablet or desktop (height >= 550) in landscape orientation
+    // (width > height) to trigger the 2-pane tablet split.
+    // Portrait tablets and landscape phones render the full-screen player theme directly.
+    final isLandscapeOrientation =
+        width > mediaQuery.size.height || Adaptive.isLandscape(context);
+    final isTabletLandscape = ((width >= 840 && mediaQuery.size.height >= 500) ||
+            (Adaptive.isTablet(context) &&
+                width >= 720 &&
+                mediaQuery.size.height >= 500)) &&
+        isLandscapeOrientation;
     if (isTabletLandscape) {
       final p = context.palette;
       return Stack(
@@ -267,8 +271,12 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                 // Left Pane: Persistent Full-Fidelity Player Theme (Artwork + Controls Column)
                 Expanded(
                   flex: 5,
-                  child: widget.themeWidget,
+                  child: PlayerSplitViewScope(
+                    isInSplitView: true,
+                    child: widget.themeWidget,
+                  ),
                 ),
+
 
                 // Right Pane: Tabbed View (Lyrics by default, Queue, Quick DSP)
                 Expanded(

@@ -9,8 +9,7 @@
 #include <memory>
 #include <string>
 #include <atomic>
-#include <thread>
-#include <condition_variable>
+// FIX M-15: <thread>/<condition_variable> removed with the dead worker thread.
 
 enum class ReverbPreset {
     Studio = 0,
@@ -155,6 +154,18 @@ private:
     std::vector<float> dryDelayR_;
     int dryDelayPos_ = 0;
 
+    // FIX M-14: native-rate dry delay for the >48kHz wet path. That path streams
+    // the wet signal through a 48kHz core (down-resample -> partitioned/direct
+    // convolution -> up-resample), so the native dry must be delayed by the
+    // whole chain's latency (reverbLatencyFrames_) to avoid a comb/doubling at
+    // mix<1. Capacity covers the worst case: 16x SR scaling of the 512-sample
+    // partition plus resampler group delay. Pre-allocated; never grown on the
+    // audio thread.
+    static constexpr int MAX_HQ_DRY_DELAY = PARTITION_SIZE * 16 + 1024; // 9216
+    std::vector<float> hqDryL_;
+    std::vector<float> hqDryR_;
+    int hqDryPos_ = 0;
+
 
     // Working buffers
     std::vector<FftUtil::Complex> fftWorkL_;
@@ -177,15 +188,8 @@ private:
 
     void processLeftChannelPartition(int numPartitions);
     void processRightChannelPartition(int numPartitions);
-    void workerLoop();
 
-    std::thread workerThread_;
-    std::mutex workerMutex_;
-    std::condition_variable workerCv_;
-    std::mutex workerDoneMutex_;
-    std::condition_variable workerCvDone_;
-    std::atomic<bool> workerRunning_{false};
-    std::atomic<bool> workerJobReady_{false};
-    std::atomic<bool> workerJobDone_{false};
-    std::atomic<int> workerNumPartitions_{0};
+    // FIX M-14: recompute the reported reverb latency (native frames), including
+    // SR scaling and the wet-path resampler group delay for the >48kHz path.
+    void updateReverbLatency();
 };

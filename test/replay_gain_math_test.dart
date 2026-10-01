@@ -77,10 +77,24 @@ void main() {
       expect(out, lessThanOrEqualTo(1.0));
     });
 
-    test('zero gain tags behave like missing tags (preampWithoutRg)', () {
+    test('zero gain tags are treated as tagged (preampWithRg)', () {
+      // A track tagged exactly 0.0 dB is at reference loudness and IS tagged,
+      // so it must use preampWithRg (not fall back to preampWithoutRg).
       final zeroGain = ReplayGainMath.apply(
-          mode: 'track', volume: 1.0, trackGainDb: 0.0, preampWithoutRg: -3.0);
-      expect(zeroGain, closeTo(0.7079, 0.001));
+          mode: 'track',
+          volume: 1.0,
+          trackGainDb: 0.0,
+          preampWithRg: 0.0,
+          preampWithoutRg: -3.0);
+      // 0 dB tag + 0 dB preampWithRg = unity, capped to the -0.5 dB
+      // inter-sample headroom ceiling.
+      expect(zeroGain, closeTo(0.9441, 0.001));
+    });
+
+    test('untagged (null) gain falls back to preampWithoutRg', () {
+      final untagged = ReplayGainMath.apply(
+          mode: 'track', volume: 1.0, trackGainDb: null, preampWithoutRg: -3.0);
+      expect(untagged, closeTo(0.7079, 0.001));
     });
   });
 

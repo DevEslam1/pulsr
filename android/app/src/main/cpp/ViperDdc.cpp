@@ -245,9 +245,12 @@ void ViperDdc::applyParams(const ViperDdcParamSet& params) {
         }
         return;
     }
-    if (!params.ddcContent.empty() && params.ddcContent != loadedContent_) {
-        loadVdcString(params.ddcContent);
-    }
+    // FIX M-18: never parse .vdc text on the audio thread. loadVdcString()
+    // calls std::stod, grows std::vectors and copies on the heap — all of which
+    // violate real-time constraints. The control-thread JNI setter is
+    // responsible for parsing (parseVdcContent) and publishing the prepared
+    // sections above. If no prepared sections are supplied, keep the previously
+    // applied coefficients rather than parsing ddcContent here.
 }
 
 void ViperDdc::process(float* L, float* R, int frames) {

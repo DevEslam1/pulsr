@@ -22,6 +22,7 @@ import '../widgets/now_playing_queue_view.dart';
 import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
+import '../widgets/player_volume_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -119,8 +120,9 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isLandscape = context.isLandscape ||
-            (context.isTwoPane || constraints.maxWidth >= 600);
+        final isInSplitView = PlayerSplitViewScope.of(context);
+        final isLandscape = (context.isLandscape || context.isTwoPane) &&
+            (constraints.maxWidth > constraints.maxHeight);
 
         final double heightRatio =
             (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -487,6 +489,11 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               onToggleRepeat: () => cubit.toggleRepeat(),
             ),
 
+            if (isInSplitView || isTablet) ...[
+              const SizedBox(height: AppSpacing.s8),
+              PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+            ],
+
             SizedBox(height: spacingControlsToDock),
 
             // Floating Glass Bottom Action Dock (EQ bar)
@@ -495,6 +502,20 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
             SizedBox(height: spacingBelowDock),
           ],
         );
+
+        if (isInSplitView) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Column(
+                children: [
+                  Expanded(child: centerDisplay),
+                  controlsColumn,
+                ],
+              ),
+            ),
+          );
+        }
 
         if (isLandscape) {
           return SafeArea(

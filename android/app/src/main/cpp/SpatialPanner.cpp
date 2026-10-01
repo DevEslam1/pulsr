@@ -46,8 +46,15 @@ void SpatialPanner::process(float* L, float* R, int frames) {
     if (std::abs(smoothedBalance_) < 1e-25) smoothedBalance_ = 0.0;
 
     const double theta = (smoothedBalance_ + 1.0) * (M_PI / 4.0);
-    gainL_ = static_cast<float>(std::cos(theta) * std::sqrt(2.0));
-    gainR_ = static_cast<float>(std::sin(theta) * std::sqrt(2.0));
+    // FIX M-20: ramp the pan gains per-sample from the previous block's gains to
+    // the new target instead of snapping once per block, which stair-stepped
+    // (zipper noise) on fast balance automation. Allocation-free accumulators.
+    const float targetGainL = static_cast<float>(std::cos(theta) * std::sqrt(2.0));
+    const float targetGainR = static_cast<float>(std::sin(theta) * std::sqrt(2.0));
+    const float stepL = (targetGainL - gainL_) / static_cast<float>(frames);
+    const float stepR = (targetGainR - gainR_) / static_cast<float>(frames);
+    float gL = gainL_;
+    float gR = gainR_;
 
     for (int i = 0; i < frames; ++i) {
         float l = L[i];
@@ -59,9 +66,14 @@ void SpatialPanner::process(float* L, float* R, int frames) {
             r = monoSample;
         }
 
-        L[i] = l * gainL_;
-        R[i] = r * gainR_;
+        L[i] = l * gL;
+        R[i] = r * gR;
+        gL += stepL;
+        gR += stepR;
     }
+
+    gainL_ = targetGainL;
+    gainR_ = targetGainR;
 }
 
 void SpatialPanner::processInterleaved(float* buffer, int frames, int channels) {
@@ -74,8 +86,13 @@ void SpatialPanner::processInterleaved(float* buffer, int frames, int channels) 
     if (std::abs(smoothedBalance_) < 1e-25) smoothedBalance_ = 0.0;
 
     const double theta = (smoothedBalance_ + 1.0) * (M_PI / 4.0);
-    gainL_ = static_cast<float>(std::cos(theta) * std::sqrt(2.0));
-    gainR_ = static_cast<float>(std::sin(theta) * std::sqrt(2.0));
+    // FIX M-20: per-sample pan-gain interpolation (matches process()).
+    const float targetGainL = static_cast<float>(std::cos(theta) * std::sqrt(2.0));
+    const float targetGainR = static_cast<float>(std::sin(theta) * std::sqrt(2.0));
+    const float stepL = (targetGainL - gainL_) / static_cast<float>(frames);
+    const float stepR = (targetGainR - gainR_) / static_cast<float>(frames);
+    float gL = gainL_;
+    float gR = gainR_;
 
     // Process pairwise channels (0/1, 2/3, etc.)
     for (int i = 0; i < frames; ++i) {
@@ -89,8 +106,13 @@ void SpatialPanner::processInterleaved(float* buffer, int frames, int channels) 
                 r = monoSample;
             }
 
-            buffer[i * channels + ch] = l * gainL_;
-            buffer[i * channels + ch + 1] = r * gainR_;
+            buffer[i * channels + ch] = l * gL;
+            buffer[i * channels + ch + 1] = r * gR;
         }
+        gL += stepL;
+        gR += stepR;
     }
+
+    gainL_ = targetGainL;
+    gainR_ = targetGainR;
 }

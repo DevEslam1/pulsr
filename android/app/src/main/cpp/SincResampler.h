@@ -58,6 +58,11 @@ public:
 
 private:
     void generatePolyphaseTable();
+    // Recomputes the per-phase DC-gain correction for the active tap window.
+    // The full table is normalised to unity DC over all TAPS_PER_PHASE taps, but
+    // quality < Ultra sums only a centred subset, which no longer sums to 1 ->
+    // passband/DC attenuation. This restores unity gain for the active window.
+    void recomputeActiveScale();
     static float sinc(float x);
     static float blackmanHarris(float x, float halfWidth);
 
@@ -72,6 +77,10 @@ private:
 
     // Polyphase FIR filter coefficients [NUM_PHASES][TAPS_PER_PHASE]
     float polyphaseTable_[NUM_PHASES][TAPS_PER_PHASE] = {};
+    // Per-phase unity-DC correction for the active (quality-truncated) window.
+    // 1.0 for Ultra (full window); >1.0 for truncated windows to undo the
+    // gain lost by summing fewer taps. Recomputed on table regen / quality change.
+    float activeScale_[NUM_PHASES] = {};
 
     // Per-channel FIFO ring buffers
     static constexpr int MAX_CHANNELS = 8;
@@ -79,6 +88,4 @@ private:
     float ringBuf_[MAX_CHANNELS][FIFO_CAPACITY] = {};
     int writePos_ = 0;
     int availableFrames_ = 0;
-
-    std::vector<float> tempOutBuf_;
 };

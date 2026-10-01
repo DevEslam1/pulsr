@@ -181,6 +181,21 @@ int functionArity(int funcId) {
             return 1;
     }
 }
+
+// FIX M-16: the recursive-descent compiler (parsePrimary -> parseExpr and
+// parseStatement -> parseStatement) has no depth limit, so hostile/deeply
+// nested input (e.g. "((((...))))", "sin(sin(sin(...)))", or nested if-blocks)
+// can overflow the native stack while loadCode()/buildProgram() runs on the
+// control thread. This RAII guard bounds the parser recursion; exceeding the
+// cap turns into a normal compile error (safe on the control thread).
+constexpr int kMaxParseDepth = 128;
+
+struct ParseDepthGuard {
+    int& depth;
+    bool ok;
+    ParseDepthGuard(int& d, int cap) : depth(d) { ok = (++depth <= cap); }
+    ~ParseDepthGuard() { --depth; }
+};
 } // namespace
 
 LiveProg::LiveProg() {
@@ -313,9 +328,24 @@ void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>
     idxSrate_ = program->idxSrate;
     for (int i = 0; i < 8; ++i) idxSliders_[i] = program->idxSliders[i];
 
-    const int slots = std::min(program->memorySlots, MAX_MEMORY);
+    // FIX M-17: clamp the slot count (a malformed snapshot could carry a
+    // negative or oversized memorySlots, and resize(negative) is catastrophic).
+    const int slots = std::clamp(program->memorySlots, 0, MAX_MEMORY);
     if (static_cast<int>(memory_.size()) != slots) {
         memory_.resize(slots, 0.0); // capacity pre-reserved -> no allocation
+    }
+
+    // FIX M-17: the audio-thread hot loop reads/writes memory_[idxSpl0_] and
+    // memory_[idxSpl1_] with no per-sample bounds check. A prepared program with
+    // out-of-range I/O indices would corrupt memory, so refuse to run it here on
+    // the control thread. (idxSrate_ and the slider indices are already
+    // bounds-checked by setSampleRate()/setSlider().)
+    const int mem = static_cast<int>(memory_.size());
+    if (idxSpl0_ < 0 || idxSpl0_ >= mem || idxSpl1_ < 0 || idxSpl1_ >= mem) {
+        idxSpl0_ = -1;
+        idxSpl1_ = -1;
+        initBytecode_.clear();
+        sampleBytecode_.clear();
     }
 
     isCompiled_ = !sampleBytecode_.empty();
@@ -365,6 +395,9 @@ bool LiveProg::compileScript(const std::string& code) {
         Lexer lexer(text);
         Token cur = lexer.next();
 
+        // FIX M-16: shared recursion-depth counter for the parser lambdas below.
+        int parseDepth = 0;
+
         auto match = [&](TokenType t) -> bool {
             if (cur.type == t) {
                 cur = lexer.next();
@@ -382,6 +415,11 @@ bool LiveProg::compileScript(const std::string& code) {
         std::function<bool()> parsePrimary;
 
         parsePrimary = [&]() -> bool {
+            ParseDepthGuard depthGuard(parseDepth, kMaxParseDepth);
+            if (!depthGuard.ok) {
+                lastError_ = "Expression nesting too deep";
+                return false;
+            }
             if (cur.type == TokenType::Number) {
                 outProgram.push_back({OpCode::PushConst, cur.numVal});
                 cur = lexer.next();
@@ -516,6 +554,11 @@ bool LiveProg::compileScript(const std::string& code) {
         // StoreVar, silently dropping `if (c) { x = 1; }`).
         std::function<bool()> parseStatement;
         parseStatement = [&]() -> bool {
+            ParseDepthGuard depthGuard(parseDepth, kMaxParseDepth);
+            if (!depthGuard.ok) {
+                lastError_ = "Statement nesting too deep";
+                return false;
+            }
             if (match(TokenType::Semi)) return true;
 
             if (cur.type == TokenType::If) {
@@ -720,6 +763,10 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program) {
 
 void LiveProg::process(float* L, float* R, int frames) {
     if (!enabled_ || !isCompiled_ || sampleBytecode_.empty() || !L || !R || frames <= 0) return;
+    // FIX M-17: guard the unchecked memory_[idxSpl0_]/[idxSpl1_] accesses below
+    // against a malformed prepared program (indices are block-constant).
+    const int mem = static_cast<int>(memory_.size());
+    if (idxSpl0_ < 0 || idxSpl0_ >= mem || idxSpl1_ < 0 || idxSpl1_ >= mem) return;
 
     for (int i = 0; i < frames; ++i) {
         memory_[idxSpl0_] = static_cast<double>(L[i]);
@@ -741,6 +788,9 @@ void LiveProg::process(float* L, float* R, int frames) {
 
 void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
     if (!enabled_ || !isCompiled_ || sampleBytecode_.empty() || !buffer || frames <= 0 || channels < 2) return;
+    // FIX M-17: guard the unchecked memory_[idxSpl0_]/[idxSpl1_] accesses below.
+    const int mem = static_cast<int>(memory_.size());
+    if (idxSpl0_ < 0 || idxSpl0_ >= mem || idxSpl1_ < 0 || idxSpl1_ >= mem) return;
 
     for (int i = 0; i < frames; ++i) {
         memory_[idxSpl0_] = static_cast<double>(buffer[i * channels]);

@@ -816,7 +816,8 @@ class _SidebarBottomSection extends StatelessWidget {
                           borderRadius: BorderRadius.circular(AppRadii.r12),
                           child: CachedArtwork(
                             id: song.id,
-                            remoteUrl: song.remoteArtworkUrl,
+                            remoteUrl:
+                                song.remoteArtworkUrl ?? song.artworkUri,
                             type: ArtworkType.AUDIO,
                             size: 44,
                             borderRadius: 11,
@@ -845,7 +846,8 @@ class _SidebarBottomSection extends StatelessWidget {
                           children: [
                             CachedArtwork(
                               id: song.id,
-                              remoteUrl: song.remoteArtworkUrl,
+                              remoteUrl:
+                                  song.remoteArtworkUrl ?? song.artworkUri,
                               type: ArtworkType.AUDIO,
                               size: 28,
                               borderRadius: 6,

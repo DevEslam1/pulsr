@@ -69,5 +69,14 @@ private:
     float decimHistory_[MAX_CHANNELS][DECIM_HISTORY_LEN] = {};
     int decimIdx_ = 0;
 
+    // FIX M-13: dry-path delay line. The wet signal is delayed by the up+down
+    // oversampling FIR group delay (the interpolation prototype convolved with
+    // the matching decimation prototype peaks at ~5 base-rate samples), so the
+    // parallel dry tap must be delayed by the same integer amount or the dry/wet
+    // sum combs at mix<1. Fixed-size per-channel ring, allocation-free.
+    static constexpr int DRY_DELAY = 5;
+    float dryDelay_[MAX_CHANNELS][DRY_DELAY] = {};
+    int dryDelayPos_ = 0;
+
     static const float polyphase4x_[OVERSAMPLE_FACTOR][TAPS_PER_PHASE];
 };

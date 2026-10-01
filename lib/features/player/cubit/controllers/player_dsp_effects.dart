@@ -11,18 +11,29 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     bool excludeBassBoost = false,
   }) {
     final state = _getState();
-    final eq = _audioHandler.equalizerManager;
-    final vol = _audioHandler.volumeController;
-    final rgActive = (vol?.replayGainMode ?? 'off') != 'off';
+    // Engine accessors (equalizerManager is a late-final, volumeController is
+    // nullable) may be unreadable before the handler is fully wired or in unit
+    // tests with a partial fake. The budget is a best-effort pre-brickwall
+    // guard — the native unconditional output clamp is the hard safety net —
+    // so a read failure degrades to 0 dB rather than throwing into a setter.
+    double eqPreampDb = 0.0;
+    double rgPreampDb = 0.0;
+    try {
+      eqPreampDb = _audioHandler.equalizerManager.preampDb;
+      final vol = _audioHandler.volumeController;
+      final rgActive = (vol?.replayGainMode ?? 'off') != 'off';
+      rgPreampDb = rgActive ? (vol?.preampWithRg ?? 0.0) : 0.0;
+    } catch (_) {
+      // Accessors not available yet; keep the conservative 0 dB defaults.
+    }
     final stages = <GainStage>[
       // EQ preamp already folds in the selected headphone profile's preamp
       // (manager.preampDb is set from the profile on apply), so it is the single
       // preamp stage here — summing it AND the profile preampGain would
       // double-count (and a negative AutoEQ preamp would wrongly inflate the
       // budget).
-      GainStage('EQ preamp', eq.preampDb),
-      GainStage(
-          'ReplayGain preamp', rgActive ? (vol?.preampWithRg ?? 0.0) : 0.0),
+      GainStage('EQ preamp', eqPreampDb),
+      GainStage('ReplayGain preamp', rgPreampDb),
       GainStagingBudget.scaledStage('Loudness contour',
           enabled: state.isLoudnessContourEnabled,
           maxDb: GainStagingBudget.maxLoudnessContourDb,
@@ -77,11 +88,14 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     await applyDspEffect(
       featureName: 'Bass Boost',
       guardCondition: requested > 0.01,
+      // State mirrors the user's requested boost (the slider stays put); the
+      // engine receives the headroom-staged value so stacked effects can't
+      // over-drive the signal into the final output clamp.
       updateDsp: (dsp) => dsp.copyWith(
         eqPreset: EqPreset(
           name: state.eqPreset.name,
           gains: state.eqPreset.gains,
-          bassBoost: clamped,
+          bassBoost: requested,
         ),
       ),
       applyAudioHandler: () => _audioHandler.setBassBoost(clamped),
@@ -298,8 +312,11 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     }
     return applyDspEffect(
       featureName: 'Volume Boost',
-      guardCondition: safeValue > 0.01,
-      updateDsp: (dsp) => dsp.copyWith(volumeBoost: safeValue),
+      guardCondition: requested > 0.01,
+      // State mirrors the user's requested boost (the slider stays put); the
+      // engine receives the headroom-staged value so stacked effects can't
+      // over-drive the signal into the final output clamp.
+      updateDsp: (dsp) => dsp.copyWith(volumeBoost: requested),
       applyAudioHandler: () => _audioHandler.setVolumeBoost(safeValue),
     );
   }

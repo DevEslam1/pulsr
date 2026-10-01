@@ -25,6 +25,7 @@ import '../widgets/now_playing_queue_view.dart';
 import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
+import '../widgets/player_volume_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -66,6 +67,7 @@ class ClassicPlayerTheme extends StatelessWidget {
     final artRadius = resolveCustomRadius(context, AppRadii.r28);
 
     final isTablet = context.isTablet;
+    final isInSplitView = PlayerSplitViewScope.of(context);
 
     // Only show standalone audio visualizer if waveform seekbar is NOT already
     // visualizing the audio and the visualizer is explicitly turned on.
@@ -150,28 +152,28 @@ class ClassicPlayerTheme extends StatelessWidget {
         SafeArea(
           child: Column(
             children: [
-              // Top Pull-down Handle Indicator
-              Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xxs),
-                child: Center(
-                  child: Container(
-                    width: 38,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+              if (!isInSplitView) ...[
+                // Top Pull-down Handle Indicator
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xxs),
+                  child: Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(AppRadii.r2),
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              // Top App Bar - Symmetrical Left/Right Touch Targets & Centered Header
-              Padding(
-                padding: EdgeInsets.symmetric(
-
-                  horizontal: isTablet ? 28 : 20,
-                  vertical: AppSpacing.xxs,
-                ),
+                // Top App Bar - Symmetrical Left/Right Touch Targets & Centered Header
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 28 : 20,
+                    vertical: AppSpacing.xxs,
+                  ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -292,13 +294,14 @@ class ClassicPlayerTheme extends StatelessWidget {
               ),
 
               const SizedBox(height: AppSpacing.s2),
+            ],
 
               // Responsive Two-Pane (Landscape / Tablet) vs Single Column (Portrait)
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isLandscape = context.isLandscape ||
-                        (context.isTwoPane || constraints.maxWidth >= 600);
+                    final isLandscape = (context.isLandscape || context.isTwoPane) &&
+                        (constraints.maxWidth > constraints.maxHeight);
 
                     // Dynamic vertical spacing ratio for balanced, centered content distribution
                     final double heightRatio =
@@ -433,7 +436,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                                   ? CachedArtwork(
                                                       id: song.id,
                                                       remoteUrl:
-                                                          song.remoteArtworkUrl,
+                                                          song.remoteArtworkUrl ?? song.artworkUri,
                                                       type: ArtworkType.AUDIO,
                                                       size: double.infinity,
                                                       borderRadius: 26.8,
@@ -647,6 +650,11 @@ class ClassicPlayerTheme extends StatelessWidget {
                           onToggleRepeat: () => cubit.toggleRepeat(),
                         ),
 
+                        if (isInSplitView || isTablet) ...[
+                          const SizedBox(height: AppSpacing.s8),
+                          PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                        ],
+
                         SizedBox(height: spacingControlsToDock),
 
                         PlayerBottomActionDock(
@@ -660,6 +668,44 @@ class ClassicPlayerTheme extends StatelessWidget {
                         SizedBox(height: spacingBelowDock),
                       ],
                     );
+
+                    // Responsive Split-View (Tablet Landscape Screen 2 - Left Pane)
+                    if (isInSplitView) {
+                      return LayoutBuilder(
+                        builder: (context, splitConstraints) {
+                          final double availableWidth =
+                              splitConstraints.maxWidth - (isTablet ? 48.0 : 32.0);
+                          final double availableHeight =
+                              splitConstraints.maxHeight - 340.0;
+                          final double rawSize =
+                              math.min(availableWidth, availableHeight);
+                          final double dynamicArtSize = (rawSize <= 0
+                                  ? 220.0
+                                  : math.min(rawSize, 400.0))
+                              .clamp(180.0, 420.0);
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Center(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: dynamicArtSize,
+                                        maxHeight: dynamicArtSize,
+                                      ),
+                                      child: centerDisplay,
+                                    ),
+                                  ),
+                                ),
+                                controlsColumn,
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    }
 
                     // Landscape / Tablet Two-Pane Mode
                     if (isLandscape) {

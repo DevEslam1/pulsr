@@ -87,6 +87,12 @@ void DynamicBass::updateFilters() {
 void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
     if (paramsChanged_.load(std::memory_order_acquire)) {
         const bool presetChanged = (pendingDevicePreset_ != devicePreset_);
+        // FIX M-19: snapshot the current cutoffs so a live cutoff change (not
+        // just a preset switch) can clear the biquad states. updateFilters()
+        // rewrites the coefficients; keeping the old delay registers against new
+        // coefficients produces a transient/click (same reason
+        // LinkwitzRiley4::configure resets on retune).
+        const int oldXLow = xLow_, oldXHigh = xHigh_, oldYLow = yLow_, oldYHigh = yHigh_;
         enabled_ = pendingEnabled_;
         devicePreset_ = pendingDevicePreset_;
 
@@ -103,7 +109,20 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
 
         strength_ = std::clamp(pendingStrength_, 0.0, 8.0);
         updateFilters();
-        if (presetChanged) reset();
+        const bool cutoffChanged = (xLow_ != oldXLow) || (xHigh_ != oldXHigh) ||
+                                   (yLow_ != oldYLow) || (yHigh_ != oldYHigh);
+        if (presetChanged) {
+            reset();
+        } else if (cutoffChanged) {
+            // FIX M-19: reset only the biquad delay registers (not the envelope
+            // or smoothed strength, which must stay continuous) so a live cutoff
+            // tweak does not click.
+            yHpMid_.reset();
+            yLpMid_.reset();
+            yLpSide_.reset();
+            xHpBass_.reset();
+            xLpBass_.reset();
+        }
         paramsChanged_.store(false, std::memory_order_release);
     }
 

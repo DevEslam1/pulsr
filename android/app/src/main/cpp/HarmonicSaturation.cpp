@@ -67,6 +67,8 @@ void HarmonicSaturation::reset() {
     std::memset(dcY_, 0, sizeof(dcY_));
     std::memset(decimHistory_, 0, sizeof(decimHistory_));
     decimIdx_ = 0;
+    std::memset(dryDelay_, 0, sizeof(dryDelay_));
+    dryDelayPos_ = 0;
 }
 
 static inline float shapeSample(float x, double k, float invNorm, int mode) {
@@ -107,6 +109,14 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
         if (!std::isfinite(inL)) inL = 0.0f;
         if (!std::isfinite(inR)) inR = 0.0f;
 
+        // FIX M-13: push current input into the dry delay line and read the tap
+        // delayed by DRY_DELAY frames (the oversampling FIR group delay).
+        const float dryL = dryDelay_[0][dryDelayPos_];
+        const float dryR = dryDelay_[1][dryDelayPos_];
+        dryDelay_[0][dryDelayPos_] = inL;
+        dryDelay_[1][dryDelayPos_] = inR;
+        dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
+
         // Shift history buffers
         for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
             history_[0][t] = history_[0][t - 1];
@@ -117,6 +127,11 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 
         float wetL = inL;
         float wetR = inR;
+        // FIX M-13: when the oversampler runs, wet is group-delayed, so mix the
+        // delay-matched dry; when it is bypassed (k<=0) wet is the current input,
+        // so the dry tap must stay undelayed to keep unity.
+        float dryTapL = inL;
+        float dryTapR = inR;
 
         if (k > 1e-9) {
             // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -170,16 +185,23 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
             }
             decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
 
-            // Polyphase FIR decimation: convolve shaped history with prototype
-            // filter reconstructed from the polyphase bank.
-            // h_proto[p * TAPS_PER_PHASE + t] = polyphase4x_[p][t]
+            // Polyphase FIR decimation: convolve shaped history with the
+            // anti-aliasing prototype reconstructed from the polyphase bank.
+            // FIX M-12: the prototype must be reconstructed with INTERLEAVED
+            // indexing, matching the interpolation prototype:
+            //   h_proto[t*OVERSAMPLE_FACTOR + p] = polyphase4x_[p][t]
+            // The previous phase-MAJOR mapping (p*TAPS_PER_PHASE + t) scattered
+            // the four per-phase peaks across lags 2,8,15,21, yielding a
+            // comb-like response that passed (rather than rejected) the images
+            // the 4x waveshaping creates. DC gain is unchanged (coefficient sum
+            // is identical under reordering), so the aliasing was hidden.
             wetL = 0.0f;
             wetR = 0.0f;
 #if defined(PULSR_HAS_NEON)
             float32x2_t vWet = vdup_n_f32(0.0f);
             for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                 for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const int k_idx = p * TAPS_PER_PHASE + t;
+                    const int k_idx = t * OVERSAMPLE_FACTOR + p;
                     const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
                     float32x2_t vDecim = { decimHistory_[0][hIdx], decimHistory_[1][hIdx] };
                     vWet = vfma_n_f32(vWet, vDecim, polyphase4x_[p][t]);
@@ -191,7 +213,7 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
             __m128 vWet = _mm_setzero_ps();
             for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                 for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const int k_idx = p * TAPS_PER_PHASE + t;
+                    const int k_idx = t * OVERSAMPLE_FACTOR + p;
                     const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
                     __m128 vDecim = _mm_set_ps(0.0f, 0.0f, decimHistory_[1][hIdx], decimHistory_[0][hIdx]);
                     __m128 vC = _mm_set1_ps(polyphase4x_[p][t]);
@@ -205,7 +227,7 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 #else
             for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                 for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                    const int k_idx = p * TAPS_PER_PHASE + t;
+                    const int k_idx = t * OVERSAMPLE_FACTOR + p;
                     const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
                     wetL += polyphase4x_[p][t] * decimHistory_[0][hIdx];
                     wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
@@ -226,13 +248,17 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
                 wetL = yL;
                 wetR = yR;
             }
+
+            // FIX M-13: oversampler ran, so align the dry tap with the wet delay.
+            dryTapL = dryL;
+            dryTapR = dryR;
         }
 
         if (!std::isfinite(wetL)) wetL = 0.0f;
         if (!std::isfinite(wetR)) wetR = 0.0f;
 
-        L[i] = (1.0f - mix) * inL + mix * wetL;
-        R[i] = (1.0f - mix) * inR + mix * wetR;
+        L[i] = (1.0f - mix) * dryTapL + mix * wetL;
+        R[i] = (1.0f - mix) * dryTapR + mix * wetR;
     }
 }
 
@@ -256,6 +282,13 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
             if (!std::isfinite(inL)) inL = 0.0f;
             if (!std::isfinite(inR)) inR = 0.0f;
 
+            // FIX M-13: dry delay line (matches process()).
+            const float dryL = dryDelay_[0][dryDelayPos_];
+            const float dryR = dryDelay_[1][dryDelayPos_];
+            dryDelay_[0][dryDelayPos_] = inL;
+            dryDelay_[1][dryDelayPos_] = inR;
+            dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
+
             // Shift history buffers
             for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
                 history_[0][t] = history_[0][t - 1];
@@ -266,6 +299,8 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
             float wetL = inL;
             float wetR = inR;
+            float dryTapL = inL;
+            float dryTapR = inR;
 
             if (k > 1e-9) {
                 // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -325,7 +360,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 float32x2_t vWet = vdup_n_f32(0.0f);
                 for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = p * TAPS_PER_PHASE + t;
+                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
                         const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
                         const float coeff = polyphase4x_[p][t];
                         float32x2_t vDecim = { decimHistory_[0][hIdx], decimHistory_[1][hIdx] };
@@ -338,7 +373,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 __m128 vWet = _mm_setzero_ps();
                 for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = p * TAPS_PER_PHASE + t;
+                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
                         const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
                         const float coeff = polyphase4x_[p][t];
                         __m128 vDecim = _mm_set_ps(0.0f, 0.0f, decimHistory_[1][hIdx], decimHistory_[0][hIdx]);
@@ -353,7 +388,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 #else
                 for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = p * TAPS_PER_PHASE + t;
+                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
                         const int hIdx = (decimIdx_ - 1 - k_idx + DECIM_HISTORY_LEN * 2) % DECIM_HISTORY_LEN;
                         wetL += polyphase4x_[p][t] * decimHistory_[0][hIdx];
                         wetR += polyphase4x_[p][t] * decimHistory_[1][hIdx];
@@ -374,13 +409,17 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                     wetL = yL;
                     wetR = yR;
                 }
+
+                // FIX M-13: align dry tap with the wet group delay.
+                dryTapL = dryL;
+                dryTapR = dryR;
             }
 
             if (!std::isfinite(wetL)) wetL = 0.0f;
             if (!std::isfinite(wetR)) wetR = 0.0f;
 
-            buffer[i * 2] = (1.0f - mix) * inL + mix * wetL;
-            buffer[i * 2 + 1] = (1.0f - mix) * inR + mix * wetR;
+            buffer[i * 2] = (1.0f - mix) * dryTapL + mix * wetL;
+            buffer[i * 2 + 1] = (1.0f - mix) * dryTapR + mix * wetR;
         }
         return;
     }
@@ -398,12 +437,18 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
             float inSample = buffer[idx];
             if (!std::isfinite(inSample)) inSample = 0.0f;
 
+            // FIX M-13: per-channel dry delay (position advanced once per frame
+            // below, after every channel of this frame is stored).
+            const float dryDelayed = dryDelay_[ch][dryDelayPos_];
+            dryDelay_[ch][dryDelayPos_] = inSample;
+
             for (int t = TAPS_PER_PHASE - 1; t > 0; --t) {
                 history_[ch][t] = history_[ch][t - 1];
             }
             history_[ch][0] = inSample;
 
             float wet = inSample;
+            float dryTap = inSample;
 
             if (k > 1e-9) {
                 // 4x oversampled nonlinear waveshaping with polyphase FIR decimation
@@ -434,7 +479,7 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 wet = 0.0f;
                 for (int p = 0; p < OVERSAMPLE_FACTOR; ++p) {
                     for (int t = 0; t < TAPS_PER_PHASE; ++t) {
-                        const int k_idx = p * TAPS_PER_PHASE + t;
+                        const int k_idx = t * OVERSAMPLE_FACTOR + p;
                         const int curDecimIdx = (ch == channels - 1)
                             ? decimIdx_
                             : (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
@@ -450,11 +495,16 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                     dcY_[ch] = y;
                     wet = y;
                 }
+
+                // FIX M-13: align dry tap with the wet group delay.
+                dryTap = dryDelayed;
             }
 
             if (!std::isfinite(wet)) wet = 0.0f;
 
-            buffer[idx] = (1.0f - mix) * inSample + mix * wet;
+            buffer[idx] = (1.0f - mix) * dryTap + mix * wet;
         }
+        // FIX M-13: advance the shared dry-delay position once per frame.
+        dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
     }
 }

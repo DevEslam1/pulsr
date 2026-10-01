@@ -447,6 +447,11 @@ ConvolutionReverb::ConvolutionReverb() {
     dryDelayR_.assign(PARTITION_SIZE, 0.0f);
     dryDelayPos_ = 0;
 
+    // FIX M-14: pre-allocate the native-rate dry delay used by the >48kHz path.
+    hqDryL_.assign(MAX_HQ_DRY_DELAY, 0.0f);
+    hqDryR_.assign(MAX_HQ_DRY_DELAY, 0.0f);
+    hqDryPos_ = 0;
+
     targetEnabledMix_.store(0.0f, std::memory_order_relaxed);
     smoothedEnabledMix_ = 0.0f;
     irCrossfadeSamples_ = 0;
@@ -455,44 +460,12 @@ ConvolutionReverb::ConvolutionReverb() {
     ensureScratchCapacity(32768);
     setPreset(ReverbPreset::Room);
     reset();
-
-    workerRunning_.store(true, std::memory_order_relaxed);
-    workerThread_ = std::thread(&ConvolutionReverb::workerLoop, this);
 }
 
-ConvolutionReverb::~ConvolutionReverb() {
-    if (workerRunning_.load(std::memory_order_relaxed)) {
-        {
-            std::lock_guard<std::mutex> lock(workerMutex_);
-            workerRunning_.store(false, std::memory_order_release);
-            workerJobReady_.store(true, std::memory_order_release);
-            workerCv_.notify_one();
-        }
-        if (workerThread_.joinable()) {
-            workerThread_.join();
-        }
-    }
-}
-
-void ConvolutionReverb::workerLoop() {
-    while (workerRunning_.load(std::memory_order_relaxed)) {
-        std::unique_lock<std::mutex> lock(workerMutex_);
-        workerCv_.wait(lock, [this] {
-            return !workerRunning_.load(std::memory_order_relaxed) || workerJobReady_.load(std::memory_order_acquire);
-        });
-        if (!workerRunning_.load(std::memory_order_relaxed)) break;
-
-        const int np = workerNumPartitions_.load(std::memory_order_relaxed);
-        processRightChannelPartition(np);
-
-        workerJobReady_.store(false, std::memory_order_release);
-        {
-            std::lock_guard<std::mutex> doneLock(workerDoneMutex_);
-            workerJobDone_.store(true, std::memory_order_release);
-            workerCvDone_.notify_one();
-        }
-    }
-}
+// FIX M-15: the per-instance worker thread was dead code — processCore always
+// convolves both channels inline (RT-safe), and workerJobReady_ was only ever
+// set by the destructor to wake the thread so it could exit. Removed entirely.
+ConvolutionReverb::~ConvolutionReverb() = default;
 
 void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
@@ -684,6 +657,11 @@ void ConvolutionReverb::setSampleRate(double sampleRate, bool updateIr) {
         wetOutResampler_.reset();
     }
 
+    // FIX M-14: the native-referred latency depends on sampleRate_/coreRate_ and
+    // the resampler enable state set just above, so refresh it on every rate
+    // change (even when the IR itself is not regenerated below).
+    updateReverbLatency();
+
     if (!updateIr) return; // RT-safe path: defer IR swap to applyParams
 
     // A2 (B-05): Regenerate prepared IR for non-custom presets if not matching effective core rate
@@ -738,9 +716,30 @@ void ConvolutionReverb::setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir) {
         }
     }
     preparedIr_ = std::move(ir);
-    reverbLatencyFrames_.store(
-        (preparedIr_ && preparedIr_->numPartitions > 0) ? PARTITION_SIZE : 0,
-        std::memory_order_relaxed);
+    updateReverbLatency();
+}
+
+void ConvolutionReverb::updateReverbLatency() {
+    // FIX M-14: report the latency the reverb actually introduces, in native
+    // frames. The overlap-save core adds one PARTITION_SIZE of latency (0 for the
+    // direct <=1024-tap path) at the CORE rate. For >48kHz the wet signal is
+    // down-resampled to the 48k core and up-resampled back, so the core block
+    // and the wet-OUT resampler both run at the core rate and scale up to native
+    // by srScale; the wet-IN resampler consumes native samples so its group
+    // delay is already native. getLatencyFrames() reports the kernel half-width
+    // (HALF_TAPS) in input samples, or 0 when the resampler is linear/bypassed.
+    // The dominant, exact term is coreBlockLatency*srScale; the resampler terms
+    // are the (smaller) measured group delays. The <=48k reporting is unchanged.
+    const int coreBlockLatency =
+        (preparedIr_ && preparedIr_->numPartitions > 0) ? PARTITION_SIZE : 0;
+    int nativeLatency = coreBlockLatency;
+    if (sampleRate_ > 48000.0 && coreRate_ > 0.0) {
+        const double srScale = sampleRate_ / coreRate_;
+        nativeLatency = wetInResampler_.getLatencyFrames()
+            + static_cast<int>(std::lround(
+                (coreBlockLatency + wetOutResampler_.getLatencyFrames()) * srScale));
+    }
+    reverbLatencyFrames_.store(nativeLatency, std::memory_order_relaxed);
 }
 
 void ConvolutionReverb::setWetDry(double wet) {
@@ -871,6 +870,10 @@ void ConvolutionReverb::reset() {
     std::fill(dryDelayL_.begin(), dryDelayL_.end(), 0.0f);
     std::fill(dryDelayR_.begin(), dryDelayR_.end(), 0.0f);
     dryDelayPos_ = 0;
+    // FIX M-14: clear the native-rate dry delay used by the >48kHz path.
+    std::fill(hqDryL_.begin(), hqDryL_.end(), 0.0f);
+    std::fill(hqDryR_.begin(), hqDryR_.end(), 0.0f);
+    hqDryPos_ = 0;
 }
 
 void ConvolutionReverb::process(const float* inL, const float* inR, float* outL, float* outR, int frames) {
@@ -896,6 +899,12 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
             dryDelayR_[k] = inR[0];
         }
         dryDelayPos_ = 0;
+        // FIX M-14: prime the >48kHz native dry delay the same way.
+        if (sampleRate_ > 48000.0) {
+            std::fill(hqDryL_.begin(), hqDryL_.end(), inL[0]);
+            std::fill(hqDryR_.begin(), hqDryR_.end(), inR[0]);
+            hqDryPos_ = 0;
+        }
     }
 
     const float startMix = smoothedEnabledMix_;
@@ -942,7 +951,15 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
     float* outResampled[2] = { resampleOutL_.data(), resampleOutR_.data() };
     int outWetFrames = wetOutResampler_.processPlanar(wetPlanar, outResampled, coreFrames, 2, frames);
 
-    // 4. Mix at native rate: native dry untouched + resampled pure wet reverberation
+    // 4. Mix at native rate: native dry (time-aligned with the wet path) +
+    //    resampled pure wet reverberation.
+    // FIX M-14: delay the native dry by the full wet-path latency
+    // (reverbLatencyFrames_: wet-in resample + core partition + wet-out resample,
+    // referred to native frames) so dry and wet no longer comb/double at mix<1.
+    // Mirror the <=48k crossfade (processCore): lean on undelayed dry while
+    // curMix is low (enable/disable ramp), on delayed dry once fully wet.
+    const int hqCap = static_cast<int>(hqDryL_.size());
+    const int hqDelay = std::clamp(reverbLatencyFrames_.load(std::memory_order_relaxed), 0, hqCap - 1);
     for (int i = 0; i < frames; ++i) {
         const float curMix = startMix + mixStep * (i + 1);
         const double curWet = startWet + wetStep * (i + 1);
@@ -950,10 +967,21 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
         const float dryGain = static_cast<float>(std::cos(effectiveWet * (M_PI / 2.0)));
         const float wetGain = static_cast<float>(std::sin(effectiveWet * (M_PI / 2.0)));
 
+        hqDryL_[hqDryPos_] = inL[i];
+        hqDryR_[hqDryPos_] = inR[i];
+        int readIdx = hqDryPos_ - hqDelay;
+        if (readIdx < 0) readIdx += hqCap;
+        const float delayedDryL = hqDryL_[readIdx];
+        const float delayedDryR = hqDryR_[readIdx];
+        hqDryPos_ = (hqDryPos_ + 1) % hqCap;
+
+        const float effectiveDryL = curMix * delayedDryL + (1.0f - curMix) * inL[i];
+        const float effectiveDryR = curMix * delayedDryR + (1.0f - curMix) * inR[i];
+
         float wetL = (i < outWetFrames) ? resampleOutL_[i] : 0.0f;
         float wetR = (i < outWetFrames) ? resampleOutR_[i] : 0.0f;
-        outL[i] = inL[i] * dryGain + wetL * wetGain;
-        outR[i] = inR[i] * dryGain + wetR * wetGain;
+        outL[i] = effectiveDryL * dryGain + wetL * wetGain;
+        outR[i] = effectiveDryR * dryGain + wetR * wetGain;
     }
 }
 
@@ -1057,6 +1085,11 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
                 wetSampleL = cL;
                 wetSampleR = cR;
             }
+            // FIX M-21: flush subnormal reverb-tail output so decaying energy
+            // can't feed denormals into downstream recursive stages (ARM CPU
+            // spikes), matching the <1e-30 flush idiom used across the modules.
+            if (std::abs(wetSampleL) < 1e-30f) wetSampleL = 0.0f;
+            if (std::abs(wetSampleR) < 1e-30f) wetSampleR = 0.0f;
 
             const float curMix = startMix + mixStep * (i + 1);
             const double curWet = startWet + wetStep * (i + 1);
@@ -1124,6 +1157,9 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             wetSampleL = cL;
             wetSampleR = cR;
         }
+        // FIX M-21: flush subnormal reverb-tail output (see direct path above).
+        if (std::abs(wetSampleL) < 1e-30f) wetSampleL = 0.0f;
+        if (std::abs(wetSampleR) < 1e-30f) wetSampleR = 0.0f;
 
         // Delay the dry signal by the partition latency so dry and wet are time-aligned.
         // During enable/disable transitions, crossfade smoothly between delayed and direct

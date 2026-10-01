@@ -15,6 +15,7 @@ import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 import 'themes/player_theme.dart';
 import 'themes/theme_registry.dart';
+import 'responsive_player_layout.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -177,32 +178,27 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             backgroundColor: bgColor,
             body: _SwipeDownToDismiss(
               onDismiss: () => _safePop(context),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: context.isLandscape
-                        ? (context.isTablet ? 1160.0 : 960.0)
-                        : (context.isTablet ? 780.0 : 560.0),
-                  ),
-                  child: Stack(
-                    children: [
-                      AnimatedSwitcher(
-                        duration: context.motionMs(350),
-                        switchInCurve:
-                            context.motionCurve(Curves.easeInOutCubic),
-                        switchOutCurve:
-                            context.motionCurve(Curves.easeInOutCubic),
-                        transitionBuilder: (child, animation) =>
-                            FadeTransition(opacity: animation, child: child),
-                        child: KeyedSubtree(
-                          key: ValueKey(settingsConfig.playerThemeMode),
-                          child: themeWidget,
-                        ),
+              child: Stack(
+                children: [
+                  ResponsivePlayerLayout(
+                    state: state,
+                    cubit: cubit,
+                    themeWidget: AnimatedSwitcher(
+                      duration: context.motionMs(350),
+                      switchInCurve: context.motionCurve(Curves.easeInOutCubic),
+                      switchOutCurve: context.motionCurve(Curves.easeInOutCubic),
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(opacity: animation, child: child),
+                      child: KeyedSubtree(
+                        key: ValueKey(settingsConfig.playerThemeMode),
+                        child: themeWidget,
                       ),
-                      const _NowPlayingGestureHintOverlay(),
-                    ],
+                    ),
+                    activeColor: activeColor,
+                    bgColor: bgColor,
                   ),
-                ),
+                  const _NowPlayingGestureHintOverlay(),
+                ],
               ),
             ),
           ),

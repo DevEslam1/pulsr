@@ -223,6 +223,24 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   static Future<Uint8List?> _fetchRemote(String url,
       {bool highQuality = false, bool lowQuality = false}) async {
+    if (url.startsWith('file://')) {
+      try {
+        final file = File(Uri.parse(url).toFilePath());
+        if (await file.exists()) {
+          return await file.readAsBytes();
+        }
+      } catch (_) {}
+      return null;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      try {
+        final file = File(url);
+        if (await file.exists()) {
+          return await file.readAsBytes();
+        }
+      } catch (_) {}
+    }
+
     final targetUrl = highQuality
         ? CachedArtwork.upgradeToHighResArtwork(url)
         : (lowQuality
@@ -231,7 +249,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
             : url);
 
     final uri = Uri.tryParse(targetUrl);
-    if (uri == null || !uri.isScheme('https')) return null;
+    if (uri == null || (!uri.isScheme('https') && !uri.isScheme('http'))) return null;
     HttpClientRequest? request;
     try {
       request = await getIt<HttpClient>()
@@ -381,24 +399,22 @@ class _CachedArtworkState extends State<CachedArtwork> {
       ).then((remoteBytes) {
         if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
         if (widget.id > 0) {
-          return _audioQuery.queryArtwork(
+          return _queryDeviceArtwork(
             widget.id,
             widget.type,
-            format: ArtworkFormat.JPEG,
-            size: isHq ? 1000 : (isThumbnail ? 180 : 350),
-            quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+            isHq: isHq,
+            isThumbnail: isThumbnail,
           );
         }
         return null;
       });
     } else {
       pending = widget.id > 0
-          ? _audioQuery.queryArtwork(
+          ? _queryDeviceArtwork(
               widget.id,
               widget.type,
-              format: ArtworkFormat.JPEG,
-              size: isHq ? 1000 : (isThumbnail ? 180 : 350),
-              quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+              isHq: isHq,
+              isThumbnail: isThumbnail,
             )
           : Future<Uint8List?>.value(null);
     }
@@ -413,6 +429,35 @@ class _CachedArtworkState extends State<CachedArtwork> {
         }
       }
     }).catchError((_) {});
+  }
+
+  Future<Uint8List?> _queryDeviceArtwork(
+    int id,
+    ArtworkType type, {
+    required bool isHq,
+    required bool isThumbnail,
+  }) async {
+    try {
+      final res = await _audioQuery.queryArtwork(
+        id,
+        type,
+        format: ArtworkFormat.JPEG,
+        size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+        quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+      );
+      if (res != null && res.isNotEmpty) return res;
+      if (type == ArtworkType.AUDIO) {
+        final albumRes = await _audioQuery.queryArtwork(
+          id,
+          ArtworkType.ALBUM,
+          format: ArtworkFormat.JPEG,
+          size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+          quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+        );
+        if (albumRes != null && albumRes.isNotEmpty) return albumRes;
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
