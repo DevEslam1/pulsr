@@ -54,4 +54,12 @@ private:
 
     LinkwitzRiley4 crossoverLow_;  // Splits Low vs Mid+High
     LinkwitzRiley4 crossoverHigh_; // Splits Mid vs High
+    // FIX M-22: the low band bypasses the high crossover, so without an allpass
+    // the 3-way LR4 reconstruction is only approximately flat and is phase-
+    // incoherent at the summing junction. This LR4, tuned to highCrossoverHz_,
+    // synthesizes the complementary 2nd-order allpass (AP = LP+HP of an LR4) that
+    // the mid+high sum already carries, and is applied to the low band so the
+    // three bands sum phase-coherently. Separate state from crossoverHigh_ since
+    // it filters the low band, not mid+high.
+    LinkwitzRiley4 lowBandAllpass_;
 };

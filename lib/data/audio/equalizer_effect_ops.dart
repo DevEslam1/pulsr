@@ -38,7 +38,8 @@ extension EqualizerEffectOps on EqualizerManager {
     if (!_effectsChannel.isVirtualizerSupported) return;
 
     // Finite-guard before clamp so a NaN strength can't survive clamp().
-    virtualizerStrength = _clampFinite(strength, 0.0, 1.0, 0.0);
+    virtualizerStrength =
+        DspParamRanges.virtualizerStrength.clamp(strength);
     final applied = await _effectsChannel.setVirtualizerStrength(
       virtualizerStrength,
     );
@@ -147,15 +148,15 @@ extension EqualizerEffectOps on EqualizerManager {
     isCrossfeedEnabled = enabled;
     // Finite-guard each knob before clamp (clamp alone passes NaN through).
     if (delayUs != null) {
-      crossfeedDelayUs = _clampFinite(delayUs, 200.0, 700.0, 350.0);
+      crossfeedDelayUs = DspParamRanges.crossfeedDelayUs.clamp(delayUs);
     }
     if (feedDb != null) {
-      crossfeedFeedDb = _clampFinite(feedDb, -15.0, -6.0, -9.0);
+      crossfeedFeedDb = DspParamRanges.crossfeedFeedDb.clamp(feedDb);
     }
     if (fcut != null) {
-      crossfeedFcut = _clampFinite(fcut, 200.0, 2000.0, 650.0);
+      crossfeedFcut = DspParamRanges.crossfeedFcut.clamp(fcut);
     }
-    if (mode != null) crossfeedMode = mode.clamp(0, 3);
+    if (mode != null) crossfeedMode = DspParamRanges.crossfeedMode.clamp(mode);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setCrossfeedParams(
         crossfeedDelayUs,
@@ -170,7 +171,7 @@ extension EqualizerEffectOps on EqualizerManager {
   }
 
   Future<void> setCrossfeedMode(int mode) async {
-    crossfeedMode = mode.clamp(0, 3);
+    crossfeedMode = DspParamRanges.crossfeedMode.clamp(mode);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setCrossfeedMode(crossfeedMode);
     }
@@ -187,16 +188,18 @@ extension EqualizerEffectOps on EqualizerManager {
     isLimiterEnabled = enabled;
     // Clamp + finite-guard every knob before it reaches native (every other
     // setter already clamps; the limiter path previously forwarded raw values).
-    // Ranges mirror the native sanitizer (AudioDspEngine.cpp / DspParams.h):
-    // threshold [-60,0] dB, release [1,1000] ms, lookahead [0,20] ms.
+    // Ranges live in the central contract (DspParamRanges), which mirrors the
+    // native sanitizer (AudioDspEngine.cpp / DspParams.h).
     if (thresholdDb != null) {
-      limiterThresholdDb = _clampFinite(thresholdDb, -60.0, 0.0, -0.2);
+      limiterThresholdDb =
+          DspParamRanges.limiterThresholdDb.clamp(thresholdDb);
     }
     if (releaseMs != null) {
-      limiterReleaseMs = _clampFinite(releaseMs, 1.0, 1000.0, 50.0);
+      limiterReleaseMs = DspParamRanges.limiterReleaseMs.clamp(releaseMs);
     }
     if (lookaheadMs != null) {
-      limiterLookaheadMs = _clampFinite(lookaheadMs, 0.0, 20.0, 5.0);
+      limiterLookaheadMs =
+          DspParamRanges.limiterLookaheadMs.clamp(lookaheadMs);
     }
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLimiterParams(
@@ -218,21 +221,24 @@ extension EqualizerEffectOps on EqualizerManager {
     double? makeupGainDb,
   }) async {
     // Clamp + finite-guard before forwarding (these knobs share the limiter
-    // HAL call and were previously forwarded raw). Ranges per DspParams.h /
-    // AudioDspEngine.cpp: threshold [-60,0] dB, ratio [1,20], attack [0.1,200]
-    // ms, release [1,1000] ms, makeup [0,24] dB.
+    // HAL call and were previously forwarded raw). Ranges live in the central
+    // contract (DspParamRanges), per DspParams.h / AudioDspEngine.cpp.
     if (thresholdDb != null) {
-      limiterThresholdDb = _clampFinite(thresholdDb, -60.0, 0.0, -0.2);
+      limiterThresholdDb =
+          DspParamRanges.limiterThresholdDb.clamp(thresholdDb);
     }
-    if (ratio != null) compressorRatio = _clampFinite(ratio, 1.0, 20.0, 3.0);
+    if (ratio != null) {
+      compressorRatio = DspParamRanges.compressorRatio.clamp(ratio);
+    }
     if (attackMs != null) {
-      compressorAttackMs = _clampFinite(attackMs, 0.1, 200.0, 15.0);
+      compressorAttackMs = DspParamRanges.compressorAttackMs.clamp(attackMs);
     }
     if (releaseMs != null) {
-      limiterReleaseMs = _clampFinite(releaseMs, 1.0, 1000.0, 50.0);
+      limiterReleaseMs = DspParamRanges.limiterReleaseMs.clamp(releaseMs);
     }
     if (makeupGainDb != null) {
-      compressorMakeupGainDb = _clampFinite(makeupGainDb, 0.0, 24.0, 0.0);
+      compressorMakeupGainDb =
+          DspParamRanges.compressorMakeupGainDb.clamp(makeupGainDb);
     }
 
     // Any explicit edit marks the compressor knobs as user-owned so restore
@@ -266,11 +272,15 @@ extension EqualizerEffectOps on EqualizerManager {
       // garbage that would silently produce the wrong room.
       reverbPreset = preset.clamp(0, ReverbPreset.values.length - 1);
     }
-    if (wetDry != null) reverbWetDry = _clampFinite(wetDry, 0.0, 1.0, 0.20);
-    if (predelayMs != null) {
-      reverbPredelayMs = _clampFinite(predelayMs, 0.0, 150.0, 0.0);
+    if (wetDry != null) {
+      reverbWetDry = DspParamRanges.reverbWetDry.clamp(wetDry);
     }
-    if (damping != null) reverbDamping = _clampFinite(damping, 0.0, 1.0, 0.5);
+    if (predelayMs != null) {
+      reverbPredelayMs = DspParamRanges.reverbPredelayMs.clamp(predelayMs);
+    }
+    if (damping != null) {
+      reverbDamping = DspParamRanges.reverbDamping.clamp(damping);
+    }
     if (PlatformCapabilities.isAndroid) {
       // Forward the clamped field, not the raw argument, so an out-of-range
       // ordinal never reaches native and produce the wrong room (see clamp above).
@@ -335,7 +345,7 @@ extension EqualizerEffectOps on EqualizerManager {
       _effectsChannel.setBandMute(index, mute);
 
   Future<void> setStereoBalance(double balance) async {
-    stereoBalance = _clampFinite(balance, -1.0, 1.0, 0.0);
+    stereoBalance = DspParamRanges.stereoBalance.clamp(balance);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setStereoBalance(stereoBalance);
     }

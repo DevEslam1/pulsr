@@ -11,6 +11,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'waveform_seek_bar.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -104,6 +105,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       _cachedWaveformFuture = null;
     }
 
+    final Widget seekWidget;
     // Check if Waveform Seek Bar is enabled in settings and song ID is available
     if (waveformEnabled && effectiveSongId != null) {
       final instantSamples = WaveformService.instance.getInstantWaveform(
@@ -116,115 +118,133 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         filePath: effectiveFilePath,
       );
 
-      return _withUpNext(
-        FutureBuilder<List<double>>(
-          key: ValueKey(effectiveSongId),
-          initialData: instantSamples,
-          future: _cachedWaveformFuture,
-          builder: (context, snapshot) {
-            final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
-                ? snapshot.data!
-                : instantSamples;
+      seekWidget = FutureBuilder<List<double>>(
+        key: ValueKey(effectiveSongId),
+        initialData: instantSamples,
+        future: _cachedWaveformFuture,
+        builder: (context, snapshot) {
+          final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
+              ? snapshot.data!
+              : instantSamples;
 
-            if (samples.isNotEmpty) {
-              return _withPosition((position) => WaveformSeekBar(
-                    position: position,
-                    duration: widget.duration,
-                    onSeek: widget.onSeek,
-                    samples: samples,
-                    activeColor: widget.activeColor,
-                    semanticLabel: widget.semanticLabel,
-                    loopPointA: widget.loopPointA,
-                    loopPointB: widget.loopPointB,
-                    crossfadeDuration: crossfadeSec > 0
-                        ? Duration(milliseconds: (crossfadeSec * 1000).round())
-                        : null,
-                  ));
-            }
-            if (snapshot.hasError) {
-              ErrorLogger.log(
-                'Waveform calculation failed for song $effectiveSongId',
-                error: snapshot.error,
-                stackTrace: snapshot.stackTrace,
-                category: 'WaveformSeekBar',
-              );
-            }
-            // Accurate fallback while waveform is computing or on failure
-            return _buildStandardSeekBar(context, crossfadeSec);
-          },
-        ),
+          if (samples.isNotEmpty) {
+            return _withPosition((position) => WaveformSeekBar(
+                  position: position,
+                  duration: widget.duration,
+                  onSeek: widget.onSeek,
+                  samples: samples,
+                  activeColor: widget.activeColor,
+                  semanticLabel: widget.semanticLabel,
+                  loopPointA: widget.loopPointA,
+                  loopPointB: widget.loopPointB,
+                  crossfadeDuration: crossfadeSec > 0
+                      ? Duration(milliseconds: (crossfadeSec * 1000).round())
+                      : null,
+                ));
+          }
+          if (snapshot.hasError) {
+            ErrorLogger.log(
+              'Waveform calculation failed for song $effectiveSongId',
+              error: snapshot.error,
+              stackTrace: snapshot.stackTrace,
+              category: 'WaveformSeekBar',
+            );
+          }
+          // Accurate fallback while waveform is computing or on failure
+          return _buildStandardSeekBar(context, crossfadeSec);
+        },
+      );
+    } else {
+      seekWidget = _buildStandardSeekBar(context, crossfadeSec);
+    }
+
+    return _withUpNext(seekWidget);
+  }
+
+    /// Adds the "Up Next" strip below the seek bar (shared by every theme).
+    Widget _withUpNext(Widget seek) {
+      if (!widget.showUpNext) return seek;
+      final hasNext = context.select<PlayerCubit, bool>((c) {
+        final q = c.state.queue;
+        final i = c.state.currentIndex;
+        return i >= 0 && i + 1 < q.length && q[i + 1].title.isNotEmpty;
+      });
+      if (!hasNext) return seek;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [seek, _upNextRow(context)],
       );
     }
 
-    return _withUpNext(_buildStandardSeekBar(context, crossfadeSec));
-  }
+    Widget _upNextRow(BuildContext context) {
+      final nextTrackInfo = context.select<PlayerCubit, ({String title, String? artist})?>((c) {
+        final q = c.state.queue;
+        final i = c.state.currentIndex;
+        if (i < 0 || i + 1 >= q.length) return null;
+        final song = q[i + 1];
+        return (title: song.title, artist: song.artist);
+      });
+      if (nextTrackInfo == null || nextTrackInfo.title.isEmpty) return const SizedBox.shrink();
 
-  /// Adds the "Up Next" strip below the seek bar (shared by every theme).
-  Widget _withUpNext(Widget seek) {
-    if (!widget.showUpNext) return seek;
-    final hasNext = context.select<PlayerCubit, bool>((c) {
-      final q = c.state.queue;
-      final i = c.state.currentIndex;
-      return i >= 0 && i + 1 < q.length && q[i + 1].title.isNotEmpty;
-    });
-    if (!hasNext) return seek;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [seek, _upNextRow(context)],
-    );
-  }
+      final p = context.palette;
+      final cubit = context.read<PlayerCubit>();
+      final displayText = (nextTrackInfo.artist != null &&
+              nextTrackInfo.artist!.isNotEmpty &&
+              !nextTrackInfo.title.toLowerCase().contains(nextTrackInfo.artist!.toLowerCase()))
+          ? '${nextTrackInfo.artist} - ${nextTrackInfo.title}'
+          : nextTrackInfo.title;
 
-  Widget _upNextRow(BuildContext context) {
-    final nextTitle = context.select<PlayerCubit, String?>((c) {
-      final q = c.state.queue;
-      final i = c.state.currentIndex;
-      if (i < 0 || i + 1 >= q.length) return null;
-      return q[i + 1].title;
-    });
-    if (nextTitle == null || nextTitle.isEmpty) return const SizedBox.shrink();
-
-    final p = context.palette;
-    final cubit = context.read<PlayerCubit>();
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(
-          start: AppSpacing.lg, end: AppSpacing.lg, top: AppSpacing.xxs),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          HapticFeedback.selectionClick();
-          cubit.toggleQueueVisibility();
-        },
-        child: Row(
-          children: [
-            Icon(Icons.skip_next_rounded, size: 14, color: p.textTertiary),
-            const SizedBox(width: AppSpacing.s6),
-            Text(
-              context.l10n.queue.toUpperCase(),
-              style: TextStyle(
-                color: p.textTertiary,
-                fontSize: AppFontSize.tiny,
-                fontWeight: FontWeight.w800,
-                letterSpacing: AppTracking.overline,
+      return Padding(
+        padding: const EdgeInsetsDirectional.only(
+            start: AppSpacing.lg, end: AppSpacing.lg, top: AppSpacing.xxs),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            cubit.toggleQueueVisibility();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(AppRadii.r12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.8,
               ),
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: Text(
-                nextTitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w600,
+            child: Row(
+              children: [
+                Icon(Icons.skip_next_rounded, size: 14, color: widget.activeColor.withValues(alpha: 0.90)),
+                const SizedBox(width: AppSpacing.s6),
+                Text(
+                  'UP NEXT',
+                  style: TextStyle(
+                    color: widget.activeColor.withValues(alpha: 0.90),
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: AppTracking.overline,
+                  ),
                 ),
-              ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    displayText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
   /// When no position was passed in (preferred path), narrow the position
   /// subscription to this subtree so per-tick rebuilds stop at the seek bar.

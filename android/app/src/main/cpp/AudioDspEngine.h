@@ -58,20 +58,19 @@ enum class DspPerformanceProfile {
     PowerSaver = 2    // Battery saver / thermal throttle: degradation threshold RTF > 0.65, recovery < 0.40
 };
 
-// TODO (M-6, DEFERRED — do not implement without the race/RT tests):
-//   The per-block snapshot swap currently goes through AtomicSharedPtr, whose
-//   fallback path (no __cpp_lib_atomic_shared_ptr) uses std::atomic_load/store
-//   on a shared_ptr and is NOT guaranteed lock-free. On the audio thread that
-//   is a priority-inversion hazard: the RT render can block on an internal libc
-//   spin/mutex while a lower-priority publisher holds it. The intended fix is to
-//   replace this with a raw std::atomic<const DspParamSnapshot*> swap (publisher
-//   release-stores the new pointer, render acquire-loads it) and reclaim retired
-//   pointers via the existing retireQueue_ drain off the audio thread, removing
-//   the shared_ptr refcount traffic from the hot path entirely. This is a
-//   delicate RT-safety change and MUST be validated by test_snapshot_race.cpp
-//   (no torn/leaked snapshots across concurrent publish+render) and
-//   test_rt_alloc.cpp (no allocation/lock on the render thread) before landing.
-//   Leave behavior unchanged until those pass.
+// M-6 (IMPLEMENTED): the audio render thread no longer reads params through this
+// AtomicSharedPtr. Its libc++ fallback (no __cpp_lib_atomic_shared_ptr) routes
+// load/store through the __sp_mut spinlock pool and is NOT guaranteed lock-free,
+// which on the render thread is a priority-inversion hazard. AtomicSharedPtr is
+// now used ONLY by control threads (the currentParams_ owner + getParams()),
+// where the __sp_mut fallback is harmless because those threads are not RT. The
+// render thread instead reads a raw std::atomic<const DspParamSnapshot*>
+// (currentParamsPtr_) — a genuinely lock-free acquire-load with zero shared_ptr
+// refcount traffic — and lifetime is covered by the retire pool + single-reader
+// hazard pointer (audioHazardPtr_) handshake. See processInterleaved(),
+// swapCurrentLocked() and retireAndDrain(). Validate with test_snapshot_race.cpp
+// (no torn/leaked snapshots across concurrent publish+render) and
+// test_rt_alloc.cpp (no allocation/lock on the render thread).
 template<typename T>
 class AtomicSharedPtr {
 public:
@@ -210,12 +209,21 @@ public:
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
     void drainRetireQueue() {
-        int tail = retireTail_.load(std::memory_order_relaxed);
-        while (tail != retireHead_.load(std::memory_order_acquire)) {
-            retireQueue_[tail].reset();
-            tail = (tail + 1) % kRetireQueueSize;
+        {
+            // Control-threads-only reclamation. The audio render thread never
+            // touches retireQueue_/retireMutex_ (it reads only the raw
+            // currentParamsPtr_), so this lock has no RT impact. Free every
+            // retired snapshot EXCEPT the one the render thread's hazard pointer
+            // currently protects; that one is freed on a later drain once the
+            // render thread has moved on (its hazard advances).
+            std::lock_guard<std::mutex> lock(retireMutex_);
+            const DspParamSnapshot* hz = audioHazardPtr_.load(std::memory_order_seq_cst);
+            for (auto& slot : retireQueue_) {
+                if (slot && slot.get() != hz) {
+                    slot.reset();
+                }
+            }
         }
-        retireTail_.store(tail, std::memory_order_release);
         reverb_.drainRetiredIrs();
     }
 
@@ -224,15 +232,33 @@ private:
     void applySampleRateLocked(double sampleRate);
     void resetInternal();
 
+    // Publishes `snap` as the live snapshot and retires the previous owner.
+    // MUST be called with publishMutex_ held.
+    void swapCurrentLocked(const std::shared_ptr<const DspParamSnapshot>& snap);
+    // Reclaims retired snapshots the render thread has moved off and parks the
+    // just-replaced owner for deferred release if the render thread may still be
+    // reading it this block. Control threads only.
+    void retireAndDrain(std::shared_ptr<const DspParamSnapshot> old);
+
     std::atomic<double> sampleRate_{48000.0};
     std::atomic<uint64_t> snapshotGeneration_{1};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
     std::atomic<uint32_t> autoDegradedStages_{0};
 
+    // Deferred reclamation pool for retired parameter snapshots. The audio
+    // render thread never touches a shared_ptr control block (it reads only the
+    // raw currentParamsPtr_), so every snapshot it may still be reading is kept
+    // alive here, on the publish side, until the single-reader hazard pointer
+    // (audioHazardPtr_) shows the render thread has moved on. Freed EXCLUSIVELY
+    // off the audio thread. Guarded by retireMutex_ (control threads only), which
+    // also serialises the previously-latent two-consumer drain race between the
+    // publish paths and DspEngineRegistry::drainRetireQueues(). Used as an
+    // unordered fixed pool, not a ring: reclamation frees all-but-the-hazarded
+    // slot out of order, so with a single reader at most one slot stays occupied
+    // and kRetireQueueSize is never exhausted.
     static constexpr int kRetireQueueSize = 16;
     std::array<std::shared_ptr<const DspParamSnapshot>, kRetireQueueSize> retireQueue_;
-    std::atomic<int> retireHead_{0};
-    std::atomic<int> retireTail_{0};
+    std::mutex retireMutex_;
 
     // Rolling RTF monitor (zero heap allocation, preallocated fixed ring buffer)
     static constexpr int kRtfWindowSize = 20;
@@ -248,8 +274,31 @@ private:
     int degradeConsecutiveBlocks_ = 0;
     int recoveryConsecutiveBlocks_ = 0;
 
-    // Thread-safe immutable parameter snapshot pointer (C++20 atomic shared_ptr)
+    // Control-side owner of the live snapshot: keeps it alive and backs the
+    // (non-RT) getParams() read and the updateParams/applySampleRateLocked base
+    // read. Only control threads touch this, so its libc++ __sp_mut fallback is
+    // harmless here. The audio render thread does NOT read this — it reads
+    // currentParamsPtr_ below.
     AtomicSharedPtr<const DspParamSnapshot> currentParams_;
+
+    // Lock-free snapshot handoff to the audio render thread. The publisher
+    // release-stores the raw pointer (under publishMutex_, via swapCurrentLocked);
+    // the render thread acquire-loads it once per block — a genuinely lock-free
+    // read with no shared_ptr refcount traffic and no __sp_mut spinlock, removing
+    // the priority-inversion hazard. Lifetime is covered by retireQueue_ +
+    // audioHazardPtr_ (see processInterleaved / retireAndDrain).
+    std::atomic<const DspParamSnapshot*> currentParamsPtr_{nullptr};
+
+    // Single-reader hazard pointer. The render thread publishes the snapshot it
+    // is about to read here (seq_cst) and then re-validates currentParamsPtr_
+    // before using it; the control-side reclaimer loads it (seq_cst) and refuses
+    // to free whatever it points at. The seq_cst StoreLoad on both sides is the
+    // correctness crux — see the argument in processInterleaved(). There is at
+    // most one render thread per engine (concurrent processInterleaved on one
+    // engine would already corrupt the stateful stage objects), so a single
+    // hazard slot suffices.
+    std::atomic<const DspParamSnapshot*> audioHazardPtr_{nullptr};
+
     mutable std::mutex publishMutex_;
 
     ParametricEQ eq_;

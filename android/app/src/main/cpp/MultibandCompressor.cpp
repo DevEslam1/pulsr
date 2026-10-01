@@ -32,6 +32,10 @@ void MultibandCompressor::setSampleRate(double sampleRate) {
     crossoverMid_.reset();
     crossoverLow_.reset();
     crossoverHigh_.reset();
+    // FIX M-11: the phase-compensation allpasses hold recursive state too; flush
+    // them on a rate swap alongside the crossovers so no stale register survives.
+    allpassLowPath_.reset();
+    allpassHighPath_.reset();
 }
 
 void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params) {
@@ -52,6 +56,12 @@ void MultibandCompressor::updateCoefficients() {
     crossoverMid_.configure(sampleRate_, f1);
     crossoverLow_.configure(sampleRate_, f0);
     crossoverHigh_.configure(sampleRate_, f2);
+    // FIX M-11: phase-compensation allpasses mirror the sibling sub-crossover
+    // cutoffs (and Butterworth Q) so their allpass phase matches exactly: the low
+    // half is given crossoverHigh_'s allpass (f2), the high half crossoverLow_'s
+    // allpass (f0). configure() resets the LR4 state when the cutoff/rate moves.
+    allpassLowPath_.configure(sampleRate_, f2);
+    allpassHighPath_.configure(sampleRate_, f0);
 
     for (int b = 0; b < NUM_BANDS; ++b) {
         const double attSec = std::clamp(params_.bands[b].attackMs, 0.1, 500.0) * 0.001;
@@ -65,6 +75,8 @@ void MultibandCompressor::reset() {
     crossoverMid_.reset();
     crossoverLow_.reset();
     crossoverHigh_.reset();
+    allpassLowPath_.reset();
+    allpassHighPath_.reset();
     for (int b = 0; b < NUM_BANDS; ++b) {
         envelopeDb_[b] = 0.0;        // linear amplitude envelope, starts at silence
         smoothedGainDb_[b] = 0.0;
@@ -134,21 +146,25 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
     while (framesRemaining > 0) {
         const int chunkFrames = std::min(framesRemaining, MAX_CHUNK_FRAMES);
 
-        // 1. Split chunk into 4 frequency bands via Linkwitz-Riley 4th order crossovers
+        // 1. Split chunk into 4 frequency bands via Linkwitz-Riley 4th order
+        //    crossovers, with allpass phase compensation for flat reconstruction.
         //
-        // FIX M-11 (DEFERRED - DOCUMENTATION ONLY, audio math unchanged):
-        // This 3-crossover tree is NOT phase-matched. Bands 0/1 pass through
-        // crossoverMid_'s low half then crossoverLow_, while bands 2/3 pass
-        // through crossoverMid_'s high half then crossoverHigh_. A correct LR4
-        // tree needs allpass phase compensation on each band so the three
-        // split points sum to a flat (unity) magnitude response: without it the
-        // recombined output at step 3 is NOT a flat reconstruction near the
-        // crossover frequencies, even when every band is at unity gain (true
-        // bypass). Restructuring the tree (e.g. feeding the complementary
-        // allpass of each sibling crossover into every band) must NOT be done
-        // blindly here: it has to be verified against test_bypass_transparency
-        // (flat reconstruction) with a real compile/test, which is unavailable
-        // in this environment. Left as-is intentionally.
+        // FIX M-11 (now implemented): the 3-crossover tree is phase-coherent.
+        // crossoverMid_(f1) splits x into lowHalf = LP_f1(x) and highHalf =
+        // HP_f1(x). crossoverLow_(f0) splits the low half (band0/band1) and
+        // crossoverHigh_(f2) splits the high half (band2/band3). An LR4 section's
+        // LP+HP is a 2nd-order allpass, so at unity gain band0+band1 =
+        // AP_f0(lowHalf) and band2+band3 = AP_f2(highHalf). Summing those raw
+        // gives AP_f0(LP_f1 x) + AP_f2(HP_f1 x): the halves meet at f1 with
+        // MISMATCHED allpass phase (f0 != f2) -> ripple/dips near the crossovers,
+        // even when every band is at unity (true bypass). Fix: before each
+        // sub-split, cross-apply the sibling's allpass so both halves carry the
+        // same phase at f1 - lowHalf through AP_f2, highHalf through AP_f0:
+        //     band0+band1 = AP_f0(AP_f2(LP_f1 x)),  band2+band3 = AP_f2(AP_f0(HP_f1 x))
+        // Allpasses are LTI and commute, so both share the factor AP_f0*AP_f2 and
+        // the full sum is AP_f0*AP_f2*(LP_f1 + HP_f1) x = AP_f0*AP_f2*AP_f1 * x,
+        // a cascade of three allpasses => unity magnitude (flat) reconstruction.
+        // Each LR4 allpass is read as its (LP + HP) output sum.
         for (int i = 0; i < chunkFrames; ++i) {
             const int inIdx = (offset + i) * channels;
             const double inL = buffer[inIdx];
@@ -157,11 +173,24 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             double lowHalfL, lowHalfR, highHalfL, highHalfR;
             crossoverMid_.process(inL, inR, lowHalfL, lowHalfR, highHalfL, highHalfR);
 
+            // Allpass-compensate each half (LR4 allpass = LP + HP). Applying the
+            // allpass to a half before its sub-split is equivalent to applying it
+            // to both sibling bands - LP_f0+HP_f0 = AP_f0 passes it through
+            // unchanged - and costs one LR4 per half instead of two.
+            double apLpL, apLpR, apHpL, apHpR;
+            allpassLowPath_.process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
+            const double lowCompL = apLpL + apHpL;  // AP_f2(lowHalf)
+            const double lowCompR = apLpR + apHpR;
+
+            allpassHighPath_.process(highHalfL, highHalfR, apLpL, apLpR, apHpL, apHpR);
+            const double highCompL = apLpL + apHpL; // AP_f0(highHalf)
+            const double highCompR = apLpR + apHpR;
+
             double b0L, b0R, b1L, b1R;
-            crossoverLow_.process(lowHalfL, lowHalfR, b0L, b0R, b1L, b1R);
+            crossoverLow_.process(lowCompL, lowCompR, b0L, b0R, b1L, b1R);
 
             double b2L, b2R, b3L, b3R;
-            crossoverHigh_.process(highHalfL, highHalfR, b2L, b2R, b3L, b3R);
+            crossoverHigh_.process(highCompL, highCompR, b2L, b2R, b3L, b3R);
 
             bandBufferL_[0][i] = static_cast<float>(b0L);
             bandBufferR_[0][i] = static_cast<float>(b0R);
@@ -237,9 +266,10 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         }
         for (; i < chunkFrames; ++i) {
             const int outIdx = (offset + i) * channels;
-            // FIX M-11 (DEFERRED): naive band sum. Not a flat reconstruction
-            // near the crossovers without allpass phase compensation on the LR4
-            // tree above - see the note at step 1. Audio math left unchanged.
+            // FIX M-11: with the allpass phase compensation applied at step 1,
+            // this band sum reconstructs flat (unity magnitude) when all bands
+            // are at unity gain - the net path is the allpass cascade
+            // AP_f0*AP_f2*AP_f1 (phase/group-delay only, no magnitude ripple).
             buffer[outIdx] = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
             buffer[outIdx + 1] = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
         }

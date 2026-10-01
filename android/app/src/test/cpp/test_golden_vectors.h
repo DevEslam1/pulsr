@@ -114,9 +114,12 @@ inline void runGoldenVectorTruePeakTest() {
     limiter.setSampleRate(48000.0);
     limiter.configure(5.0, -0.2, 50.0, true);
 
-    // Symmetric intersample peak pattern: raw samples peak at 0.80, but between
-    // taps 2 and 3 the reconstructed continuous analog peak is > 1.05.
-    const float history[6] = {0.0f, -0.4f, 0.80f, 0.80f, -0.4f, 0.0f};
+    // Symmetric intersample peak pattern centered in the window. estimateTruePeak
+    // now uses the 48-tap / 4-phase ITU-R BS.1770-4 true-peak FIR (12 taps/phase),
+    // so it reads a 12-sample history; the peak pair (0.80, 0.80) sits mid-window
+    // and the reconstructed continuous analog peak between them is > 1.0.
+    const float history[12] = {
+        0.0f, 0.0f, 0.0f, 0.0f, -0.4f, 0.80f, 0.80f, -0.4f, 0.0f, 0.0f, 0.0f, 0.0f};
     const float truePeak = limiter.estimateTruePeak(history);
 
     assert(truePeak > 0.80f);

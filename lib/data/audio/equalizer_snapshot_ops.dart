@@ -22,7 +22,18 @@ extension EqualizerSnapshotOps on EqualizerManager {
 
   /// Serializes the full effect chain into a JSON-safe map. The map is stored
   /// verbatim inside [DspSnapshot.effects].
-  Map<String, dynamic> captureEffectsState() => <String, dynamic>{
+  ///
+  /// For a `custom` convolution reverb the map also carries a reference to the
+  /// loaded impulse response so recall can restore the ACTUAL custom room
+  /// instead of falling back to a synthesized preset. To keep the snapshot JSON
+  /// small the WAV *path* is preferred (persisted by the IR picker); the raw
+  /// samples are only embedded when no backing file is known.
+  Map<String, dynamic> captureEffectsState() {
+    final isCustomReverb = reverbPreset == ReverbPreset.custom.wireValue;
+    final customIrPath = isCustomReverb
+        ? (_cachedPrefs?.getString(PrefsKeys.customReverbIrPath) ?? '')
+        : '';
+    return <String, dynamic>{
         'v': effectsSnapshotVersion,
         // EQ curve + plan
         'eqEnabled': isEnabled,
@@ -59,6 +70,13 @@ extension EqualizerSnapshotOps on EqualizerManager {
         'reverbPreset': reverbPreset,
         'reverbWetDry': reverbWetDry,
         'reverbCrossChannel': reverbCrossChannel,
+        // Custom-reverb IR reference (prefer the small WAV path; only embed the
+        // raw samples when no backing file exists). Restored on apply via
+        // loadCustomImpulseResponse so the captured room survives recall.
+        if (customIrPath.isNotEmpty)
+          'customReverbIrPath': customIrPath
+        else if (isCustomReverb && customImpulseResponse.isNotEmpty)
+          'customImpulseResponse': List<double>.from(customImpulseResponse),
         // Panner
         'stereoBalance': stereoBalance,
         'monoMix': monoMix,
@@ -122,6 +140,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
         'liveProgSliders':
             liveProgSliders.map((k, v) => MapEntry(k.toString(), v)),
       };
+  }
 
   /// Restores the full effect chain from a map produced by
   /// [captureEffectsState]. Missing keys fall back to the current in-memory
@@ -210,16 +229,18 @@ extension EqualizerSnapshotOps on EqualizerManager {
     // Convolution reverb (crossChannel has no public setter — set the field
     // and push through the channel directly, mirroring restore).
     reverbCrossChannel = d('reverbCrossChannel', reverbCrossChannel);
-    // Snapshots never serialize the raw custom impulse response, so a stored
-    // `custom` preset would restore a silent reverb when no IR is live in
-    // memory. Fall back to a synthesizable room (Studio) so the stage is
-    // audible instead of dead; a loaded IR in memory is still honored.
+    // A stored `custom` preset needs its impulse response back, otherwise the
+    // reverb would be silent. Restore the IR the snapshot captured (WAV path or
+    // embedded samples) when none is live in memory; if that is impossible
+    // (file gone, non-Android host, nothing captured) fall back to a
+    // synthesizable room (Studio) so the stage is audible instead of dead.
     final storedReverbPreset = i('reverbPreset', reverbPreset);
-    final effectiveReverbPreset =
-        (storedReverbPreset == ReverbPreset.custom.wireValue &&
-                customImpulseResponse.isEmpty)
-            ? ReverbPreset.studio.wireValue
-            : storedReverbPreset;
+    var effectiveReverbPreset = storedReverbPreset;
+    if (storedReverbPreset == ReverbPreset.custom.wireValue &&
+        customImpulseResponse.isEmpty) {
+      final restored = await _restoreCustomReverbIrFromSnapshot(m);
+      if (!restored) effectiveReverbPreset = ReverbPreset.studio.wireValue;
+    }
     await setReverb(
       b('reverbEnabled', isReverbEnabled),
       preset: effectiveReverbPreset,
@@ -350,5 +371,38 @@ extension EqualizerSnapshotOps on EqualizerManager {
     }
 
     _syncPipeline();
+  }
+
+  /// Restores the custom convolution-reverb impulse response captured in a
+  /// snapshot [m]. Prefers the persisted WAV path (small) over inline samples
+  /// (large), mirroring how [captureEffectsState] stores them. Returns true
+  /// only when the native side accepted an IR, so the caller can fall back to a
+  /// synthesizable room when restore is impossible (file deleted / unreadable,
+  /// or on a non-Android host where [loadCustomImpulseResponse] is a no-op).
+  Future<bool> _restoreCustomReverbIrFromSnapshot(
+      Map<String, dynamic> m) async {
+    final irPath = (m['customReverbIrPath'] as String?) ?? '';
+    if (irPath.isNotEmpty) {
+      try {
+        final samples = await IrFileParser.parseWavFile(File(irPath));
+        if (samples.isNotEmpty && await loadCustomImpulseResponse(samples)) {
+          return true;
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to restore custom reverb IR from snapshot path $irPath',
+          error: e,
+          stackTrace: st,
+          category: 'EqualizerManager',
+        );
+      }
+    }
+    final rawIr = (m['customImpulseResponse'] as List?)
+        ?.map((e) => (e as num).toDouble())
+        .toList();
+    if (rawIr != null && rawIr.isNotEmpty) {
+      return loadCustomImpulseResponse(rawIr);
+    }
+    return false;
   }
 }

@@ -129,6 +129,7 @@ abstract class DspSlice with _$DspSlice {
     @Default(false) bool isSpatializerSupported,
     @Default(false) bool isSpatializerEnabled,
     @Default(0.0) double volumeBoost,
+    @Default(0.0) double preampDb,
     @Default(false) bool isVolumeBoostSupported,
     @Default(false) bool isBassBoostSupported,
     @Default(false) bool isCrossfeedEnabled,
@@ -327,6 +328,7 @@ abstract class PlayerState with _$PlayerState {
   bool get isSpatializerSupported => dsp.isSpatializerSupported;
   bool get isSpatializerEnabled => dsp.isSpatializerEnabled;
   double get volumeBoost => dsp.volumeBoost;
+  double get preampDb => dsp.preampDb;
   bool get isVolumeBoostSupported => dsp.isVolumeBoostSupported;
   bool get isBassBoostSupported => dsp.isBassBoostSupported;
   bool get isCrossfeedEnabled => dsp.isCrossfeedEnabled;

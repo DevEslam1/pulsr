@@ -147,7 +147,11 @@ AudioDspEngine::AudioDspEngine() {
     initialSnapshot->generation = 1;
     initialSnapshot->sampleRate = 48000.0;
     initialSnapshot->activeStages = 0xFFFFFFFF;
-    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(initialSnapshot));
+    auto initialConst = std::const_pointer_cast<const DspParamSnapshot>(initialSnapshot);
+    currentParams_.store(initialConst);
+    // Seed the lock-free render-thread pointer with the same snapshot. No
+    // previous owner exists yet, so there is nothing to retire.
+    currentParamsPtr_.store(initialConst.get(), std::memory_order_seq_cst);
     safetyLimiter_.configure(5.0, -6.0, 50.0, true);
     safetyLimiter_.setEnabled(true);
     setSampleRateInternal(48000.0);
@@ -192,8 +196,60 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
     if (current->reverb.enabled && prewarmedIr) {
         updated->reverb.preparedIr = prewarmedIr;
     }
-    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
-    drainRetireQueue();
+    swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
+void AudioDspEngine::swapCurrentLocked(const std::shared_ptr<const DspParamSnapshot>& snap) {
+    // MUST be called with publishMutex_ held.
+    // 1) Capture the previous owner so it can be kept alive for the render thread.
+    auto old = currentParams_.load();
+    // 2) Update the control-side owner (keeps `snap` alive; backs getParams()).
+    currentParams_.store(snap);
+    // 3) Publish the raw pointer the render thread acquire-loads. seq_cst (not
+    //    merely release) because this store is one half of the StoreLoad
+    //    handshake with the render thread's hazard: it must be ordered before
+    //    retireAndDrain()'s seq_cst load of audioHazardPtr_, so a render thread
+    //    that has already hazarded `old` is guaranteed to be observed there.
+    currentParamsPtr_.store(snap.get(), std::memory_order_seq_cst);
+    // 4) Reclaim prior retirees and defer-free the previous owner.
+    retireAndDrain(std::move(old));
+}
+
+void AudioDspEngine::retireAndDrain(std::shared_ptr<const DspParamSnapshot> old) {
+    {
+        std::lock_guard<std::mutex> lock(retireMutex_);
+        // seq_cst completes the StoreLoad handshake begun by the render thread
+        // (hazard store, then re-read of currentParamsPtr_) and by
+        // swapCurrentLocked (currentParamsPtr_ store, then this load). If a
+        // render thread confirmed `old` as current AFTER hazarding it, we are
+        // guaranteed to read that hazard here and must not free `old`. If instead
+        // we free it (hazard not yet set), the render thread's re-read observes
+        // the newer pointer and retries, so it never dereferences freed memory.
+        const DspParamSnapshot* hz = audioHazardPtr_.load(std::memory_order_seq_cst);
+        // Reclaim every parked snapshot the render thread has moved off of.
+        for (auto& slot : retireQueue_) {
+            if (slot && slot.get() != hz) {
+                slot.reset();
+            }
+        }
+        // Park the previous owner only while the render thread may still be
+        // mid-block on it (its hazard still points at it). The reclaim above
+        // frees all but that single hazarded snapshot, so a free slot always
+        // exists. If `old` is not hazarded it is unreferenced and is freed below,
+        // off the audio thread, when `old` leaves scope.
+        if (old && old.get() == hz) {
+            for (auto& slot : retireQueue_) {
+                if (!slot) {
+                    slot = std::move(old);
+                    break;
+                }
+            }
+        }
+    }
+    // Outside retireMutex_: keep reverb's retired-IR reclamation in exactly the
+    // lock context it had before (publishMutex_ / registry mutex_, never the new
+    // retire lock), and let any `old` deletion happen off the retire lock.
+    reverb_.drainRetiredIrs();
 }
 
 void AudioDspEngine::setSampleRate(double sampleRate) {
@@ -452,8 +508,7 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
         SanitizeSnapshot(*updated);
         updated->generation = ++snapshotGeneration_;
         auto snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
-        currentParams_.store(snap);
-        drainRetireQueue();
+        swapCurrentLocked(snap);
 
         if (this == &AudioDspEngine::instance()) {
             DspEngineRegistry::instance().broadcastParams(snap);
@@ -511,8 +566,7 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
         snapshotGeneration_.store(snapshot->generation);
     }
     mutableSnap->generation = ++snapshotGeneration_;
-    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
-    drainRetireQueue();
+    swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
 }
 
 std::shared_ptr<const DspParamSnapshot> AudioDspEngine::getParams() const {
@@ -562,8 +616,35 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
 
     const auto blockStart = std::chrono::steady_clock::now();
 
-    // Load parameter snapshot atomically ONCE per processing block
-    auto snapshot = currentParams_.load();
+    // Load the active snapshot for this block with a genuinely lock-free raw
+    // pointer read (std::atomic<const DspParamSnapshot*>), replacing the former
+    // AtomicSharedPtr load whose libc++ fallback used the __sp_mut spinlock pool
+    // (not lock-free -> priority inversion against a lower-priority publisher).
+    //
+    // Lifetime (single-reader hazard protocol). We publish the pointer we intend
+    // to read into audioHazardPtr_ (seq_cst) and then RE-READ currentParamsPtr_
+    // (seq_cst). The control-side reclaimer (retireAndDrain / drainRetireQueue)
+    // stores currentParamsPtr_ (seq_cst, in swapCurrentLocked) BEFORE it loads
+    // audioHazardPtr_ (seq_cst). Those two StoreLoad pairs give a single total
+    // order in which:
+    //   - If our re-read confirms the pointer is still current (confirm ==
+    //     snapshot), then any reclaimer that later retires that snapshot is
+    //     guaranteed to observe our hazard and defer freeing it until a LATER
+    //     block moves the hazard on. So the pointer we use cannot be freed
+    //     mid-block.
+    //   - If a reclaimer freed it first (our hazard was not yet visible), our
+    //     re-read necessarily observes the newer pointer, confirm != snapshot,
+    //     and we retry — we never dereference the freed snapshot.
+    // The loop is wait-free in practice: it only retries while a concurrent
+    // publish is changing currentParamsPtr_, which is bounded. The audio thread
+    // never touches a shared_ptr control block and never allocates or locks.
+    const DspParamSnapshot* snapshot = currentParamsPtr_.load(std::memory_order_acquire);
+    for (;;) {
+        audioHazardPtr_.store(snapshot, std::memory_order_seq_cst);
+        const DspParamSnapshot* confirm = currentParamsPtr_.load(std::memory_order_seq_cst);
+        if (confirm == snapshot) break;
+        snapshot = confirm;
+    }
     if (!snapshot) return frames;
 
     // Fast check: generation counter skips applyParams entirely when unchanged
@@ -1116,13 +1197,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
     }
 
-    // Defer destruction of old snapshots off the audio thread
-    int head = retireHead_.load(std::memory_order_relaxed);
-    int next = (head + 1) % kRetireQueueSize;
-    if (next != retireTail_.load(std::memory_order_acquire)) {
-        retireQueue_[head] = std::move(snapshot);
-        retireHead_.store(next, std::memory_order_release);
-    }
+    // NOTE (M-6): the audio render thread no longer retires snapshots. It holds
+    // only a raw pointer (no shared_ptr, no ownership), so there is nothing to
+    // hand off here. Deferred release is driven entirely by the publish side
+    // (swapCurrentLocked -> retireAndDrain), gated by audioHazardPtr_ above.
 
     // Telemetry updates (lock-free atomics)
     limiterGrDb_.store(limiter_.getCurrentGainReductionDb(), std::memory_order_relaxed);

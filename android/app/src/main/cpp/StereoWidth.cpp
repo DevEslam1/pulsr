@@ -43,6 +43,9 @@ void StereoWidth::configureMultiband(bool multiband, double lowWidth, double mid
 void StereoWidth::updateCrossovers() {
     crossoverLow_.configure(sampleRate_, lowCrossoverHz_);
     crossoverHigh_.configure(sampleRate_, highCrossoverHz_);
+    // FIX M-22: match the low-band compensating allpass to the high crossover so
+    // AP(low) == AP embedded in the mid+high sum (identical coeffs -> exact).
+    lowBandAllpass_.configure(sampleRate_, highCrossoverHz_);
 }
 
 void StereoWidth::applyParams(const StereoWidthParamSet& params) {
@@ -59,6 +62,7 @@ void StereoWidth::reset() {
     smoothedHighWidth_ = targetHighWidth_;
     crossoverLow_.reset();
     crossoverHigh_.reset();
+    lowBandAllpass_.reset();  // FIX M-22
 }
 
 void StereoWidth::process(float* L, float* R, int frames) {
@@ -141,6 +145,18 @@ void StereoWidth::process(float* L, float* R, int frames) {
         // 2. Split mid vs high
         double midL, midR, highL, highR;
         crossoverHigh_.process(midHighL, midHighR, midL, midR, highL, highR);
+
+        // FIX M-22: allpass-compensate the low band for the high crossover it
+        // bypasses. mid+high already reconstruct to HP_f1*(LP_f2+HP_f2) =
+        // HP_f1*AP_f2; running the low band (LP_f1) through the matched allpass
+        // AP_f2 (= LP+HP of lowBandAllpass_) makes the sum AP_f2*(LP_f1+HP_f1) =
+        // AP_f1*AP_f2 -> exactly magnitude-flat and phase-coherent at neutral
+        // width. (This is the full tree for this serial split; mid and high
+        // already pass through both crossovers.)
+        double apLpL, apLpR, apHpL, apHpR;
+        lowBandAllpass_.process(lowL, lowR, apLpL, apLpR, apHpL, apHpR);
+        lowL = apLpL + apHpL;
+        lowR = apLpR + apHpR;
 
         // 3. Process each band with its dedicated stereo width
         // Low band (defaults to mono when wLow == 0.0)
@@ -262,6 +278,12 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
 
             double midL, midR, highL, highR;
             crossoverHigh_.process(midHighL, midHighR, midL, midR, highL, highR);
+
+            // FIX M-22: allpass-compensate the low band (see process()).
+            double apLpL, apLpR, apHpL, apHpR;
+            lowBandAllpass_.process(lowL, lowR, apLpL, apLpR, apHpL, apHpR);
+            lowL = apLpL + apHpL;
+            lowR = apLpR + apHpR;
 
             const double mLow = 0.5 * (lowL + lowR);
             const double sLow = 0.5 * (lowL - lowR);

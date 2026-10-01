@@ -90,6 +90,8 @@ class PlayerControls extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(width: AppSpacing.md),
+
             // Previous Button
             Semantics(
               label: l10n.previous,
@@ -118,6 +120,8 @@ class PlayerControls extends StatelessWidget {
                 ),
               ),
             ),
+
+            const SizedBox(width: AppSpacing.s18),
 
             // Main Play / Pause Button
             Semantics(
@@ -191,6 +195,8 @@ class PlayerControls extends StatelessWidget {
               ),
             ),
 
+            const SizedBox(width: AppSpacing.s18),
+
             // Next Button
             Semantics(
               label: l10n.next,
@@ -219,6 +225,8 @@ class PlayerControls extends StatelessWidget {
                 ),
               ),
             ),
+
+            const SizedBox(width: AppSpacing.md),
 
             // Repeat Button with active indicator
             Semantics(

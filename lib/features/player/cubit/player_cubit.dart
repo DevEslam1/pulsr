@@ -238,6 +238,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         isBassBoostSupported: _audioHandler.isBassBoostSupported,
         isVolumeBoostSupported: _audioHandler.isVolumeBoostSupported,
         volumeBoost: _audioHandler.volumeBoost,
+        preampDb: _audioHandler.preampDb,
         isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
         crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
         crossfeedFeedDb: _audioHandler.crossfeedFeedDb,

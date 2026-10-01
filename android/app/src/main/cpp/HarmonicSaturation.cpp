@@ -16,12 +16,18 @@ constexpr double kMaxDrive = 5.0;
 constexpr double kTiltHpHz = 1800.0;
 } // namespace
 
-// 24-tap polyphase sinc coefficients windowed with Blackman-Harris across 4 phases (6 taps per phase)
+// FIX M-23: 32-tap polyphase sinc, Blackman-Harris windowed, across 4 phases
+// (8 taps per phase). True linear-phase prototype (fc = 0.125*Fs_os, each phase
+// normalized to unity DC gain); the combined interpolate->decimate impulse
+// response is symmetric with its peak at base sample 7 (= DRY_DELAY) and total
+// DC gain 1.0. Longer than the previous 24-tap kernel for a deeper decimation
+// stopband (image rejection re DC: ~12 dB above 0.15*Fs_os, ~37 dB above
+// 0.20*Fs_os, vs ~2 dB / ~5 dB before).
 const float HarmonicSaturation::polyphase4x_[OVERSAMPLE_FACTOR][TAPS_PER_PHASE] = {
-    { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f },                       // Phase 0 (identity)
-    { 0.0063f, -0.0984f, 0.8841f, 0.2642f, -0.0682f, 0.0120f },   // Phase 1 (1/4)
-    { 0.0152f, -0.1386f, 0.6234f, 0.6234f, -0.1386f, 0.0152f },   // Phase 2 (2/4)
-    { 0.0120f, -0.0682f, 0.2642f, 0.8841f, -0.0984f, 0.0063f }    // Phase 3 (3/4)
+    { -0.000002f, 0.001019f, -0.015667f, 0.103639f, 0.968717f, -0.066211f, 0.008894f, -0.000389f },  // Phase 0 (1/4-aligned, near-passthrough)
+    { -0.000057f, 0.005586f, -0.063263f, 0.405135f, 0.743252f, -0.101779f, 0.011414f, -0.000289f },  // Phase 1 (1/4)
+    { -0.000289f, 0.011414f, -0.101779f, 0.743252f, 0.405135f, -0.063263f, 0.005586f, -0.000057f },  // Phase 2 (2/4)
+    { -0.000389f, 0.008894f, -0.066211f, 0.968717f, 0.103639f, -0.015667f, 0.001019f, -0.000002f }   // Phase 3 (3/4)
 };
 
 HarmonicSaturation::HarmonicSaturation() {

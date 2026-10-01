@@ -1814,6 +1814,7 @@ mixin _$DspSlice {
   bool get isSpatializerSupported;
   bool get isSpatializerEnabled;
   double get volumeBoost;
+  double get preampDb;
   bool get isVolumeBoostSupported;
   bool get isBassBoostSupported;
   bool get isCrossfeedEnabled;
@@ -1910,6 +1911,8 @@ mixin _$DspSlice {
                 other.isSpatializerEnabled == _this.isSpatializerEnabled) &&
             (identical(other.volumeBoost, _this.volumeBoost) ||
                 other.volumeBoost == _this.volumeBoost) &&
+            (identical(other.preampDb, _this.preampDb) ||
+                other.preampDb == _this.preampDb) &&
             (identical(other.isVolumeBoostSupported, _this.isVolumeBoostSupported) ||
                 other.isVolumeBoostSupported == _this.isVolumeBoostSupported) &&
             (identical(other.isBassBoostSupported, _this.isBassBoostSupported) ||
@@ -1930,8 +1933,7 @@ mixin _$DspSlice {
                 other.limiterReleaseMs == _this.limiterReleaseMs) &&
             (identical(other.isReverbEnabled, _this.isReverbEnabled) ||
                 other.isReverbEnabled == _this.isReverbEnabled) &&
-            (identical(other.reverbPreset, _this.reverbPreset) ||
-                other.reverbPreset == _this.reverbPreset) &&
+            (identical(other.reverbPreset, _this.reverbPreset) || other.reverbPreset == _this.reverbPreset) &&
             (identical(other.reverbWetDry, _this.reverbWetDry) || other.reverbWetDry == _this.reverbWetDry) &&
             (identical(other.stereoBalance, _this.stereoBalance) || other.stereoBalance == _this.stereoBalance) &&
             (identical(other.monoMix, _this.monoMix) || other.monoMix == _this.monoMix) &&
@@ -1997,6 +1999,7 @@ mixin _$DspSlice {
       _this.isSpatializerSupported,
       _this.isSpatializerEnabled,
       _this.volumeBoost,
+      _this.preampDb,
       _this.isVolumeBoostSupported,
       _this.isBassBoostSupported,
       _this.isCrossfeedEnabled,
@@ -2060,7 +2063,7 @@ mixin _$DspSlice {
   @override
   String toString() {
     final _this = this as DspSlice;
-    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
+    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, preampDb: ${_this.preampDb}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
   }
 }
 
@@ -2082,6 +2085,7 @@ abstract mixin class $DspSliceCopyWith<$Res> {
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      double preampDb,
       bool isVolumeBoostSupported,
       bool isBassBoostSupported,
       bool isCrossfeedEnabled,
@@ -2165,6 +2169,7 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? preampDb = null,
     Object? isVolumeBoostSupported = null,
     Object? isBassBoostSupported = null,
     Object? isCrossfeedEnabled = null,
@@ -2271,6 +2276,10 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
       volumeBoost: null == volumeBoost
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
+              as double,
+      preampDb: null == preampDb
+          ? _self.preampDb
+          : preampDb // ignore: cast_nullable_to_non_nullable
               as double,
       isVolumeBoostSupported: null == isVolumeBoostSupported
           ? _self.isVolumeBoostSupported
@@ -2610,6 +2619,7 @@ extension DspSlicePatterns on DspSlice {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            double preampDb,
             bool isVolumeBoostSupported,
             bool isBassBoostSupported,
             bool isCrossfeedEnabled,
@@ -2686,6 +2696,7 @@ extension DspSlicePatterns on DspSlice {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.preampDb,
             _that.isVolumeBoostSupported,
             _that.isBassBoostSupported,
             _that.isCrossfeedEnabled,
@@ -2776,6 +2787,7 @@ extension DspSlicePatterns on DspSlice {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            double preampDb,
             bool isVolumeBoostSupported,
             bool isBassBoostSupported,
             bool isCrossfeedEnabled,
@@ -2851,6 +2863,7 @@ extension DspSlicePatterns on DspSlice {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.preampDb,
             _that.isVolumeBoostSupported,
             _that.isBassBoostSupported,
             _that.isCrossfeedEnabled,
@@ -2940,6 +2953,7 @@ extension DspSlicePatterns on DspSlice {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            double preampDb,
             bool isVolumeBoostSupported,
             bool isBassBoostSupported,
             bool isCrossfeedEnabled,
@@ -3015,6 +3029,7 @@ extension DspSlicePatterns on DspSlice {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.preampDb,
             _that.isVolumeBoostSupported,
             _that.isBassBoostSupported,
             _that.isCrossfeedEnabled,
@@ -3095,6 +3110,7 @@ class _DspSlice extends DspSlice {
       this.isSpatializerSupported = false,
       this.isSpatializerEnabled = false,
       this.volumeBoost = 0.0,
+      this.preampDb = 0.0,
       this.isVolumeBoostSupported = false,
       this.isBassBoostSupported = false,
       this.isCrossfeedEnabled = false,
@@ -3191,6 +3207,9 @@ class _DspSlice extends DspSlice {
   @override
   @JsonKey()
   final double volumeBoost;
+  @override
+  @JsonKey()
+  final double preampDb;
   @override
   @JsonKey()
   final bool isVolumeBoostSupported;
@@ -3413,6 +3432,8 @@ class _DspSlice extends DspSlice {
                 other.isSpatializerEnabled == isSpatializerEnabled) &&
             (identical(other.volumeBoost, volumeBoost) ||
                 other.volumeBoost == volumeBoost) &&
+            (identical(other.preampDb, preampDb) ||
+                other.preampDb == preampDb) &&
             (identical(other.isVolumeBoostSupported, isVolumeBoostSupported) ||
                 other.isVolumeBoostSupported == isVolumeBoostSupported) &&
             (identical(other.isBassBoostSupported, isBassBoostSupported) ||
@@ -3456,8 +3477,7 @@ class _DspSlice extends DspSlice {
                 other.saturationTilt == saturationTilt) &&
             (identical(other.saturationMultiband, saturationMultiband) ||
                 other.saturationMultiband == saturationMultiband) &&
-            (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) ||
-                other.isStereoWidthEnabled == isStereoWidthEnabled) &&
+            (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) || other.isStereoWidthEnabled == isStereoWidthEnabled) &&
             (identical(other.stereoWidth, stereoWidth) || other.stereoWidth == stereoWidth) &&
             (identical(other.isLoudnessContourEnabled, isLoudnessContourEnabled) || other.isLoudnessContourEnabled == isLoudnessContourEnabled) &&
             (identical(other.loudnessContourIntensity, loudnessContourIntensity) || other.loudnessContourIntensity == loudnessContourIntensity) &&
@@ -3510,6 +3530,7 @@ class _DspSlice extends DspSlice {
       isSpatializerSupported,
       isSpatializerEnabled,
       volumeBoost,
+      preampDb,
       isVolumeBoostSupported,
       isBassBoostSupported,
       isCrossfeedEnabled,
@@ -3572,7 +3593,7 @@ class _DspSlice extends DspSlice {
 
   @override
   String toString() {
-    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
+    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, preampDb: $preampDb, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
   }
 }
 
@@ -3596,6 +3617,7 @@ abstract mixin class _$DspSliceCopyWith<$Res>
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      double preampDb,
       bool isVolumeBoostSupported,
       bool isBassBoostSupported,
       bool isCrossfeedEnabled,
@@ -3679,6 +3701,7 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? preampDb = null,
     Object? isVolumeBoostSupported = null,
     Object? isBassBoostSupported = null,
     Object? isCrossfeedEnabled = null,
@@ -3785,6 +3808,10 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
       volumeBoost: null == volumeBoost
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
+              as double,
+      preampDb: null == preampDb
+          ? _self.preampDb
+          : preampDb // ignore: cast_nullable_to_non_nullable
               as double,
       isVolumeBoostSupported: null == isVolumeBoostSupported
           ? _self.isVolumeBoostSupported

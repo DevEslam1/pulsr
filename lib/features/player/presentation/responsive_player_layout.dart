@@ -286,12 +286,11 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                       // Sleek Floating Capsule TabBar at Top Right
                       Padding(
                         padding: const EdgeInsetsDirectional.only(
-                          top: AppSpacing.md,
+                          top: AppSpacing.sm,
                           bottom: AppSpacing.xs,
-                          end: AppSpacing.lg,
                         ),
                         child: Align(
-                          alignment: AlignmentDirectional.centerEnd,
+                          alignment: AlignmentDirectional.center,
                           child: Container(
                             height: 38,
                             padding: const EdgeInsets.all(3),

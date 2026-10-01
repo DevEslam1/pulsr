@@ -154,6 +154,10 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   double get volumeBoost => _equalizerManager.volumeBoost;
 
+  /// Engine-canonical EQ preamp (dB). Exposed at the handler boundary so the
+  /// cubit's effect reconciliation reads it like every other DSP param.
+  double get preampDb => _equalizerManager.preampDb;
+
   Future<void> setVolumeBoost(double value) =>
       _equalizerManager.setVolumeBoost(value);
 

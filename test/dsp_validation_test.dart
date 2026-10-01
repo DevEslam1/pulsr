@@ -5,6 +5,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
+import 'package:pulsr/domain/models/reverb_preset.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -116,6 +117,47 @@ void main() {
     test('empty impulse response is rejected', () async {
       final manager = EqualizerManager();
       expect(await manager.loadCustomImpulseResponse([]), isFalse);
+      manager.dispose();
+    });
+
+    test('snapshot embeds the custom reverb IR samples when no WAV path exists',
+        () async {
+      final manager = EqualizerManager();
+      // No init() => no cached prefs path, so capture must fall back to
+      // embedding the raw samples so recall can still rebuild the room.
+      manager.reverbPreset = ReverbPreset.custom.wireValue;
+      manager.customImpulseResponse = const [0.1, -0.2, 0.3];
+
+      final effects = manager.captureEffectsState();
+      expect(effects['reverbPreset'], ReverbPreset.custom.wireValue);
+      expect(effects.containsKey('customReverbIrPath'), isFalse);
+      expect(effects['customImpulseResponse'], const [0.1, -0.2, 0.3]);
+      manager.dispose();
+    });
+
+    test('non-custom reverb snapshots carry no IR reference', () async {
+      final manager = EqualizerManager();
+      manager.reverbPreset = ReverbPreset.hall.wireValue;
+      manager.customImpulseResponse = const [0.1, 0.2];
+
+      final effects = manager.captureEffectsState();
+      expect(effects.containsKey('customReverbIrPath'), isFalse);
+      expect(effects.containsKey('customImpulseResponse'), isFalse);
+      manager.dispose();
+    });
+
+    test(
+        'recall falls back to a synthesizable room when the custom IR cannot be restored',
+        () async {
+      final manager = EqualizerManager();
+      // A stored custom preset with no restorable IR (no path, no samples,
+      // and loadCustomImpulseResponse is a no-op off-Android) must not leave a
+      // silent reverb: it falls back to the Studio room.
+      await manager.applyEffectsState(<String, dynamic>{
+        'reverbEnabled': true,
+        'reverbPreset': ReverbPreset.custom.wireValue,
+      });
+      expect(manager.reverbPreset, ReverbPreset.studio.wireValue);
       manager.dispose();
     });
 

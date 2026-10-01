@@ -23,6 +23,55 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+namespace {
+// FIX M-24: scoped flush-to-zero (FTZ/DAZ) guard for the reverb process block.
+// A long convolution tail decaying into silence leaves tiny denormal values in
+// the frequency-domain overlap-add accumulators (accumFreq*, inputHistoryFreq*)
+// that the per-sample output flush (FIX M-21) does not reach; multiplying and
+// adding denormals triggers microcode-assisted slow paths on some ARM cores,
+// causing audible CPU spikes / dropouts as the tail fades. Setting the hardware
+// flush-to-zero bit for the duration of the block makes the FPU treat denormal
+// inputs and results as zero at zero per-sample cost, covering every denormal
+// (FFT, biquad, resampler) without touching the audible tail (denormals are
+// < ~1.2e-38, far below the noise floor). The caller's FP mode is saved on
+// entry and restored on scope exit, so float behaviour outside this block is
+// unchanged. Allocation-free, lock-free, log-free, RT-safe.
+struct DenormalFlushGuard {
+#if defined(__aarch64__)
+    // GCC/Clang (Android NDK) aarch64. Not gated on _M_ARM64: MSVC lacks
+    // GCC-style inline asm, so an ARM64 MSVC build safely falls to the no-op.
+    uint64_t saved_;
+    DenormalFlushGuard() {
+        __asm__ __volatile__("mrs %0, fpcr" : "=r"(saved_));
+        const uint64_t fz = saved_ | (1ULL << 24); // FPCR.FZ
+        __asm__ __volatile__("msr fpcr, %0" : : "r"(fz));
+    }
+    ~DenormalFlushGuard() {
+        __asm__ __volatile__("msr fpcr, %0" : : "r"(saved_));
+    }
+#elif defined(__arm__)
+    uint32_t saved_;
+    DenormalFlushGuard() {
+        __asm__ __volatile__("vmrs %0, fpscr" : "=r"(saved_));
+        const uint32_t fz = saved_ | (1u << 24); // FPSCR.FZ
+        __asm__ __volatile__("vmsr fpscr, %0" : : "r"(fz));
+    }
+    ~DenormalFlushGuard() {
+        __asm__ __volatile__("vmsr fpscr, %0" : : "r"(saved_));
+    }
+#elif defined(PULSR_HAS_SSE)
+    unsigned int saved_;
+    DenormalFlushGuard() {
+        saved_ = _mm_getcsr();
+        _mm_setcsr(saved_ | 0x8040u); // MXCSR FTZ (bit 15) | DAZ (bit 6)
+    }
+    ~DenormalFlushGuard() { _mm_setcsr(saved_); }
+#else
+    DenormalFlushGuard() {}
+#endif
+};
+} // namespace
+
 struct SyntheticCacheKey {
     int preset;
     int sampleRate;
@@ -877,6 +926,11 @@ void ConvolutionReverb::reset() {
 }
 
 void ConvolutionReverb::process(const float* inL, const float* inR, float* outL, float* outR, int frames) {
+    // FIX M-24: flush denormals to zero for the whole reverb block (restored on
+    // return via RAII). Covers the FFT overlap-add accumulators whose fading
+    // tail would otherwise spill denormals into recursive downstream stages.
+    DenormalFlushGuard denormGuard;
+
     if (!preparedIr_ || preparedIr_->totalTaps == 0 || frames <= 0) {
         if (inL != outL) std::memcpy(outL, inL, frames * sizeof(float));
         if (inR != outR) std::memcpy(outR, inR, frames * sizeof(float));

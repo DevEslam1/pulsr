@@ -19,9 +19,9 @@ public:
     static_assert(MAX_LOOKAHEAD_SAMPLES >= 768 * 20,
                   "MAX_LOOKAHEAD_SAMPLES must accommodate at least 20ms @ 768kHz");
 
-    static constexpr int INTERP_TAPS = 24;
+    static constexpr int INTERP_TAPS = 48;
     static constexpr int INTERP_PHASES = 4;
-    static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 6
+    static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 12
 
     LookaheadLimiter();
     void setSampleRate(double sampleRate);
@@ -99,7 +99,6 @@ private:
         return (dequeTail_ > dequeHead_) ? deque_[dequeHead_ & kMask].gain : 1.0f;
     }
 
-    // 4x and 8x oversampling polyphase interpolation tables for true peak detection
+    // ITU-R BS.1770-4 4x-oversampling polyphase interpolation table for true-peak detection
     static const float polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE];
-    static const float polyphase8x_[8][TAPS_PER_PHASE];
 };

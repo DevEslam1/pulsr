@@ -17,6 +17,7 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'karaoke_mode_screen.dart';
 import 'lyrics_editor_sheet.dart';
+import '../themes/player_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -519,11 +520,13 @@ class _LyricsViewState extends State<LyricsView> {
     final source = _effectiveSource;
     final isSynced = _isSynced;
     final p = context.palette;
+    final isInSplit = PlayerSplitViewScope.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        // Lyrics scrim uses palette background token to support AMOLED and light mode cleanly.
-        color: p.bg.withValues(alpha: p.isDark ? 0.40 : 0.72),
+        color: isInSplit
+            ? Colors.transparent
+            : p.bg.withValues(alpha: p.isDark ? 0.40 : 0.72),
         borderRadius: AppRadii.cardRadius,
       ),
       child: Stack(

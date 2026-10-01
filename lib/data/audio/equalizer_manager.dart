@@ -15,6 +15,7 @@ import '../../domain/models/reverb_preset.dart';
 import 'async_lock.dart';
 import 'audio_effects_channel.dart';
 import 'comparison_slot.dart';
+import 'dsp_param_ranges.dart';
 import 'eq_frequency_validation.dart';
 import 'eq_preset_schema_validator.dart';
 import 'headphone_profiles_repository.dart';
@@ -29,15 +30,12 @@ part 'equalizer_preset_ops.dart';
 part 'equalizer_snapshot_ops.dart';
 part 'equalizer_effect_ops.dart';
 
-/// Coerces a non-finite [value] (NaN or ±infinity) to [fallback], then clamps
-/// into [min]..[max]. Dart's `num.clamp` propagates NaN (clamp(NaN, lo, hi) ==
-/// NaN), so numeric setters must finite-guard the incoming argument before
-/// clamping or garbage reaches native. Mirrors `clampFinite` on the native
-/// side (DspParams.h / AudioDspEngine sanitizers). Library-level so every
-/// `part` file setter shares one definition (modelled on setBandGain's guard).
-double _clampFinite(double value, double min, double max, double fallback) =>
-    (value.isFinite ? value : fallback).clamp(min, max);
-
+/// Numeric DSP-parameter sanitation lives in `dsp_param_ranges.dart`:
+/// [DspParamRanges] is the single source of truth for every parameter's valid
+/// range, and [clampFinite] / [DspRange.clamp] are the NaN/Inf-safe clamps the
+/// setters use. Dart's `num.clamp` propagates NaN, so numeric setters must
+/// finite-guard before clamping or garbage reaches native (mirrors the native
+/// `clampFinite` sanitizers in DspParams.h / AudioDspEngine).
 class EqualizerManager {
   /// Native `ParametricEQ::MAX_BANDS` (android/app/src/main/cpp/ParametricEQ.h).
   static const int equalizerMaxNativeBands = 64;
@@ -463,8 +461,8 @@ class EqualizerManager {
 
       currentPreset = EqPreset(name: presetName, gains: gains, bassBoost: bass);
       comparisonSlots[ComparisonSlot.slotA] = currentPreset;
-      preampDb =
-          (prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0).clamp(-15.0, 15.0);
+      preampDb = DspParamRanges.preampDb
+          .clampRaw(prefs.getDouble(PrefsKeys.eqPreamp) ?? 0.0);
 
       isVirtualizerEnabled =
           prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
@@ -1258,7 +1256,7 @@ class EqualizerManager {
     selectedHeadphoneProfile = null;
 
     final newGains = List<double>.from(currentPreset.gains);
-    newGains[index] = gain.clamp(-15.0, 15.0);
+    newGains[index] = DspParamRanges.eqBandGainDb.clampRaw(gain);
     currentPreset = currentPreset.copyWith(name: 'Custom', gains: newGains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
 
@@ -1331,8 +1329,10 @@ class EqualizerManager {
 
   Future<void> setPreamp(double preampDb) async {
     // Finite-guard before clamp: a NaN would otherwise survive clamp() and
-    // reach native (mirrors setBandGain's isFinite guard).
-    this.preampDb = _clampFinite(preampDb, -15.0, 15.0, 0.0);
+    // reach native (mirrors setBandGain's isFinite guard). Range lives in the
+    // central contract (DspParamRanges.preampDb) so UI, setter and native stay
+    // in lockstep.
+    this.preampDb = DspParamRanges.preampDb.clamp(preampDb);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setEqPreamp(this.preampDb);
     }
@@ -1430,9 +1430,10 @@ class EqualizerManager {
 
   Future<void> setVolumeBoost(double value) async {
     final preampDb = selectedHeadphoneProfile?.preampGain ?? 0.0;
-    var safeValue = value.clamp(0.0, 1.0);
+    var safeValue = DspParamRanges.volumeBoost.clampRaw(value);
     if ((preampDb + safeValue * 10.0) > 6.0) {
-      safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
+      safeValue =
+          DspParamRanges.volumeBoost.clampRaw((6.0 - preampDb) / 10.0);
     }
     volumeBoost = safeValue;
     final milliBels = (volumeBoost * 1000).round();
@@ -1540,9 +1541,11 @@ class EqualizerManager {
       if (!f.frequency.isFinite || f.frequency <= 0 || !f.gain.isFinite) {
         continue;
       }
-      frequencies.add(f.frequency.clamp(10.0, 24000.0));
-      gains.add(f.gain.clamp(-24.0, 24.0));
-      qs.add(f.q.isFinite && f.q > 0 ? f.q.clamp(0.1, 18.0) : 1.414);
+      frequencies.add(DspParamRanges.eqFilterFrequencyHz.clampRaw(f.frequency));
+      gains.add(DspParamRanges.eqFilterGainDb.clampRaw(f.gain));
+      qs.add(f.q.isFinite && f.q > 0
+          ? DspParamRanges.eqFilterQ.clampRaw(f.q)
+          : DspParamRanges.eqFilterQ.defaultValue);
       types.add(f.filterType);
     }
     if (frequencies.isEmpty) return false;
@@ -1721,10 +1724,14 @@ class EqualizerManager {
     bool? multiband,
   }) async {
     isSaturationEnabled = enabled;
-    if (drive != null) saturationDrive = drive.clamp(0.0, 1.0);
-    if (mix != null) saturationMix = mix.clamp(0.0, 1.0);
-    if (tilt != null) saturationTilt = tilt.clamp(0.0, 1.0);
-    if (mode != null) saturationMode = mode.clamp(0, 2);
+    if (drive != null) {
+      saturationDrive = DspParamRanges.saturationDrive.clampRaw(drive);
+    }
+    if (mix != null) saturationMix = DspParamRanges.saturationMix.clampRaw(mix);
+    if (tilt != null) {
+      saturationTilt = DspParamRanges.saturationTilt.clampRaw(tilt);
+    }
+    if (mode != null) saturationMode = DspParamRanges.saturationMode.clamp(mode);
     if (multiband != null) saturationMultiband = multiband;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSaturationParams(
@@ -1787,7 +1794,10 @@ class EqualizerManager {
   /// stage via [updateLoudnessVolume].
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {
     isLoudnessContourEnabled = enabled;
-    if (intensity != null) loudnessContourIntensity = intensity.clamp(0.0, 1.0);
+    if (intensity != null) {
+      loudnessContourIntensity =
+          DspParamRanges.loudnessContourIntensity.clampRaw(intensity);
+    }
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLoudnessContourParams(
         loudnessContourIntensity,
@@ -1808,7 +1818,7 @@ class EqualizerManager {
   /// contour follows the listening level. Automatically toggles loudness contour
   /// on when volume drops below 0.3 and off when it rises above 0.5.
   Future<void> updateLoudnessVolume(double volumeLinear) async {
-    loudnessVolumeLinear = volumeLinear.clamp(0.0, 1.0);
+    loudnessVolumeLinear = DspParamRanges.volumeLinear.clampRaw(volumeLinear);
     if (autoLoudnessContour) {
       if (loudnessVolumeLinear <= autoLoudnessLowThreshold &&
           !isLoudnessContourEnabled) {
@@ -1837,11 +1847,16 @@ class EqualizerManager {
     bool? antiPop,
   }) async {
     isSubCrossoverEnabled = enabled;
-    if (cornerHz != null) subCrossoverCornerHz = cornerHz.clamp(60.0, 150.0);
+    if (cornerHz != null) {
+      subCrossoverCornerHz =
+          DspParamRanges.subCrossoverCornerHz.clampRaw(cornerHz);
+    }
     if (slopeDbPerOct != null) {
       subCrossoverSlopeDbPerOct = slopeDbPerOct < 18.0 ? 12.0 : 24.0;
     }
-    if (gain != null) subCrossoverGain = gain.clamp(0.0, 1.0);
+    if (gain != null) {
+      subCrossoverGain = DspParamRanges.subCrossoverGain.clampRaw(gain);
+    }
     if (bassMono != null) subCrossoverBassMono = bassMono;
     if (antiPop != null) subCrossoverAntiPop = antiPop;
     if (PlatformCapabilities.isAndroid) {
@@ -1963,27 +1978,34 @@ class EqualizerManager {
   }) async {
     isMultibandCompressorEnabled = enabled;
     if (bands != null) multibandCompressorBands = List.from(bands);
-    if (f0 != null) multibandCompressorF0 = f0.clamp(40.0, 500.0);
-    if (f1 != null) multibandCompressorF1 = f1.clamp(200.0, 4000.0);
-    if (f2 != null) multibandCompressorF2 = f2.clamp(1000.0, 16000.0);
+    if (f0 != null) {
+      multibandCompressorF0 = DspParamRanges.multibandCompressorF0.clampRaw(f0);
+    }
+    if (f1 != null) {
+      multibandCompressorF1 = DspParamRanges.multibandCompressorF1.clampRaw(f1);
+    }
+    if (f2 != null) {
+      multibandCompressorF2 = DspParamRanges.multibandCompressorF2.clampRaw(f2);
+    }
     // Crossovers must stay strictly ordered (f0 < f1 < f2); individual
     // clamps alone allow inversions such as f0=500 > f1=200.
     if (multibandCompressorF1 <= multibandCompressorF0) {
-      multibandCompressorF1 =
-          (multibandCompressorF0 + 50.0).clamp(200.0, 4000.0);
+      multibandCompressorF1 = DspParamRanges.multibandCompressorF1
+          .clampRaw(multibandCompressorF0 + 50.0);
     }
     if (multibandCompressorF2 <= multibandCompressorF1) {
-      multibandCompressorF2 =
-          (multibandCompressorF1 + 500.0).clamp(1000.0, 16000.0);
+      multibandCompressorF2 = DspParamRanges.multibandCompressorF2
+          .clampRaw(multibandCompressorF1 + 500.0);
     }
     // Second pass: the clamps above can themselves collapse the ordering at
     // the range edges, so pull the lower crossover down instead.
     if (multibandCompressorF1 <= multibandCompressorF0) {
-      multibandCompressorF0 = (multibandCompressorF1 - 50.0).clamp(40.0, 500.0);
+      multibandCompressorF0 = DspParamRanges.multibandCompressorF0
+          .clampRaw(multibandCompressorF1 - 50.0);
     }
     if (multibandCompressorF2 <= multibandCompressorF1) {
-      multibandCompressorF1 =
-          (multibandCompressorF2 - 500.0).clamp(200.0, 4000.0);
+      multibandCompressorF1 = DspParamRanges.multibandCompressorF1
+          .clampRaw(multibandCompressorF2 - 500.0);
     }
     if (PlatformCapabilities.isAndroid) {
       await _pushMultibandCompressorConfig();
@@ -2059,8 +2081,12 @@ class EqualizerManager {
     int? preset,
   }) async {
     isDynamicBassEnabled = enabled;
-    if (strength != null) dynamicBassStrength = strength.clamp(0.0, 8.0);
-    if (preset != null) dynamicBassPreset = preset.clamp(0, 9);
+    if (strength != null) {
+      dynamicBassStrength = DspParamRanges.dynamicBassStrength.clampRaw(strength);
+    }
+    if (preset != null) {
+      dynamicBassPreset = DspParamRanges.dynamicBassPreset.clamp(preset);
+    }
     if (dynamicBassPreset > 0) {
       if (xLow != null ||
           xHigh != null ||
@@ -2084,15 +2110,21 @@ class EqualizerManager {
       dynamicBassSideGainLow = p.sideGainLow;
       dynamicBassSideGainHigh = p.sideGainHigh;
     } else {
-      if (xLow != null) dynamicBassXLow = xLow.clamp(20, 2400);
-      if (xHigh != null) dynamicBassXHigh = xHigh.clamp(500, 12000);
-      if (yLow != null) dynamicBassYLow = yLow.clamp(20, 200);
-      if (yHigh != null) dynamicBassYHigh = yHigh.clamp(30, 300);
+      if (xLow != null) dynamicBassXLow = DspParamRanges.dynamicBassXLow.clamp(xLow);
+      if (xHigh != null) {
+        dynamicBassXHigh = DspParamRanges.dynamicBassXHigh.clamp(xHigh);
+      }
+      if (yLow != null) dynamicBassYLow = DspParamRanges.dynamicBassYLow.clamp(yLow);
+      if (yHigh != null) {
+        dynamicBassYHigh = DspParamRanges.dynamicBassYHigh.clamp(yHigh);
+      }
       if (sideGainLow != null) {
-        dynamicBassSideGainLow = sideGainLow.clamp(0.0, 1.0);
+        dynamicBassSideGainLow =
+            DspParamRanges.dynamicBassSideGainLow.clampRaw(sideGainLow);
       }
       if (sideGainHigh != null) {
-        dynamicBassSideGainHigh = sideGainHigh.clamp(0.0, 1.0);
+        dynamicBassSideGainHigh =
+            DspParamRanges.dynamicBassSideGainHigh.clampRaw(sideGainHigh);
       }
     }
 

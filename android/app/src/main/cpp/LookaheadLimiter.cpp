@@ -12,23 +12,33 @@
 #define PULSR_HAS_SSE 1
 #endif
 
-// 24-tap polyphase sinc coefficients windowed with Blackman-Harris across 4 phases (6 taps per phase)
+// FIX M-2: replace the ad-hoc 6-tap-per-phase sinc with the ITU-R BS.1770-4
+// true-peak 4x-oversampling FIR: 48 taps split into 4 polyphase branches of 12
+// taps each (coefficients are the standard's values, quantised to multiples of
+// 1/8192, e.g. 0.9721679687500 = 7963/8192). Phase 0 aligns to the integer
+// sample, phases 1-3 evaluate the 1/4, 2/4, 3/4 inter-sample positions. Phase 3
+// is the time-reverse of phase 0 and phase 2 of phase 1 (linear-phase symmetry).
+// Per-phase DC gain (sum of the 12 taps): phase 0/3 = 1.0015869, phase 1/2 =
+// 0.9730225 — this is the standard filter's small passband ripple. The raw-sample
+// floor in estimateTruePeak() guarantees the estimate never drops below an actual
+// sample value despite the sub-unity branches.
 const float LookaheadLimiter::polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE] = {
-    { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f }, // Phase 0 (identity)
-    { 0.0063f, -0.0984f, 0.8841f, 0.2642f, -0.0682f, 0.0120f }, // Phase 1 (1/4)
-    { 0.0152f, -0.1386f, 0.6234f, 0.6234f, -0.1386f, 0.0152f }, // Phase 2 (2/4)
-    { 0.0120f, -0.0682f, 0.2642f, 0.8841f, -0.0984f, 0.0063f }  // Phase 3 (3/4)
-};
-
-const float LookaheadLimiter::polyphase8x_[8][TAPS_PER_PHASE] = {
-    { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f },
-    { 0.0031f, -0.0520f, 0.9620f, 0.1250f, -0.0420f, 0.0039f },
-    { 0.0063f, -0.0984f, 0.8841f, 0.2642f, -0.0682f, 0.0120f },
-    { 0.0105f, -0.1280f, 0.7680f, 0.4350f, -0.1050f, 0.0195f },
-    { 0.0152f, -0.1386f, 0.6234f, 0.6234f, -0.1386f, 0.0152f },
-    { 0.0195f, -0.1050f, 0.4350f, 0.7680f, -0.1280f, 0.0105f },
-    { 0.0120f, -0.0682f, 0.2642f, 0.8841f, -0.0984f, 0.0063f },
-    { 0.0039f, -0.0420f, 0.1250f, 0.9620f, -0.0520f, 0.0031f }
+    // Phase 0 (integer sample position)
+    {  0.0017089843750f,  0.0109863281250f, -0.0196533203125f,  0.0332031250000f,
+      -0.0594482421875f,  0.1373291015625f,  0.9721679687500f, -0.1022949218750f,
+       0.0476074218750f, -0.0266113281250f,  0.0148925781250f, -0.0083007812500f },
+    // Phase 1 (1/4 inter-sample)
+    { -0.0291748046875f,  0.0292968750000f, -0.0517578125000f,  0.0891113281250f,
+      -0.1665039062500f,  0.4650878906250f,  0.7797851562500f, -0.2003173828125f,
+       0.1015625000000f, -0.0582275390625f,  0.0330810546875f, -0.0189208984375f },
+    // Phase 2 (2/4 inter-sample)
+    { -0.0189208984375f,  0.0330810546875f, -0.0582275390625f,  0.1015625000000f,
+      -0.2003173828125f,  0.7797851562500f,  0.4650878906250f, -0.1665039062500f,
+       0.0891113281250f, -0.0517578125000f,  0.0292968750000f, -0.0291748046875f },
+    // Phase 3 (3/4 inter-sample)
+    { -0.0083007812500f,  0.0148925781250f, -0.0266113281250f,  0.0476074218750f,
+      -0.1022949218750f,  0.9721679687500f,  0.1373291015625f, -0.0594482421875f,
+       0.0332031250000f, -0.0196533203125f,  0.0109863281250f,  0.0017089843750f }
 };
 
 LookaheadLimiter::LookaheadLimiter() {
@@ -49,17 +59,31 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
     releaseMs_ = std::clamp(releaseMs, 5.0, 1000.0);
     truePeakMode_ = truePeakMode;
 
-    lookaheadSamples_ = std::clamp(
+    const int newLookahead = std::clamp(
         static_cast<int>(lookaheadMs_ * 0.001 * sampleRate_),
         TAPS_PER_PHASE + 1,
         MAX_LOOKAHEAD_SAMPLES - 1
     );
+
+    // FIX M-3: the delay-line read index is (writeIdx_ - lookaheadSamples_), so
+    // changing the lookahead length mid-stream would jump the read position and
+    // the min-gain deque window, producing a click. Detect the change and
+    // re-prime: reset() clears the delay line, the monotonic deque and the gain
+    // state so the new latency starts from a clean (silent) buffer rather than a
+    // discontinuous read. latencyFramesAtomic_ is stored in lockstep below so
+    // getLatencyFrames() always reports the length actually in effect.
+    const bool lookaheadChanged = (newLookahead != lookaheadSamples_);
+    lookaheadSamples_ = newLookahead;
     latencyFramesAtomic_.store(lookaheadSamples_, std::memory_order_relaxed);
 
     threshold_ = static_cast<float>(std::pow(10.0, thresholdDb_ / 20.0));
     fastReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (0.015 * sampleRate_))); // 15ms fast transient release
     // Honour the user's release time (clamped to [5, 1000] ms in configure).
     slowReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (releaseMs_ * 0.001 * sampleRate_)));
+
+    if (lookaheadChanged) {
+        reset();
+    }
 }
 
 void LookaheadLimiter::setEnabled(bool enabled) {
@@ -87,71 +111,84 @@ void LookaheadLimiter::reset() {
 }
 
 float LookaheadLimiter::estimateTruePeak(const float* history) {
-    float peak = std::abs(history[2]); // Central sample in 6-tap window
+    // history[0..TAPS_PER_PHASE-1] runs oldest -> newest (history[11] is the
+    // sample just written). The BS.1770-4 4x filter aligns phase 0 to history[6]
+    // and phase 3 to history[5], so the oversampled interval evaluated here is
+    // [history[5], history[6]]. Seed the estimate with the raw sample at
+    // history[6] so it can never read below the actual sample value; history[5]
+    // is floored the same way by the previous frame's history[6], so every
+    // integer sample is protected while phases 0-3 add the inter-sample maxima.
+    float peak = std::abs(history[6]);
 
     if (!truePeakMode_) {
         return peak;
     }
 
     if (sampleRate_ > 192000.0) {
-        // > 192kHz: 1x oversampling (Nyquist is >= 96kHz, intersample peaks negligible)
+        // Nyquist >= 96 kHz: inter-sample peaks are negligible, 1x is enough.
         return peak;
-    } else if (sampleRate_ > 96000.0) {
-        // > 96kHz: 8-phase polyphase true peak estimation
-        for (int phase = 1; phase < 8; ++phase) {
-            float subSample = 0.0f;
-            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-                subSample += history[tap] * polyphase8x_[phase][tap];
-            }
-            peak = std::max(peak, std::abs(subSample));
-        }
-    } else {
-        // <= 96kHz: 4x oversampling (evaluate phases 1, 2, 3)
-#if defined(PULSR_HAS_NEON)
-        alignas(16) static const float kPhaseCoeffs[6][4] = {
-            { 0.0063f,  0.0152f,  0.0120f, 0.0f },
-            { -0.0984f, -0.1386f, -0.0682f, 0.0f },
-            { 0.8841f,  0.6234f,  0.2642f, 0.0f },
-            { 0.2642f,  0.6234f,  0.8841f, 0.0f },
-            { -0.0682f, -0.1386f, -0.0984f, 0.0f },
-            { 0.0120f,  0.0152f,  0.0063f, 0.0f }
-        };
-        float32x4_t vAcc = vdupq_n_f32(0.0f);
-        for (int t = 0; t < 6; ++t) {
-            float32x4_t vC = vld1q_f32(kPhaseCoeffs[t]);
-            vAcc = vfmaq_n_f32(vAcc, vC, history[t]);
-        }
-        float32x4_t vAbs = vabsq_f32(vAcc);
-        peak = std::max(peak, vmaxvq_f32(vAbs));
-#elif defined(PULSR_HAS_SSE)
-        alignas(16) static const float kPhaseCoeffs[6][4] = {
-            { 0.0063f,  0.0152f,  0.0120f, 0.0f },
-            { -0.0984f, -0.1386f, -0.0682f, 0.0f },
-            { 0.8841f,  0.6234f,  0.2642f, 0.0f },
-            { 0.2642f,  0.6234f,  0.8841f, 0.0f },
-            { -0.0682f, -0.1386f, -0.0984f, 0.0f },
-            { 0.0120f,  0.0152f,  0.0063f, 0.0f }
-        };
-        __m128 vAcc = _mm_setzero_ps();
-        for (int t = 0; t < 6; ++t) {
-            __m128 vC = _mm_load_ps(kPhaseCoeffs[t]);
-            __m128 vH = _mm_set1_ps(history[t]);
-            vAcc = _mm_add_ps(vAcc, _mm_mul_ps(vH, vC));
-        }
-        __m128 vAbs = _mm_and_ps(vAcc, _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff)));
-        alignas(16) float sub[4];
-        _mm_store_ps(sub, vAbs);
-        peak = std::max(peak, std::max(sub[0], std::max(sub[1], sub[2])));
-#else
-        for (int phase = 1; phase < INTERP_PHASES; ++phase) {
-            float subSample = 0.0f;
-            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-                subSample += history[tap] * polyphase4x_[phase][tap];
-            }
-            peak = std::max(peak, std::abs(subSample));
-        }
-#endif
     }
+
+    // 4x oversampling: evaluate all four polyphase branches, keep the max |.|.
+#if defined(PULSR_HAS_NEON)
+    // kPhaseCoeffs[tap] = { phase0, phase1, phase2, phase3 } (polyphase4x_
+    // transposed), so one fused multiply-add per tap accumulates all four branch
+    // sums across the 4 SIMD lanes; vmaxvq then reduces to the max over phases.
+    alignas(16) static const float kPhaseCoeffs[TAPS_PER_PHASE][4] = {
+        {  0.0017089843750f, -0.0291748046875f, -0.0189208984375f, -0.0083007812500f },
+        {  0.0109863281250f,  0.0292968750000f,  0.0330810546875f,  0.0148925781250f },
+        { -0.0196533203125f, -0.0517578125000f, -0.0582275390625f, -0.0266113281250f },
+        {  0.0332031250000f,  0.0891113281250f,  0.1015625000000f,  0.0476074218750f },
+        { -0.0594482421875f, -0.1665039062500f, -0.2003173828125f, -0.1022949218750f },
+        {  0.1373291015625f,  0.4650878906250f,  0.7797851562500f,  0.9721679687500f },
+        {  0.9721679687500f,  0.7797851562500f,  0.4650878906250f,  0.1373291015625f },
+        { -0.1022949218750f, -0.2003173828125f, -0.1665039062500f, -0.0594482421875f },
+        {  0.0476074218750f,  0.1015625000000f,  0.0891113281250f,  0.0332031250000f },
+        { -0.0266113281250f, -0.0582275390625f, -0.0517578125000f, -0.0196533203125f },
+        {  0.0148925781250f,  0.0330810546875f,  0.0292968750000f,  0.0109863281250f },
+        { -0.0083007812500f, -0.0189208984375f, -0.0291748046875f,  0.0017089843750f }
+    };
+    float32x4_t vAcc = vdupq_n_f32(0.0f);
+    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+        float32x4_t vC = vld1q_f32(kPhaseCoeffs[t]);
+        vAcc = vfmaq_n_f32(vAcc, vC, history[t]);
+    }
+    float32x4_t vAbs = vabsq_f32(vAcc);
+    peak = std::max(peak, vmaxvq_f32(vAbs));
+#elif defined(PULSR_HAS_SSE)
+    alignas(16) static const float kPhaseCoeffs[TAPS_PER_PHASE][4] = {
+        {  0.0017089843750f, -0.0291748046875f, -0.0189208984375f, -0.0083007812500f },
+        {  0.0109863281250f,  0.0292968750000f,  0.0330810546875f,  0.0148925781250f },
+        { -0.0196533203125f, -0.0517578125000f, -0.0582275390625f, -0.0266113281250f },
+        {  0.0332031250000f,  0.0891113281250f,  0.1015625000000f,  0.0476074218750f },
+        { -0.0594482421875f, -0.1665039062500f, -0.2003173828125f, -0.1022949218750f },
+        {  0.1373291015625f,  0.4650878906250f,  0.7797851562500f,  0.9721679687500f },
+        {  0.9721679687500f,  0.7797851562500f,  0.4650878906250f,  0.1373291015625f },
+        { -0.1022949218750f, -0.2003173828125f, -0.1665039062500f, -0.0594482421875f },
+        {  0.0476074218750f,  0.1015625000000f,  0.0891113281250f,  0.0332031250000f },
+        { -0.0266113281250f, -0.0582275390625f, -0.0517578125000f, -0.0196533203125f },
+        {  0.0148925781250f,  0.0330810546875f,  0.0292968750000f,  0.0109863281250f },
+        { -0.0083007812500f, -0.0189208984375f, -0.0291748046875f,  0.0017089843750f }
+    };
+    __m128 vAcc = _mm_setzero_ps();
+    for (int t = 0; t < TAPS_PER_PHASE; ++t) {
+        __m128 vC = _mm_load_ps(kPhaseCoeffs[t]);
+        __m128 vH = _mm_set1_ps(history[t]);
+        vAcc = _mm_add_ps(vAcc, _mm_mul_ps(vH, vC));
+    }
+    __m128 vAbs = _mm_and_ps(vAcc, _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff)));
+    alignas(16) float sub[4];
+    _mm_store_ps(sub, vAbs);
+    peak = std::max(peak, std::max(std::max(sub[0], sub[1]), std::max(sub[2], sub[3])));
+#else
+    for (int phase = 0; phase < INTERP_PHASES; ++phase) {
+        float subSample = 0.0f;
+        for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+            subSample += history[tap] * polyphase4x_[phase][tap];
+        }
+        peak = std::max(peak, std::abs(subSample));
+    }
+#endif
 
     return peak;
 }

@@ -1,10 +1,12 @@
 // android/app/src/main/cpp/eq_jni_bridge.cpp
 #include <jni.h>
 #include <android/log.h>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <mutex>
 #include <shared_mutex>
+#include <thread>
 #include <vector>
 #include "AudioDspEngine.h"
 #include "UsbAudioSink.h"
@@ -15,9 +17,24 @@
 
 namespace {
 // Serialises engine teardown against in-flight calls that use the raw jlong
-// handle (which bypasses the registry). Shared for the hot process/reset paths,
-// unique for destroy, so `delete engine` can never race an active render.
+// handle (which bypasses the registry). Shared for the non-RT control paths
+// (nativeResetEngine / nativeResyncForTrack), unique for destroy.
 std::shared_mutex gEngineLifecycleMutex;
+
+// M-6 lock-free render/teardown handshake. The per-block render path
+// (nativeProcessDirectFloatBuffer) must NOT take gEngineLifecycleMutex: a
+// shared_mutex read-lock can still block and invert priority against the writer
+// in nativeDestroyEngine on the RT render thread. Instead the render path bumps
+// gRenderInFlight (a lock-free atomic RMW) around its engine use and checks
+// gEngineTeardown; nativeDestroyEngine sets gEngineTeardown then waits for
+// gRenderInFlight to drain to zero before `delete engine`. All four ops are
+// seq_cst so the arrive-then-check / set-then-wait pair forms a Dekker-style
+// StoreLoad handshake: destroy can never both observe zero in-flight renders AND
+// let a render proceed to touch the engine. The flag is process-global (one
+// destroy briefly gates all engines' renders), matching the old unique_lock,
+// which also excluded every shared-lock render regardless of engine.
+std::atomic<int> gRenderInFlight{0};
+std::atomic<bool> gEngineTeardown{false};
 
 // FIX M-4: Validate an arbitrary jint against the FilterType enum range
 // (0..7 == Peaking..AllPass, see DspParams.h) before casting. An out-of-range
@@ -1096,13 +1113,34 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
     if (engineHandle == 0) return;
     try {
-        // Unique lock: wait for any in-flight processInterleaved() on this
-        // handle (which holds the shared lock) before destroying the engine.
+        // Control-side teardown with two independent exclusions, because the
+        // render path no longer shares this mutex (see
+        // nativeProcessDirectFloatBuffer):
+        //   1) unique_lock still excludes the NON-RT shared-lock holders
+        //      (nativeResetEngine / nativeResyncForTrack), so they cannot run
+        //      against `delete engine`.
+        //   2) The gEngineTeardown + gRenderInFlight handshake excludes in-flight
+        //      renders. We publish teardown (seq_cst) THEN wait for the in-flight
+        //      render count to reach zero. A render bumps its +1 (seq_cst) BEFORE
+        //      reading gEngineTeardown, so this StoreLoad pair guarantees we
+        //      cannot both see zero renders here AND let a render proceed to
+        //      touch the engine there: a render that slipped past the flag is
+        //      already counted and we wait for it; a render arriving later sees
+        //      the flag and bails. Hence `delete engine` never races a render.
         std::unique_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
+        gEngineTeardown.store(true, std::memory_order_seq_cst);
+        while (gRenderInFlight.load(std::memory_order_seq_cst) != 0) {
+            std::this_thread::yield();
+        }
         auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
         DspEngineRegistry::instance().unregisterEngine(engine);
         delete engine;
-    } catch (...) {}
+        gEngineTeardown.store(false, std::memory_order_seq_cst);
+    } catch (...) {
+        // Re-open the render gate even if teardown threw, so a failed destroy
+        // cannot wedge every subsequent render into the reject path forever.
+        gEngineTeardown.store(false, std::memory_order_seq_cst);
+    }
 }
 
 JNIEXPORT void JNICALL
@@ -1120,14 +1158,11 @@ JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
         JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
-    // FIX M-2: Reject the engineHandle==0 render fallback. Rendering through the
-    // process-wide singleton here is a use-after-free hazard: the singleton's
-    // retireQueue_ is drained concurrently by updateParams()/publishParams()
-    // (under publishMutex_) AND by DspEngineRegistry::drainRetireQueues() (under
-    // the registry mutex_) — two different locks — which is only benign while the
-    // singleton never renders (processInterleaved both drains and enqueues to
-    // that same queue). The singleton is a control engine, not a render target,
-    // so a null handle is a caller error: no-op instead of rendering.
+    // FIX M-2: Reject the engineHandle==0 render fallback. The process-wide
+    // singleton is the control/broadcast engine, not a render target: it never
+    // runs processInterleaved, so it never sets a render-thread hazard and its
+    // retired snapshots are reclaimed eagerly. Rendering through it here would
+    // violate that invariant, so a null handle is a caller error: no-op.
     if (engineHandle == 0) return 0;
     // A negative or unaligned offset would let `requiredBytes` under-count and
     // address memory before the mapped region; reject it like the AAudio path.
@@ -1140,16 +1175,26 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
     if (capacity < 0 || requiredBytes > capacity) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
-    // TODO (M-6, DEFERRED — do not implement without the race/RT tests):
-    //   This per-block std::shared_lock on gEngineLifecycleMutex is taken on the
-    //   audio render thread. A shared_mutex read lock can still block (and invert
-    //   priority against the writer in nativeDestroyEngine), so it is not strictly
-    //   RT-safe. The intended fix pairs the raw-atomic snapshot swap described at
-    //   AtomicSharedPtr in AudioDspEngine.h with lifetime handoff via the existing
-    //   retireQueue_ reclamation, removing this lock from the hot path entirely.
-    //   It MUST pass test_snapshot_race.cpp and test_rt_alloc.cpp before landing;
-    //   until then the lock stays and behavior is unchanged.
-    std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
+    // M-6: lock-free render/teardown handshake, replacing the per-block
+    // std::shared_lock<std::shared_mutex> that was taken here on the RT render
+    // thread. A shared_mutex read-lock can still block (and invert priority
+    // against nativeDestroyEngine's writer), so it was never RT-safe. Instead we
+    // publish our arrival in gRenderInFlight (a lock-free atomic RMW: no mutex,
+    // no priority inversion, no allocation) and then read gEngineTeardown. Both
+    // ops are seq_cst to form a StoreLoad (Dekker) handshake with destroy, which
+    // stores gEngineTeardown then loads gRenderInFlight: destroy can never both
+    // observe zero in-flight renders AND allow this render to touch the engine.
+    // Either we observe teardown and bail before using the engine, or destroy
+    // observes our count and waits for this block to finish before deleting.
+    gRenderInFlight.fetch_add(1, std::memory_order_seq_cst);
+    struct RenderGate {
+        ~RenderGate() { gRenderInFlight.fetch_sub(1, std::memory_order_seq_cst); }
+    } renderGate;
+    // A destroy is in progress: do not touch the engine. One silent block during
+    // the (rare) teardown window is preferable to blocking the RT thread.
+    if (gEngineTeardown.load(std::memory_order_seq_cst)) {
+        return 0;
+    }
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
     if (!engine) return 0;  // FIX M-2: never render through the control singleton
     try {

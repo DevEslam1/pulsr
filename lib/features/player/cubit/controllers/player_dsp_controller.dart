@@ -13,6 +13,7 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/comparison_slot.dart';
+import '../../../../data/audio/dsp_param_ranges.dart';
 import '../../../../data/audio/gain_staging_budget.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../data/audio/ir_file_parser.dart';
@@ -246,18 +247,25 @@ class PlayerDspController {
 
   Future<void> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
 
+  /// The engine-canonical EQ preamp (dB), read through the handler boundary
+  /// (which returns the equalizer manager's value) — the single source of truth,
+  /// kept in sync with native on every setPreamp, restore, snapshot recall and
+  /// session reattach. Exposed so the cubit's reconciliation and the UI read ONE
+  /// value instead of drifting.
+  double get preampDb => _audioHandler.preampDb;
+
   /// Routes preamp through the shared guard/emit/rollback helper so it obeys
   /// the bit-perfect gate, marks user interaction and surfaces native failures
   /// like every other DSP setter (previously it bypassed all of this and let
-  /// native exceptions escape into UI callers). Preamp has no dedicated
-  /// PlayerState field, so [updateDsp] is the identity — the helper is used
-  /// purely for guarding, error handling and clearing stale error messages.
-  /// Clamped defensively to the native ±15 dB range.
+  /// native exceptions escape into UI callers). Clamped defensively to the
+  /// central ±15 dB contract ([DspParamRanges.preampDb]) and mirrored into
+  /// PlayerState.dsp.preampDb so the reconciliation path and UI never drift from
+  /// the engine (PlayerCubit._syncAudioEffects reads it back from the handler).
   Future<void> setPreamp(double preampDb) {
-    final clamped = preampDb.clamp(-15.0, 15.0).toDouble();
+    final clamped = DspParamRanges.preampDb.clampRaw(preampDb);
     return applyDspEffect(
       featureName: 'Preamp',
-      updateDsp: (dsp) => dsp,
+      updateDsp: (dsp) => dsp.copyWith(preampDb: clamped),
       applyAudioHandler: () => _audioHandler.setPreamp(clamped),
     );
   }
