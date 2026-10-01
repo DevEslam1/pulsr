@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../../data/db/app_database.dart';
@@ -16,16 +16,9 @@ import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
-import '../../../../core/constants/app_radii.dart';
-import '../../../../core/responsive/pulsr_responsive_tokens.dart';
-import '../../../../core/responsive/breakpoints.dart';
-import '../../../../core/utils/adaptive.dart';
 
-/// Computed responsive metrics used by [PlayerThemeScaffold].
-///
-/// Renamed from the former `PlayerScaffoldMetrics` to avoid colliding with the
-/// canonical `PlayerScaffoldMetrics` in `player_theme_metrics.dart`.
-class PlayerScaffoldMetrics {
+/// Computed responsive metrics used across player themes.
+class PlayerThemeMetrics {
   final BoxConstraints constraints;
   final bool isTablet;
   final bool isLandscape;
@@ -38,15 +31,8 @@ class PlayerScaffoldMetrics {
   final double switcherBottomPad;
   final double pillBarWidth;
   final double pillBarHeight;
-  final double artworkSize;
-  final double controlSize;
-  final double seekBarHeight;
-  final double titleFontSize;
-  final bool isSplitMode;
-  final bool isCompactHeight;
-  final double contentPadding;
 
-  const PlayerScaffoldMetrics({
+  const PlayerThemeMetrics({
     required this.constraints,
     required this.isTablet,
     required this.isLandscape,
@@ -59,30 +45,18 @@ class PlayerScaffoldMetrics {
     required this.switcherBottomPad,
     required this.pillBarWidth,
     required this.pillBarHeight,
-    this.artworkSize = 240.0,
-    this.controlSize = 64.0,
-    this.seekBarHeight = 36.0,
-    this.titleFontSize = 20.0,
-    this.isSplitMode = false,
-    this.isCompactHeight = false,
-    this.contentPadding = 20.0,
   });
 
-  factory PlayerScaffoldMetrics.calculate(
+  factory PlayerThemeMetrics.calculate(
     BuildContext context,
     BoxConstraints constraints,
   ) {
-    final vp = PulsrViewport.of(context);
-    final isTablet = vp.isTablet;
-    final isSplitMode =
-        PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
-    final isLandscape = isSplitMode;
-    final isCompactHeight = constraints.maxHeight < 500.0 || vp.isShortHeight;
+    final isTablet = context.isTablet;
+    final isLandscape = context.isLandscape ||
+        (context.isTwoPane || constraints.maxWidth >= 600);
 
-    final double heightRatio = isCompactHeight
-        ? 0.85
-        : (isTablet ? 1.05 : (constraints.maxHeight / 700.0).clamp(0.8, 1.18));
-
+    final double heightRatio =
+        (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
     final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
     final double spacingSeekToControls = (isTablet ? 12.0 : 8.0) * heightRatio;
     final double spacingControlsToDock = (isTablet ? 12.0 : 8.0) * heightRatio;
@@ -94,30 +68,9 @@ class PlayerScaffoldMetrics {
       constraints.maxWidth - (isTablet ? 64 : 28),
       isTablet ? 440.0 : 336.0,
     );
-    final double pillBarHeight =
-        (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+    final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
-    final double controlSize = switch (vp.sizeClass) {
-      PulsrBreakpoint.compact => isCompactHeight ? 52.0 : 58.0,
-      PulsrBreakpoint.medium => 64.0,
-      PulsrBreakpoint.expanded => 68.0,
-      PulsrBreakpoint.large => 74.0,
-    };
-
-    final double seekBarHeight = isTablet ? 40.0 : 32.0;
-    final double titleFontSize = isTablet ? 24.0 : 20.0;
-    final double contentPadding = vp.pagePadding;
-
-    final double maxArt = isSplitMode
-        ? (isCompactHeight ? 260.0 : 380.0)
-        : (isTablet ? 560.0 : 420.0);
-    final double rawArt = isSplitMode
-        ? math.min(constraints.maxWidth * 0.45, constraints.maxHeight - 48.0)
-        : math.min(constraints.maxWidth - (contentPadding * 2),
-            constraints.maxHeight * 0.45);
-    final double artworkSize = rawArt.clamp(140.0, maxArt);
-
-    return PlayerScaffoldMetrics(
+    return PlayerThemeMetrics(
       constraints: constraints,
       isTablet: isTablet,
       isLandscape: isLandscape,
@@ -130,13 +83,6 @@ class PlayerScaffoldMetrics {
       switcherBottomPad: switcherBottomPad,
       pillBarWidth: pillBarWidth,
       pillBarHeight: pillBarHeight,
-      artworkSize: artworkSize,
-      controlSize: controlSize,
-      seekBarHeight: seekBarHeight,
-      titleFontSize: titleFontSize,
-      isSplitMode: isSplitMode,
-      isCompactHeight: isCompactHeight,
-      contentPadding: contentPadding,
     );
   }
 
@@ -182,7 +128,7 @@ class PlayerHeaderBar extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
           color: p.textPrimary,
-          tooltip: context.l10n.close,
+          tooltip: 'Close',
           onPressed: onBack ?? () => Navigator.of(context).maybePop(),
         ),
         Expanded(
@@ -219,7 +165,7 @@ class PlayerHeaderBar extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.more_vert_rounded, size: 22),
             color: p.textPrimary,
-            tooltip: context.l10n.moreOptions,
+            tooltip: 'Options',
             onPressed: () {
               if (song != null) {
                 SongInfoSheet.show(context, song: song);
@@ -246,17 +192,12 @@ class PlayerThemeScaffold extends StatelessWidget {
   final double switcherBorderAlpha;
   final PlayerDockIconStyle dockIconStyle;
   final bool showLyricsAndQueueOverlays;
-  final Widget Function(BuildContext context, PlayerScaffoldMetrics metrics) body;
-  final Widget Function(BuildContext context, PlayerScaffoldMetrics metrics)?
-      trackInfo;
-  final Widget Function(BuildContext context, PlayerScaffoldMetrics metrics)?
-      seekBar;
-  final Widget Function(BuildContext context, PlayerScaffoldMetrics metrics)?
-      controls;
-  final Widget Function(BuildContext context, PlayerScaffoldMetrics metrics)?
-      bottomDock;
-  final Widget Function(BuildContext context, PlayerScaffoldMetrics metrics)?
-      viewSwitcher;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics) body;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? trackInfo;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? seekBar;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? controls;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? bottomDock;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? viewSwitcher;
   final EdgeInsetsGeometry padding;
 
   const PlayerThemeScaffold({
@@ -295,14 +236,9 @@ class PlayerThemeScaffold extends StatelessWidget {
           if (background != null) Positioned.fill(child: background!),
           if (ambientGlow != null) Positioned.fill(child: ambientGlow!),
           SafeArea(
-            top: true,
-            bottom: false,
-            left: !context.isLandscape,
-            right: !context.isLandscape,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final metrics =
-                    PlayerScaffoldMetrics.calculate(context, constraints);
+                final metrics = PlayerThemeMetrics.calculate(context, constraints);
 
                 final resolvedSwitcher = viewSwitcher != null
                     ? viewSwitcher!(context, metrics)
@@ -385,18 +321,8 @@ class PlayerThemeScaffold extends StatelessWidget {
                       );
 
                 if (metrics.isLandscape) {
-                  final insets = MediaQuery.paddingOf(context);
-                  final horizontalPad =
-                      math.max(16.0, math.max(insets.left, insets.right));
-                  final effectivePadding = EdgeInsets.symmetric(
-                    horizontal: metrics.isTablet
-                        ? math.max(32.0, horizontalPad)
-                        : horizontalPad,
-                    vertical: metrics.isCompactHeight ? 4.0 : 8.0,
-                  );
-
                   return Padding(
-                    padding: effectivePadding,
+                    padding: padding,
                     child: Row(
                       children: [
                         Expanded(
@@ -407,13 +333,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                               SizedBox(height: metrics.switcherTopPad),
                               resolvedSwitcher,
                               SizedBox(height: metrics.switcherBottomPad),
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r24),
-                                  child: resolvedCenter,
-                                ),
-                              ),
+                              Expanded(child: resolvedCenter),
                             ],
                           ),
                         ),
@@ -426,15 +346,12 @@ class PlayerThemeScaffold extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  if (trackInfo != null)
-                                    trackInfo!(context, metrics),
+                                  if (trackInfo != null) trackInfo!(context, metrics),
                                   SizedBox(height: metrics.spacingTrackToSeek),
                                   resolvedSeekBar,
-                                  SizedBox(
-                                      height: metrics.spacingSeekToControls),
+                                  SizedBox(height: metrics.spacingSeekToControls),
                                   resolvedControls,
-                                  SizedBox(
-                                      height: metrics.spacingControlsToDock),
+                                  SizedBox(height: metrics.spacingControlsToDock),
                                   resolvedDock,
                                   SizedBox(height: metrics.spacingBelowDock),
                                 ],

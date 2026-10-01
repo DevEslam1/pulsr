@@ -80,7 +80,12 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
 
     return BlocConsumer<PlayerCubit, PlayerState>(
       listenWhen: (prev, curr) => prev.currentIndex != curr.currentIndex,
-      listener: (context, state) => _scrollToActiveIndex(state.currentIndex),
+      listener: (context, state) {
+        // Mi-5: Reset GlobalKey so ensureVisible binds to the new tile element,
+        // not a stale reference left over from the previous track.
+        _activeTileKey = GlobalKey();
+        _scrollToActiveIndex(state.currentIndex);
+      },
       buildWhen: (prev, curr) =>
           prev.queue != curr.queue ||
           prev.currentIndex != curr.currentIndex ||
@@ -208,7 +213,12 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                             bottom: AppSpacing.lg, top: AppSpacing.xxs),
                         itemCount: queue.length,
                         onReorderItem: (oldIndex, newIndex) {
-                          cubit.reorderQueue(oldIndex, newIndex);
+                          // Flutter's ReorderableListView passes newIndex +1
+                          // when an item is dragged downward. Correct it before
+                          // calling the cubit so songs land in the right slot.
+                          final adjustedNew =
+                              (oldIndex < newIndex) ? newIndex - 1 : newIndex;
+                          cubit.reorderQueue(oldIndex, adjustedNew);
                         },
                         itemBuilder: (context, index) {
                           final song = queue[index];

@@ -68,25 +68,32 @@ class PlayerTransportController {
   }
 
   Future<void> pause() async {
+    final prevState = _getState();
     try {
       _onUserPausedIntentionally?.call(true);
-      final s = _getState();
-      _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: false)));
+      _emit(prevState.copyWith(playback: prevState.playback.copyWith(isPlaying: false)));
       await _audioHandler.pause();
     } catch (e, st) {
       ErrorLogger.log('Pause failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
+        // C-2: Roll back optimistic isPlaying=false to the pre-pause value.
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to pause playback')));
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(
+            isPlaying: prevState.isPlaying,
+            errorMessage: 'Failed to pause playback',
+          ),
+        ));
       }
     }
   }
 
   Future<void> togglePlayPause() async {
     HapticFeedback.lightImpact();
+    final prevState = _getState();
     try {
-      final state = _getState();
+      final state = prevState;
       final enginePlaying = _audioHandler.playbackState.value.playing;
       final shouldPause = state.isPlaying || enginePlaying;
 
@@ -107,8 +114,14 @@ class PlayerTransportController {
       ErrorLogger.log('Toggle play/pause failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
+        // C-2: Roll back the optimistic isPlaying change to the pre-toggle value.
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Playback action failed')));
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(
+            isPlaying: prevState.isPlaying,
+            errorMessage: 'Playback action failed',
+          ),
+        ));
       }
     }
   }
@@ -116,6 +129,7 @@ class PlayerTransportController {
   Future<void> seek(Duration position) {
     if (_isClosed()) return Future.value();
     final state = _getState();
+    final prevPosition = state.position; // C-2: snapshot for rollback
     var target = position.isNegative ? Duration.zero : position;
     if (state.duration > Duration.zero && target > state.duration) {
       target = state.duration;
@@ -144,9 +158,14 @@ class PlayerTransportController {
               ErrorLogger.log('Coalesced seek failed',
                   error: e, stackTrace: st, category: 'PlayerTransportController');
               if (!_isClosed()) {
+                // C-2: Restore position so seek bar snaps back to where it was.
                 final s = _getState();
                 _emit(s.copyWith(
-                    playback: s.playback.copyWith(errorMessage: 'Seek failed, position restored')));
+                  playback: s.playback.copyWith(
+                    position: prevPosition,
+                    errorMessage: 'Seek failed, position restored',
+                  ),
+                ));
               }
             });
           }
@@ -160,8 +179,14 @@ class PlayerTransportController {
       ErrorLogger.log('Discrete seek failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
+        // C-2: Restore position so seek bar snaps back to where it was.
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Seek failed, position restored')));
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(
+            position: prevPosition,
+            errorMessage: 'Seek failed, position restored',
+          ),
+        ));
       }
     });
   }

@@ -28,6 +28,8 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
   Future<void> setBassBoost(double amount) =>
       dspController.setBassBoost(amount);
 
+  Future<void> setPreamp(double preampDb) => dspController.setPreamp(preampDb);
+
   Future<void> setBandMode(int count) => dspController.setBandMode(count);
 
   Future<void> switchComparisonSlot(ComparisonSlot slot) =>

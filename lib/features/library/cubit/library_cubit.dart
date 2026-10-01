@@ -622,14 +622,22 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   /// Batch imports YouTube Music playlist tracks as Favorites.
+  /// M-3: Returns -1 on repository failure (distinguishable from a genuine
+  /// 0 tracks imported) so callers can surface the error to the UI.
   Future<int> importYtmTracksAsFavorites(List<YtmTrack> tracks) async {
     final repo = _musicRepository ??
         (getIt.isRegistered<IMusicRepository>()
             ? getIt<IMusicRepository>()
             : null);
-    if (repo == null) return 0;
+    if (repo == null) return -1;
     final result = await repo.importOnlineTracksAsFavorites(tracks);
-    return result.fold((failure) => 0, (count) => count);
+    return result.fold((failure) {
+      ErrorLogger.log(
+        'importYtmTracksAsFavorites failed: ${failure.message}',
+        category: 'LibraryCubit',
+      );
+      return -1;
+    }, (count) => count);
   }
 
   /// Synchronizes private Liked Music from the authenticated YouTube Music web account.
@@ -643,7 +651,13 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       }
       final tracks = await accountService.fetchLikedSongs();
       final count = await importYtmTracksAsFavorites(tracks);
-      return count;
+      // M-3: -1 means the repository threw — surface the failure.
+      if (count < 0 && !isClosed) {
+        safeEmit(state.copyWith(
+            errorMessage: 'Failed to import YouTube Music liked songs'));
+        return 0;
+      }
+      return count < 0 ? 0 : count;
     } catch (e, st) {
       ErrorLogger.log('Failed to sync YTM account likes',
           error: e, stackTrace: st, category: 'LibraryCubit');

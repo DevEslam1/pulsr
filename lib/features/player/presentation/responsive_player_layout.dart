@@ -1,6 +1,7 @@
 // lib/features/player/presentation/responsive_player_layout.dart
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
@@ -49,6 +50,22 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // M-1: Sync manual tab swipes back to PlayerCubit so isLyricsVisible /
+    // isQueueVisible always reflects the tab that is actually on screen.
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (_tabController.indexIsChanging) return;
+    final cubit = context.read<PlayerCubit>();
+    switch (_tabController.index) {
+      case 0:
+        if (!widget.state.isLyricsVisible) cubit.toggleLyricsVisibility();
+      case 1:
+        if (!widget.state.isQueueVisible) cubit.toggleQueueVisibility();
+      default:
+        break;
+    }
   }
 
   @override
@@ -196,7 +213,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             top: -40,
             start: -30,
             width: width * 0.52,
-            height: 540,
+            height: mediaQuery.size.height * 0.75, // Mi-1: relative, not hardcoded 540
             child: IgnorePointer(
               child: AnimatedContainer(
                 duration: context.motionMs(500),
@@ -221,7 +238,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             top: 40,
             end: -30,
             width: width * 0.50,
-            height: 480,
+            height: mediaQuery.size.height * 0.65, // Mi-1: relative, not hardcoded 480
             child: IgnorePointer(
               child: AnimatedContainer(
                 duration: context.motionMs(500),

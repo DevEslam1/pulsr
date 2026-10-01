@@ -238,6 +238,10 @@ class PlayerDspController {
 
   Future<void> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
 
+  Future<void> setPreamp(double preampDb) async {
+    await _audioHandler.setPreamp(preampDb);
+  }
+
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
       {bool isPerSongRestore = false}) async {
     if (profile != null && !guardDsp('AutoEQ', showError: true)) return;

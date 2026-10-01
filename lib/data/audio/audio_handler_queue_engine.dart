@@ -569,6 +569,18 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         !_gaplessLoaded &&
         _userPlaybackInitiated &&
         _gaplessTargetIndex != null) {
+      final tEarly = DateTime.now().toIso8601String();
+      ErrorLogger.addBreadcrumb(
+        '[$tEarly] _broadcastState: early-return (gapless loading target=$_gaplessTargetIndex)',
+        category: 'AudioHandler',
+        data: {
+          'ts': tEarly,
+          'gaplessMode': _gaplessMode,
+          'gaplessLoaded': _gaplessLoaded,
+          'userPlaybackInitiated': _userPlaybackInitiated,
+          'gaplessTargetIndex': _gaplessTargetIndex,
+        },
+      );
       return;
     }
 
@@ -623,6 +635,18 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
           ProcessingState.completed: AudioProcessingState.completed,
         }[_activePlayer.processingState] ??
         AudioProcessingState.ready;
+
+    final tEmit = DateTime.now().toIso8601String();
+    ErrorLogger.addBreadcrumb(
+      '[$tEmit] _broadcastState: emit playing=$isPlaying controls=${controls.map((c) => c.label).toList()}',
+      category: 'AudioHandler',
+      data: {
+        'ts': tEmit,
+        'playing': isPlaying,
+        'controls': controls.map((c) => c.label).toList(),
+        'processingState': processingState.name,
+      },
+    );
 
     playbackState.add(
       playbackState.value.copyWith(

@@ -15,7 +15,6 @@ import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 import 'themes/player_theme.dart';
 import 'themes/theme_registry.dart';
-import 'responsive_player_layout.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -182,7 +181,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: context.isLandscape
-                        ? double.infinity
+                        ? (context.isTablet ? 1160.0 : 960.0)
                         : (context.isTablet ? 780.0 : 560.0),
                   ),
                   child: Stack(
@@ -197,13 +196,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             FadeTransition(opacity: animation, child: child),
                         child: KeyedSubtree(
                           key: ValueKey(settingsConfig.playerThemeMode),
-                          child: ResponsivePlayerLayout(
-                            state: state,
-                            cubit: cubit,
-                            themeWidget: themeWidget,
-                            activeColor: activeColor,
-                            bgColor: bgColor,
-                          ),
+                          child: themeWidget,
                         ),
                       ),
                       const _NowPlayingGestureHintOverlay(),

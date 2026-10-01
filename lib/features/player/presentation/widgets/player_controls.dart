@@ -9,7 +9,6 @@ import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 class PlayerControls extends StatelessWidget {
   final bool isPlaying;
@@ -51,7 +50,7 @@ class PlayerControls extends StatelessWidget {
     final p = context.palette;
     final l10n = context.l10n;
     final onPrimaryColor = primaryColor.computeLuminance() > 0.5
-        ? AppColors.onBright
+        ? const Color(0xFF101223)
         : Colors.white;
 
     final shuffleLabel = isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
@@ -61,16 +60,18 @@ class PlayerControls extends StatelessWidget {
             ? l10n.repeatAll
             : l10n.repeatOff;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
             // Shuffle Button with active indicator
             Semantics(
               label: shuffleLabel,
@@ -128,75 +129,58 @@ class PlayerControls extends StatelessWidget {
                   HapticFeedback.mediumImpact();
                   onPlayPause();
                 },
-                // BUG-26: the A/B ring lives in its own overlay layer so it
-                // never conflicts with the gradient fill of the button.
-                child: SizedBox(
+                child: AnimatedContainer(
+                  duration: context.motionMs(200),
                   width: mainButtonSize,
                   height: mainButtonSize,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AnimatedContainer(
-                        duration: context.motionMs(200),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color.lerp(primaryColor, Colors.white, 0.18) ??
-                                  primaryColor,
-                              primaryColor,
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primaryColor.withValues(
-                                  alpha: isPlaying ? 0.45 : 0.25),
-                              blurRadius: isPlaying ? 24 : 16,
-                              spreadRadius: isPlaying ? 2 : 0,
-                              offset: const Offset(0, 6),
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: AnimatedSwitcher(
-                            duration: context.motionMs(180),
-                            transitionBuilder: (child, anim) => ScaleTransition(
-                              scale: anim,
-                              child: child,
-                            ),
-                            child: Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              key: ValueKey(isPlaying),
-                              color: onPrimaryColor,
-                              size: mainButtonSize * 0.52,
-                            ),
-                          ),
-                        ),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color.lerp(primaryColor, Colors.white, 0.18) ??
+                            primaryColor,
+                        primaryColor,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(
+                            alpha: isPlaying ? 0.45 : 0.25),
+                        blurRadius: isPlaying ? 24 : 16,
+                        spreadRadius: isPlaying ? 2 : 0,
+                        offset: const Offset(0, 6),
                       ),
-                      IgnorePointer(
-                        child: AnimatedContainer(
-                          duration: context.motionMs(200),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: abLoopActive
-                                  ? p.accent
-                                  : Colors.white.withValues(alpha: 0.25),
-                              width: abLoopActive ? 2.2 : 1.2,
-                            ),
-                          ),
-                        ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
                     ],
+                    border: Border.all(
+                      color: abLoopActive
+                          ? p.accent
+                          : Colors.white.withValues(alpha: 0.25),
+                      width: abLoopActive ? 2.2 : 1.2,
+                    ),
+                  ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: context.motionMs(180),
+                      transitionBuilder: (child, anim) => ScaleTransition(
+                        scale: anim,
+                        child: child,
+                      ),
+                      child: Icon(
+                        isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        key: ValueKey(isPlaying),
+                        color: onPrimaryColor,
+                        size: mainButtonSize * 0.52,
+                      ),
+                    ),
                   ),
                 ).animate(target: isPlaying ? 1 : 0).scale(
                       duration: context.motionMs(140),
@@ -279,7 +263,8 @@ class PlayerControls extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 
@@ -312,51 +297,47 @@ class _ControlButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppRadii.r20),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedContainer(
-                    duration: context.motionMs(200),
-                    padding: const EdgeInsets.all(AppSpacing.s6),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isActive
-                          ? activeColor.withValues(alpha: 0.15)
-                          : Colors.transparent,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: isActive ? activeColor : inactiveColor,
-                      size: iconSize,
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: context.motionMs(200),
+                  padding: const EdgeInsets.all(AppSpacing.s6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isActive
+                        ? activeColor.withValues(alpha: 0.15)
+                        : Colors.transparent,
                   ),
-                  const SizedBox(height: AppSpacing.s2),
-                  AnimatedContainer(
-                    duration: context.motionMs(200),
-                    width: isActive ? 4 : 0,
-                    height: isActive ? 4 : 0,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: activeColor,
-                      boxShadow: isActive
-                          ? [
-                              BoxShadow(
-                                color: activeColor.withValues(alpha: 0.6),
-                                blurRadius: 4,
-                                spreadRadius: 0.5,
-                              )
-                            ]
-                          : null,
-                    ),
+                  child: Icon(
+                    icon,
+                    color: isActive ? activeColor : inactiveColor,
+                    size: iconSize,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: AppSpacing.s2),
+                AnimatedContainer(
+                  duration: context.motionMs(200),
+                  width: isActive ? 4 : 0,
+                  height: isActive ? 4 : 0,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: activeColor,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.6),
+                              blurRadius: 4,
+                              spreadRadius: 0.5,
+                            )
+                          ]
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

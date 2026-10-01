@@ -89,7 +89,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       crossfadeSec = context.select<SettingsCubit, double>(
         (c) => c.state.crossfadeSeconds,
       );
-    } catch (_) {
+    } on ProviderNotFoundException {
+      // M-2: Only catch missing-provider failures, not all exceptions.
       final fallback = getIt.isRegistered<SettingsCubit>() ? getIt<SettingsCubit>() : null;
       crossfadeSec = fallback?.state.crossfadeSeconds ?? 0.0;
     }
@@ -237,7 +238,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     bool isPlaying = false;
     try {
       isPlaying = context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
-    } catch (_) {
+    } on ProviderNotFoundException {
+      // M-2: Only catch missing-provider failures, not all exceptions.
       final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       isPlaying = fallback?.state.isPlaying ?? false;
     }
@@ -399,7 +401,8 @@ class _PlayerPositionScope extends StatelessWidget {
     Duration position;
     try {
       position = context.select<PlayerCubit, Duration>((c) => c.state.position);
-    } catch (_) {
+    } on ProviderNotFoundException {
+      // M-2: Only catch missing-provider failures, not all exceptions.
       final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       position = fallback?.state.position ?? Duration.zero;
     }

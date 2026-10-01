@@ -1,5 +1,4 @@
 // lib/features/player/presentation/themes/circle_player_theme.dart
-
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,9 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/adaptive.dart';
-import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -28,7 +25,6 @@ import '../widgets/advanced_playback_bar.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import 'player_theme.dart';
-import 'player_theme_metrics.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -96,15 +92,16 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
     final activeColor = widget.props.activeColor;
     final bgColor = widget.props.bgColor;
     final song = state.currentSong;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
-        SettingsCubit,
-        ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-        })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-        ));
+    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) =
+        context.select<
+            SettingsCubit,
+            ({
+              NowPlayingDoubleTapAction nowPlayingDoubleTap,
+              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+            })>((c) => (
+              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+            ));
     final isTablet = context.isTablet;
 
     final bool hasDownload = song != null &&
@@ -127,29 +124,29 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final isLandscape =
-                PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
+            final isLandscape = context.isLandscape ||
+                (context.isTwoPane || constraints.maxWidth >= 600);
 
-            final m = PlayerThemeMetrics.of(
-              isTablet: isTablet,
-              isLandscape: isLandscape,
-              constraints: constraints,
-            );
-
-            final double heightRatio = m.heightRatio;
-            final double spacingTrackToSeek = m.spacingTrackToSeek;
-            final double spacingSeekToControls = m.spacingSeekToControls;
-            final double spacingControlsToDock = m.spacingControlsToDock;
-            final double spacingBelowDock = m.spacingBelowDock;
-            final double switcherTopPad = m.switcherTopPad;
-            final double switcherBottomPad = m.switcherBottomPad;
+            final double heightRatio =
+                (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
+            final double spacingTrackToSeek =
+                (isTablet ? 10.0 : 6.0) * heightRatio;
+            final double spacingSeekToControls =
+                (isTablet ? 12.0 : 8.0) * heightRatio;
+            final double spacingControlsToDock =
+                (isTablet ? 12.0 : 8.0) * heightRatio;
+            final double spacingBelowDock =
+                (isTablet ? 8.0 : 4.0) * heightRatio;
+            final double switcherTopPad =
+                (isTablet ? 4.0 : 2.0) * heightRatio;
+            final double switcherBottomPad =
+                (isTablet ? 6.0 : 3.0) * heightRatio;
 
             final double pillBarWidth = math.min(
               constraints.maxWidth - (isTablet ? 64 : 28),
               isTablet ? 440.0 : 336.0,
             );
-            final double pillBarHeight =
-                (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+            final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
             final viewSwitcher = PlayerViewSwitcher(
               state: state,
@@ -216,9 +213,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                               turns: _rotationController,
                               child: LayoutBuilder(
                                 builder: (context, vinylConstraints) {
-                                  final maxDimension = isLandscape
-                                      ? 300.0
-                                      : (isTablet ? 540.0 : 420.0);
+                                  final maxDimension =
+                                      isLandscape ? 300.0 : (isTablet ? 540.0 : 420.0);
                                   final vinylSize = math.min(
                                     math.min(vinylConstraints.maxWidth,
                                             vinylConstraints.maxHeight) *
@@ -230,16 +226,14 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     height: vinylSize,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: PlayerMaterialColors.vinylBlack,
+                                      color: const Color(0xFF121212),
                                       border: Border.all(
-                                        color:
-                                            p.hairline.withValues(alpha: 0.6),
+                                        color: p.hairline.withValues(alpha: 0.6),
                                         width: 3,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: activeColor.withValues(
-                                              alpha: 0.35),
+                                          color: activeColor.withValues(alpha: 0.35),
                                           blurRadius: 36,
                                           spreadRadius: 4,
                                         ),
@@ -248,48 +242,39 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     child: Stack(
                                       alignment: Alignment.center,
                                       children: [
-// Outer vinyl grooves
-
+                                        // Outer vinyl grooves
                                         CustomPaint(
                                           size: Size(vinylSize, vinylSize),
                                           painter: _VinylGroovesPainter(),
                                         ),
-
-// Center circular artwork
-
-                                        Hero(
-                                          tag: 'now_playing_art_circle',
-                                          child: Container(
-                                            width: vinylSize * 0.58,
-                                            height: vinylSize * 0.58,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: Colors.white24,
-                                                width: 2,
-                                              ),
+                                        // Center circular artwork
+                                        Container(
+                                          width: vinylSize * 0.58,
+                                          height: vinylSize * 0.58,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white24,
+                                              width: 2,
                                             ),
-                                            clipBehavior: Clip.antiAlias,
-                                            child: song != null
-                                                ? CachedArtwork(
-                                                    id: song.id,
-                                                    remoteUrl:
-                                                        song.remoteArtworkUrl,
-                                                    type: ArtworkType.AUDIO,
-                                                    size: vinylSize * 0.58,
-                                                    borderRadius: 999,
-                                                    highQuality: true,
-                                                  )
-                                                : Icon(
-                                                    Icons.album_rounded,
-                                                    size: vinylSize * 0.25,
-                                                    color: Colors.white54,
-                                                  ),
                                           ),
+                                          clipBehavior: Clip.antiAlias,
+                                          child: song != null
+                                              ? CachedArtwork(
+                                                  id: song.id,
+                                                  remoteUrl: song.remoteArtworkUrl,
+                                                  type: ArtworkType.AUDIO,
+                                                  size: vinylSize * 0.58,
+                                                  borderRadius: 999,
+                                                  highQuality: true,
+                                                )
+                                              : Icon(
+                                                  Icons.album_rounded,
+                                                  size: vinylSize * 0.25,
+                                                  color: Colors.white54,
+                                                ),
                                         ),
-
-// Center Spindle Hole
-
+                                        // Center Spindle Hole
                                         Container(
                                           width: 24,
                                           height: 24,
@@ -315,10 +300,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             final controlsColumn = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-// Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
-
+                // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 16,
                     vertical: AppSpacing.s2,
                   ),
@@ -328,11 +313,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-// Left Action: Download (stream) or Add to Playlist (local)
-
+                          // Left Action: Download (stream) or Add to Playlist (local)
                           SizedBox(
-                            width: 48,
-                            height: 48,
+                            width: isTablet ? 48 : 44,
+                            height: isTablet ? 48 : 44,
                             child: hasDownload
                                 ? Center(
                                     child: YtmDownloadButton(
@@ -350,15 +334,13 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                       onTap: () {
                                         if (song != null) {
                                           HapticFeedback.lightImpact();
-                                          AddToPlaylistSheet.show(context,
-                                              song: song);
+                                          AddToPlaylistSheet.show(context, song: song);
                                         }
                                       },
                                       child: Center(
                                         child: Icon(
                                           Icons.playlist_add_rounded,
-                                          semanticLabel:
-                                              context.l10n.addToPlaylist,
+                                          semanticLabel: context.l10n.addToPlaylist,
                                           size: isTablet ? 24 : 22,
                                           color: p.textSecondary,
                                         ),
@@ -367,23 +349,18 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                   ),
                           ),
 
-// Center: Title & Artist (Symmetric & Centered)
-
+                          // Center: Title & Artist (Symmetric & Centered)
                           Expanded(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s10),
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   MarqueeText(
-                                    text: song?.title ??
-                                        context.l10n.noTrackSelected,
+                                    text: song?.title ?? context.l10n.noTrackSelected,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet
-                                          ? AppFontSize.headline
-                                          : AppFontSize.title,
+                                      fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
                                       fontWeight: FontWeight.w900,
                                       color: p.textPrimary,
                                       height: 1.22,
@@ -392,13 +369,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                   ),
                                   const SizedBox(height: AppSpacing.xxs),
                                   MarqueeText(
-                                    text: song?.artist ??
-                                        context.l10n.unknownArtist,
+                                    text: song?.artist ?? context.l10n.unknownArtist,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet
-                                          ? AppFontSize.callout
-                                          : AppFontSize.bodySmall,
+                                      fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
                                       fontWeight: FontWeight.w600,
                                       color: p.textSecondary,
                                     ),
@@ -408,10 +382,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                             ),
                           ),
 
-// Right Symmetrical Action: Animated Favorite Button
-
-                          SizedBox(
-                            width: AppSpacing.xxl,
+                          // Right Symmetrical Action: Animated Favorite Button
+                          SizedBox(width: AppSpacing.xxl,
                             height: 48,
                             child: Material(
                               color: Colors.white.withValues(alpha: 0.06),
@@ -436,8 +408,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                         ],
                       ),
 
-// Symmetrical Audio Quality Badge
-
+                      // Symmetrical Audio Quality Badge
                       if (song != null) ...[
                         const SizedBox(height: AppSpacing.s6),
                         Center(
@@ -455,8 +426,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                 SizedBox(height: spacingTrackToSeek),
 
-// Seek Bar
-
+                // Seek Bar
                 PlayerSeekBar(
                   duration: state.duration,
                   activeColor: activeColor,
@@ -469,8 +439,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                 SizedBox(height: spacingSeekToControls),
 
-// Playback Controls
+                // F1/F2/F11 advanced playback (AB loop, delay, bookmark)
+                const AdvancedPlaybackBar(),
 
+                // Playback Controls
                 PlayerControls(
                   isPlaying: state.isPlaying,
                   isShuffle: state.isShuffle,
@@ -478,9 +450,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   hasPrevious: state.hasPreviousNeighbour,
                   hasNext: state.hasNextNeighbour,
                   primaryColor: activeColor,
-                  mainButtonSize:
-                      (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) *
-                          heightRatio.clamp(0.85, 1.10),
+                  mainButtonSize: (isTablet ? 72.0 : (isLandscape ? 56.0 : 64.0)) * heightRatio.clamp(0.85, 1.10),
                   onPlayPause: () => cubit.togglePlayPause(),
                   onNext: () => cubit.next(),
                   onPrevious: () => cubit.previous(),
@@ -488,16 +458,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   onToggleRepeat: () => cubit.toggleRepeat(),
                 ),
 
-                if (!isLandscape || constraints.maxHeight >= 480) ...[
-// F1/F2/F11 advanced playback (AB loop, delay, bookmark)
-
-                  const AdvancedPlaybackBar(),
-                ],
-
                 SizedBox(height: spacingControlsToDock),
 
-// Floating Glass Bottom Action Dock (EQ bar)
-
+                // Floating Glass Bottom Action Dock (EQ bar)
                 bottomDock,
 
                 SizedBox(height: spacingBelowDock),
@@ -505,179 +468,33 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             );
 
             if (isLandscape) {
-              final bool isSplitContentMode =
-                  state.isLyricsVisible || state.isQueueVisible;
-
-              final Widget circleArtwork = Center(
-                key: const ValueKey('circle_artwork_view_landscape'),
-                child: RotationTransition(
-                  turns: _rotationController,
-                  child: Container(
-                    width: (constraints.maxHeight - 56)
-                        .clamp(160.0, isTablet ? 480.0 : 300.0),
-                    height: (constraints.maxHeight - 56)
-                        .clamp(160.0, isTablet ? 480.0 : 300.0),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: PlayerMaterialColors.vinylBlack,
-                      border: Border.all(
-                        color: p.hairline.withValues(alpha: 0.6),
-                        width: 3,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: activeColor.withValues(alpha: 0.35),
-                          blurRadius: 36,
-                          spreadRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CustomPaint(
-                          size: Size(
-                            (constraints.maxHeight - 56)
-                                .clamp(160.0, isTablet ? 480.0 : 300.0),
-                            (constraints.maxHeight - 56)
-                                .clamp(160.0, isTablet ? 480.0 : 300.0),
-                          ),
-                          painter: _VinylGroovesPainter(),
-                        ),
-                        ClipOval(
-                          child: SizedBox(
-                            width: (constraints.maxHeight - 56)
-                                    .clamp(160.0, isTablet ? 480.0 : 300.0) *
-                                0.52,
-                            height: (constraints.maxHeight - 56)
-                                    .clamp(160.0, isTablet ? 480.0 : 300.0) *
-                                0.52,
-                            child: song != null
-                                ? CachedArtwork(
-                                    id: song.id,
-                                    remoteUrl: song.remoteArtworkUrl,
-                                    type: ArtworkType.AUDIO,
-                                    size: double.infinity,
-                                    borderRadius: 0,
-                                    highQuality: true,
-                                  )
-                                : const SizedBox.shrink(),
-                          ),
-                        ),
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black,
-                            border: Border.all(color: Colors.white24, width: 2),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-
-              final Widget leftPaneContent = isSplitContentMode
-                  ? Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: m.paneMaxWidth,
-                        ),
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom:
-                                      isTablet ? AppSpacing.lg : AppSpacing.md,
-                                ),
-                                child: viewSwitcher,
-                              ),
-                              controlsColumn,
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                          child: viewSwitcher,
-                        ),
-                        Expanded(
-                          child: circleArtwork,
-                        ),
-                      ],
-                    );
-
               return Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTablet ? 32 : 16,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
                       flex: 5,
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: context.motionMs(260),
-                          child: KeyedSubtree(
-                            key: ValueKey(
-                                'left_pane_${isSplitContentMode ? "split" : "circle"}'),
-                            child: leftPaneContent,
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: switcherTopPad,
+                              bottom: switcherBottomPad,
+                            ),
+                            child: viewSwitcher,
                           ),
-                        ),
+                          Expanded(
+                            child: centerDisplay,
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(width: isTablet ? 32 : 16),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       flex: 6,
-                      child: SizedBox.expand(
-                        child: AnimatedSwitcher(
-                          duration: context.motionMs(260),
-                          layoutBuilder: (currentChild, previousChildren) {
-                            return Stack(
-                              fit: StackFit.expand,
-                              alignment: Alignment.center,
-                              children: <Widget>[
-                                // BUG-FIX: previous panes are fading out —
-                                // prevent them from stealing touch events.
-                                ...previousChildren.map(
-                                    (c) => IgnorePointer(child: c)),
-                                if (currentChild != null) currentChild,
-                              ],
-                            );
-                          },
-                          child: state.isLyricsVisible
-                              ? LyricsView(
-                                  key: ValueKey(
-                                      'lyrics_${song?.id}_${song?.remoteId}'),
-                                  lyrics: state.lyrics,
-                                  isLoading: state.isLoadingLyrics,
-                                  activeColor: activeColor,
-                                  source: state.lyricsSource,
-                                )
-                              : state.isQueueVisible
-                                  ? const NowPlayingQueueView(
-                                      key: ValueKey('queue_view_circle'),
-                                    )
-                                  : Center(
-                                      key:
-                                          const ValueKey('track_controls_pane'),
-                                      child: SingleChildScrollView(
-                                        child: controlsColumn,
-                                      ),
-                                    ),
-                        ),
+                      child: SingleChildScrollView(
+                        child: controlsColumn,
                       ),
                     ),
                   ],
@@ -687,11 +504,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
             return Column(
               children: [
-// Top Pull-down Handle Indicator
-
+                // Top Pull-down Handle Indicator
                 Padding(
-                  padding: const EdgeInsets.only(
-                      top: AppSpacing.xxs, bottom: AppSpacing.s2),
+                  padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
                   child: Center(
                     child: Container(
                       width: 38,
@@ -704,21 +519,20 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   ),
                 ),
 
-// Top App Bar - Symmetrical Left/Right Targets & Centered Header
-
+                // Top App Bar - Symmetrical Left/Right Targets & Centered Header
                 Padding(
                   padding: EdgeInsets.symmetric(
+
                     horizontal: isTablet ? 28 : 20,
                     vertical: AppSpacing.s2,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-// Dismiss Button
-
+                      // Dismiss Button
                       SizedBox(
-                        width: 48,
-                        height: 48,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -734,8 +548,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                             },
                             child: Center(
                               child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                semanticLabel: context.l10n.close,
+                                Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
                                 size: isTablet ? 26 : 24,
                                 color: p.textPrimary,
                               ),
@@ -744,12 +557,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                         ),
                       ),
 
-// Center: "PLAYING FROM" / Album Header
-
+                      // Center: "PLAYING FROM" / Album Header
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -796,9 +607,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     .titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      fontSize: isTablet
-                                          ? AppFontSize.body
-                                          : AppFontSize.bodySmall,
+                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
                                       color: p.textPrimary,
                                     ),
                               ),
@@ -807,11 +616,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                         ),
                       ),
 
-// More Options Button
-
+                      // More Options Button
                       SizedBox(
-                        width: 48,
-                        height: 48,
+                        width: isTablet ? 48 : 44,
+                        height: isTablet ? 48 : 44,
                         child: Material(
                           color: Colors.white.withValues(alpha: 0.07),
                           shape: const CircleBorder(),
@@ -825,8 +633,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                             },
                             child: Center(
                               child: Icon(
-                                Icons.more_horiz_rounded,
-                                semanticLabel: context.l10n.songInfo,
+                                Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
                                 size: isTablet ? 24 : 22,
                                 color: p.textPrimary,
                               ),
@@ -838,8 +645,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   ),
                 ),
 
-// Top View Switcher (lyrics bar: Track | Lyrics | Queue)
-
+                // Top View Switcher (lyrics bar: Track | Lyrics | Queue)
                 Padding(
                   padding: EdgeInsets.only(
                     top: switcherTopPad,
@@ -848,8 +654,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                   child: viewSwitcher,
                 ),
 
-// Center: Spinning Circle / Lyrics / Queue
-
+                // Center: Spinning Circle / Lyrics / Queue
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, artConstraints) {
@@ -860,20 +665,21 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       final double maxAllowed = isTablet ? 560.0 : 420.0;
                       final double rawSize =
                           math.min(availableWidth, availableHeight);
-                      final double circleArtSize =
-                          rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
+                      final double circleArtSize = rawSize <= 0
+                          ? 0.0
+                          : math.min(rawSize, maxAllowed);
 
                       return Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth:
-                                (state.isLyricsVisible || state.isQueueVisible)
-                                    ? (isTablet ? 560.0 : double.infinity)
-                                    : circleArtSize,
-                            maxHeight:
-                                (state.isLyricsVisible || state.isQueueVisible)
-                                    ? double.infinity
-                                    : circleArtSize,
+                            maxWidth: (state.isLyricsVisible ||
+                                    state.isQueueVisible)
+                                ? (isTablet ? 560.0 : double.infinity)
+                                : circleArtSize,
+                            maxHeight: (state.isLyricsVisible ||
+                                    state.isQueueVisible)
+                                ? double.infinity
+                                : circleArtSize,
                           ),
                           child: centerDisplay,
                         ),
@@ -884,8 +690,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                 const SizedBox(height: AppSpacing.xxs),
 
-// Bottom Controls Section
-
+                // Bottom Controls Section
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                   child: controlsColumn,
@@ -897,6 +702,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
       ),
     );
   }
+
 }
 
 class _VinylGroovesPainter extends CustomPainter {
@@ -920,7 +726,6 @@ class _VinylGroovesPainter extends CustomPainter {
 }
 
 // -----------------------------------------------------------------------------
-
 // Sub-widgets
-
 // -----------------------------------------------------------------------------
+

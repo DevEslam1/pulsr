@@ -25,29 +25,37 @@ import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 import '../../../core/utils/error_logger.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'widgets/tablet_player_bar.dart';
+
+enum MiniPlayerVariant { auto, compact, horizontal, tablet }
 
 class MiniPlayer extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback? onSwipeDown;
   final VoidCallback? onSwipeUp;
+  final VoidCallback? onLongPress;
 
   const MiniPlayer({
     super.key,
     required this.onTap,
     this.onSwipeDown,
     this.onSwipeUp,
+    this.onLongPress,
   });
 
   @override
-  State<MiniPlayer> createState() => _MiniPlayerState();
+  State<MiniPlayer> createState() => MiniPlayerState();
 }
 
-class _MiniPlayerState extends State<MiniPlayer> {
+class MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
   bool _controllerDisposed = false;
   int _lastKnownIndex = -1;
   final ValueNotifier<bool> _isInteracting = ValueNotifier<bool>(false);
+  @visibleForTesting
+  ValueNotifier<bool> get isInteractingNotifier => _isInteracting;
   bool _swipeInFlight = false;
   Timer? _verticalSwipeTimer;
   double _verticalDragDy = 0.0;
@@ -305,6 +313,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
               customSemanticsActions: customSemanticsActions,
               child: GestureDetector(
             behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            onLongPress: widget.onLongPress,
             onVerticalDragStart: (_) {
               if (_swipeInFlight) return;
               _verticalDragDy = 0.0;
@@ -1000,3 +1010,143 @@ class _MiniProgressWavePainter extends CustomPainter {
       old.inactiveColor != inactiveColor ||
       old.isPlaying != isPlaying;
 }
+
+/// Horizontal single-row mini player designed for landscape phones and medium breakpoint wide dock.
+/// Height: 48dp, [artwork 40dp] [title • artist] [play/pause] [next]
+class MiniPlayerHorizontal extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const MiniPlayerHorizontal({super.key, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final cubit = context.read<PlayerCubit>();
+    final activeAccent = p.accent;
+
+    return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.currentSong != curr.currentSong ||
+          prev.isPlaying != curr.isPlaying,
+      builder: (context, state) {
+        final song = state.currentSong;
+        if (song == null) return const SizedBox.shrink();
+
+        return Semantics(
+          label: '${song.title}, ${song.artist}',
+          button: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: SizedBox(
+              height: 48,
+              child: Row(
+                children: [
+                  const SizedBox(width: AppSpacing.xs),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    child: CachedArtwork(
+                      id: song.id,
+                      remoteUrl: song.remoteArtworkUrl,
+                      type: ArtworkType.AUDIO,
+                      size: 40,
+                      borderRadius: 8,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          song.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w700,
+                            color: p.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          song.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.tiny,
+                            fontWeight: FontWeight.w500,
+                            color: p.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: state.isPlaying
+                        ? context.l10n.pause
+                        : context.l10n.play,
+                    iconSize: 26,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      state.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: activeAccent,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      cubit.togglePlayPause();
+                    },
+                  ),
+                  IconButton(
+                    tooltip: context.l10n.next,
+                    iconSize: 24,
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      Icons.skip_next_rounded,
+                      color: p.textPrimary,
+                    ),
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      cubit.next();
+                    },
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Tablet-optimized player bar variant.
+class MiniPlayerTablet extends StatelessWidget {
+  final VoidCallback onTap;
+  final VoidCallback? onToggleSideInspector;
+  final bool isInspectorOpen;
+
+  const MiniPlayerTablet({
+    super.key,
+    required this.onTap,
+    this.onToggleSideInspector,
+    this.isInspectorOpen = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TabletPlayerBar(
+      onOpenNowPlaying: onTap,
+      onToggleSideInspector: onToggleSideInspector,
+      isInspectorOpen: isInspectorOpen,
+    );
+  }
+}
+
+/// Compact portrait mini player (alias for standard MiniPlayer in compact mode).
+typedef MiniPlayerCompact = MiniPlayer;
+

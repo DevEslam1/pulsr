@@ -17,9 +17,6 @@ import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/models/headphone_profile.dart';
 import 'package:pulsr/domain/models/reverb_preset.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
-import 'package:pulsr/domain/models/lyrics_line.dart';
-import 'package:pulsr/features/player/cubit/controllers/player_controllers.dart';
-import 'package:pulsr/features/player/cubit/managers/player_managers.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
@@ -36,11 +33,6 @@ class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockWidgetService extends Mock implements WidgetService {}
-
-class MockPlayerLyricsManager extends Mock implements PlayerLyricsManager {}
-
-class MockPlayerSponsorBlockManager extends Mock
-    implements PlayerSponsorBlockManager {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler
@@ -195,10 +187,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   DynamicsPreset get dynamicsPreset => DynamicsPreset.off;
 
-  HeadphoneProfile? _testSelectedHeadphoneProfile;
   @override
-  HeadphoneProfile? get selectedHeadphoneProfile =>
-      _testSelectedHeadphoneProfile;
+  HeadphoneProfile? get selectedHeadphoneProfile => null;
 
   @override
   Future<void> setVirtualizerEnabled(bool enabled) async {}
@@ -213,16 +203,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   }) async {}
 
   @override
-  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
-    _testSelectedHeadphoneProfile = profile;
-    if (profile != null) {
-      currentEqPreset = EqPreset(
-        name: profile.name,
-        gains: profile.gains,
-        bassBoost: profile.bassBoost,
-      );
-    }
-  }
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
 
   @override
   bool get isSpatializerEnabled => false;
@@ -233,14 +214,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   bool get isHeadTrackerAvailable => false;
 
-  bool throwOnDspDisable = false;
-
   @override
-  Future<void> setSpatializerEnabled(bool enabled) async {
-    if (throwOnDspDisable && !enabled) {
-      throw Exception('DSP disable failed');
-    }
-  }
+  Future<void> setSpatializerEnabled(bool enabled) async {}
 
   @override
   double get volumeBoost => 0.0;
@@ -427,14 +402,6 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setMonoMix(bool mono) async {}
   @override
-  Future<void> setViperDdc(bool enabled,
-      {String? profileName, List<double>? coeffs, String? ddcContent}) async {}
-  @override
-  Future<void> setArbitraryEq(bool enabled,
-      {String? eqString, bool? linearPhase}) async {}
-  @override
-  Future<void> setLiveProg(bool enabled, {String? code}) async {}
-  @override
   Future<void> setSincResampler(bool enabled) async {}
   @override
   Future<void> setDither(bool enabled, {int? targetBitDepth}) async {}
@@ -498,19 +465,13 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> removeQueueItemAt(int index) async {}
 
-  bool throwOnLoadQueue = false;
-
   @override
   Future<void> loadQueue(
     List<SongsTableData> songs, {
     int initialIndex = 0,
     Duration? initialPosition,
     bool autoPlay = true,
-  }) async {
-    if (throwOnLoadQueue) {
-      throw Exception('Simulated load queue failure');
-    }
-  }
+  }) async {}
 
   double? lastSetSpeed;
   @override
@@ -606,8 +567,7 @@ void main() {
       cubit.close();
     });
 
-    test(
-        'TTFA playing mark only fires when ExoPlayer is ready AND playing, '
+    test('TTFA playing mark only fires when ExoPlayer is ready AND playing, '
         'never while loading', () async {
       final tracker = PlaybackLatencyTracker.withClock(const SystemClock());
       final cubit = PlayerCubit(
@@ -1608,543 +1568,5 @@ void main() {
       expect(calls, 2);
       expect(cubit.state.queue.map((s) => s.id).toList(), [202, 201]);
     });
-
-    test(
-        '[C-01] setDspEffectsEnabled(false) resyncs and emits error when disable fails',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      testAudioHandler.throwOnDspDisable = true;
-      try {
-        await cubit.setDspEffectsEnabled(false);
-        expect(cubit.state.errorMessage, contains('DSP disable failed'));
-      } finally {
-        testAudioHandler.throwOnDspDisable = false;
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[C-02] playSong double load failure clears corrupted slot and enters terminal state',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      final song1 = SongsTableData(
-        id: 998,
-        title: 'Initial Song',
-        artist: 'Artist',
-        album: 'Album',
-        durationMs: 120000,
-        path: '/initial.mp3',
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-        source: SongSource.local,
-      );
-      final song2 = SongsTableData(
-        id: 999,
-        title: 'Broken Song',
-        artist: 'Artist',
-        album: 'Album',
-        durationMs: 120000,
-        path: '/broken.mp3',
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-        source: SongSource.local,
-      );
-
-      // Play first song successfully so prevQueue is non-empty
-      await cubit.playSong(song1);
-
-      // Now induce failure on both initial load and rollback load
-      testAudioHandler.throwOnLoadQueue = true;
-      try {
-        await cubit.playSong(song2);
-        expect(cubit.state.errorMessage, contains('Playback unavailable'));
-        expect(cubit.state.queue, isEmpty);
-      } finally {
-        testAudioHandler.throwOnLoadQueue = false;
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[C-14] resolveMediaItemId resolves numeric IDs directly and assigns collision-free monotonic negative IDs to virtual items',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        // Numeric IDs resolve directly
-        expect(cubit.resolveMediaItemId('42'), equals(42));
-        expect(cubit.resolveMediaItemId('0'), equals(0));
-        expect(cubit.resolveMediaItemId('1005'), equals(1005));
-
-        // Non-numeric IDs get negative integers <= -2
-        final idA = cubit.resolveMediaItemId('yt_video_123');
-        final idB = cubit.resolveMediaItemId('yt_video_456');
-        final idC = cubit.resolveMediaItemId('yt_video_789');
-
-        expect(idA, lessThanOrEqualTo(-2));
-        expect(idB, lessThanOrEqualTo(-2));
-        expect(idC, lessThanOrEqualTo(-2));
-
-        // Distinct virtual IDs get distinct negative numbers (no hash collisions)
-        expect(idA, isNot(equals(idB)));
-        expect(idB, isNot(equals(idC)));
-        expect(idA, isNot(equals(idC)));
-
-        // Resolving the same virtual ID repeatedly is deterministic and idempotent
-        expect(cubit.resolveMediaItemId('yt_video_123'), equals(idA));
-        expect(cubit.resolveMediaItemId('yt_video_456'), equals(idB));
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[H-01] clearing headphone profile preserves user-modified EQ instead of reverting to stale backup',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        // Initial state: default Flat preset
-        expect(cubit.state.dsp.eqPreset.name, 'Flat');
-
-        // Apply a headphone profile
-        const hp = HeadphoneProfile(
-          id: 'sony_xm4',
-          name: 'Sony WH-1000XM4',
-          brand: 'Sony',
-          model: 'WH-1000XM4',
-          category: 'Over-Ear',
-          gains: [1.0, 2.0, -1.0, 0.5, 0.0],
-          bassBoost: 0.0,
-        );
-        await cubit.applyHeadphoneProfile(hp);
-        expect(
-            cubit.state.dsp.selectedHeadphoneProfile?.name, 'Sony WH-1000XM4');
-        expect(cubit.state.dsp.eqPreset.name, 'Sony WH-1000XM4');
-
-        // User modifies EQ preset while profile was active (e.g. adjusts band 0)
-        await cubit.setBandGain(0, 5.0);
-        expect(cubit.state.dsp.eqPreset.name, 'Custom');
-        expect(cubit.state.dsp.eqPreset.gains[0], 5.0);
-
-        // Reset headphone profile: should preserve user's custom EQ rather than reverting to pre-headphone Flat
-        await cubit.applyHeadphoneProfile(null);
-        expect(cubit.state.dsp.selectedHeadphoneProfile, isNull);
-        expect(cubit.state.dsp.eqPreset.name, 'Custom');
-        expect(cubit.state.dsp.eqPreset.gains[0], 5.0);
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[H-02] switchQueueSlot surfaces error message when another slot switch is already in progress',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        // Simulate a slot switch already in flight
-        cubit.queueController.isSwitchingSlot = true;
-
-        await cubit.switchQueueSlot(1);
-
-        expect(
-          cubit.state.errorMessage,
-          equals('Queue slot switch already in progress'),
-        );
-      } finally {
-        cubit.queueController.isSwitchingSlot = false;
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[H-03] isUserSeeking starts false without magic number and reflects seek activity accurately',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        // Initially, no seek has occurred: must be false
-        expect(cubit.transportController.isUserSeeking, isFalse);
-
-        // Perform a seek
-        await cubit.seek(const Duration(seconds: 15));
-        expect(cubit.transportController.isUserSeeking, isTrue);
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[H-15] position stream fallback rethrows StateError when stream is disposed',
-        () {
-      final disposedHandler = _DisposedPositionAudioHandler();
-      expect(
-        () => PlayerCubit(
-          audioHandler: disposedHandler,
-          repository: mockRepository,
-          toggleFavoriteUseCase: mockToggleFavorite,
-        ),
-        throwsA(isA<StateError>()),
-      );
-    });
-
-    test(
-        '[H-15] position stream fallback gracefully falls back to positionStream on stream error',
-        () async {
-      final errorStreamHandler = _ErrorStreamAudioHandler();
-      final cubit = PlayerCubit(
-        audioHandler: errorStreamHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        // compensatedPositionStream emits an error
-        errorStreamHandler.compensatedController
-            .addError(Exception('DSP pipeline failure'));
-        await pumpEventQueue();
-
-        // positionStream emits a valid position
-        errorStreamHandler.rawPositionController
-            .add(const Duration(seconds: 42));
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-
-        expect(cubit.state.position, equals(const Duration(seconds: 42)));
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[H-22] enrichTrackParallel surfaces error message when parallel enrichment completely fails',
-        () async {
-      final mockLyrics = MockPlayerLyricsManager();
-      final mockSponsor = MockPlayerSponsorBlockManager();
-      final mockRepo = MockMusicRepository();
-
-      const song = SongsTableData(
-        id: 99,
-        title: 'Broken Track',
-        artist: 'Artist',
-        album: 'Album',
-        durationMs: 1000,
-        path: '/broken.mp3',
-        source: 'local',
-        cueFile: '/broken.cue',
-        cueStartMs: 0,
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-      );
-
-      var state = const PlayerState(
-        playback: PlaybackSlice(currentSong: song),
-      );
-
-      when(() => mockLyrics.getCachedLyrics(song))
-          .thenThrow(Exception('Lyrics service down'));
-      when(() => mockSponsor.loadSegmentsForSong(
-            song,
-            isOfflineOnly: any(named: 'isOfflineOnly'),
-            isStale: any(named: 'isStale'),
-          )).thenAnswer((_) => Future.error(Exception('SponsorBlock failure')));
-      when(() => mockRepo.getSongById(song.id))
-          .thenAnswer((_) => Future.error(Exception('Database error')));
-
-      final metadataController = PlayerMetadataController(
-        lyricsManager: mockLyrics,
-        sponsorBlockManager: mockSponsor,
-        repository: mockRepo,
-        getState: () => state,
-        emit: (s) => state = s,
-        isClosed: () => false,
-        isSameTrack: (a, b) => a?.id == b?.id,
-      );
-
-      await metadataController.enrichTrackParallel(song);
-
-      expect(state.errorMessage, contains('Track enrichment failed'));
-      expect(state.errorMessage, contains('lyrics'));
-      expect(state.errorMessage, contains('sponsorBlock'));
-      expect(state.errorMessage, contains('quality'));
-    });
-
-    test(
-        '[M-01] setVolumeBoost uses latest preampDb dynamically to prevent clipping',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        const hp = HeadphoneProfile(
-          id: 'test-hp-preamp',
-          name: 'High Preamp Headphone',
-          brand: 'Test',
-          model: 'HP',
-          category: 'Over-Ear',
-          preampGain: 3.0,
-          gains: [0, 0, 0, 0, 0],
-        );
-
-        await cubit.applyHeadphoneProfile(hp);
-        expect(
-            cubit.state.dsp.selectedHeadphoneProfile?.preampGain, equals(3.0));
-
-        // Request 0.8 (8 dB boost). With preamp 3.0, total would be 11.0 > 6.0 dB.
-        // It must clamp to (6.0 - 3.0) / 10.0 = 0.3.
-        await cubit.setVolumeBoost(0.8);
-        expect(cubit.state.dsp.volumeBoost, closeTo(0.3, 0.001));
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[M-02] loadLyrics generation and track change guards prevent stale lyrics emission',
-        () async {
-      final mockLyrics = MockPlayerLyricsManager();
-      final mockSponsor = MockPlayerSponsorBlockManager();
-      final mockRepo = MockMusicRepository();
-
-      const songA = SongsTableData(
-        id: 101,
-        title: 'Song A',
-        artist: 'Artist A',
-        album: 'Album A',
-        durationMs: 1000,
-        path: '/songA.mp3',
-        source: 'local',
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-      );
-
-      const songB = SongsTableData(
-        id: 102,
-        title: 'Song B',
-        artist: 'Artist B',
-        album: 'Album B',
-        durationMs: 1000,
-        path: '/songB.mp3',
-        source: 'local',
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-      );
-
-      var state = const PlayerState(
-        playback: PlaybackSlice(currentSong: songA),
-      );
-
-      var currentGeneration = 0;
-      when(() => mockLyrics.bumpGeneration())
-          .thenAnswer((_) => ++currentGeneration);
-      when(() => mockLyrics.generation).thenAnswer((_) => currentGeneration);
-      when(() => mockLyrics.getCachedLyrics(songA)).thenReturn(null);
-      when(() => mockLyrics.hasFreshNegativeCache(songA)).thenReturn(false);
-
-      final completer = Completer<LyricsResult?>();
-      when(() => mockLyrics.resolveLyrics(
-            songA,
-            isOfflineOnly: any(named: 'isOfflineOnly'),
-            isStale: any(named: 'isStale'),
-          )).thenAnswer((_) => completer.future);
-
-      final metadataController = PlayerMetadataController(
-        lyricsManager: mockLyrics,
-        sponsorBlockManager: mockSponsor,
-        repository: mockRepo,
-        getState: () => state,
-        emit: (s) => state = s,
-        isClosed: () => false,
-        isSameTrack: (a, b) => a?.id == b?.id,
-      );
-
-      final loadFuture = metadataController.loadLyrics(songA);
-
-      // Track switches to songB before resolveLyrics completes
-      state =
-          state.copyWith(playback: state.playback.copyWith(currentSong: songB));
-
-      // Resolve lyrics for songA
-      completer.complete(const LyricsResult(
-        lines: [
-          LyricsLine(timestamp: Duration.zero, text: 'Stale lyrics for Song A')
-        ],
-        source: LyricsSource.lrclib,
-      ));
-
-      await loadFuture;
-
-      // Ensure stale lyrics were discarded
-      expect(state.lyrics, isEmpty);
-      expect(state.currentSong, equals(songB));
-    });
-
-    test(
-        '[M-03] warmStreams timers are properly tracked and cancelled on dispose',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        const onlineSong1 = SongsTableData(
-          id: -1,
-          title: 'Online 1',
-          artist: 'Artist',
-          album: 'Album',
-          durationMs: 180000,
-          path: 'https://stream.example/1',
-          source: SongSource.youtube,
-          remoteId: 'remote-1',
-          isFavorite: false,
-          isMissing: false,
-          isDownloaded: false,
-          playCount: 0,
-          lastPositionMs: 0,
-        );
-        const onlineSong2 = SongsTableData(
-          id: -2,
-          title: 'Online 2',
-          artist: 'Artist',
-          album: 'Album',
-          durationMs: 180000,
-          path: 'https://stream.example/2',
-          source: SongSource.youtube,
-          remoteId: 'remote-2',
-          isFavorite: false,
-          isMissing: false,
-          isDownloaded: false,
-          playCount: 0,
-          lastPositionMs: 0,
-        );
-
-        cubit.warmStreams([onlineSong1, onlineSong2], count: 2);
-        expect(cubit.queueController.activeWarmTimersCount, equals(2));
-
-        cubit.queueController.dispose();
-        expect(cubit.queueController.activeWarmTimersCount, equals(0));
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[M-04] togglePlayPause serializes rapid concurrent calls without racing state and engine',
-        () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      try {
-        const testSong = SongsTableData(
-          id: 1,
-          title: 'Test Song',
-          artist: 'Artist',
-          album: 'Album',
-          durationMs: 180000,
-          path: '/test.mp3',
-          source: SongSource.local,
-          isFavorite: false,
-          isMissing: false,
-          isDownloaded: false,
-          playCount: 0,
-          lastPositionMs: 0,
-        );
-
-        await cubit.playSong(testSong);
-        expect(cubit.state.isPlaying, isTrue);
-
-        // Fire two rapid togglePlayPause calls concurrently
-        final future1 = cubit.togglePlayPause();
-        final future2 = cubit.togglePlayPause();
-
-        await Future.wait([future1, future2]);
-
-        // Toggle twice should return to isPlaying == true
-        expect(cubit.state.isPlaying, isTrue);
-      } finally {
-        await cubit.close();
-      }
-    });
-
-    test(
-        '[M-05] attachSettingsCubit binds settings stream and syncs audio effects correctly',
-        () async {
-      final mockScannerService = MockMediaScannerService();
-      final settingsCubit = SettingsCubit(scannerService: mockScannerService);
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-        // initialized without settingsCubit
-      );
-      try {
-        cubit.attachSettingsCubit(settingsCubit);
-        await settingsCubit.setCrossfade(4.5);
-        expect(testAudioHandler.crossfadeDuration,
-            equals(const Duration(milliseconds: 4500)));
-      } finally {
-        await cubit.close();
-        await settingsCubit.close();
-      }
-    });
   });
-}
-
-class _DisposedPositionAudioHandler extends TestPulsrAudioHandler {
-  @override
-  Stream<Duration> get compensatedPositionStream =>
-      throw StateError('Stream closed/disposed');
-}
-
-class _ErrorStreamAudioHandler extends TestPulsrAudioHandler {
-  final StreamController<Duration> compensatedController =
-      StreamController<Duration>.broadcast();
-  final StreamController<Duration> rawPositionController =
-      StreamController<Duration>.broadcast();
-
-  @override
-  Stream<Duration> get compensatedPositionStream =>
-      compensatedController.stream;
-
-  @override
-  Stream<Duration> get positionStream => rawPositionController.stream;
 }

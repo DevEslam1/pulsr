@@ -712,6 +712,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               padding:
                                   const EdgeInsets.only(bottom: AppSpacing.xxs),
                               child: TextField(
+                                // Mi-4: Stable key preserves focus + text on
+                                // dialog re-renders triggered by error state.
+                                key: ValueKey('eq_freq_field_$i'),
                                 controller: controllers[i],
                                 keyboardType:
                                     const TextInputType.numberWithOptions(

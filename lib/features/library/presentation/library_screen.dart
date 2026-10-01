@@ -519,7 +519,33 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<LibraryCubit, LibraryState>(
+    return BlocConsumer<LibraryCubit, LibraryState>(
+      listenWhen: (prev, curr) =>
+          curr.infoMessage != null && prev.infoMessage != curr.infoMessage,
+      listener: (context, state) {
+        // M-6: Surface infoMessage (e.g. song-cap notifications) as a SnackBar.
+        final msg = state.infoMessage;
+        if (msg == null || msg.isEmpty) return;
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 16, color: Colors.white70),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(msg,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      },
       builder: (context, state) {
         final cubit = context.read<LibraryCubit>();
         final playerCubit = context.read<PlayerCubit>();
