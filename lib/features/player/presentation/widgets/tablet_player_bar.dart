@@ -1,8 +1,10 @@
 // lib/features/player/presentation/widgets/tablet_player_bar.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -71,7 +73,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     final bottomInset = mq.padding.bottom;
     final isShortHeight =
         mq.size.height < 500 && mq.orientation == Orientation.landscape;
-    final cardHeight = isShortHeight ? 68.0 : 76.0;
+    final cardHeight = isShortHeight ? 72.0 : 80.0;
     final bottomMargin =
         bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10;
     _maybeUpdateDock(cardHeight + bottomMargin + 6.0, true);
@@ -117,7 +119,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     final bottomInset = mq.padding.bottom;
     final isShortHeight =
         mq.size.height < 500 && mq.orientation == Orientation.landscape;
-    final cardHeight = isShortHeight ? 68.0 : 76.0;
+    final cardHeight = isShortHeight ? 72.0 : 80.0;
     final bottomMargin =
         bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10;
 
@@ -171,6 +173,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           .clamp(48.0, cardHeight)
                       : cardHeight;
 
+                  final barRadius = BorderRadius.circular(AppRadii.r20);
+
                   return Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(
                       AppSpacing.sm,
@@ -181,33 +185,83 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                     child: Container(
                       height: maxAllowedHeight,
                       decoration: BoxDecoration(
-                        color:
-                            p.surface.withValues(alpha: p.isDark ? 0.94 : 0.98),
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
-                        border: Border.all(
-                          color: p.isDark
-                              ? Colors.white.withValues(alpha: 0.12)
-                              : Colors.black.withValues(alpha: 0.08),
-                          width: 1.2,
-                        ),
+                        borderRadius: barRadius,
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black
-                                .withValues(alpha: p.isDark ? 0.35 : 0.12),
+                                .withValues(alpha: p.isDark ? 0.40 : 0.12),
+                            blurRadius: 24,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: p.accent
+                                .withValues(alpha: p.isDark ? 0.10 : 0.05),
                             blurRadius: 18,
-                            offset: const Offset(0, 4),
+                            spreadRadius: -2,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical:
-                                isShortHeight ? AppSpacing.xxs : AppSpacing.s6,
-                          ),
-                          child: LayoutBuilder(
+                        borderRadius: barRadius,
+                        child: Builder(
+                          builder: (context) {
+                            final barContainer = Container(
+                              height: maxAllowedHeight,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    GpuBudget.isGpuSaverActive
+                                        ? p.surface
+                                        : p.surface.withValues(
+                                            alpha: p.isDark ? 0.76 : 0.86),
+                                    GpuBudget.isGpuSaverActive
+                                        ? p.surfaceContainer
+                                        : p.surfaceContainer.withValues(
+                                            alpha: p.isDark ? 0.70 : 0.82),
+                                  ],
+                                ),
+                                border: Border.all(
+                                  color: p.isDark
+                                      ? Colors.white.withValues(alpha: 0.14)
+                                      : Colors.black.withValues(alpha: 0.08),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  // Specular refraction highlight along top edge
+                                  PositionedDirectional(
+                                    top: 0,
+                                    start: 16,
+                                    end: 16,
+                                    height: 1.2,
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.white.withValues(alpha: 0.0),
+                                              Colors.white.withValues(
+                                                  alpha: p.isDark ? 0.35 : 0.65),
+                                              Colors.white.withValues(alpha: 0.0),
+                                            ],
+                                            stops: const [0.0, 0.5, 1.0],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md,
+                                      vertical:
+                                          isShortHeight ? AppSpacing.xxs : AppSpacing.s6,
+                                    ),
+                                    child: LayoutBuilder(
                             builder: (context, barConstraints) {
                               final totalWidth = barConstraints.maxWidth;
                               final isCompactBar = totalWidth < 600;
@@ -245,9 +299,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                     song.remoteArtworkUrl,
                                                 type: ArtworkType.AUDIO,
                                                 size: isCompactBar
-                                                    ? 38
-                                                    : (isShortHeight ? 42 : 50),
-                                                borderRadius: 10,
+                                                    ? 42
+                                                    : (isShortHeight ? 48 : 54),
+                                                borderRadius: 12,
                                               ),
                                             ),
                                           ),
@@ -908,9 +962,22 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                             },
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   );
+
+                      if (GpuBudget.isGpuSaverActive) {
+                        return barContainer;
+                      }
+                      return BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                        child: barContainer,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
                 },
               );
             },

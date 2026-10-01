@@ -53,6 +53,9 @@ class MiniPlayerState extends State<MiniPlayer> {
   PageController? _pageController;
   bool _controllerDisposed = false;
   int _lastKnownIndex = -1;
+  int? _pendingSyncIndex;
+  int? _pendingQueueLength;
+  bool _hasPendingPostFrameSync = false;
   final ValueNotifier<bool> _isInteracting = ValueNotifier<bool>(false);
   @visibleForTesting
   ValueNotifier<bool> get isInteractingNotifier => _isInteracting;
@@ -131,6 +134,7 @@ class MiniPlayerState extends State<MiniPlayer> {
 
   void _onInteractionChanged() {
     if (!_isInteracting.value && mounted && !_controllerDisposed) {
+      _drainPendingSync();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _controllerDisposed) return;
         final cubit = context.read<PlayerCubit>();
@@ -153,6 +157,8 @@ class MiniPlayerState extends State<MiniPlayer> {
   @override
   void dispose() {
     _controllerDisposed = true;
+    _pendingSyncIndex = null;
+    _pendingQueueLength = null;
     _isInteracting.removeListener(_onInteractionChanged);
     _isInteracting.dispose();
     _verticalSwipeTimer?.cancel();
@@ -161,29 +167,50 @@ class MiniPlayerState extends State<MiniPlayer> {
     super.dispose();
   }
 
-  void _syncPageController(int targetIndex, int queueLength, {int retryCount = 0}) {
+  void _drainPendingSync() {
+    if (_controllerDisposed || !mounted) return;
+    final target = _pendingSyncIndex;
+    final qLen = _pendingQueueLength;
+    if (target == null || qLen == null) return;
+    final controller = _pageController;
+    if (controller != null && controller.hasClients && controller.position.hasContentDimensions) {
+      _pendingSyncIndex = null;
+      _pendingQueueLength = null;
+      _syncPageController(target, qLen);
+    }
+  }
+
+  void _schedulePostFrameSync() {
+    if (_hasPendingPostFrameSync || _controllerDisposed || !mounted) return;
+    _hasPendingPostFrameSync = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _hasPendingPostFrameSync = false;
+      if (!mounted || _controllerDisposed) return;
+      _drainPendingSync();
+    });
+  }
+
+  void _syncPageController(int targetIndex, int queueLength) {
     if (_controllerDisposed || !mounted) return;
     try {
       final controller = _pageController;
       if (queueLength == 0 || controller == null || _controllerDisposed) return;
       final safeIndex = targetIndex.clamp(0, queueLength - 1);
       // Never fight an in-progress user gesture or in-flight skip.
-      if (_isInteracting.value || _swipeInFlight) return;
+      if (_isInteracting.value || _swipeInFlight) {
+        _pendingSyncIndex = safeIndex;
+        _pendingQueueLength = queueLength;
+        return;
+      }
+      if (!controller.hasClients || !controller.position.hasContentDimensions) {
+        _pendingSyncIndex = safeIndex;
+        _pendingQueueLength = queueLength;
+        _schedulePostFrameSync();
+        return;
+      }
+      _pendingSyncIndex = null;
+      _pendingQueueLength = null;
       if (_lastKnownIndex != safeIndex) {
-        if (!controller.hasClients || !controller.position.hasContentDimensions) {
-          // B-4 & H-04: Limit recursive post-frame callbacks to avoid infinite loops if unattached.
-          // On final retry failure, force _lastKnownIndex = safeIndex so subsequent track changes diff correctly.
-          if (retryCount < 3) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && !_controllerDisposed) {
-                _syncPageController(targetIndex, queueLength, retryCount: retryCount + 1);
-              }
-            });
-          } else {
-            _lastKnownIndex = safeIndex;
-          }
-          return;
-        }
         if (controller.page?.round() != safeIndex) {
           try {
             final maxPage = controller.position.viewportDimension > 0
@@ -244,6 +271,9 @@ class MiniPlayerState extends State<MiniPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    if (_pendingSyncIndex != null) {
+      _schedulePostFrameSync();
+    }
     // Narrow subscription: only the vinyl theme decision is read here, so an
     // unrelated settings change must not rebuild the mini player (A-11).
     final playerThemeMode = context
@@ -418,11 +448,11 @@ class MiniPlayerState extends State<MiniPlayer> {
                               GpuBudget.isGpuSaverActive
                                   ? p.surface
                                   : p.surface
-                                      .withValues(alpha: p.isDark ? 0.78 : 0.88),
+                                      .withValues(alpha: p.isDark ? 0.76 : 0.86),
                               GpuBudget.isGpuSaverActive
                                   ? p.surfaceContainer
                                   : p.surfaceContainer
-                                      .withValues(alpha: p.isDark ? 0.72 : 0.84),
+                                      .withValues(alpha: p.isDark ? 0.70 : 0.82),
                             ],
                           ),
                         border: Border.all(
@@ -437,6 +467,28 @@ class MiniPlayerState extends State<MiniPlayer> {
                         child: Stack(
                           alignment: Alignment.topCenter,
                           children: [
+                            // Specular refraction highlight along top edge
+                            PositionedDirectional(
+                              top: 0,
+                              start: 16,
+                              end: 16,
+                              height: 1.2,
+                              child: IgnorePointer(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.white.withValues(alpha: 0.0),
+                                        Colors.white.withValues(
+                                            alpha: p.isDark ? 0.35 : 0.65),
+                                        Colors.white.withValues(alpha: 0.0),
+                                      ],
+                                      stops: const [0.0, 0.5, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -462,6 +514,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                         } else if (notification is ScrollEndNotification) {
                                           if (!_swipeInFlight) {
                                             _isInteracting.value = false;
+                                            _drainPendingSync();
                                           }
                                         }
                                         return false;

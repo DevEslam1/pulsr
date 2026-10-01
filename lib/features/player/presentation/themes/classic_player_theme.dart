@@ -696,6 +696,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   Expanded(
                                     flex: 6,
                                     child: Center(
+                                      key: const ValueKey('track_controls_pane'),
                                       child: ConstrainedBox(
                                         constraints: const BoxConstraints(
                                             maxWidth: 540),

@@ -26,6 +26,7 @@ class PlaybackVolumeController {
   Timer? _transitionTimer;
   Completer<void>? _transitionCompleter;
   bool _isDisposed = false;
+  bool _isTransitionActive = false;
 
   /// BUG-07: bumped whenever a transition starts or the controller is disposed.
   /// A timer callback from a superseded / disposed transition bails out before
@@ -44,7 +45,7 @@ class PlaybackVolumeController {
   bool get bitPerfectBypass => _bitPerfectBypass;
   bool get isDisposed => _isDisposed;
   bool get hasActiveTransitionTimer =>
-      _transitionTimer != null && _transitionTimer!.isActive;
+      _isTransitionActive && !_isDisposed;
 
   void setDopActive(bool active) {
     _isDopActive = active;
@@ -185,45 +186,34 @@ class PlaybackVolumeController {
     final completer = Completer<void>();
     _transitionCompleter = completer;
     final generation = _transitionGeneration;
+    _isTransitionActive = true;
 
-    _transitionTimer = Timer.periodic(stepDuration, (timer) async {
-      // BUG-07: bail before touching the player if a newer transition started
-      // or the controller was disposed while this timer was pending.
+    unawaited(() async {
       try {
-        if (_isDisposed || generation != _transitionGeneration) {
-          timer.cancel();
-          if (generation == _transitionGeneration) _transitionTimer = null;
-          if (!completer.isCompleted) completer.complete();
-          return;
-        }
-        stepIndex++;
-        final current = (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
-        if (_isDisposed || generation != _transitionGeneration) {
-          timer.cancel();
-          if (generation == _transitionGeneration) _transitionTimer = null;
-          if (!completer.isCompleted) completer.complete();
-          return;
-        }
-        try {
-          await player.setVolume(current);
-        } catch (_) {
-          timer.cancel();
-          if (generation == _transitionGeneration) _transitionTimer = null;
-          if (!completer.isCompleted) completer.complete();
-          return;
-        }
+        while (stepIndex < steps) {
+          await Future.delayed(stepDuration);
+          if (_isDisposed || generation != _transitionGeneration) break;
 
-        if (stepIndex >= steps) {
-          timer.cancel();
-          if (generation == _transitionGeneration) _transitionTimer = null;
-          if (!completer.isCompleted) completer.complete();
+          stepIndex++;
+          final current =
+              (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
+          if (_isDisposed || generation != _transitionGeneration) break;
+
+          try {
+            await player.setVolume(current);
+          } catch (_) {
+            break;
+          }
         }
-      } catch (_) {
-        timer.cancel();
-        if (generation == _transitionGeneration) _transitionTimer = null;
-        if (!completer.isCompleted) completer.complete();
+      } finally {
+        if (generation == _transitionGeneration) {
+          _isTransitionActive = false;
+        }
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
       }
-    });
+    }());
 
     return completer.future;
   }
@@ -247,6 +237,7 @@ class PlaybackVolumeController {
     // BUG-07: mark disposed and invalidate any in-flight transition timer
     // before cancelling it, so a callback already in flight cannot setVolume.
     _isDisposed = true;
+    _isTransitionActive = false;
     _transitionGeneration++;
     _transitionTimer?.cancel();
     _transitionTimer = null;

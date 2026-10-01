@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/constants/channels.dart';
+import '../../core/router/app_router.dart';
 import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
@@ -86,8 +87,9 @@ class SongInfoSheet extends StatelessWidget {
             confirmLabel: context.l10n.openSettings,
             cancelLabel: context.l10n.cancel,
           );
+          if (!context.mounted) return;
           if (proceed == true) {
-            channel.invokeMethod('openWriteSettings');
+            _openSettingsAndListenForRetry(channel, type);
           }
           return;
         }
@@ -97,7 +99,8 @@ class SongInfoSheet extends StatelessWidget {
         'filePath': song.path,
         'type': type,
       });
-      if (context.mounted && (success ?? false)) {
+      if (!context.mounted) return;
+      if (success ?? false) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.ringtoneSet)),
@@ -113,7 +116,7 @@ class SongInfoSheet extends StatelessWidget {
             action: SnackBarAction(
               label: context.l10n.settings,
               onPressed: () {
-                channel.invokeMethod('openWriteSettings');
+                _openSettingsAndListenForRetry(channel, type);
               },
             ),
           ),
@@ -132,6 +135,38 @@ class SongInfoSheet extends StatelessWidget {
         SnackBar(content: Text('${context.l10n.ringtoneFailed} $e')),
       );
     }
+  }
+
+  void _openSettingsAndListenForRetry(
+    MethodChannel channel,
+    String type,
+  ) {
+    AppLifecycleListener? listener;
+    listener = AppLifecycleListener(
+      onResume: () async {
+        listener?.dispose();
+        listener = null;
+        try {
+          final canWrite = await channel
+                  .invokeMethod<bool>('checkWriteSettingsPermission') ??
+              false;
+          if (canWrite) {
+            final activeContext = rootNavigatorKey.currentContext;
+            if (activeContext != null && activeContext.mounted) {
+              await _setRingtone(activeContext, type);
+            }
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Auto-retry setRingtone failed after returning from settings',
+            error: e,
+            stackTrace: st,
+            category: 'SongInfoSheet',
+          );
+        }
+      },
+    );
+    channel.invokeMethod('openWriteSettings');
   }
 
   void _showRingtoneOptions(BuildContext context) {

@@ -70,5 +70,30 @@ void main() {
           lessThanOrEqualTo(AudioMemoryManager.maxPreloadBudgetBytes));
       expect(manager.preloadedHeadCount, equals(1));
     });
+
+    test('get and touch promote entry to MRU so oldest unaccessed item is evicted first', () {
+      const entrySize = 4 * 1024 * 1024; // 4MB per entry
+
+      // Add 8 entries = 32MB
+      for (int i = 0; i < 8; i++) {
+        manager.registerPreload('entry_$i', entrySize);
+      }
+
+      // Touch entry_0 (oldest) so it moves to MRU
+      final accessed = manager.get('entry_0');
+      expect(accessed, isNotNull);
+      expect(accessed!.key, equals('entry_0'));
+
+      // Also touch entry_1 using touch()
+      manager.touch('entry_1');
+
+      // Now LRU is entry_2! Adding 9th entry should evict entry_2, NOT entry_0 or entry_1
+      manager.registerPreload('entry_8', entrySize);
+
+      expect(manager.containsKey('entry_0'), isTrue);
+      expect(manager.containsKey('entry_1'), isTrue);
+      expect(manager.containsKey('entry_2'), isFalse); // Evicted!
+      expect(manager.containsKey('entry_8'), isTrue);
+    });
   });
 }

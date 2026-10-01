@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -186,17 +188,34 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
           width: totalWidth,
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
-            color: p.surface,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                GpuBudget.isGpuSaverActive
+                    ? p.surface
+                    : p.surface.withValues(
+                        alpha: p.isDark ? 0.78 : 0.88),
+                GpuBudget.isGpuSaverActive
+                    ? p.surfaceContainer
+                    : p.surfaceContainer.withValues(
+                        alpha: p.isDark ? 0.72 : 0.84),
+              ],
+            ),
             border: BorderDirectional(
               end: BorderSide(
-                color: p.hairline.withValues(alpha: p.isDark ? 0.35 : 0.16),
-                width: 1,
+                color: p.isDark
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : Colors.black.withValues(alpha: 0.08),
+                width: 1.2,
               ),
             ),
           ),
           child: ClipRect(
-            child: Padding(
-              padding: EdgeInsetsDirectional.only(start: leftInset),
+            child: Builder(
+              builder: (context) {
+                final sidebarBody = Padding(
+                  padding: EdgeInsetsDirectional.only(start: leftInset),
               child: SafeArea(
                 top: true,
                 bottom: true,
@@ -354,8 +373,18 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                   },
                 ),
               ),
-            ),
+            );
+
+              if (GpuBudget.isGpuSaverActive) {
+                return sidebarBody;
+              }
+              return BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: sidebarBody,
+              );
+            },
           ),
+        ),
         ),
       ),
     );

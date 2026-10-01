@@ -14,13 +14,12 @@ extension EqualizerEffectOps on EqualizerManager {
     isVirtualizerEnabled = enabled;
     try {
       final applied = await _effectsChannel.setVirtualizerEnabled(enabled);
-      if (enabled) {
-        _recordEffectOutcome('virtualizer', applied);
-        // Never leave the toggle ON when the engine rejected the request.
-        if (!applied) isVirtualizerEnabled = previous;
-      } else {
-        _recordEffectOutcome('virtualizer', true);
-      }
+      // A rejected "off" still reaches the desired disabled state, so only an
+      // enable that the engine rejects is a real failure. Never leave the
+      // toggle ON when the user asked for OFF (engine may return false when no
+      // session is attached / the effect is unsupported).
+      _recordEffectOutcome('virtualizer', enabled ? applied : true);
+      if (enabled && !applied) isVirtualizerEnabled = previous;
       await _savePreferences();
     } catch (e, st) {
       isVirtualizerEnabled = previous;
@@ -115,12 +114,8 @@ extension EqualizerEffectOps on EqualizerManager {
     isSpatializerEnabled = enabled;
     try {
       final applied = await _applySpatializerWithFallback(enabled);
-      if (enabled) {
-        _recordEffectOutcome('spatializer', applied);
-        if (!applied) isSpatializerEnabled = previous;
-      } else {
-        _recordEffectOutcome('spatializer', true);
-      }
+      _recordEffectOutcome('spatializer', applied);
+      if (!applied) isSpatializerEnabled = previous;
       await _savePreferences();
     } catch (e, st) {
       isSpatializerEnabled = previous;

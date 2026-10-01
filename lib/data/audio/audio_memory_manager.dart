@@ -139,6 +139,30 @@ class AudioMemoryManager {
     _currentPreloadBytes += sizeBytes;
   }
 
+  /// Retrieves a preloaded head from cache, promoting it to Most Recently Used (MRU).
+  PreloadedHead? get(String key) {
+    if (_headCache.containsKey(key)) {
+      final entry = _headCache.remove(key)!;
+      _headCache[key] = entry; // Moves to end (MRU)
+      return entry;
+    }
+    return null;
+  }
+
+  /// Marks a preloaded head as accessed, promoting it to Most Recently Used (MRU).
+  void touch(String key) {
+    if (_headCache.containsKey(key)) {
+      final entry = _headCache.remove(key)!;
+      _headCache[key] = entry; // Moves to end (MRU)
+    }
+  }
+
+  /// Returns true if a preloaded head exists for [key].
+  bool containsKey(String key) => _headCache.containsKey(key);
+
+  /// Peeks at a preloaded head without updating its LRU position.
+  PreloadedHead? peek(String key) => _headCache[key];
+
   /// Releases a specific preloaded head from cache.
   void evict(String key) {
     if (_headCache.containsKey(key)) {

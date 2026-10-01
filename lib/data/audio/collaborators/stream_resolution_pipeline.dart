@@ -132,6 +132,8 @@ class StreamResolutionPipeline {
       final cached = _streamCache[cacheKey];
       if (cached != null &&
           cached.expires.isAfter(DateTime.now().add(_expirySafetyMargin))) {
+        _streamCache.remove(cacheKey);
+        _streamCache[cacheKey] = cached;
         try {
           getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}

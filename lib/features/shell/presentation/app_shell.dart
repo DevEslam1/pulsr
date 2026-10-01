@@ -420,10 +420,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               bottom: false,
               left: false,
               right: true,
-              child: Column(
+              child: Stack(
                 children: [
                   // Upper Screen Row: Active Screen + Optional Side Inspector
-                  Expanded(
+                  Positioned.fill(
                     child: Row(
                       children: [
                         Expanded(child: widget.navigationShell),
@@ -438,13 +438,18 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   ),
 
                   // Bottom Docked Tablet Player Bar
-                  TabletPlayerBar(
-                    onOpenNowPlaying: () => _openNowPlaying(context),
-                    onToggleSideInspector: canShowInspector
-                        ? () => setState(
-                            () => _isSideInspectorOpen = !_isSideInspectorOpen)
-                        : null,
-                    isInspectorOpen: inspectorOpen,
+                  PositionedDirectional(
+                    start: 0,
+                    end: 0,
+                    bottom: 0,
+                    child: TabletPlayerBar(
+                      onOpenNowPlaying: () => _openNowPlaying(context),
+                      onToggleSideInspector: canShowInspector
+                          ? () => setState(
+                              () => _isSideInspectorOpen = !_isSideInspectorOpen)
+                          : null,
+                      isInspectorOpen: inspectorOpen,
+                    ),
                   ),
                 ],
               ),

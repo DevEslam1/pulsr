@@ -100,13 +100,15 @@ class SpeedPickerSheet extends StatelessWidget {
                 .round();
 
         return PulsrBottomSheetContainer(
-          child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.md),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -265,7 +267,8 @@ class SpeedPickerSheet extends StatelessWidget {
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }

@@ -320,9 +320,13 @@ class WidgetService {
     }
 
     try {
-      final dir = await getTemporaryDirectory();
+      final baseDir = await getTemporaryDirectory();
+      final artDir = Directory('${baseDir.path}/pulsr_widget_art');
+      if (!await artDir.exists()) {
+        await artDir.create(recursive: true);
+      }
       final cleanId = songId < 0 ? 'neg_${songId.abs()}' : '$songId';
-      final cachedFile = File('${dir.path}/pulsr_widget_art_$cleanId.png');
+      final cachedFile = File('${artDir.path}/pulsr_widget_art_$cleanId.png');
       if (await cachedFile.exists() && await cachedFile.length() > 0) {
         _artworkCache[songId] = cachedFile.path;
         return cachedFile.path;
@@ -451,7 +455,7 @@ class WidgetService {
       // Opportunistically prune old widget temp files at most once per session (L-6)
       if (!_hasPrunedArtworkThisSession) {
         _hasPrunedArtworkThisSession = true;
-        unawaited(_pruneOldWidgetArtwork(dir));
+        unawaited(_pruneOldWidgetArtwork(baseDir));
       }
       return cachedFile.path;
     } catch (e, st) {
@@ -490,10 +494,12 @@ class WidgetService {
 
   Future<void> _pruneOldWidgetArtwork(Directory dir) async {
     try {
-      // List the directory once, then stat every file concurrently instead of
-      // awaiting stat() sequentially per file (I24).
+      // Use dedicated subdirectory if present, otherwise scan the provided directory (e.g. in tests)
+      final subDir = Directory('${dir.path}/pulsr_widget_art');
+      final scanDir = await subDir.exists() ? subDir : dir;
+
       final files = <File>[];
-      await for (final entity in dir.list()) {
+      await for (final entity in scanDir.list(followLinks: false)) {
         if (entity is File && entity.path.contains('pulsr_widget_art_')) {
           files.add(entity);
         }

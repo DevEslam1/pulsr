@@ -2114,6 +2114,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
       if (cached != null && cached.expires.isAfter(DateTime.now())) {
+        _streamCache.remove(cacheKey);
+        _streamCache[cacheKey] = cached;
+        _memoryManager.touch(cacheKey);
         try {
           _latencyTracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}

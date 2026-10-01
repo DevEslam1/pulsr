@@ -1,5 +1,7 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -92,15 +94,33 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
     return Container(
       width: inspectorWidth,
       decoration: BoxDecoration(
-        color: p.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            GpuBudget.isGpuSaverActive
+                ? p.surface
+                : p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
+            GpuBudget.isGpuSaverActive
+                ? p.surfaceContainer
+                : p.surfaceContainer.withValues(alpha: p.isDark ? 0.72 : 0.84),
+          ],
+        ),
         border: BorderDirectional(
           start: BorderSide(
-            color: _isDragging ? p.accent.withValues(alpha: 0.6) : p.hairline,
-            width: _isDragging ? 1.5 : 1.0,
+            color: _isDragging
+                ? p.accent.withValues(alpha: 0.6)
+                : (p.isDark
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : Colors.black.withValues(alpha: 0.08)),
+            width: _isDragging ? 1.5 : 1.2,
           ),
         ),
       ),
-      child: Stack(
+      child: ClipRect(
+        child: Builder(
+          builder: (context) {
+            final inspectorContent = Stack(
         children: [
           Column(
             children: [
@@ -331,6 +351,17 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
             ),
           ),
         ],
+      );
+
+            if (GpuBudget.isGpuSaverActive) {
+              return inspectorContent;
+            }
+            return BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+              child: inspectorContent,
+            );
+          },
+        ),
       ),
     );
   }
