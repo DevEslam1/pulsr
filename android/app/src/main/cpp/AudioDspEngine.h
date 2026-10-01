@@ -58,6 +58,20 @@ enum class DspPerformanceProfile {
     PowerSaver = 2    // Battery saver / thermal throttle: degradation threshold RTF > 0.65, recovery < 0.40
 };
 
+// TODO (M-6, DEFERRED — do not implement without the race/RT tests):
+//   The per-block snapshot swap currently goes through AtomicSharedPtr, whose
+//   fallback path (no __cpp_lib_atomic_shared_ptr) uses std::atomic_load/store
+//   on a shared_ptr and is NOT guaranteed lock-free. On the audio thread that
+//   is a priority-inversion hazard: the RT render can block on an internal libc
+//   spin/mutex while a lower-priority publisher holds it. The intended fix is to
+//   replace this with a raw std::atomic<const DspParamSnapshot*> swap (publisher
+//   release-stores the new pointer, render acquire-loads it) and reclaim retired
+//   pointers via the existing retireQueue_ drain off the audio thread, removing
+//   the shared_ptr refcount traffic from the hot path entirely. This is a
+//   delicate RT-safety change and MUST be validated by test_snapshot_race.cpp
+//   (no torn/leaked snapshots across concurrent publish+render) and
+//   test_rt_alloc.cpp (no allocation/lock on the render thread) before landing.
+//   Leave behavior unchanged until those pass.
 template<typename T>
 class AtomicSharedPtr {
 public:

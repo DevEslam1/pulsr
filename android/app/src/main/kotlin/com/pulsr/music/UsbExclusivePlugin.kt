@@ -12,6 +12,7 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -65,7 +66,7 @@ class UsbExclusivePlugin(
     private val methodChannel = MethodChannel(messenger, METHOD_CHANNEL)
     private val eventChannel = EventChannel(messenger, EVENT_CHANNEL)
 
-    private var eventSink: EventChannel.EventSink? = null
+    @Volatile private var eventSink: EventChannel.EventSink? = null
     private var connection: UsbDeviceConnection? = null
     private var openedDevice: UsbDevice? = null
     private var volumeUnit: UsbAudioControlParser.FeatureUnitVolume? = null
@@ -81,6 +82,17 @@ class UsbExclusivePlugin(
     @Volatile private var streaming = false
     @Volatile private var currentStreamingRate = 0
     private var claimedStreamingInterface: UsbInterface? = null
+
+    // Blocking USB control transfers, raw-descriptor parsing and native sink
+    // start/stop/query must never run on the main thread (ANR). All such work
+    // is serialized onto this single worker thread; MethodChannel replies are
+    // posted back to the main thread. getStatus returns the last cached status
+    // immediately and refreshes asynchronously.
+    private val workerThread = HandlerThread("UsbExclusiveWorker").apply { start() }
+    private val workerHandler = Handler(workerThread.looper)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile private var cachedStatus: Map<String, Any?> =
+        baseStatus(attached = false, permitted = false, device = null)
 
     // Raw UAC2 isochronous streaming, implemented in UsbAudioSink.cpp.
     private external fun nativeUsbStreamStart(
@@ -108,10 +120,14 @@ class UsbExclusivePlugin(
                         @Suppress("DEPRECATION")
                         intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
                     }
-                    if (detached == null || detached.deviceId == openedDevice?.deviceId) {
-                        closeLocked()
+                    // closeLocked() stops the native sink and closes the USB
+                    // connection (blocking); run it off the main thread.
+                    workerHandler.post {
+                        if (detached == null || detached.deviceId == openedDevice?.deviceId) {
+                            closeLocked()
+                        }
+                        emitState()
                     }
-                    emitState()
                 }
                 UsbManager.ACTION_USB_DEVICE_ATTACHED -> emitState()
             }
@@ -151,22 +167,27 @@ class UsbExclusivePlugin(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         try {
             when (call.method) {
-                "getStatus" -> result.success(buildStatus())
+                "getStatus" -> {
+                    // Return the cached snapshot immediately and refresh (which
+                    // issues blocking control transfers) off the main thread.
+                    result.success(cachedStatus)
+                    emitState()
+                }
                 "requestPermission" -> requestPermission(result)
                 "setExclusive" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    result.success(setExclusiveInternal(enabled))
+                    runAsync(call.method, result) { setExclusiveInternal(enabled) }
                 }
                 "setHardwareVolume" -> {
                     val db = call.argument<Double>("db") ?: 0.0
-                    result.success(setHardwareVolumeInternal(db))
+                    runAsync(call.method, result) { setHardwareVolumeInternal(db) }
                 }
                 "startStreaming" -> {
                     val sampleRate = call.argument<Int>("sampleRate") ?: 48000
                     val channels = call.argument<Int>("channels") ?: 2
-                    result.success(startStreamingInternal(sampleRate, channels))
+                    runAsync(call.method, result) { startStreamingInternal(sampleRate, channels) }
                 }
-                "stopStreaming" -> result.success(stopStreamingInternal())
+                "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
                 "isStreamingSupported" -> {
                     val device = openedDevice ?: findAudioDevice()
                     val supported = nativeLoaded && device != null &&
@@ -206,39 +227,33 @@ class UsbExclusivePlugin(
                     } else 0.0
                     result.success(offset)
                 }
-                "querySupportedRates" -> {
-                    val device = openedDevice ?: findAudioDevice()
-                    if (device == null || usbManager?.hasPermission(device) != true) {
-                        result.success(emptyList<Int>())
-                        return
-                    }
-                    val conn = ensureConnection(device)
-                    if (conn == null) {
-                        result.success(emptyList<Int>())
-                        return
-                    }
-                    val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
-                    val ifaceNum = streamInterfaceNumber ?: 1
-                    val nativeRates = if (nativeLoaded && fd >= 0) {
-                        try {
-                            nativeUsbQuerySupportedRates(fd, ifaceNum).toList()
-                        } catch (e: Throwable) {
-                            Log.w(TAG, "nativeUsbQuerySupportedRates failed: ${e.message}")
-                            emptyList<Int>()
-                        }
-                    } else {
-                        emptyList<Int>()
-                    }
-                    val parsed = parseViaRawDescriptors(conn)
-                    val descriptorRates = parsed?.supportedRates ?: emptyList()
-                    val merged = (nativeRates + descriptorRates).distinct().sorted()
-                    result.success(merged)
-                }
+                "querySupportedRates" -> runAsync(call.method, result) { querySupportedRatesInternal() }
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {
             Log.e(TAG, "MethodChannel error handling ${call.method}: ${e.message}", e)
             result.error("USB_EXCLUSIVE_ERROR", e.message, null)
+        }
+    }
+
+    /**
+     * Runs blocking USB work on the dedicated worker thread and delivers the
+     * MethodChannel reply back on the main thread. Exactly one of
+     * result.success/result.error is invoked on every path.
+     */
+    private fun runAsync(method: String, result: MethodChannel.Result, block: () -> Any?) {
+        workerHandler.post {
+            try {
+                val value = block()
+                mainHandler.post {
+                    try { result.success(value) } catch (_: Exception) {}
+                }
+            } catch (e: Throwable) {
+                mainHandler.post {
+                    Log.e(TAG, "MethodChannel error handling $method: ${e.message}", e)
+                    try { result.error("USB_EXCLUSIVE_ERROR", e.message, null) } catch (_: Exception) {}
+                }
+            }
         }
     }
 
@@ -261,6 +276,7 @@ class UsbExclusivePlugin(
         closeLocked()
         methodChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
+        try { workerThread.quitSafely() } catch (_: Exception) {}
     }
 
     // ---- device discovery / descriptor parsing ----
@@ -428,11 +444,27 @@ class UsbExclusivePlugin(
     }
 
     private fun emitState() {
-        val sink = eventSink ?: return
-        try {
-            sink.success(buildStatus())
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to emit USB state: ${e.message}")
+        // buildStatus() issues blocking control transfers; run it on the worker
+        // thread, cache the result, then push to the event sink on the main
+        // thread. The cache always refreshes so getStatus can reply instantly.
+        workerHandler.post {
+            val status = try {
+                buildStatus()
+            } catch (e: Throwable) {
+                Log.w(TAG, "Failed to build USB state: ${e.message}")
+                return@post
+            }
+            cachedStatus = status
+            if (eventSink != null) {
+                mainHandler.post {
+                    val sink = eventSink ?: return@post
+                    try {
+                        sink.success(status)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to emit USB state: ${e.message}")
+                    }
+                }
+            }
         }
     }
 
@@ -802,6 +834,33 @@ class UsbExclusivePlugin(
         claimedStreamingInterface = null
         emitState()
         return buildStatus() + mapOf("success" to true)
+    }
+
+    /**
+     * Blocking: opens the device, issues a native rate query and parses the raw
+     * descriptors. Always invoked on the worker thread via runAsync.
+     */
+    private fun querySupportedRatesInternal(): List<Int> {
+        val device = openedDevice ?: findAudioDevice()
+        if (device == null || usbManager?.hasPermission(device) != true) {
+            return emptyList()
+        }
+        val conn = ensureConnection(device) ?: return emptyList()
+        val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
+        val ifaceNum = streamInterfaceNumber ?: 1
+        val nativeRates = if (nativeLoaded && fd >= 0) {
+            try {
+                nativeUsbQuerySupportedRates(fd, ifaceNum).toList()
+            } catch (e: Throwable) {
+                Log.w(TAG, "nativeUsbQuerySupportedRates failed: ${e.message}")
+                emptyList<Int>()
+            }
+        } else {
+            emptyList<Int>()
+        }
+        val parsed = parseViaRawDescriptors(conn)
+        val descriptorRates = parsed?.supportedRates ?: emptyList<Int>()
+        return (nativeRates + descriptorRates).distinct().sorted()
     }
 
     @Synchronized

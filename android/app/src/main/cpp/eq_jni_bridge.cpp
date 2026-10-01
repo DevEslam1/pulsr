@@ -18,6 +18,18 @@ namespace {
 // handle (which bypasses the registry). Shared for the hot process/reset paths,
 // unique for destroy, so `delete engine` can never race an active render.
 std::shared_mutex gEngineLifecycleMutex;
+
+// FIX M-4: Validate an arbitrary jint against the FilterType enum range
+// (0..7 == Peaking..AllPass, see DspParams.h) before casting. An out-of-range
+// value otherwise casts to an undefined enumerator that ParametricEQ coeff
+// computation treats as silent passthrough; clamp invalid input to Peaking(0)
+// at the bridge boundary instead.
+inline FilterType toFilterType(jint type) {
+    if (type < 0 || type > static_cast<jint>(FilterType::AllPass)) {
+        return FilterType::Peaking;
+    }
+    return static_cast<FilterType>(type);
+}
 }  // namespace
 
 extern "C" {
@@ -82,7 +94,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBand(
         snap.eq.bands[index].frequency = freq;
         snap.eq.bands[index].gainDb = gainDb;
         snap.eq.bands[index].q = q;
-        snap.eq.bands[index].type = static_cast<FilterType>(type);
+        snap.eq.bands[index].type = toFilterType(type);
         snap.eq.bands[index].enabled = enabled;
     });
 }
@@ -135,7 +147,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
             snap.eq.bands[i].frequency = vFreqs[i];
             snap.eq.bands[i].gainDb = vGains[i];
             snap.eq.bands[i].q = vQs[i];
-            snap.eq.bands[i].type = static_cast<FilterType>(vTypes[i]);
+            snap.eq.bands[i].type = toFilterType(vTypes[i]);
             snap.eq.bands[i].enabled = true;
         }
     });
@@ -237,6 +249,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbEnabled(
 
 // FIX C-3: Retain last loaded custom IR so it can be restored when
 // the user switches back to the Custom preset from a synthetic one.
+//
+// FIX M-3 (threading): gLastCustomIr is a plain (non-atomic) static shared_ptr
+// read/written only from the AudioEffectsPlugin JNI setters
+// (nativeLoadImpulseResponse writes it; nativeSetReverbPreset reads it). These
+// are platform-channel calls, which the Flutter engine dispatches strictly
+// serially on the platform thread, so there is never a concurrent read/write of
+// this pointer. It is NEVER touched from the audio render thread (the engine
+// only ever sees the immutable PreparedIr it was handed via the snapshot), so
+// no lock is added here — doing so on an RT-reachable path is forbidden. If a
+// future caller accesses it off the platform thread, promote it to an
+// atomic<shared_ptr> rather than relying on this serialization assumption.
 static std::shared_ptr<const PreparedIr> gLastCustomIr;
 
 JNIEXPORT void JNICALL
@@ -311,6 +334,15 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     jfloat* data = env->GetFloatArrayElements(irSamples, nullptr);
     if (!data) return JNI_FALSE;
 
+    // FIX M-3: Copy the samples out BEFORE any mutation, then release
+    // immediately with JNI_ABORT. GetFloatArrayElements may hand back a direct
+    // (pinned) pointer into the caller's float[]; normalizing in place and then
+    // releasing with JNI_ABORT does NOT undo the writes on a non-copy JVM,
+    // silently corrupting the caller's array. Working on a private copy and
+    // releasing right away guarantees the Java array is never mutated.
+    std::vector<float> ir(data, data + len);
+    env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
+
     int frames = (channels > 0) ? (len / channels) : len;
 
     // Normalize the loaded IR to unit peak. A full-scale impulse response would
@@ -319,20 +351,19 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     // the reverb's dry/wet balance meaningful for arbitrary user IRs.
     float irPeak = 0.0f;
     for (int i = 0; i < len; ++i) {
-        const float a = std::abs(data[i]);
+        const float a = std::abs(ir[i]);
         if (a > irPeak) irPeak = a;
     }
     if (irPeak > 1e-6f && std::isfinite(irPeak)) {
         const float invPeak = 1.0f / irPeak;
         for (int i = 0; i < len; ++i) {
-            data[i] *= invPeak;
+            ir[i] *= invPeak;
         }
     }
 
     auto current = AudioDspEngine::instance().getParams();
     const double targetCoreRate = (current && current->sampleRate > 0.0) ? std::min(current->sampleRate, 48000.0) : 48000.0;
-    auto customIr = PreparedIr::createCustom(current ? current->sampleRate : 48000.0, data, frames, channels, targetCoreRate);
-    env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
+    auto customIr = PreparedIr::createCustom(current ? current->sampleRate : 48000.0, ir.data(), frames, channels, targetCoreRate);
 
     if (customIr) {
         gLastCustomIr = customIr; // FIX C-3: persist for Custom preset restore
@@ -1089,6 +1120,15 @@ JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
         JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
+    // FIX M-2: Reject the engineHandle==0 render fallback. Rendering through the
+    // process-wide singleton here is a use-after-free hazard: the singleton's
+    // retireQueue_ is drained concurrently by updateParams()/publishParams()
+    // (under publishMutex_) AND by DspEngineRegistry::drainRetireQueues() (under
+    // the registry mutex_) — two different locks — which is only benign while the
+    // singleton never renders (processInterleaved both drains and enqueues to
+    // that same queue). The singleton is a control engine, not a render target,
+    // so a null handle is a caller error: no-op instead of rendering.
+    if (engineHandle == 0) return 0;
     // A negative or unaligned offset would let `requiredBytes` under-count and
     // address memory before the mapped region; reject it like the AAudio path.
     if (offsetBytes < 0 || (offsetBytes % static_cast<jint>(sizeof(float))) != 0) return 0;
@@ -1100,9 +1140,18 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
     if (capacity < 0 || requiredBytes > capacity) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
+    // TODO (M-6, DEFERRED — do not implement without the race/RT tests):
+    //   This per-block std::shared_lock on gEngineLifecycleMutex is taken on the
+    //   audio render thread. A shared_mutex read lock can still block (and invert
+    //   priority against the writer in nativeDestroyEngine), so it is not strictly
+    //   RT-safe. The intended fix pairs the raw-atomic snapshot swap described at
+    //   AtomicSharedPtr in AudioDspEngine.h with lifetime handoff via the existing
+    //   retireQueue_ reclamation, removing this lock from the hot path entirely.
+    //   It MUST pass test_snapshot_race.cpp and test_rt_alloc.cpp before landing;
+    //   until then the lock stays and behavior is unchanged.
     std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
-    if (!engine) engine = &AudioDspEngine::instance();
+    if (!engine) return 0;  // FIX M-2: never render through the control singleton
     try {
         jint processed = static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels));
         // USB exclusive streaming: tee the processed PCM to the isochronous USB

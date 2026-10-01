@@ -13,6 +13,7 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/comparison_slot.dart';
+import '../../../../data/audio/gain_staging_budget.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../data/audio/ir_file_parser.dart';
 import '../../../../data/db/app_database.dart';
@@ -166,6 +167,14 @@ class PlayerDspController {
 
   /// Declarative helper consolidating repetitive DSP effect setters, guarding,
   /// state emission, and audio handler sync.
+  ///
+  /// Unified error-reconciliation policy (shared by [applyPreset],
+  /// [applyHeadphoneProfile], [setBandGain] and [resetToFlat]): on a native
+  /// failure the DSP slice is rolled back to the pre-attempt snapshot
+  /// ([previousDsp]) and the error is surfaced. We intentionally do NOT call
+  /// [_syncAudioEffects] on failure — the snapshot is the authoritative
+  /// known-good state, and re-reading the engine mid-failure only risks
+  /// emitting a half-applied slice.
   Future<void> applyDspEffect({
     required String featureName,
     bool requiresGuard = true,
@@ -190,7 +199,6 @@ class PlayerDspController {
     try {
       await applyAudioHandler();
     } catch (e) {
-      _syncAudioEffects();
       final s = _getState();
       _emit(s.copyWith(
         dsp: previousDsp,
@@ -238,8 +246,20 @@ class PlayerDspController {
 
   Future<void> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
 
-  Future<void> setPreamp(double preampDb) async {
-    await _audioHandler.setPreamp(preampDb);
+  /// Routes preamp through the shared guard/emit/rollback helper so it obeys
+  /// the bit-perfect gate, marks user interaction and surfaces native failures
+  /// like every other DSP setter (previously it bypassed all of this and let
+  /// native exceptions escape into UI callers). Preamp has no dedicated
+  /// PlayerState field, so [updateDsp] is the identity — the helper is used
+  /// purely for guarding, error handling and clearing stale error messages.
+  /// Clamped defensively to the native ±15 dB range.
+  Future<void> setPreamp(double preampDb) {
+    final clamped = preampDb.clamp(-15.0, 15.0).toDouble();
+    return applyDspEffect(
+      featureName: 'Preamp',
+      updateDsp: (dsp) => dsp,
+      applyAudioHandler: () => _audioHandler.setPreamp(clamped),
+    );
   }
 
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
@@ -322,7 +342,6 @@ class PlayerDspController {
     try {
       await _audioHandler.setBandGain(bandIndex, clamped);
     } catch (e) {
-      _syncAudioEffects();
       final s = _getState();
       _emit(s.copyWith(
           dsp: previousDsp,
@@ -333,6 +352,7 @@ class PlayerDspController {
 
   Future<void> resetToFlat() async {
     final state = _getState();
+    final previousDsp = state.dsp;
     _emit(state.copyWith(
       dsp: state.dsp.copyWith(
         eqPreset: EqPreset.defaultPresets.first,
@@ -342,7 +362,12 @@ class PlayerDspController {
     try {
       await _audioHandler.resetToFlat();
     } catch (e) {
-      _syncAudioEffects();
+      final s = _getState();
+      _emit(s.copyWith(
+        dsp: previousDsp,
+        playback:
+            s.playback.copyWith(errorMessage: 'Failed to reset equalizer: $e'),
+      ));
     }
   }
 

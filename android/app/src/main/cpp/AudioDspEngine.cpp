@@ -1084,18 +1084,30 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
     }
 
-    // Output-integrity guard: if any upstream stage emitted a non-finite sample
-    // (corrupt tag, denormal blow-up, bad coefficient), scrub it and reset the
-    // whole chain. Without this a poisoned filter/gain state stays NaN and every
-    // subsequent track plays as persistent noise until the process restarts.
+    // FIX M-1: Unconditional output-integrity guard — runs on EVERY block,
+    // independent of any stage toggle. Two jobs in one pass:
+    //   (a) non-finite scrub: a non-finite sample (corrupt tag, denormal
+    //       blow-up, bad coefficient) is zeroed and the whole chain is reset,
+    //       so a poisoned filter/gain state cannot persist as NaN and turn every
+    //       subsequent track into permanent noise until the process restarts.
+    //   (b) hard clamp to [-1, 1]: the brickwall limiter stage is conditional
+    //       (STAGE_LIMITER && (hasNetPositiveGain || limiter.enabled)) and
+    //       hasNetPositiveGain ignores reverb wet, crossfeed, saturation drive,
+    //       dynamicEq boost, multiband makeup, arbitrary-EQ, ViPER-DDC and
+    //       LiveProg — any of which can push peaks > 1.0 with the limiter OFF.
+    //       The old scrub only fixed NaN, not magnitude, so those peaks hard-
+    //       clipped downstream. Clamping here guarantees no sample ever leaves
+    //       the engine out of range. Branchless clamp, zero allocation.
     {
         const int total = frames * channels;
         bool nonFiniteFound = false;
         for (int i = 0; i < total; ++i) {
-            if (!std::isfinite(buffer[i])) {
-                buffer[i] = 0.0f;
+            float s = buffer[i];
+            if (!std::isfinite(s)) {
+                s = 0.0f;
                 nonFiniteFound = true;
             }
+            buffer[i] = std::clamp(s, -1.0f, 1.0f);
         }
         if (nonFiniteFound) {
             resetInternal();

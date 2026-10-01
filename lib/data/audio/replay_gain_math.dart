@@ -46,10 +46,14 @@ class ReplayGainMath {
     }
 
     double preampDb;
+    // A tag is present when [gainDb] is non-null and finite. A track legitimately
+    // tagged exactly 0.0 dB IS tagged (already at reference loudness) and must use
+    // [preampWithRg] — not be mistaken for "untagged" and fall back to
+    // [preampWithoutRg]. Nullability carries the tagged/untagged distinction, so
+    // 0.0 is no longer special-cased.
+    final bool hasTag = gainDb != null && gainDb.isFinite;
     // Guard against NaN/Infinity from corrupt tags — fall back to no gain.
-    if (gainDb != null &&
-        gainDb.isFinite &&
-        gainDb != 0.0 &&
+    if (hasTag &&
         preampWithRg.isFinite &&
         preampWithoutRg.isFinite &&
         volume.isFinite) {
@@ -97,9 +101,10 @@ class ReplayGainMath {
     }
   }
 
-  /// Selects the effective preamp: [preampWithRg] when a finite non-zero tag
-  /// exists, else [preampWithoutRg]. Mirrors [apply] without volume scaling —
-  /// the native stage applies gain itself, so the mixer stays at unity.
+  /// Selects the effective preamp: [preampWithRg] when a finite tag exists
+  /// (including a legitimate 0.0 dB tag), else [preampWithoutRg]. Mirrors
+  /// [apply] without volume scaling — the native stage applies gain itself, so
+  /// the mixer stays at unity.
   static double nativePreAmpFor({
     required String mode,
     double? trackGainDb,
@@ -123,7 +128,8 @@ class ReplayGainMath {
       default:
         return 0.0;
     }
-    final hasTag = gainDb != null && gainDb.isFinite && gainDb != 0.0;
+    // Tagged 0.0 dB is still a tag (see [apply]); do not treat it as untagged.
+    final hasTag = gainDb != null && gainDb.isFinite;
     if (hasTag) return preampWithRg.isFinite ? preampWithRg : 0.0;
     return preampWithoutRg.isFinite ? preampWithoutRg : 0.0;
   }

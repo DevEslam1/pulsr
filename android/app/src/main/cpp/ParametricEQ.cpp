@@ -40,6 +40,14 @@ void ParametricEQ::setSampleRate(double sampleRate) {
     for (int i = 0; i < bandCount_; ++i) {
         computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
     }
+    // FIX M-7: a rate change swaps every band's coefficient set, so the
+    // retained TDF-II delay registers (s1_/s2_) belong to the old coefficients
+    // and thump on the first block. applyParams only clears state on a
+    // structural change (~:120-130), so a pure rate change never clears it
+    // otherwise. Mirror SubCrossover/LookaheadLimiter and flush all delay
+    // registers after recompute.
+    std::memset(s1_, 0, sizeof(s1_));
+    std::memset(s2_, 0, sizeof(s2_));
 }
 
 void ParametricEQ::setBandCount(int count) {
@@ -48,6 +56,10 @@ void ParametricEQ::setBandCount(int count) {
 }
 
 void ParametricEQ::setDynamicBands(int count, const double* freqs, const double* qs) {
+    // FIX M-10: guard the raw freqs pointer. qs is already null-guarded below
+    // (qs ? qs[i] : ...), but freqs[i] is dereferenced unconditionally, so a
+    // null or empty list would crash.
+    if (!freqs || count <= 0) return;
     bandCount_ = std::clamp(count, 1, MAX_BANDS);
     for (int i = 0; i < bandCount_; ++i) {
         bands_[i].frequency = freqs[i];

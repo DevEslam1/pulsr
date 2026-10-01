@@ -23,7 +23,6 @@ class PlaybackVolumeController {
   bool _dvcEnabled = false;
   bool _bitPerfectBypass = false;
 
-  Timer? _transitionTimer;
   Completer<void>? _transitionCompleter;
   bool _isDisposed = false;
   bool _isTransitionActive = false;
@@ -153,8 +152,10 @@ class PlaybackVolumeController {
     if (_isDisposed) return;
     final clamped = targetVolume.clamp(0.0, 1.0);
     _transitionGeneration++;
-    _transitionTimer?.cancel();
-    _transitionTimer = null;
+    // Bumping the generation supersedes any in-flight smooth transition. That
+    // transition's loop can no longer clear this flag (its finally is
+    // generation-gated), so clear it here. The smooth path below re-arms it.
+    _isTransitionActive = false;
 
     if (!smoothTransition) {
       try {
@@ -234,13 +235,11 @@ class PlaybackVolumeController {
 
   /// Lifecycle teardown hook (Prompt 1.3).
   void dispose() {
-    // BUG-07: mark disposed and invalidate any in-flight transition timer
-    // before cancelling it, so a callback already in flight cannot setVolume.
+    // BUG-07: mark disposed and bump the generation so any in-flight smooth
+    // transition loop bails out (generation-gated) before touching the player.
     _isDisposed = true;
     _isTransitionActive = false;
     _transitionGeneration++;
-    _transitionTimer?.cancel();
-    _transitionTimer = null;
     if (_transitionCompleter != null && !_transitionCompleter!.isCompleted) {
       _transitionCompleter!.complete();
     }

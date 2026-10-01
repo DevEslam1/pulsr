@@ -29,6 +29,15 @@ part 'equalizer_preset_ops.dart';
 part 'equalizer_snapshot_ops.dart';
 part 'equalizer_effect_ops.dart';
 
+/// Coerces a non-finite [value] (NaN or ±infinity) to [fallback], then clamps
+/// into [min]..[max]. Dart's `num.clamp` propagates NaN (clamp(NaN, lo, hi) ==
+/// NaN), so numeric setters must finite-guard the incoming argument before
+/// clamping or garbage reaches native. Mirrors `clampFinite` on the native
+/// side (DspParams.h / AudioDspEngine sanitizers). Library-level so every
+/// `part` file setter shares one definition (modelled on setBandGain's guard).
+double _clampFinite(double value, double min, double max, double fallback) =>
+    (value.isFinite ? value : fallback).clamp(min, max);
+
 class EqualizerManager {
   /// Native `ParametricEQ::MAX_BANDS` (android/app/src/main/cpp/ParametricEQ.h).
   static const int equalizerMaxNativeBands = 64;
@@ -54,6 +63,9 @@ class EqualizerManager {
       ValueNotifier<Map<String, String>>(const {});
 
   void _recordEffectOutcome(String effectKey, bool applied) {
+    // Never touch effectStatusNotifier once disposed: dispose() calls
+    // effectStatusNotifier.dispose(), after which writing .value throws.
+    if (_isDisposed) return;
     final current = effectStatusNotifier.value;
     if (applied) {
       if (current.containsKey(effectKey)) {
@@ -65,13 +77,11 @@ class EqualizerManager {
     if (current.containsKey(effectKey)) return; // already known; no log spam
     final next = Map<String, String>.from(current)..[effectKey] = 'notApplied';
     effectStatusNotifier.value = Map.unmodifiable(next);
-    if (!_isDisposed) {
-      ErrorLogger.log(
-        'Effect "$effectKey" reported it could not be applied by the audio engine '
-        '(unsupported, build failure, or unavailable session)',
-        category: 'EqualizerManager',
-      );
-    }
+    ErrorLogger.log(
+      'Effect "$effectKey" reported it could not be applied by the audio engine '
+      '(unsupported, build failure, or unavailable session)',
+      category: 'EqualizerManager',
+    );
   }
 
   EqPreset currentPreset = EqPreset.defaultPresets.first;
@@ -664,10 +674,11 @@ class EqualizerManager {
           );
         }
       }
-      if (isBitPerfectBypass) {
-        _syncPipeline();
-        return;
-      }
+      // Hydrate stored dynamic-EQ bands and the selected headphone profile into
+      // memory BEFORE the bit-perfect early-return. These only populate
+      // in-memory state (no native push), so the stored config survives the
+      // session even while bypass is on and is correctly re-applied once bypass
+      // is turned off, instead of being silently lost.
       final dynEqJson = prefs.getString(PrefsKeys.dynamicEqBands);
       if (dynEqJson != null) {
         try {
@@ -692,6 +703,11 @@ class EqualizerManager {
         selectedHeadphoneProfile = HeadphoneProfilesRepository().getProfileById(
           profileId,
         );
+      }
+
+      if (isBitPerfectBypass) {
+        _syncPipeline();
+        return;
       }
 
       // Batch native effect enables to avoid sound-drop dropout (requires EQ off/on to fix)
@@ -1314,7 +1330,9 @@ class EqualizerManager {
   }
 
   Future<void> setPreamp(double preampDb) async {
-    this.preampDb = preampDb.clamp(-15.0, 15.0);
+    // Finite-guard before clamp: a NaN would otherwise survive clamp() and
+    // reach native (mirrors setBandGain's isFinite guard).
+    this.preampDb = _clampFinite(preampDb, -15.0, 15.0, 0.0);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setEqPreamp(this.preampDb);
     }
@@ -2242,7 +2260,15 @@ class EqualizerManager {
       return; // 0 = no session yet; never attach to the global mix
     }
     _pendingReattachSessionId = sessionId;
-    _reattachChain = _reattachChain.then((_) => _runReattach()).catchError((
+    // Serialize the reattach through _effectsLock (not just _reattachChain) so a
+    // release -> re-push cannot interleave with a concurrent _flushBandGains or
+    // _savePreferences, both of which already hold _effectsLock. _runReattach /
+    // _pushFullEffectState push native via _effectsChannel directly and never
+    // re-enter _effectsLock, so this cannot deadlock. _reattachChain still
+    // collapses rapid session ids down to the newest.
+    _reattachChain = _reattachChain
+        .then((_) => _effectsLock.lock(() => _runReattach()))
+        .catchError((
       Object e,
       StackTrace st,
     ) {
@@ -2263,8 +2289,10 @@ class EqualizerManager {
   /// ended the audio focus. Idempotent and safe to call repeatedly.
   Future<void> resyncActiveEffects() async {
     if (!PlatformCapabilities.isAndroid) return;
+    // Same locking rationale as reapplyToSession: push the full state under
+    // _effectsLock so it cannot interleave with a band-gain flush / pref write.
     _reattachChain = _reattachChain
-        .then((_) => _pushFullEffectState())
+        .then((_) => _effectsLock.lock(() => _pushFullEffectState()))
         .catchError((Object e, StackTrace st) {
       ErrorLogger.log(
         'resyncActiveEffects failed',

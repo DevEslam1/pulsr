@@ -24,6 +24,21 @@ void DynamicEQ::setSampleRate(double sampleRate) {
         updateBandCache(bands_[i]);
         bands_[i].lastCoeffGainDb = 1e9; // force recompute at new rate
         computeBandCoeffs(bands_[i], bands_[i].currentGainDb);
+        // FIX M-7: the detection band-pass and application biquads were just
+        // recomputed for the new rate; their retained registers belong to the
+        // old coefficients and would thump. computeBandCoeffs only clears the
+        // application state when |gain|<1e-6 and never clears the detector
+        // state, so flush both explicitly on a rate change (mirrors reset()).
+        BandState& band = bands_[i];
+        std::memset(band.dx1, 0, sizeof(band.dx1));
+        std::memset(band.dx2, 0, sizeof(band.dx2));
+        std::memset(band.dy1, 0, sizeof(band.dy1));
+        std::memset(band.dy2, 0, sizeof(band.dy2));
+        std::memset(band.env, 0, sizeof(band.env));
+        std::memset(band.x1, 0, sizeof(band.x1));
+        std::memset(band.x2, 0, sizeof(band.x2));
+        std::memset(band.y1, 0, sizeof(band.y1));
+        std::memset(band.y2, 0, sizeof(band.y2));
     }
 }
 
@@ -35,8 +50,22 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     if (idx < 0 || idx >= MAX_BANDS) return;
     if (idx >= bandCount_) bandCount_ = idx + 1;
     BandState& band = bands_[idx];
-    band.frequency = std::clamp(params.frequency, 20.0, sampleRate_ * 0.45);
-    band.q = std::clamp(params.q, 0.1, 12.0);
+
+    // FIX M-8: detect a structural change (frequency / Q / filter type) so this
+    // band's retained filter state can be cleared below. computeBandCoeffs only
+    // zeroes the application state when |gain|<1e-6 (~:137-140) and never
+    // touches the detector state, so a retune at non-zero gain otherwise leaves
+    // stale registers and clicks. Capture old values before overwriting them.
+    const double newFreq = std::clamp(params.frequency, 20.0, sampleRate_ * 0.45);
+    const double newQ = std::clamp(params.q, 0.1, 12.0);
+    const int newFilterType = std::clamp(params.filterType, 0, 2);
+    const bool structureChanged =
+        std::abs(newFreq - band.frequency) > 1e-6 ||
+        std::abs(newQ - band.q) > 1e-6 ||
+        newFilterType != band.filterType;
+
+    band.frequency = newFreq;
+    band.q = newQ;
     band.thresholdDb = std::clamp(params.thresholdDb, -80.0, 0.0);
     band.ratio = std::clamp(params.ratio, 1.0, 20.0);
     band.attackMs = std::clamp(params.attackMs, 0.1, 200.0);
@@ -44,10 +73,24 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     band.maxCutDb = std::clamp(params.maxCutDb, -24.0, 0.0);
     band.maxBoostDb = std::clamp(params.maxBoostDb, 0.0, 24.0);
     band.mode = std::clamp(params.mode, 0, 1);
-    band.filterType = std::clamp(params.filterType, 0, 2);
+    band.filterType = newFilterType;
     band.enabled = params.enabled;
     updateBandCache(band);
     band.lastCoeffGainDb = 1e9; // force recompute
+
+    // FIX M-8: only the band that actually changed is cleared, so untouched
+    // bands keep their filter continuity.
+    if (structureChanged) {
+        std::memset(band.dx1, 0, sizeof(band.dx1));
+        std::memset(band.dx2, 0, sizeof(band.dx2));
+        std::memset(band.dy1, 0, sizeof(band.dy1));
+        std::memset(band.dy2, 0, sizeof(band.dy2));
+        std::memset(band.env, 0, sizeof(band.env));
+        std::memset(band.x1, 0, sizeof(band.x1));
+        std::memset(band.x2, 0, sizeof(band.x2));
+        std::memset(band.y1, 0, sizeof(band.y1));
+        std::memset(band.y2, 0, sizeof(band.y2));
+    }
 }
 
 void DynamicEQ::applyParams(const DynamicEqParamSet& params) {
@@ -324,6 +367,18 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
         const double releaseCoeff = 1.0 - std::exp(-1.0 / (sampleRate_ * band.releaseMs * 0.001));
 
         for (int i = 0; i < frames; ++i) {
+            // FIX M-9: flush non-finite inputs in place before they reach the
+            // detector or application biquads. The denormal flush
+            // (std::abs(..) < 1e-25) does NOT catch NaN/inf, so one bad sample
+            // would otherwise poison env/dx/dy (and y1/y2) and trip the engine's
+            // heavy global resetInternal(). The sibling process(L,R) path
+            // sanitizes its inputs up front (~:211-212); do the same here so the
+            // detection read, the SIMD/scalar application reads and the x-history
+            // updates all see finite values.
+            for (int ch = 0; ch < chCount; ++ch) {
+                if (!std::isfinite(buffer[i * channels + ch])) buffer[i * channels + ch] = 0.0f;
+            }
+
             double envMax = 0.0;
             for (int ch = 0; ch < chCount; ++ch) {
                 const double x = buffer[i * channels + ch];
@@ -385,8 +440,10 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
 
                 double y0 = vgetq_lane_f64(vy, 0);
                 double y1 = vgetq_lane_f64(vy, 1);
-                if (std::abs(y0) < 1e-25) y0 = 0.0;
-                if (std::abs(y1) < 1e-25) y1 = 0.0;
+                // FIX M-9: flush NaN/inf as well as denormals before the output
+                // feeds back into the y1/y2 history.
+                if (!std::isfinite(y0) || std::abs(y0) < 1e-25) y0 = 0.0;
+                if (!std::isfinite(y1) || std::abs(y1) < 1e-25) y1 = 0.0;
 
                 band.x2[0] = band.x1[0]; band.x2[1] = band.x1[1];
                 band.x1[0] = buffer[i * channels]; band.x1[1] = buffer[i * channels + 1];
@@ -414,8 +471,10 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
 
                 alignas(16) double y_arr[2];
                 _mm_store_pd(y_arr, vy);
-                if (std::abs(y_arr[0]) < 1e-25) y_arr[0] = 0.0;
-                if (std::abs(y_arr[1]) < 1e-25) y_arr[1] = 0.0;
+                // FIX M-9: flush NaN/inf as well as denormals before the output
+                // feeds back into the y1/y2 history.
+                if (!std::isfinite(y_arr[0]) || std::abs(y_arr[0]) < 1e-25) y_arr[0] = 0.0;
+                if (!std::isfinite(y_arr[1]) || std::abs(y_arr[1]) < 1e-25) y_arr[1] = 0.0;
 
                 band.x2[0] = band.x1[0]; band.x2[1] = band.x1[1];
                 band.x1[0] = buffer[i * channels]; band.x1[1] = buffer[i * channels + 1];
@@ -429,8 +488,10 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                     const double x = buffer[i * channels + ch];
                     double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
                         - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
-                    if (std::abs(y) < 1e-25) y = 0.0;
-                    
+                    // FIX M-9: flush NaN/inf as well as denormals before y feeds
+                    // back into the y1/y2 history.
+                    if (!std::isfinite(y) || std::abs(y) < 1e-25) y = 0.0;
+
                     band.x2[ch] = band.x1[ch];
                     band.x1[ch] = x;
                     band.y2[ch] = band.y1[ch];
@@ -443,8 +504,10 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
                     const double x = buffer[i * channels + ch];
                     double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
                         - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
-                    if (std::abs(y) < 1e-25) y = 0.0;
-                    
+                    // FIX M-9: flush NaN/inf as well as denormals before y feeds
+                    // back into the y1/y2 history.
+                    if (!std::isfinite(y) || std::abs(y) < 1e-25) y = 0.0;
+
                     band.x2[ch] = band.x1[ch];
                     band.x1[ch] = x;
                     band.y2[ch] = band.y1[ch];

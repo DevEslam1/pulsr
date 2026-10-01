@@ -2,13 +2,81 @@
 part of 'player_dsp_controller.dart';
 
 extension PlayerDspEffectsExtension on PlayerDspController {
+  /// Collects every currently-active gain stage (in dB) for the shared clipping
+  /// budget, reading live values from PlayerState, the equalizer manager and
+  /// the volume controller. [excludeVolumeBoost] / [excludeBassBoost] drop the
+  /// stage being (re)set so it is budgeted against the OTHERS only.
+  List<GainStage> _activeGainStages({
+    bool excludeVolumeBoost = false,
+    bool excludeBassBoost = false,
+  }) {
+    final state = _getState();
+    final eq = _audioHandler.equalizerManager;
+    final vol = _audioHandler.volumeController;
+    final rgActive = (vol?.replayGainMode ?? 'off') != 'off';
+    final stages = <GainStage>[
+      // EQ preamp already folds in the selected headphone profile's preamp
+      // (manager.preampDb is set from the profile on apply), so it is the single
+      // preamp stage here — summing it AND the profile preampGain would
+      // double-count (and a negative AutoEQ preamp would wrongly inflate the
+      // budget).
+      GainStage('EQ preamp', eq.preampDb),
+      GainStage(
+          'ReplayGain preamp', rgActive ? (vol?.preampWithRg ?? 0.0) : 0.0),
+      GainStagingBudget.scaledStage('Loudness contour',
+          enabled: state.isLoudnessContourEnabled,
+          maxDb: GainStagingBudget.maxLoudnessContourDb,
+          intensity: state.loudnessContourIntensity),
+      GainStagingBudget.scaledStage('Saturation',
+          enabled: state.isSaturationEnabled,
+          maxDb: GainStagingBudget.maxSaturationDb),
+      GainStagingBudget.scaledStage('Dynamic bass',
+          enabled: state.isDynamicBassEnabled,
+          maxDb: GainStagingBudget.maxDynamicBassDb,
+          intensity: (state.dynamicBassStrength - 1.0) / 7.0),
+      GainStagingBudget.scaledStage('Sub crossover',
+          enabled: state.isSubCrossoverEnabled,
+          maxDb: GainStagingBudget.maxSubCrossoverDb,
+          intensity: state.subCrossoverGain),
+    ];
+    if (!excludeBassBoost) {
+      stages.add(GainStage(
+          'Bass boost',
+          state.eqPreset.bassBoost.clamp(0.0, 1.0).toDouble() *
+              GainStagingBudget.maxBassBoostDb));
+    }
+    if (!excludeVolumeBoost) {
+      stages.add(GainStage(
+          'Volume boost',
+          state.volumeBoost.clamp(0.0, 1.0).toDouble() *
+              GainStagingBudget.maxVolumeBoostDb));
+    }
+    return stages;
+  }
+
   // Audio Effects
   Future<void> setBassBoost(double amount) async {
-    final clamped = amount.clamp(0.0, 1.0);
+    final requested = amount.clamp(0.0, 1.0).toDouble();
+    // Budget bass boost against every other active boost stage so the summed
+    // DSP gain stays within headroom (not just an isolated 0..1 clamp).
+    final allowedDb = GainStagingBudget.clampBoostDb(
+      requestedBoostDb: requested * GainStagingBudget.maxBassBoostDb,
+      committedStages: _activeGainStages(excludeBassBoost: true),
+    );
+    final clamped =
+        (allowedDb / GainStagingBudget.maxBassBoostDb).clamp(0.0, 1.0).toDouble();
+    if (clamped < requested - 0.01) {
+      ErrorLogger.log(
+        'Bass boost request (${(amount * 10).toStringAsFixed(1)} dB) clamped to '
+        '+${(clamped * 10).toStringAsFixed(1)} dB to keep the summed DSP gain '
+        'within +${GainStagingBudget.defaultHeadroomCeilingDb.toStringAsFixed(1)} dB headroom',
+        category: 'PlayerDspEffects',
+      );
+    }
     final state = _getState();
     await applyDspEffect(
       featureName: 'Bass Boost',
-      guardCondition: amount > 0.01,
+      guardCondition: requested > 0.01,
       updateDsp: (dsp) => dsp.copyWith(
         eqPreset: EqPreset(
           name: state.eqPreset.name,
@@ -208,18 +276,25 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setVolumeBoost(double value) {
-    final state = _getState();
-    final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
-    var safeValue = value.clamp(0.0, 1.0);
-    if ((preampDb + safeValue * 10.0) > 6.0) {
-      safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
-      if (safeValue < value - 0.01) {
-        ErrorLogger.log(
-          'Volume boost request (${(value * 10).toStringAsFixed(1)} dB) clamped to '
-          '+${(safeValue * 10).toStringAsFixed(1)} dB to prevent clipping with preamp (${preampDb.toStringAsFixed(1)} dB)',
-          category: 'PlayerDspEffects',
-        );
-      }
+    final requested = value.clamp(0.0, 1.0).toDouble();
+    // Budget the broadband volume boost against the FULL active gain chain
+    // (EQ/ReplayGain preamp, bass boost, loudness, saturation, dynamic bass,
+    // sub-crossover) instead of only the headphone preamp, so stacking effects
+    // can never drive the summed gain past the shared headroom ceiling.
+    final allowedDb = GainStagingBudget.clampBoostDb(
+      requestedBoostDb: requested * GainStagingBudget.maxVolumeBoostDb,
+      committedStages: _activeGainStages(excludeVolumeBoost: true),
+    );
+    final safeValue = (allowedDb / GainStagingBudget.maxVolumeBoostDb)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    if (safeValue < requested - 0.01) {
+      ErrorLogger.log(
+        'Volume boost request (${(value * 10).toStringAsFixed(1)} dB) clamped to '
+        '+${(safeValue * 10).toStringAsFixed(1)} dB to keep the summed DSP gain '
+        'within +${GainStagingBudget.defaultHeadroomCeilingDb.toStringAsFixed(1)} dB headroom',
+        category: 'PlayerDspEffects',
+      );
     }
     return applyDspEffect(
       featureName: 'Volume Boost',

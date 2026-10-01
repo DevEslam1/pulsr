@@ -106,6 +106,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var dvcEnabled = false
     @Volatile private var dvcSavedSystemVolume = -1
     @Volatile private var dvcActive = false
+    // Last digital DVC gain pushed to the native float stage; retained so DVC
+    // can be re-established after a bit-perfect bypass round-trip.
+    @Volatile private var dvcGain = 1.0
 
     @Volatile private var isCrossfeedEnabled = false
     @Volatile private var crossfeedDelayUs = 350.0
@@ -199,11 +202,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrNativeControl") }
     )
 
-    private fun safeReverbExecute(action: () -> Unit): Boolean {
+    private fun safeReverbExecute(onDropped: (() -> Unit)? = null, action: () -> Unit): Boolean {
         if (disposed.get()) return false
         try {
             reverbExecutor.execute {
-                if (disposed.get() || !isNativeDspLoaded) return@execute
+                if (disposed.get() || !isNativeDspLoaded) {
+                    // Action dropped after scheduling: signal the caller so a
+                    // pending reply (e.g. result.success) is not lost.
+                    onDropped?.invoke()
+                    return@execute
+                }
                 try { action() } catch (_: Exception) {}
             }
             return true
@@ -225,7 +233,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrNativeControl") }
                 )
                 reverbExecutor.execute {
-                    if (disposed.get() || !isNativeDspLoaded) return@execute
+                    if (disposed.get() || !isNativeDspLoaded) {
+                        onDropped?.invoke()
+                        return@execute
+                    }
                     try { action() } catch (_: Exception) {}
                 }
                 Log.i(TAG, "Native control executor successfully recreated and action executed")
@@ -1918,7 +1929,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
 
                     val copy = irList.toList()
-                    val scheduled = safeReverbExecute {
+                    val scheduled = safeReverbExecute(onDropped = { result.success(false) }) {
                         if (disposed.get() || !isNativeDspLoaded) {
                             result.success(false)
                             return@safeReverbExecute
@@ -2983,6 +2994,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         } else {
                             dvcEnabled = false
                             dvcActive = false
+                            dvcGain = 1.0
                             if (dvcSavedSystemVolume >= 0 && am != null) {
                                 am.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
                             }
@@ -3006,6 +3018,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.success(false)
                         return
                     }
+                    dvcGain = gain
                     try {
                         nativeSetDirectVolumeParams(true, gain)
                         cachedDebugReport = null
@@ -3026,12 +3039,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             isDopActive = isDop
                             // Mirror into the native snapshot so the C++ early-return
                             // fires even if a stages mask is stale after reattach.
-                            try { nativeSetBitPerfectParams(bypass, isDop) } catch (_: Exception) {}
+                            // Guard the JNI call: an UnsatisfiedLinkError (a Throwable,
+                            // not an Exception) crashes if libpulsr_dsp failed to load.
+                            if (isNativeDspLoaded) {
+                                try { nativeSetBitPerfectParams(bypass, isDop) } catch (_: Throwable) {}
+                            }
                             // DVC cannot apply its float gain through the bypass
                             // early-return, so suspend it while bit-perfect is active.
+                            // Hearing-safety: DVC pins STREAM_MUSIC to device max and
+                            // attenuates digitally; the bypass early-return drops that
+                            // digital attenuation, so restore the user's saved system
+                            // volume to avoid full-scale PCM at max hardware volume.
                             if (bypass && dvcEnabled) {
                                 dvcActive = false
-                                try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Exception) {}
+                                if (isNativeDspLoaded) {
+                                    try { nativeSetDirectVolumeParams(false, 1.0) } catch (_: Throwable) {}
+                                }
+                                if (dvcSavedSystemVolume >= 0) {
+                                    try {
+                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                        am?.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
+                                    } catch (_: Throwable) {}
+                                }
                             }
                             if (bypass) {
                                 // Immediately disable virtualizer/loudness/bass + native stages
@@ -3047,6 +3076,26 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 // Same suppression-aware DP enable rule as everywhere else.
                                 updateDpEnabled()
                                 restoreNativeStateAfterBypass()
+                                // Hearing-safety: re-establish DVC after leaving
+                                // bit-perfect. Re-pin STREAM_MUSIC to device max and
+                                // re-apply the digital gain so loudness returns to the
+                                // pre-bypass (hardware*digital) level rather than
+                                // staying at the user's raw system volume.
+                                if (dvcEnabled) {
+                                    dvcActive = true
+                                    try {
+                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                        if (am != null) {
+                                            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                            if (max > 0) {
+                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                                            }
+                                        }
+                                    } catch (_: Throwable) {}
+                                    if (isNativeDspLoaded) {
+                                        try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
+                                    }
+                                }
                             }
                         }
                     }
@@ -3079,7 +3128,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     val isDop = call.argument<Boolean>("isDop") ?: false
                     isDopActive = isDop
-                    try { nativeSetBitPerfectParams(enabled, isDop) } catch (e: Exception) { Log.w(TAG, "nativeSetBitPerfectParams failed: ${e.message}") }
+                    // Guard the JNI call: UnsatisfiedLinkError is a Throwable, not
+                    // an Exception, so it would crash when libpulsr_dsp is absent.
+                    if (isNativeDspLoaded) {
+                        try { nativeSetBitPerfectParams(enabled, isDop) } catch (e: Throwable) { Log.w(TAG, "nativeSetBitPerfectParams failed: ${e.message}") }
+                    }
                     result.success(true)
                 }
 
@@ -3368,7 +3421,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         // 13. Dynamic EQ (Native C++)
         val deqActive = isDynamicEqEnabled && !isBitPerfectBypassActive
-        if (deqActive) activeNames.add("Dynamic EQ (3 Bands Active)")
+        if (deqActive) activeNames.add("Dynamic EQ ($dynamicEqBandCount Bands Active)")
         stagesList.add(buildDspStage(
             name = "Dynamic Equalizer",
             category = "Native C++ Engine",
@@ -3377,7 +3430,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             isBypassed = isBitPerfectBypassActive,
             isDegraded = ((autoDegraded and STAGE_DYNEQ) != 0),
             parameters = mapOf(
-                "bands" to 3
+                "bands" to dynamicEqBandCount
             ),
             statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isDynamicEqEnabled) "Active" else "Disabled"
         ))
@@ -4266,6 +4319,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
 
     private fun recreateEffects() {
+        // Give the new session a fresh chance at a stereo DynamicsProcessing
+        // config instead of inheriting a prior session's mono fallback.
+        effectiveChannelCount = CHANNEL_COUNT
         // Release old instances BEFORE creating new ones to prevent audio session conflicts
         try { virtualizer?.release() } catch (_: Exception) {}
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
@@ -4485,6 +4541,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeDynamicBassParams = null
         dpBuildFailures = 0
         dpBuildFailureSessionId = 0
+        // Reset the stereo->mono DynamicsProcessing fallback so one transient
+        // config rejection does not pin the plugin to mono for its lifetime.
+        effectiveChannelCount = CHANNEL_COUNT
     }
 
     fun hasActiveEffects(): Boolean {

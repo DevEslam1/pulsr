@@ -25,6 +25,11 @@ void LoudnessContour::setSampleRate(double sampleRate) {
     for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
         computeLowShelf(bass_[ch], kBassShelfHz, currentBassDb_, sampleRate_);
         computeHighShelf(treble_[ch], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        // FIX M-7: the shelves were just recomputed for the new rate; their
+        // retained delay registers belong to the old coefficients and would
+        // click on the first block. Clear state only, leaving the fresh coeffs.
+        bass_[ch].x1 = bass_[ch].x2 = bass_[ch].y1 = bass_[ch].y2 = 0.0;
+        treble_[ch].x1 = treble_[ch].x2 = treble_[ch].y1 = treble_[ch].y2 = 0.0;
     }
 }
 

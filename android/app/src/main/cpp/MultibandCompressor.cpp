@@ -24,6 +24,14 @@ void MultibandCompressor::setSampleRate(double sampleRate) {
     if (sampleRate > 768000.0) sampleRate = 768000.0;
     sampleRate_ = sampleRate;
     updateCoefficients();
+    // FIX M-7: the crossovers were just reconfigured for the new rate; their
+    // retained LR4 filter registers belong to the old coefficients and would
+    // thump on the first block. LinkwitzRiley4::configure() already resets on a
+    // rate change, but flush explicitly here so a stale register set can never
+    // survive a rate swap (mirrors SubCrossover/LookaheadLimiter).
+    crossoverMid_.reset();
+    crossoverLow_.reset();
+    crossoverHigh_.reset();
 }
 
 void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params) {
@@ -127,6 +135,20 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         const int chunkFrames = std::min(framesRemaining, MAX_CHUNK_FRAMES);
 
         // 1. Split chunk into 4 frequency bands via Linkwitz-Riley 4th order crossovers
+        //
+        // FIX M-11 (DEFERRED - DOCUMENTATION ONLY, audio math unchanged):
+        // This 3-crossover tree is NOT phase-matched. Bands 0/1 pass through
+        // crossoverMid_'s low half then crossoverLow_, while bands 2/3 pass
+        // through crossoverMid_'s high half then crossoverHigh_. A correct LR4
+        // tree needs allpass phase compensation on each band so the three
+        // split points sum to a flat (unity) magnitude response: without it the
+        // recombined output at step 3 is NOT a flat reconstruction near the
+        // crossover frequencies, even when every band is at unity gain (true
+        // bypass). Restructuring the tree (e.g. feeding the complementary
+        // allpass of each sibling crossover into every band) must NOT be done
+        // blindly here: it has to be verified against test_bypass_transparency
+        // (flat reconstruction) with a real compile/test, which is unavailable
+        // in this environment. Left as-is intentionally.
         for (int i = 0; i < chunkFrames; ++i) {
             const int inIdx = (offset + i) * channels;
             const double inL = buffer[inIdx];
@@ -215,6 +237,9 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         }
         for (; i < chunkFrames; ++i) {
             const int outIdx = (offset + i) * channels;
+            // FIX M-11 (DEFERRED): naive band sum. Not a flat reconstruction
+            // near the crossovers without allpass phase compensation on the LR4
+            // tree above - see the note at step 1. Audio math left unchanged.
             buffer[outIdx] = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
             buffer[outIdx + 1] = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
         }

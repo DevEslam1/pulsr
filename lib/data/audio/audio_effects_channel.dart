@@ -552,7 +552,7 @@ class AudioEffectsChannel {
       await _channel.invokeMethod('setEqBandGain', {
         'index': index,
         'gainDb': gainDb,
-      });
+      }).timeout(const Duration(seconds: 3));
       return true;
     } catch (e, st) {
       ErrorLogger.log(
@@ -1003,7 +1003,7 @@ class AudioEffectsChannel {
           'irSamples': irSamples,
           'channels': 1, // FIX C-1: ir_file_parser.dart always outputs mono
         },
-      );
+      ).timeout(const Duration(seconds: 10)); // large payload
       // Older bridges return nothing on success; only an explicit false is a
       // failure signal.
       return result ?? true;
@@ -1058,7 +1058,7 @@ class AudioEffectsChannel {
     try {
       await _channel.invokeMethod('setSincResamplerEnabled', {
         'enabled': enabled,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set sinc resampler enabled ($enabled)',
@@ -1199,7 +1199,7 @@ class AudioEffectsChannel {
     try {
       await _channel.invokeMethod('setLoudnessContourEnabled', {
         'enabled': enabled,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set loudness contour enabled ($enabled)',
@@ -1949,7 +1949,7 @@ class AudioEffectsChannel {
       final bool? ok = await _channel.invokeMethod<bool>('loadViperDdc', {
         'ddcContent': ddcContent,
         'profileName': profileName,
-      });
+      }).timeout(const Duration(seconds: 10)); // large payload
       return ok ?? false;
     } catch (e, st) {
       ErrorLogger.log(
@@ -1987,7 +1987,7 @@ class AudioEffectsChannel {
       final bool? ok = await _channel.invokeMethod<bool>('loadArbitraryEq', {
         'eqString': eqString,
         'linearPhase': linearPhase,
-      });
+      }).timeout(const Duration(seconds: 10)); // large payload
       return ok ?? false;
     } catch (e, st) {
       ErrorLogger.log(
@@ -2022,7 +2022,7 @@ class AudioEffectsChannel {
       final String? status = await _channel.invokeMethod<String>(
         'loadLiveProgCode',
         {'code': code},
-      );
+      ).timeout(const Duration(seconds: 10)); // large payload / EEL compile
       return status ?? 'OK';
     } catch (e, st) {
       ErrorLogger.log(

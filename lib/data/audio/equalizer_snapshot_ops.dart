@@ -43,6 +43,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
         'crossfeedEnabled': isCrossfeedEnabled,
         'crossfeedDelayUs': crossfeedDelayUs,
         'crossfeedFeedDb': crossfeedFeedDb,
+        'crossfeedFcut': crossfeedFcut,
         'crossfeedMode': crossfeedMode,
         // Lookahead limiter + compressor knobs
         'limiterEnabled': isLimiterEnabled,
@@ -187,6 +188,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
       b('crossfeedEnabled', isCrossfeedEnabled),
       delayUs: d('crossfeedDelayUs', crossfeedDelayUs),
       feedDb: d('crossfeedFeedDb', crossfeedFeedDb),
+      fcut: d('crossfeedFcut', crossfeedFcut),
       mode: i('crossfeedMode', crossfeedMode),
     );
 
@@ -208,9 +210,19 @@ extension EqualizerSnapshotOps on EqualizerManager {
     // Convolution reverb (crossChannel has no public setter — set the field
     // and push through the channel directly, mirroring restore).
     reverbCrossChannel = d('reverbCrossChannel', reverbCrossChannel);
+    // Snapshots never serialize the raw custom impulse response, so a stored
+    // `custom` preset would restore a silent reverb when no IR is live in
+    // memory. Fall back to a synthesizable room (Studio) so the stage is
+    // audible instead of dead; a loaded IR in memory is still honored.
+    final storedReverbPreset = i('reverbPreset', reverbPreset);
+    final effectiveReverbPreset =
+        (storedReverbPreset == ReverbPreset.custom.wireValue &&
+                customImpulseResponse.isEmpty)
+            ? ReverbPreset.studio.wireValue
+            : storedReverbPreset;
     await setReverb(
       b('reverbEnabled', isReverbEnabled),
-      preset: i('reverbPreset', reverbPreset),
+      preset: effectiveReverbPreset,
       wetDry: d('reverbWetDry', reverbWetDry),
     );
     if (PlatformCapabilities.isAndroid && isReverbEnabled) {
