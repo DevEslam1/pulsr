@@ -13,6 +13,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -142,7 +143,8 @@ void main() {
       );
     });
 
-    testWidgets('transitions RPM badge from 33⅓ RPM to STANDBY when playback pauses',
+    testWidgets(
+        'transitions RPM badge from 33⅓ RPM to STANDBY when playback pauses',
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(500, 950));
       addTearDown(() => tester.binding.setSurfaceSize(null));

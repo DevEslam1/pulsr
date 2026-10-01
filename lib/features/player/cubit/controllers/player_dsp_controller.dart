@@ -46,7 +46,7 @@ class PlayerDspController {
   final HeadphoneProfilesRepository _headphoneProfilesRepo;
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
-  final void Function() _syncAudioEffects;
+  final void Function({bool force}) _syncAudioEffects;
   final bool Function() _isClosed;
 
   StreamSubscription<AudioOutputInfo>? _deviceSub;
@@ -73,6 +73,16 @@ class PlayerDspController {
       _interactionStopwatch.isRunning &&
       _interactionStopwatch.elapsedMilliseconds < _interactionWindowMs;
 
+  /// Value equality for gain lists (List `!=` is identity in Dart).
+  static bool _doubleListsEqual(List<double> a, List<double> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   PlayerDspController({
     required PulsrAudioHandler audioHandler,
     required SettingsCubit? settingsCubit,
@@ -83,7 +93,7 @@ class PlayerDspController {
     HeadphoneProfilesRepository? headphoneProfilesRepo,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
-    required void Function() syncAudioEffects,
+    required void Function({bool force}) syncAudioEffects,
     required bool Function() isClosed,
   })  : _audioHandler = audioHandler,
         _settingsCubit = settingsCubit,
@@ -91,7 +101,8 @@ class PlayerDspController {
         _deviceProfileService = deviceProfileService,
         _hiResAudioService = hiResAudioService,
         _smartAudioService = smartAudioService,
-        _headphoneProfilesRepo = headphoneProfilesRepo ?? HeadphoneProfilesRepository(),
+        _headphoneProfilesRepo =
+            headphoneProfilesRepo ?? HeadphoneProfilesRepository(),
         _getState = getState,
         _emit = emit,
         _syncAudioEffects = syncAudioEffects,
@@ -111,7 +122,13 @@ class PlayerDspController {
   void dispose() {
     _abRevertTimer?.cancel();
     _abRevertTimer = null;
-    _abComparisonActive = false;
+    // If an A/B comparison is still held, restore the live preset so the native
+    // EQ is not left flattened after the player/controller is torn down (the
+    // EqualizerManager is a singleton and keeps its flattened state otherwise).
+    if (_abComparisonActive) {
+      _abComparisonActive = false;
+      unawaited(_audioHandler.endAbComparison());
+    }
     _deviceSub?.cancel();
     _deviceSub = null;
   }
@@ -198,21 +215,24 @@ class PlayerDspController {
     }
     final state = _getState();
     final previousDsp = state.dsp;
+    final optimisticDsp = updateDsp(previousDsp);
     _emit(state.copyWith(
-      dsp: updateDsp(previousDsp),
+      dsp: optimisticDsp,
       playback: state.playback.copyWith(errorMessage: null),
     ));
     try {
       await applyAudioHandler();
     } catch (e) {
-      _syncAudioEffects();
+      final error =
+          failureMessage ?? 'Failed to set ${featureName.toLowerCase()}: $e';
+      // Reconcile from the handler first (force, since we marked interaction).
+      final superseded = _getState().dsp != optimisticDsp;
+      _syncAudioEffects(force: true);
       final s = _getState();
       _emit(s.copyWith(
-        dsp: previousDsp,
-        playback: s.playback.copyWith(
-          errorMessage: failureMessage ??
-              'Failed to set ${featureName.toLowerCase()}: $e',
-        ),
+        // Roll back this optimistic change unless a newer edit superseded it.
+        dsp: superseded ? s.dsp : previousDsp,
+        playback: s.playback.copyWith(errorMessage: error),
       ));
     }
   }
@@ -249,102 +269,14 @@ class PlayerDspController {
     } catch (e) {
       _syncAudioEffects();
       final s = _getState();
-      _emit(s.copyWith(dsp: previousDsp, playback: s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
+      _emit(s.copyWith(
+          dsp: previousDsp,
+          playback:
+              s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
     }
   }
 
   Future<void> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
-
-  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
-      {bool isPerSongRestore = false}) async {
-    markUserInteracting();
-    if (profile != null && !guardDsp('AutoEQ', showError: true)) return;
-    final state = _getState();
-    final previousDsp = state.dsp;
-    if (profile != null) {
-      globalEqBackup = state.eqPreset;
-      if (perSongOverrideActive && !isPerSongRestore) {
-        globalHeadphoneProfileBackup = profile;
-      }
-      _emit(state.copyWith(
-        dsp: state.dsp.copyWith(
-          isEqEnabled: true,
-          selectedHeadphoneProfile: profile,
-          eqPreset: EqPreset(
-            name: profile.name,
-            gains: profile.gains,
-            bassBoost: profile.bassBoost,
-          ),
-        ),
-        playback: state.playback.copyWith(errorMessage: null),
-      ));
-      try {
-        await _audioHandler.applyHeadphoneProfile(profile);
-        await _audioHandler.setEqualizerEnabled(true);
-        final latest = _getState();
-        _emit(latest.copyWith(
-          dsp: latest.dsp.copyWith(
-            isEqEnabled: true,
-            selectedHeadphoneProfile: profile,
-            eqPreset: EqPreset(
-              name: profile.name,
-              gains: profile.gains,
-              bassBoost: profile.bassBoost,
-            ),
-          ),
-          playback: latest.playback.copyWith(errorMessage: null),
-        ));
-      } catch (e) {
-        final s = _getState();
-        _emit(s.copyWith(
-          dsp: previousDsp,
-          playback: s.playback.copyWith(
-            errorMessage: 'Failed to apply AutoEQ profile: $e',
-          ),
-        ));
-      }
-    } else {
-      final currentProfile = state.dsp.selectedHeadphoneProfile;
-      final bool eqModified = currentProfile != null &&
-          (state.dsp.eqPreset.name != currentProfile.name ||
-              state.dsp.eqPreset.gains != currentProfile.gains);
-      final restorePreset = eqModified
-          ? state.dsp.eqPreset
-          : (globalEqBackup ?? EqPreset.defaultPresets.first);
-      globalEqBackup = null;
-      globalHeadphoneProfileBackup = null;
-      _emit(state.copyWith(
-        dsp: state.dsp.copyWith(
-          selectedHeadphoneProfile: null,
-          eqPreset: restorePreset,
-        ),
-        playback: state.playback.copyWith(errorMessage: null),
-      ));
-      try {
-        await _audioHandler.applyHeadphoneProfile(null);
-        await _audioHandler.applyPreset(restorePreset);
-        final latest = _getState();
-        _emit(latest.copyWith(
-          dsp: latest.dsp.copyWith(
-            selectedHeadphoneProfile: null,
-            eqPreset: restorePreset,
-          ),
-          playback: latest.playback.copyWith(errorMessage: null),
-        ));
-      } catch (e) {
-        _syncAudioEffects();
-        final s = _getState();
-        _emit(s.copyWith(
-          dsp: previousDsp,
-          playback: s.playback.copyWith(
-            errorMessage: 'Failed to reset headphone profile: $e',
-          ),
-        ));
-      }
-    }
-  }
-
-  Future<void> resetHeadphoneProfile() => applyHeadphoneProfile(null);
 
   Future<void> setBandGain(int bandIndex, double gain) async {
     markUserInteracting();
@@ -375,8 +307,8 @@ class PlayerDspController {
       final s = _getState();
       _emit(s.copyWith(
           dsp: previousDsp,
-          playback:
-              s.playback.copyWith(errorMessage: 'Failed to set band gain: $e')));
+          playback: s.playback
+              .copyWith(errorMessage: 'Failed to set band gain: $e')));
     }
   }
 
@@ -401,5 +333,6 @@ class PlayerDspController {
   /// both invoking [endAbComparison] and double-calling the audio handler.
   bool _abComparisonActive = false;
 
-  void attachSettingsCubit(SettingsCubit settingsCubit) => _settingsCubit = settingsCubit;
+  void attachSettingsCubit(SettingsCubit settingsCubit) =>
+      _settingsCubit = settingsCubit;
 }

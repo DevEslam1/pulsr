@@ -17,7 +17,8 @@ class EqPresetValidationResult {
     this.schemaVersion = 1,
   });
 
-  factory EqPresetValidationResult.success(EqPreset preset, {int schemaVersion = 1}) {
+  factory EqPresetValidationResult.success(EqPreset preset,
+      {int schemaVersion = 1}) {
     return EqPresetValidationResult(
       isValid: true,
       preset: preset,
@@ -48,7 +49,8 @@ class EqPresetSchemaValidator {
   static EqPresetValidationResult validateAndParse(String rawInput) {
     final trimmed = rawInput.trim();
     if (trimmed.isEmpty) {
-      return EqPresetValidationResult.failure('Preset payload cannot be empty.');
+      return EqPresetValidationResult.failure(
+          'Preset payload cannot be empty.');
     }
 
     // Try parsing as JSON first
@@ -72,12 +74,14 @@ class EqPresetSchemaValidator {
       return EqPresetValidationResult.failure('Preset name cannot be empty.');
     }
     if (preset.gains.isEmpty) {
-      return EqPresetValidationResult.failure('Preset gains list cannot be empty.');
+      return EqPresetValidationResult.failure(
+          'Preset gains list cannot be empty.');
     }
     for (int i = 0; i < preset.gains.length; i++) {
       final gain = preset.gains[i];
       if (gain.isNaN || gain.isInfinite) {
-        return EqPresetValidationResult.failure('Band $i gain is not a finite number.');
+        return EqPresetValidationResult.failure(
+            'Band $i gain is not a finite number.');
       }
       if (gain < minAllowedGain || gain > maxAllowedGain) {
         return EqPresetValidationResult.failure(
@@ -86,19 +90,26 @@ class EqPresetSchemaValidator {
       }
     }
 
-    if (preset.bassBoost.isNaN || preset.bassBoost < 0.0 || preset.bassBoost > 1.0) {
-      return EqPresetValidationResult.failure('bassBoost must be a value between 0.0 and 1.0.');
+    if (preset.bassBoost.isNaN ||
+        preset.bassBoost < 0.0 ||
+        preset.bassBoost > 1.0) {
+      return EqPresetValidationResult.failure(
+          'bassBoost must be a value between 0.0 and 1.0.');
     }
 
     if (preset.customFrequencies != null) {
       final freqs = preset.customFrequencies!;
       if (freqs.isEmpty) {
-        return EqPresetValidationResult.failure('customFrequencies list cannot be empty when provided.');
+        return EqPresetValidationResult.failure(
+            'customFrequencies list cannot be empty when provided.');
       }
       double lastFreq = 0.0;
       for (int i = 0; i < freqs.length; i++) {
         final f = freqs[i];
-        if (f.isNaN || f.isInfinite || f < minFrequencyHz || f > maxFrequencyHz) {
+        if (f.isNaN ||
+            f.isInfinite ||
+            f < minFrequencyHz ||
+            f > maxFrequencyHz) {
           return EqPresetValidationResult.failure(
             'Frequency at band $i ($f Hz) is out of bounds [$minFrequencyHz, $maxFrequencyHz].',
           );
@@ -137,26 +148,31 @@ class EqPresetSchemaValidator {
 
       final name = decoded['name'] as String? ?? 'Imported Preset';
       if (name.trim().isEmpty) {
-        return EqPresetValidationResult.failure('Preset name must be a non-empty string.');
+        return EqPresetValidationResult.failure(
+            'Preset name must be a non-empty string.');
       }
 
       final rawGains = decoded['gains'];
       if (rawGains == null || rawGains is! List) {
-        return EqPresetValidationResult.failure("Missing or invalid 'gains' array in preset JSON.");
+        return EqPresetValidationResult.failure(
+            "Missing or invalid 'gains' array in preset JSON.");
       }
       if (rawGains.isEmpty) {
-        return EqPresetValidationResult.failure("'gains' array cannot be empty.");
+        return EqPresetValidationResult.failure(
+            "'gains' array cannot be empty.");
       }
 
       final gains = <double>[];
       for (int i = 0; i < rawGains.length; i++) {
         final val = rawGains[i];
         if (val is! num) {
-          return EqPresetValidationResult.failure('Gain value at index $i is not numeric.');
+          return EqPresetValidationResult.failure(
+              'Gain value at index $i is not numeric.');
         }
         final doubleVal = val.toDouble();
         if (doubleVal.isNaN || doubleVal.isInfinite) {
-          return EqPresetValidationResult.failure('Gain at index $i is NaN or infinite.');
+          return EqPresetValidationResult.failure(
+              'Gain at index $i is NaN or infinite.');
         }
         gains.add(doubleVal.clamp(minAllowedGain, maxAllowedGain));
       }
@@ -165,7 +181,8 @@ class EqPresetSchemaValidator {
       double bassBoost = 0.0;
       if (bassBoostRaw != null) {
         if (bassBoostRaw is! num) {
-          return EqPresetValidationResult.failure("'bassBoost' must be a numeric value.");
+          return EqPresetValidationResult.failure(
+              "'bassBoost' must be a numeric value.");
         }
         bassBoost = bassBoostRaw.toDouble().clamp(0.0, 1.0);
       }
@@ -174,21 +191,28 @@ class EqPresetSchemaValidator {
       final rawFreqs = decoded['customFrequencies'];
       if (rawFreqs != null) {
         if (rawFreqs is! List) {
-          return EqPresetValidationResult.failure("'customFrequencies' must be a list of numbers.");
+          return EqPresetValidationResult.failure(
+              "'customFrequencies' must be a list of numbers.");
         }
         customFrequencies = [];
         double lastFreq = 0.0;
         for (int i = 0; i < rawFreqs.length; i++) {
           final fVal = rawFreqs[i];
           if (fVal is! num) {
-            return EqPresetValidationResult.failure('Frequency at index $i is not numeric.');
+            return EqPresetValidationResult.failure(
+                'Frequency at index $i is not numeric.');
           }
           final f = fVal.toDouble();
-          if (f.isNaN || f.isInfinite || f < minFrequencyHz || f > maxFrequencyHz) {
-            return EqPresetValidationResult.failure('Frequency $f at index $i is out of range.');
+          if (f.isNaN ||
+              f.isInfinite ||
+              f < minFrequencyHz ||
+              f > maxFrequencyHz) {
+            return EqPresetValidationResult.failure(
+                'Frequency $f at index $i is out of range.');
           }
           if (f <= lastFreq) {
-            return EqPresetValidationResult.failure('Frequencies must be in strictly ascending order.');
+            return EqPresetValidationResult.failure(
+                'Frequencies must be in strictly ascending order.');
           }
           customFrequencies.add(f);
           lastFreq = f;
@@ -199,13 +223,15 @@ class EqPresetSchemaValidator {
       final rawQs = decoded['qFactors'];
       if (rawQs != null) {
         if (rawQs is! List) {
-          return EqPresetValidationResult.failure("'qFactors' must be a list of numbers.");
+          return EqPresetValidationResult.failure(
+              "'qFactors' must be a list of numbers.");
         }
         qFactors = [];
         for (int i = 0; i < rawQs.length; i++) {
           final qVal = rawQs[i];
           if (qVal is! num) {
-            return EqPresetValidationResult.failure('Q factor at index $i is not numeric.');
+            return EqPresetValidationResult.failure(
+                'Q factor at index $i is not numeric.');
           }
           qFactors.add(qVal.toDouble().clamp(minQFactor, maxQFactor));
         }
@@ -234,7 +260,8 @@ class EqPresetSchemaValidator {
         bandsMap: bandsMap,
       );
 
-      return EqPresetValidationResult.success(preset, schemaVersion: schemaVersion);
+      return EqPresetValidationResult.success(preset,
+          schemaVersion: schemaVersion);
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to validate EQ preset JSON',
@@ -330,7 +357,8 @@ class EqPresetSchemaValidator {
       map['qFactors'] = preset.qFactors;
     }
     if (preset.bandsMap.isNotEmpty) {
-      map['bandsMap'] = preset.bandsMap.map((k, v) => MapEntry(k.toString(), v));
+      map['bandsMap'] =
+          preset.bandsMap.map((k, v) => MapEntry(k.toString(), v));
     }
 
     if (pretty) {

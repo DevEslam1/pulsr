@@ -26,8 +26,10 @@ class SettingsConflictCard extends StatelessWidget {
     final p = context.palette;
     final canResolve = resolveLabel != null && onResolve != null;
     return Container(
-      margin: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
+      margin: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
       decoration: BoxDecoration(
         color: p.error.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(AppRadii.r12),
@@ -59,10 +61,12 @@ class SettingsConflictCard extends StatelessWidget {
                 icon: Icon(Icons.auto_fix_high_rounded, size: 14),
                 label: Text(resolveLabel!,
                     style: const TextStyle(
-                        fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w700)),
                 style: FilledButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
                   backgroundColor: p.error.withValues(alpha: 0.18),
                   foregroundColor: p.error,
                   elevation: 0,

@@ -34,7 +34,8 @@ class SponsorBlockService {
   final LinkedHashMap<String, List<SponsorBlockSegment>> _cache =
       LinkedHashMap<String, List<SponsorBlockSegment>>();
 
-  SponsorBlockService([http.Client? client]) : _client = client ?? http.Client();
+  SponsorBlockService([http.Client? client])
+      : _client = client ?? http.Client();
 
   void dispose() {
     _client.close();
@@ -71,8 +72,7 @@ class SponsorBlockService {
       _enabled = prefs.getBool(PrefsKeys.sponsorBlockEnabled) ?? true;
       final saved = prefs.getStringList(PrefsKeys.sponsorBlockCategories);
       if (saved != null) {
-        _enabledCategories =
-            saved.where(supportedCategories.contains).toSet();
+        _enabledCategories = saved.where(supportedCategories.contains).toSet();
       }
     } catch (_) {}
   }
@@ -86,8 +86,7 @@ class SponsorBlockService {
   }
 
   Future<void> setEnabledCategories(Set<String> categories) async {
-    _enabledCategories =
-        categories.where(supportedCategories.contains).toSet();
+    _enabledCategories = categories.where(supportedCategories.contains).toSet();
     await loadPreferences();
     try {
       await _prefs?.setStringList(
@@ -129,7 +128,8 @@ class SponsorBlockService {
         },
       );
 
-      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      final response =
+          await _client.get(uri).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 404 || response.body == 'Not Found') {
         _cache[cleanId] = const [];
@@ -188,7 +188,8 @@ class SponsorBlockService {
         }
       }
     } catch (e) {
-      debugPrint('[SPONSORBLOCK] Failed to fetch skip segments for $cleanId: $e');
+      debugPrint(
+          '[SPONSORBLOCK] Failed to fetch skip segments for $cleanId: $e');
     }
 
     return const [];

@@ -21,7 +21,9 @@ void main() {
   });
 
   group('[M-14] LandscapeSidebar.resolveMode modeOverride', () {
-    testWidgets('resolveMode strictly respects modeOverride = hidden even when isExtended and isPeeking are true', (tester) async {
+    testWidgets(
+        'resolveMode strictly respects modeOverride = hidden even when isExtended and isPeeking are true',
+        (tester) async {
       late BuildContext capturedContext;
 
       await tester.pumpWidget(
@@ -65,7 +67,9 @@ void main() {
       expect(compactMode, equals(SidebarRailMode.compact));
     });
 
-    testWidgets('LandscapeSidebar renders SizedBox.shrink when modeOverride is hidden on large screen', (tester) async {
+    testWidgets(
+        'LandscapeSidebar renders SizedBox.shrink when modeOverride is hidden on large screen',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -90,7 +94,8 @@ void main() {
       }
 
       // 1. With modeOverride: hidden, the sidebar should not render any destinations
-      await tester.pumpWidget(buildSidebar(modeOverride: SidebarRailMode.hidden));
+      await tester
+          .pumpWidget(buildSidebar(modeOverride: SidebarRailMode.hidden));
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationRailDestination), findsNothing);

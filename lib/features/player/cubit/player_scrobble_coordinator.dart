@@ -34,9 +34,6 @@ class PlayerScrobbleCoordinator {
   final Stopwatch _monotonicClock = Stopwatch()..start();
   int? _lastScrobbleElapsedMs;
   int? get lastScrobbleElapsedMs => _lastScrobbleElapsedMs;
-  // FIX-C06: Track last scrobble notification time
-  DateTime? _lastScrobbleTime;
-  DateTime? get lastScrobbleTime => _lastScrobbleTime;
   // Latest pending values for the debounced minor-tick flush. Read at fire
   // time so the flush reports the newest position, not the first tick's.
   SongsTableData? _pendingSong;
@@ -49,13 +46,16 @@ class PlayerScrobbleCoordinator {
     final posMs = position.inMilliseconds;
     // Differentiate true track restart (returning near zero from >10s into playback)
     // from a standard backward scrub within the track.
-    final isTrueRestart =
-        _lastSongId == song.id && _lastPosMs != null && posMs < 3000 && _lastPosMs! > 10000;
+    final isTrueRestart = _lastSongId == song.id &&
+        _lastPosMs != null &&
+        posMs < 3000 &&
+        _lastPosMs! > 10000;
     final isSongRestart = isTrueRestart;
     final isSongChange = _lastSongId != song.id || isSongRestart;
     final isPlayStateChange = _lastIsPlaying != isPlaying;
-    final isMajorSeek =
-        !isSongRestart && _lastPosMs != null && (posMs - _lastPosMs!).abs() >= 5000;
+    final isMajorSeek = !isSongRestart &&
+        _lastPosMs != null &&
+        (posMs - _lastPosMs!).abs() >= 5000;
 
     // Strict track-change cleanup: ensure pending timers from previous track are canceled immediately
     if (_lastSongId != song.id) {
@@ -72,7 +72,6 @@ class PlayerScrobbleCoordinator {
       _debounce?.cancel();
       _debounce = null;
       _pendingSong = null;
-      _lastScrobbleTime = DateTime.now();
       _lastScrobbleElapsedMs = _monotonicClock.elapsedMilliseconds;
       _service()?.notifyPlaybackState(
         id: song.id,
@@ -94,7 +93,6 @@ class PlayerScrobbleCoordinator {
       if (_isClosed()) return;
       final pendingSong = _pendingSong;
       if (pendingSong != null) {
-        _lastScrobbleTime = DateTime.now();
         _lastScrobbleElapsedMs = _monotonicClock.elapsedMilliseconds;
         _service()?.notifyPlaybackState(
           id: pendingSong.id,

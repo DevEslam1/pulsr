@@ -42,13 +42,16 @@ void main() {
       );
     });
 
-    test('redactPii scrubs emails, auth tokens, po_token, and session cookies (BUG-027)', () {
+    test(
+        'redactPii scrubs emails, auth tokens, po_token, and session cookies (BUG-027)',
+        () {
       const emailFixture = 'User email is test.user@example.com logged in';
       final scrubbedEmail = ErrorLogger.redactPii(emailFixture);
       expect(scrubbedEmail, contains('[REDACTED_EMAIL]'));
       expect(scrubbedEmail, isNot(contains('test.user@example.com')));
 
-      const cookieFixture = 'SAPISID=123456789abcdef; __Secure-3PSID=secret_psid_val; po_token=potoken_secret_val; other=ok';
+      const cookieFixture =
+          'SAPISID=123456789abcdef; __Secure-3PSID=secret_psid_val; po_token=potoken_secret_val; other=ok';
       final scrubbedCookie = ErrorLogger.redactPii(cookieFixture);
       expect(scrubbedCookie, contains('SAPISID=[REDACTED_TOKEN]'));
       expect(scrubbedCookie, contains('__Secure-3PSID=[REDACTED_TOKEN]'));
@@ -57,7 +60,8 @@ void main() {
       expect(scrubbedCookie, isNot(contains('secret_psid_val')));
       expect(scrubbedCookie, isNot(contains('potoken_secret_val')));
 
-      const authHeaderFixture = 'Authorization: Bearer my_secret_jwt_token_here';
+      const authHeaderFixture =
+          'Authorization: Bearer my_secret_jwt_token_here';
       final scrubbedAuth = ErrorLogger.redactPii(authHeaderFixture);
       expect(scrubbedAuth, contains('Authorization: [REDACTED_TOKEN]'));
       expect(scrubbedAuth, isNot(contains('my_secret_jwt_token_here')));

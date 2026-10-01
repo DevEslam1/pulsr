@@ -46,9 +46,7 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   }
 
   void _scheduleEngineSwitch({required bool toGapless}) {
-    if (_songs.isEmpty ||
-        _currentIndex < 0 ||
-        _currentIndex >= _songs.length) {
+    if (_songs.isEmpty || _currentIndex < 0 || _currentIndex >= _songs.length) {
       return;
     }
     // Debounce slider drags: rapid toggles previously spawned concurrent
@@ -116,6 +114,9 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   Future<void> setBassBoost(double value) =>
       _equalizerManager.setBassBoost(value);
 
+  Future<void> setPreamp(double preampDb) =>
+      _equalizerManager.setPreamp(preampDb);
+
   Future<void> applyPreset(EqPreset preset) =>
       _equalizerManager.applyPreset(preset);
 
@@ -182,8 +183,10 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   int get crossfeedMode => _equalizerManager.crossfeedMode;
 
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb, int? mode}) =>
-      _equalizerManager.setCrossfeed(enabled, delayUs: delayUs, feedDb: feedDb, mode: mode);
+  Future<void> setCrossfeed(bool enabled,
+          {double? delayUs, double? feedDb, int? mode}) =>
+      _equalizerManager.setCrossfeed(enabled,
+          delayUs: delayUs, feedDb: feedDb, mode: mode);
 
   Future<void> setCrossfeedMode(int mode) =>
       _equalizerManager.setCrossfeedMode(mode);
@@ -359,7 +362,8 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   Future<void> addDynamicEqBand() => _equalizerManager.addDynamicEqBand();
 
-  Future<void> removeDynamicEqBand(int index) => _equalizerManager.removeDynamicEqBand(index);
+  Future<void> removeDynamicEqBand(int index) =>
+      _equalizerManager.removeDynamicEqBand(index);
 
   bool get isViperDdcEnabled => _equalizerManager.isViperDdcEnabled;
 
@@ -419,149 +423,42 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
         sideGainLow: sideGainLow,
         sideGainHigh: sideGainHigh,
       );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  // Requires: provided by the composing class (same library).
   void _broadcastState(PlaybackEvent event);
 
-  // Requires: provided by the composing class (same library).
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag);
 
-  // Requires: provided by the composing class (same library).
   CrossfadeManager get _crossfadeManager;
 
-  // Requires: provided by the composing class (same library).
   Timer? get _crossfadeSwitchDebounce;
   set _crossfadeSwitchDebounce(Timer? value);
 
-  // Requires: provided by the composing class (same library).
   int get _currentIndex;
 
-  // Requires: provided by the composing class (same library).
   int get _engineSwitchGeneration;
   set _engineSwitchGeneration(int value);
 
-  // Requires: provided by the composing class (same library).
   EqualizerManager get _equalizerManager;
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessEnabled;
   set _gaplessEnabled(bool value);
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessMode;
 
-  // Requires: provided by the composing class (same library).
-  Future<void> _loadGaplessQueue( {Duration? initialPosition, bool preload = true});
+  Future<void> _loadGaplessQueue(
+      {Duration? initialPosition, bool preload = true});
 
-  // Requires: provided by the composing class (same library).
   List<SongsTableData> get _songs;
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessLoaded;
   set _gaplessLoaded(bool value);
 
-  // Requires: provided by the composing class (same library).
   Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);
 
-  // Requires: provided by the composing class (same library).
   Future<void> playSongAt(int index, {Duration? initialPosition});
 }

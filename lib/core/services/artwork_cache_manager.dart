@@ -118,8 +118,11 @@ class ArtworkCacheManager {
         _putCount++;
         if (_putCount % _enforceEvery == 0) {
           unawaited(_enforceDiskLimit().catchError((e, st) {
-            ErrorLogger.log('Failed to enforce disk limit in ArtworkCacheManager',
-                error: e, stackTrace: st, category: 'ArtworkCacheManager');
+            ErrorLogger.log(
+                'Failed to enforce disk limit in ArtworkCacheManager',
+                error: e,
+                stackTrace: st,
+                category: 'ArtworkCacheManager');
           }));
         }
       }

@@ -12,7 +12,9 @@ import 'package:pulsr/features/settings/presentation/hidden_folders_screen.dart'
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockFolderUseCases extends Mock implements FolderUseCases {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
+
 class MockLibraryCubit extends Mock implements LibraryCubit {}
 
 void main() {
@@ -46,7 +48,8 @@ void main() {
     mockLibraryCubit = MockLibraryCubit();
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
     when(() => mockSettingsCubit.getMinFileSizeKb()).thenAnswer((_) async => 0);
     when(() => mockSettingsCubit.rescanLibrary()).thenAnswer((_) async => 0);
 
@@ -55,7 +58,9 @@ void main() {
     when(() => mockLibraryCubit.loadFolders()).thenAnswer((_) async {});
   });
 
-  testWidgets('[H-20] _toggleFolder updates folder exclusion without full-screen loading flicker', (tester) async {
+  testWidgets(
+      '[H-20] _toggleFolder updates folder exclusion without full-screen loading flicker',
+      (tester) async {
     tester.view.physicalSize = const Size(800, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -65,7 +70,8 @@ void main() {
       callCount++;
       return Right(callCount == 1 ? initialFolders : toggledFolders);
     });
-    when(() => mockFolderUseCases.toggleExcludeFolder(any())).thenAnswer((_) async => const Right(null));
+    when(() => mockFolderUseCases.toggleExcludeFolder(any()))
+        .thenAnswer((_) async => const Right(null));
 
     await tester.pumpWidget(
       MultiBlocProvider(
@@ -100,11 +106,13 @@ void main() {
 
     // Verify toggled state is rendered
     expect(find.text('Unhide'), findsOneWidget);
-    verify(() => mockFolderUseCases.toggleExcludeFolder('/music/rock')).called(1);
+    verify(() => mockFolderUseCases.toggleExcludeFolder('/music/rock'))
+        .called(1);
     verify(() => mockLibraryCubit.loadFolders()).called(1);
   });
 
-  testWidgets('[M-28] _searchDebounce timer is cancelled on dispose', (tester) async {
+  testWidgets('[M-28] _searchDebounce timer is cancelled on dispose',
+      (tester) async {
     when(() => mockFolderUseCases.getFolderHierarchy())
         .thenAnswer((_) async => Right(initialFolders));
 
@@ -128,7 +136,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'rock');
     await tester.pump();
 
-    final state = tester.state<HiddenFoldersScreenState>(find.byType(HiddenFoldersScreen));
+    final state = tester
+        .state<HiddenFoldersScreenState>(find.byType(HiddenFoldersScreen));
     expect(state.searchDebounce?.isActive, isTrue);
 
     // Unmount widget (simulate navigating away / dispose)

@@ -11,6 +11,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/shell/presentation/widgets/stacked_bottom_dock.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -57,7 +58,9 @@ void main() {
     when(() => settingsCubit.stream).thenAnswer((_) => const Stream.empty());
   });
 
-  testWidgets('H-14: _dockSyncDebounceTimer callback safely guards unmounted widget', (tester) async {
+  testWidgets(
+      'H-14: _dockSyncDebounceTimer callback safely guards unmounted widget',
+      (tester) async {
     when(() => playerCubit.state).thenReturn(
       const PlayerState(
         playback: PlaybackSlice(

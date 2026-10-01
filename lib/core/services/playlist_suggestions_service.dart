@@ -61,7 +61,8 @@ class PlaylistSuggestionsService {
 
   /// Generates smart suggested mixes based on library tracks and playback history.
   /// Uses a single-pass traversal over [allSongs] and caches results for 30 minutes.
-  List<PlaylistSuggestion> generateSuggestions(List<SongsTableData> allSongs, {bool forceRefresh = false}) {
+  List<PlaylistSuggestion> generateSuggestions(List<SongsTableData> allSongs,
+      {bool forceRefresh = false}) {
     if (allSongs.isEmpty) return [];
 
     final now = DateTime.now();
@@ -81,7 +82,8 @@ class PlaylistSuggestionsService {
     return suggestions;
   }
 
-  static List<PlaylistSuggestion> generateSuggestionsRaw(List<SongsTableData> allSongs) {
+  static List<PlaylistSuggestion> generateSuggestionsRaw(
+      List<SongsTableData> allSongs) {
     if (allSongs.isEmpty) return [];
 
     final heavyRotationCandidates = <SongsTableData>[];
@@ -99,8 +101,8 @@ class PlaylistSuggestionsService {
       }
       if (audiophile.length < 30 &&
           (song.codec == 'FLAC' ||
-           song.codec == 'ALAC' ||
-           (song.bitDepth != null && song.bitDepth! >= 24))) {
+              song.codec == 'ALAC' ||
+              (song.bitDepth != null && song.bitDepth! >= 24))) {
         audiophile.add(song);
       }
       if (upbeat.length < 25 &&

@@ -63,7 +63,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
     for (final song in songs) {
       if (!song.path.startsWith('ytmusic://') &&
           !song.path.startsWith('content://')) {
-        final normalized = p_path.posix.normalize(song.path.replaceAll('\\', '/'));
+        final normalized =
+            p_path.posix.normalize(song.path.replaceAll('\\', '/'));
         final dir = p_path.posix.dirname(normalized);
         if (dir.isNotEmpty && dir != '.') folders.add(dir);
       }
@@ -75,8 +76,10 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
     if (folders.isEmpty) return null;
     final sorted = folders.toList()
       ..sort((a, b) {
-        final depthA = a.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).length;
-        final depthB = b.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).length;
+        final depthA =
+            a.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).length;
+        final depthB =
+            b.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).length;
         if (depthA != depthB) return depthA.compareTo(depthB);
         return a.length.compareTo(b.length);
       });
@@ -111,7 +114,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         final songs = state.songs;
         if (songs.isEmpty) {
           return Center(
-            child: Text(context.l10n.noMusicIndexed,
+            child: Text(
+              context.l10n.noMusicIndexed,
               style: TextStyle(color: p.textSecondary),
             ),
           );
@@ -119,26 +123,30 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
 
         final folders = _getFolders(songs);
         final effectivePath = _currentPath ?? _findRootFolder(folders) ?? '';
-        final currentDir = p_path.posix.normalize(effectivePath.replaceAll('\\', '/'));
-        final dirPrefix = currentDir.endsWith('/') ? currentDir : '$currentDir/';
+        final currentDir =
+            p_path.posix.normalize(effectivePath.replaceAll('\\', '/'));
+        final dirPrefix =
+            currentDir.endsWith('/') ? currentDir : '$currentDir/';
         final childSongs = songs.where((s) {
           final dir = p_path.posix.dirname(
             p_path.posix.normalize(s.path.replaceAll('\\', '/')),
           );
           return dir == currentDir;
         }).toList();
-        final childFolders = folders
-            .where((f) {
-              final normF = p_path.posix.normalize(f.replaceAll('\\', '/'));
-              return normF != currentDir && normF.startsWith(dirPrefix);
-            })
-            .toList()
+        final childFolders = folders.where((f) {
+          final normF = p_path.posix.normalize(f.replaceAll('\\', '/'));
+          return normF != currentDir && normF.startsWith(dirPrefix);
+        }).toList()
           ..sort();
 
         FolderItem? folderItemFor(String path) {
-          final normalized = p_path.posix.normalize(path.replaceAll('\\', '/')).toLowerCase();
+          final normalized =
+              p_path.posix.normalize(path.replaceAll('\\', '/')).toLowerCase();
           for (final f in state.folders) {
-            if (p_path.posix.normalize(f.path.replaceAll('\\', '/')).toLowerCase() == normalized) {
+            if (p_path.posix
+                    .normalize(f.path.replaceAll('\\', '/'))
+                    .toLowerCase() ==
+                normalized) {
               return f;
             }
           }
@@ -162,20 +170,18 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                 separatorBuilder: (_, __) => Icon(Icons.chevron_right_rounded,
                     size: 18, color: p.textSecondary),
                 itemBuilder: (context, index) {
-                  final crumbPath = p_path.posix
-                      .joinAll(breadcrumbs.take(index + 1));
+                  final crumbPath =
+                      p_path.posix.joinAll(breadcrumbs.take(index + 1));
                   final isLast = index == breadcrumbs.length - 1;
 
                   return Center(
                     child: InkWell(
-                      onTap: isLast
-                          ? null
-                          : () => _navigateTo(crumbPath),
+                      onTap: isLast ? null : () => _navigateTo(crumbPath),
                       borderRadius: BorderRadius.circular(AppRadii.r8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s6, vertical: AppSpacing.xxs),
+                            horizontal: AppSpacing.s6,
+                            vertical: AppSpacing.xxs),
                         child: Text(
                           breadcrumbs[index],
                           style: TextStyle(
@@ -195,7 +201,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
             // Content list (sub-folders + files)
             Expanded(
               child: ListView(
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
                 children: [
                   // Parent folder button
                   if (breadcrumbs.length > 1) ...[

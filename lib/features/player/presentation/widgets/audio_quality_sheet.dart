@@ -17,6 +17,7 @@ import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../domain/services/cast_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
+import '../../cubit/player_cubit.dart';
 import 'pulsr_cast_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -68,12 +69,14 @@ class AudioQualitySheet extends StatelessWidget {
         ),
         child: Material(
           color: p.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           clipBehavior: Clip.antiAlias,
           child: SafeArea(
             top: false,
             child: SingleChildScrollView(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s14, AppSpacing.s20, AppSpacing.lg),
+              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20,
+                  AppSpacing.s14, AppSpacing.s20, AppSpacing.lg),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +184,6 @@ class AudioQualitySheet extends StatelessWidget {
 
                   // Streaming & Download Quality Selector for YouTube online streams
                   if ((song.source == SongSource.youtube ||
-                          song.source == 'youtube' ||
                           song.path.toLowerCase().startsWith('ytmusic://')) &&
                       song.isDownloaded != true) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -223,7 +225,8 @@ class AudioQualitySheet extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(context.l10n.hwOutputRouting,
+                      Text(
+                        context.l10n.hwOutputRouting,
                         style: TextStyle(
                           fontSize: AppFontSize.caption,
                           letterSpacing: AppTracking.wide,
@@ -234,7 +237,6 @@ class AudioQualitySheet extends StatelessWidget {
                       if (outputDevice?.isUsbDac == true)
                         Container(
                           padding: const EdgeInsets.symmetric(
-
                             horizontal: AppSpacing.s6,
                             vertical: AppSpacing.s2,
                           ),
@@ -244,7 +246,8 @@ class AudioQualitySheet extends StatelessWidget {
                             ).withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(AppRadii.r6),
                           ),
-                          child: Text(context.l10n.usbDacAttached,
+                          child: Text(
+                            context.l10n.usbDacAttached,
                             style: TextStyle(
                               color: AppColors.dacGold,
                               fontSize: AppFontSize.tiny,
@@ -306,7 +309,8 @@ class AudioQualitySheet extends StatelessWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(context.l10n.outputPathDiag,
+                          Text(
+                            context.l10n.outputPathDiag,
                             style: TextStyle(
                               fontSize: AppFontSize.caption,
                               letterSpacing: AppTracking.wide,
@@ -329,7 +333,8 @@ class AudioQualitySheet extends StatelessWidget {
                           Text(
                             maxRate == null
                                 ? context.l10n.directPlaybackNotReported
-                                : context.l10n.directPlaybackUpTo(maxRate.toString(), bitsLabel),
+                                : context.l10n.directPlaybackUpTo(
+                                    maxRate.toString(), bitsLabel),
                             style: TextStyle(
                               fontSize: AppFontSize.label,
                               color: p.textPrimary,
@@ -337,7 +342,8 @@ class AudioQualitySheet extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.s2),
-                          Text(context.l10n.dsdPcmNote,
+                          Text(
+                            context.l10n.dsdPcmNote,
                             style: TextStyle(
                               fontSize: AppFontSize.tiny,
                               color: p.textSecondary,
@@ -351,7 +357,8 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: AppSpacing.s20),
 
                   // --- SECTION 2: OUTPUT SAMPLE RATE CONTROL ---
-                  Text(context.l10n.targetSampleRate,
+                  Text(
+                    context.l10n.targetSampleRate,
                     style: TextStyle(
                       fontSize: AppFontSize.caption,
                       letterSpacing: AppTracking.wide,
@@ -373,7 +380,8 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: AppSpacing.s20),
 
                   // --- SECTION 3: BIT DEPTH & BIT-PERFECT ---
-                  Text(context.l10n.targetBitPerfect,
+                  Text(
+                    context.l10n.targetBitPerfect,
                     style: TextStyle(
                       fontSize: AppFontSize.caption,
                       letterSpacing: AppTracking.wide,
@@ -395,7 +403,8 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: AppSpacing.s20),
 
                   // --- SECTION 4: AUDIO SPECIFICATIONS ---
-                  Text(context.l10n.trackSourceSpecs,
+                  Text(
+                    context.l10n.trackSourceSpecs,
                     style: TextStyle(
                       fontSize: AppFontSize.caption,
                       letterSpacing: AppTracking.wide,
@@ -416,8 +425,8 @@ class AudioQualitySheet extends StatelessWidget {
                       children: [
                         _buildSpecItem(
                           context,
-                            icon: Icons.audio_file_rounded,
-                            label: context.l10n.dspAudioFormatCodec,
+                          icon: Icons.audio_file_rounded,
+                          label: context.l10n.dspAudioFormatCodec,
                           value: info.format,
                           subValue: info.codecName,
                           p: p,
@@ -474,7 +483,8 @@ class AudioQualitySheet extends StatelessWidget {
                   const SizedBox(height: AppSpacing.md),
 
                   // --- SECTION 5: LIVE SIGNAL CHAIN INDICATOR ---
-                  Text(context.l10n.liveSignalChain,
+                  Text(
+                    context.l10n.liveSignalChain,
                     style: TextStyle(
                       fontSize: AppFontSize.caption,
                       letterSpacing: AppTracking.wide,
@@ -503,13 +513,15 @@ class AudioQualitySheet extends StatelessWidget {
                         foregroundColor: activeColor.computeLuminance() > 0.5
                             ? Colors.black
                             : Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.s14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadii.r14),
                         ),
                       ),
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(context.l10n.applyDone,
+                      child: Text(
+                        context.l10n.applyDone,
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: AppFontSize.body,
@@ -538,7 +550,8 @@ class AudioQualitySheet extends StatelessWidget {
     if (devices.isEmpty) {
       // Fallback display
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
           color: activeColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -575,10 +588,14 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   Text(
                     context.l10n.activeSystemOutputDesc(
-                      (outputDevice != null ? (outputDevice.sampleRate ~/ 1000) : 48).toString(),
+                      (outputDevice != null
+                              ? (outputDevice.sampleRate ~/ 1000)
+                              : 48)
+                          .toString(),
                       (outputDevice?.bitDepth ?? 16).toString(),
                     ),
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
+                    style: TextStyle(
+                        color: p.textSecondary, fontSize: AppFontSize.caption),
                   ),
                 ],
               ),
@@ -628,7 +645,6 @@ class AudioQualitySheet extends StatelessWidget {
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-
                       horizontal: AppSpacing.s14,
                       vertical: AppSpacing.sm,
                     ),
@@ -666,7 +682,12 @@ class AudioQualitySheet extends StatelessWidget {
                               Text(
                                 context.l10n.deviceOutputSpecsDesc(
                                   dev.typeName,
-                                  (dev.sampleRates.isEmpty ? 48 : (dev.sampleRates.reduce((a, b) => a > b ? a : b) ~/ 1000)).toString(),
+                                  (dev.sampleRates.isEmpty
+                                          ? 48
+                                          : (dev.sampleRates.reduce(
+                                                  (a, b) => a > b ? a : b) ~/
+                                              1000))
+                                      .toString(),
                                   dev.maxBitDepth.toString(),
                                 ),
                                 style: TextStyle(
@@ -709,8 +730,10 @@ class AudioQualitySheet extends StatelessWidget {
               cubit?.openOutputSwitcher();
             },
             icon: const Icon(Icons.open_in_new_rounded, size: 15),
-            label: Text(context.l10n.switchOutputPanel,
-              style: TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700),
+            label: Text(
+              context.l10n.switchOutputPanel,
+              style: TextStyle(
+                  fontSize: AppFontSize.caption, fontWeight: FontWeight.w700),
             ),
             style: TextButton.styleFrom(
               foregroundColor: p.textSecondary,
@@ -815,7 +838,8 @@ class AudioQualitySheet extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadii.r14),
       onTap: () => PulsrCastSheet.show(context),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
         decoration: BoxDecoration(
           color: isConnected
               ? activeColor.withValues(alpha: 0.14)
@@ -917,7 +941,8 @@ class AudioQualitySheet extends StatelessWidget {
         if (isBitPerfectActive)
           Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
             decoration: BoxDecoration(
               color: goldAccent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -1002,7 +1027,8 @@ class AudioQualitySheet extends StatelessWidget {
         if (isBitPerfectActive)
           Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
             decoration: BoxDecoration(
               color: goldAccent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -1055,7 +1081,8 @@ class AudioQualitySheet extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         AnimatedContainer(
           duration: context.motionMs(200),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             color: isBitPerfectEnabled
                 ? goldAccent.withValues(alpha: 0.12)
@@ -1100,7 +1127,8 @@ class AudioQualitySheet extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(context.l10n.directBpMode,
+                        Text(
+                          context.l10n.directBpMode,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: AppFontSize.bodySmall,
@@ -1120,7 +1148,8 @@ class AudioQualitySheet extends StatelessWidget {
                               color: goldAccent.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(AppRadii.r4),
                             ),
-                            child: Text(context.l10n.activeLabel,
+                            child: Text(
+                              context.l10n.activeLabel,
                               style: TextStyle(
                                 color: goldAccent,
                                 fontSize: AppFontSize.micro,
@@ -1139,7 +1168,8 @@ class AudioQualitySheet extends StatelessWidget {
                               color: p.accent.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(AppRadii.r4),
                             ),
-                            child: Text(context.l10n.armedLabel,
+                            child: Text(
+                              context.l10n.armedLabel,
                               style: TextStyle(
                                 color: p.accent,
                                 fontSize: AppFontSize.micro,
@@ -1193,7 +1223,9 @@ class AudioQualitySheet extends StatelessWidget {
                                 title: context.l10n.bitPerfectMode,
                                 icon: Icons.info_outline_rounded,
                                 content: Text(
-                                  AudioFeatureRegistry.bitPerfect.description,
+                                  AudioFeatureRegistry.bitPerfect
+                                      .localized(context.l10n)
+                                      .description,
                                   style: TextStyle(
                                     color: p.textPrimary,
                                     fontSize: AppFontSize.bodySmall,
@@ -1283,7 +1315,8 @@ class AudioQualitySheet extends StatelessWidget {
     bool isLast = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         border: !isLast ? Border(bottom: BorderSide(color: p.hairline)) : null,
       ),
@@ -1350,9 +1383,32 @@ class AudioQualitySheet extends StatelessWidget {
     final String sourceLabel = isDsd
         ? 'DSD Stream (${info.format})'
         : '${info.format} (${info.sampleRate} / ${info.bitDepth})';
+    // Derive the DSP stage list from the live state instead of hardcoding it,
+    // so the signal chain never claims processing that is switched off.
+    var eqOn = false;
+    var limiterOn = settingsState?.limiterEnabled == true;
+    var crossfeedOn = settingsState?.crossfeedEnabled == true;
+    var reverbOn = settingsState?.reverbEnabled == true;
+    try {
+      final ps = context.read<PlayerCubit>().state;
+      eqOn = ps.isEqEnabled;
+      limiterOn = ps.isLimiterEnabled;
+      crossfeedOn = ps.isCrossfeedEnabled;
+      reverbOn = ps.isReverbEnabled;
+    } catch (_) {
+      // PlayerCubit unavailable (standalone preview) — keep settings fallback.
+    }
+    final List<String> activeStages = [
+      if (eqOn) 'EQ',
+      if (limiterOn) 'True-Peak Limiter',
+      if (crossfeedOn) 'BS2B Crossfeed',
+      if (reverbOn) 'Reverb',
+    ];
     final String dspLabel = isBitPerfect
         ? 'Bypassed (Bit-Perfect Guardrail)'
-        : 'EQ (8 RBJ) + True-Peak Limiter + BS2B';
+        : (activeStages.isEmpty
+            ? 'None (Clean Path)'
+            : activeStages.join(' + '));
     final String resamplerLabel = isBitPerfect
         ? 'Direct 1:1 Stream'
         : (outputDevice != null && outputDevice.targetSampleRate > 0
@@ -1380,7 +1436,8 @@ class AudioQualitySheet extends StatelessWidget {
         children: [
           if (isBitPerfect) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
               margin: const EdgeInsets.only(bottom: AppSpacing.sm),
               decoration: BoxDecoration(
                 color: AppColors.dacGold.withValues(alpha: 0.12),
@@ -1398,7 +1455,8 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
-                    child: Text(context.l10n.bpGuardrails,
+                    child: Text(
+                      context.l10n.bpGuardrails,
                       style: TextStyle(
                         color: AppColors.dacGold,
                         fontSize: AppFontSize.tiny,
@@ -1436,7 +1494,7 @@ class AudioQualitySheet extends StatelessWidget {
             title: context.l10n.dspResamplingEngine,
             detail: resamplerLabel,
             icon: Icons.transform_rounded,
-            color: isBitPerfect ? Colors.grey : p.success,
+            color: isBitPerfect ? p.textTertiary : p.success,
             p: p,
             isDimmed: isBitPerfect,
           ),
@@ -1468,7 +1526,6 @@ class AudioQualitySheet extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _SignalChainNode extends StatelessWidget {
@@ -1617,7 +1674,8 @@ class _OptionPill extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadii.r14),
             onTap: isEnabled ? onTap : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1719,7 +1777,7 @@ List<String> visibleBtCodecsForRoute(
 }
 
 extension _BluetoothCodecSection on AudioQualitySheet {
-  static const _btAccent = Color(0xFF00D4FF);
+  static const _btAccent = AppColors.accentCyan;
   static const _ldacAccent = AppColors.ldacViolet;
   static const _warnAccent = AppColors.warning;
 
@@ -1747,8 +1805,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     final isLeRoute = outputDevice?.isLeAudio ?? false;
     final repoCodecs =
         selectableCodecs.isNotEmpty ? selectableCodecs : allCodecs;
-    final visibleCodecs = visibleBtCodecsForRoute(
-        repoCodecs: repoCodecs, isLeAudio: isLeRoute);
+    final visibleCodecs =
+        visibleBtCodecsForRoute(repoCodecs: repoCodecs, isLeAudio: isLeRoute);
 
     const ldacModes = [
       (0, 'Best Effort', 'Auto kbps'),
@@ -1786,7 +1844,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               color: _btAccent,
             ),
             const SizedBox(width: AppSpacing.s6),
-            Text(context.l10n.btAudioCodec,
+            Text(
+              context.l10n.btAudioCodec,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 letterSpacing: AppTracking.wide,
@@ -1901,7 +1960,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     ),
                     const SizedBox(width: AppSpacing.s10),
                     Expanded(
-                      child: Text(context.l10n.earbudsConnected,
+                      child: Text(
+                        context.l10n.earbudsConnected,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: AppFontSize.label,
@@ -1917,7 +1977,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           const SizedBox(height: AppSpacing.s14),
 
           // ── Codec chips: tap a supported codec to request it natively ──
-          Text(context.l10n.supportedCodecs,
+          Text(
+            context.l10n.supportedCodecs,
             style: TextStyle(
               fontSize: AppFontSize.tiny,
               letterSpacing: AppTracking.wide,
@@ -1937,7 +1998,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   final isLdacOpt = c == 'LDAC';
                   final accent = isLdacOpt ? _ldacAccent : _btAccent;
                   return Padding(
-                    padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+                    padding:
+                        const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                     child: GestureDetector(
                       onTap: isActive
                           ? null
@@ -1950,48 +2012,48 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                               }
                             },
                       child: Container(
-                      padding: const EdgeInsets.symmetric(
-
-                        horizontal: AppSpacing.s14,
-                        vertical: AppSpacing.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? accent.withValues(alpha: 0.18)
-                            : p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
-                        border: Border.all(
-                          color: isActive ? accent : p.hairline,
-                          width: isActive ? 1.5 : 1.0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s14,
+                          vertical: AppSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? accent.withValues(alpha: 0.18)
+                              : p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          border: Border.all(
+                            color: isActive ? accent : p.hairline,
+                            width: isActive ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isActive) ...[
+                              Icon(
+                                Icons.check_rounded,
+                                color: accent,
+                                size: 11,
+                              ),
+                              const SizedBox(width: AppSpacing.xxs),
+                            ],
+                            Text(
+                              c,
+                              style: TextStyle(
+                                fontSize: AppFontSize.label,
+                                fontWeight: isActive
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: isActive ? accent : p.textSecondary,
+                                letterSpacing: AppTracking.label,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isActive) ...[
-                            Icon(
-                              Icons.check_rounded,
-                              color: accent,
-                              size: 11,
-                            ),
-                            const SizedBox(width: AppSpacing.xxs),
-                          ],
-                          Text(
-                            c,
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              fontWeight:
-                                  isActive ? FontWeight.w800 : FontWeight.w500,
-                              color: isActive ? accent : p.textSecondary,
-                              letterSpacing: AppTracking.label,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
               ),
             ),
           ),
@@ -2019,7 +2081,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(context.l10n.sampleRateLabel,
+                    Text(
+                      context.l10n.sampleRateLabel,
                       style: TextStyle(
                         fontSize: AppFontSize.tiny,
                         letterSpacing: AppTracking.wide,
@@ -2039,13 +2102,11 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                                 current: sampleRateHz,
                                 label: (hz) =>
                                     '${(hz / 1000).toStringAsFixed(hz % 1000 == 0 ? 0 : 1)} kHz',
-                                onPick: (v) =>
-                                    cubit.setBluetoothSampleRate(v),
+                                onPick: (v) => cubit.setBluetoothSampleRate(v),
                               ),
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.s14,
                           vertical: AppSpacing.xs,
                         ),
@@ -2086,7 +2147,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(context.l10n.bitDepthLabel,
+                    Text(
+                      context.l10n.bitDepthLabel,
                       style: TextStyle(
                         fontSize: AppFontSize.tiny,
                         letterSpacing: AppTracking.wide,
@@ -2105,13 +2167,11 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                                 options: selectableDepths,
                                 current: bitDepth,
                                 label: (b) => '$b-bit',
-                                onPick: (v) =>
-                                    cubit.setBluetoothBitDepth(v),
+                                onPick: (v) => cubit.setBluetoothBitDepth(v),
                               ),
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.s14,
                           vertical: AppSpacing.xs,
                         ),
@@ -2164,7 +2224,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.s6),
-                Text(context.l10n.ldacQuality,
+                Text(
+                  context.l10n.ldacQuality,
                   style: TextStyle(
                     fontSize: AppFontSize.tiny,
                     letterSpacing: AppTracking.wide,
@@ -2176,7 +2237,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             ),
             const SizedBox(height: AppSpacing.s6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: _ldacAccent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -2201,7 +2263,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   const SizedBox(width: AppSpacing.xs),
                   Text(
                     ldacModes[ldacMode.clamp(0, 3)].$3,
-                    style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
+                    style: TextStyle(
+                        color: p.textTertiary, fontSize: AppFontSize.label),
                   ),
                   const Spacer(),
                   Row(
@@ -2212,8 +2275,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                         child: GestureDetector(
                           onTap: () async {
                             HapticFeedback.selectionClick();
-                            final ok = await cubit?.setBluetoothLdacQuality(i) ??
-                                false;
+                            final ok =
+                                await cubit?.setBluetoothLdacQuality(i) ??
+                                    false;
                             if (!ok && context.mounted) {
                               _showBtRefused(context, cubit);
                             }
@@ -2227,8 +2291,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                               height: 8,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color:
-                                    i <= ldacMode ? _ldacAccent : p.hairline,
+                                color: i <= ldacMode ? _ldacAccent : p.hairline,
                               ),
                             ),
                           ),
@@ -2250,7 +2313,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             },
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
@@ -2282,15 +2346,19 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(context.l10n.changeBtCodec,
+                        Text(
+                          context.l10n.changeBtCodec,
                           style: TextStyle(
                             color: _btAccent,
                             fontSize: AppFontSize.bodySmall,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        Text(context.l10n.devOptionsBtCodec,
-                          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+                        Text(
+                          context.l10n.devOptionsBtCodec,
+                          style: TextStyle(
+                              color: p.textTertiary,
+                              fontSize: AppFontSize.caption),
                         ),
                       ],
                     ),
@@ -2347,7 +2415,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xxs),
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20,
+                    AppSpacing.sm, AppSpacing.s20, AppSpacing.xxs),
                 child: Text(
                   title,
                   style: TextStyle(
@@ -2363,9 +2432,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     label(opt),
                     style: TextStyle(
                       color: opt == current ? _btAccent : sp.textPrimary,
-                      fontWeight: opt == current
-                          ? FontWeight.w800
-                          : FontWeight.w500,
+                      fontWeight:
+                          opt == current ? FontWeight.w800 : FontWeight.w500,
                     ),
                   ),
                   trailing: opt == current
@@ -2410,7 +2478,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 color: _btAccent,
               ),
               const SizedBox(width: AppSpacing.s6),
-              Text(context.l10n.btAudioCodec,
+              Text(
+                context.l10n.btAudioCodec,
                 style: TextStyle(
                   fontSize: AppFontSize.caption,
                   letterSpacing: AppTracking.wide,
@@ -2430,8 +2499,10 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               ),
               const SizedBox(width: AppSpacing.s10),
               Expanded(
-                child: Text(context.l10n.nearbyPermDesc,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                child: Text(
+                  context.l10n.nearbyPermDesc,
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.label),
                 ),
               ),
             ],
@@ -2443,7 +2514,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               await _requestBluetoothPermission(context, cubit);
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: _warnAccent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -2458,7 +2530,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     size: 16,
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text(context.l10n.grantBtPerm,
+                  Text(
+                    context.l10n.grantBtPerm,
                     style: TextStyle(
                       color: _warnAccent,
                       fontSize: AppFontSize.label,
@@ -2487,7 +2560,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             const Icon(Icons.bluetooth_audio_rounded,
                 size: 14, color: _btAccent),
             const SizedBox(width: AppSpacing.s6),
-            Text(context.l10n.leAudio,
+            Text(
+              context.l10n.leAudio,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 letterSpacing: AppTracking.wide,
@@ -2501,7 +2575,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 HapticFeedback.selectionClick();
                 cubit?.refreshOutputDevice();
               },
-              child: Icon(Icons.refresh_rounded, size: 16, color: p.textTertiary),
+              child:
+                  Icon(Icons.refresh_rounded, size: 16, color: p.textTertiary),
             ),
           ],
         ),
@@ -2539,7 +2614,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                         letterSpacing: AppTracking.medium,
                       ),
                     ),
-                    Text(context.l10n.lc3Negotiation,
+                    Text(
+                      context.l10n.lc3Negotiation,
                       style: TextStyle(
                         fontSize: AppFontSize.label,
                         color: p.textSecondary,
@@ -2575,7 +2651,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           const Icon(Icons.bluetooth_audio_rounded, size: 14, color: _btAccent),
           const SizedBox(width: AppSpacing.s6),
           Expanded(
-            child: Text(context.l10n.connectingBt,
+            child: Text(
+              context.l10n.connectingBt,
               style: TextStyle(
                 color: p.textSecondary,
                 fontSize: AppFontSize.label,
@@ -2588,7 +2665,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               HapticFeedback.selectionClick();
               cubit?.refreshOutputDevice();
             },
-            child: Text(context.l10n.retry,
+            child: Text(
+              context.l10n.retry,
               style: TextStyle(
                 color: _btAccent,
                 fontSize: AppFontSize.label,

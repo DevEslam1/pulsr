@@ -149,8 +149,7 @@ class MetadataSearchService {
             var recArtist = '';
             String? recAlbum;
             String? recYear;
-            final artists =
-                (item['artist-credit'] as List<dynamic>?) ?? [];
+            final artists = (item['artist-credit'] as List<dynamic>?) ?? [];
             if (artists.isNotEmpty) {
               final names = <String>[];
               for (final a in artists) {

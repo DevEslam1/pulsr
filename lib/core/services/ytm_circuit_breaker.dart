@@ -89,7 +89,9 @@ class YtmCircuitBreaker {
   /// Snapshot for logs/diagnostics UI. Keys are signal names.
   Map<String, dynamic> metrics() => {
         'successes': _totalSuccesses,
-        'failures': {for (final e in _totalFailures.entries) e.key.name: e.value},
+        'failures': {
+          for (final e in _totalFailures.entries) e.key.name: e.value
+        },
         'open': {
           for (final e in _openUntil.entries)
             if (_now().isBefore(e.value)) e.key.name: e.value.toIso8601String(),

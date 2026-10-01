@@ -20,13 +20,15 @@ void main() {
       expect(isValidCustomFrequencyList([31, 0, 125], 3), isFalse);
       expect(isValidCustomFrequencyList([31, -20, 125], 3), isFalse);
       expect(isValidCustomFrequencyList([31, double.nan, 125], 3), isFalse);
-      expect(isValidCustomFrequencyList([31, double.infinity, 125], 3), isFalse);
+      expect(
+          isValidCustomFrequencyList([31, double.infinity, 125], 3), isFalse);
     });
   });
 
   group('validateProxyHostAndPort', () {
     test('accepts IPv4, hostname and localhost with a valid port', () {
-      expect(validateProxyHostAndPort(host: '192.168.1.10', port: 8080), isNull);
+      expect(
+          validateProxyHostAndPort(host: '192.168.1.10', port: 8080), isNull);
       expect(validateProxyHostAndPort(host: 'proxy.example.com', port: 3128),
           isNull);
       expect(validateProxyHostAndPort(host: 'localhost', port: 9050), isNull);
@@ -35,8 +37,8 @@ void main() {
 
     test('rejects an empty or malformed host', () {
       expect(validateProxyHostAndPort(host: '', port: 1080), isNotNull);
-      expect(validateProxyHostAndPort(host: 'not a host', port: 1080),
-          isNotNull);
+      expect(
+          validateProxyHostAndPort(host: 'not a host', port: 1080), isNotNull);
     });
 
     test('rejects out-of-range ports', () {

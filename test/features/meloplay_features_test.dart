@@ -24,13 +24,13 @@ void main() {
         expect(preset.gradient.colors.length, equals(2));
       }
 
-      final amoledPreset =
-          AuraTheme.presets.firstWhere((p) => p.isAmoled);
+      final amoledPreset = AuraTheme.presets.firstWhere((p) => p.isAmoled);
       expect(amoledPreset.name, equals('Midnight AMOLED'));
       expect(amoledPreset.primaryColor, equals(const Color(0xFF000000)));
     });
 
-    testWidgets('SpinningVinylDisc renders with correct size and outer groove decoration',
+    testWidgets(
+        'SpinningVinylDisc renders with correct size and outer groove decoration',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(

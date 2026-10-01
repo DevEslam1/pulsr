@@ -66,7 +66,8 @@ class DatabaseHealthCheck {
     } catch (e, st) {
       integrityIssues.add('integrity_check failed: $e');
       isHealthy = false;
-      ErrorLogger.log('integrity_check failed', error: e, stackTrace: st, category: 'Database');
+      ErrorLogger.log('integrity_check failed',
+          error: e, stackTrace: st, category: 'Database');
     }
 
     // 2. PRAGMA foreign_key_check
@@ -78,7 +79,8 @@ class DatabaseHealthCheck {
       }
     } catch (e, st) {
       foreignKeyViolations.add('foreign_key_check failed: $e');
-      ErrorLogger.log('foreign_key_check failed', error: e, stackTrace: st, category: 'Database');
+      ErrorLogger.log('foreign_key_check failed',
+          error: e, stackTrace: st, category: 'Database');
     }
 
     // 3. Row counts & Size
@@ -88,29 +90,40 @@ class DatabaseHealthCheck {
     var dbSizeBytes = 0;
 
     try {
-      final songRow = await _db.customSelect('SELECT COUNT(*) AS c FROM songs;').getSingleOrNull();
+      final songRow = await _db
+          .customSelect('SELECT COUNT(*) AS c FROM songs;')
+          .getSingleOrNull();
       totalSongs = (songRow?.data['c'] as num?)?.toInt() ?? 0;
 
-      final playlistRow = await _db.customSelect('SELECT COUNT(*) AS c FROM playlists;').getSingleOrNull();
+      final playlistRow = await _db
+          .customSelect('SELECT COUNT(*) AS c FROM playlists;')
+          .getSingleOrNull();
       totalPlaylists = (playlistRow?.data['c'] as num?)?.toInt() ?? 0;
 
-      final historyRow = await _db.customSelect('SELECT COUNT(*) AS c FROM play_history;').getSingleOrNull();
+      final historyRow = await _db
+          .customSelect('SELECT COUNT(*) AS c FROM play_history;')
+          .getSingleOrNull();
       totalHistoryEntries = (historyRow?.data['c'] as num?)?.toInt() ?? 0;
 
-      final pageCountRow = await _db.customSelect('PRAGMA page_count;').getSingleOrNull();
-      final pageSizeRow = await _db.customSelect('PRAGMA page_size;').getSingleOrNull();
+      final pageCountRow =
+          await _db.customSelect('PRAGMA page_count;').getSingleOrNull();
+      final pageSizeRow =
+          await _db.customSelect('PRAGMA page_size;').getSingleOrNull();
       final pages = (pageCountRow?.data.values.first as num?)?.toInt() ?? 0;
       final size = (pageSizeRow?.data.values.first as num?)?.toInt() ?? 4096;
       dbSizeBytes = pages * size;
     } catch (e) {
-      ErrorLogger.log('Failed to fetch DB stats', error: e, category: 'Database');
+      ErrorLogger.log('Failed to fetch DB stats',
+          error: e, category: 'Database');
     }
 
     // 4. FTS health verification
     var ftsHealthy = !AppDatabase.ftsRebuildFailed;
     if (ftsHealthy) {
       try {
-        final ftsCheck = await _db.customSelect('SELECT COUNT(*) AS c FROM songs_fts;').getSingleOrNull();
+        final ftsCheck = await _db
+            .customSelect('SELECT COUNT(*) AS c FROM songs_fts;')
+            .getSingleOrNull();
         if (ftsCheck == null) {
           ftsHealthy = false;
         }
@@ -120,7 +133,8 @@ class DatabaseHealthCheck {
     }
 
     return DatabaseHealthReport(
-      isHealthy: isHealthy && integrityIssues.isEmpty && foreignKeyViolations.isEmpty,
+      isHealthy:
+          isHealthy && integrityIssues.isEmpty && foreignKeyViolations.isEmpty,
       integrityIssues: integrityIssues,
       foreignKeyViolations: foreignKeyViolations,
       totalSongs: totalSongs,
@@ -177,8 +191,10 @@ class DatabaseOptimizer {
     int pageSize = 4096;
     int pagesBefore = 0;
     try {
-      final sizeRow = await _db.customSelect('PRAGMA page_size;').getSingleOrNull();
-      final countRow = await _db.customSelect('PRAGMA page_count;').getSingleOrNull();
+      final sizeRow =
+          await _db.customSelect('PRAGMA page_size;').getSingleOrNull();
+      final countRow =
+          await _db.customSelect('PRAGMA page_count;').getSingleOrNull();
       pageSize = (sizeRow?.data.values.first as num?)?.toInt() ?? 4096;
       pagesBefore = (countRow?.data.values.first as num?)?.toInt() ?? 0;
     } catch (_) {}
@@ -187,7 +203,8 @@ class DatabaseOptimizer {
     try {
       await _db.customStatement('ANALYZE;');
     } catch (e, st) {
-      ErrorLogger.log('ANALYZE failed', error: e, stackTrace: st, category: 'Database');
+      ErrorLogger.log('ANALYZE failed',
+          error: e, stackTrace: st, category: 'Database');
     }
 
     // 2. Rebuild FTS5 search index
@@ -205,17 +222,21 @@ class DatabaseOptimizer {
     try {
       await _db.customStatement('VACUUM;');
     } catch (e, st) {
-      ErrorLogger.log('VACUUM failed', error: e, stackTrace: st, category: 'Database');
+      ErrorLogger.log('VACUUM failed',
+          error: e, stackTrace: st, category: 'Database');
     }
 
     int pagesAfter = pagesBefore;
     try {
-      final countAfterRow = await _db.customSelect('PRAGMA page_count;').getSingleOrNull();
-      pagesAfter = (countAfterRow?.data.values.first as num?)?.toInt() ?? pagesBefore;
+      final countAfterRow =
+          await _db.customSelect('PRAGMA page_count;').getSingleOrNull();
+      pagesAfter =
+          (countAfterRow?.data.values.first as num?)?.toInt() ?? pagesBefore;
     } catch (_) {}
 
     sw.stop();
-    final bytesReclaimed = (pagesBefore - pagesAfter).clamp(0, 1 << 30) * pageSize;
+    final bytesReclaimed =
+        (pagesBefore - pagesAfter).clamp(0, 1 << 30) * pageSize;
 
     return DatabaseOptimizationReport(
       pagesBefore: pagesBefore,
@@ -317,7 +338,8 @@ class DatabaseMigrationValidator {
   Future<MigrationValidationResult> validateSchema() async {
     int currentVersion = 0;
     try {
-      final verRow = await _db.customSelect('PRAGMA user_version;').getSingleOrNull();
+      final verRow =
+          await _db.customSelect('PRAGMA user_version;').getSingleOrNull();
       currentVersion = (verRow?.data.values.first as num?)?.toInt() ?? 0;
     } catch (_) {}
 
@@ -328,7 +350,9 @@ class DatabaseMigrationValidator {
     // 1. Check tables
     final existingTables = <String>{};
     try {
-      final tableRows = await _db.customSelect("SELECT name FROM sqlite_master WHERE type='table';").get();
+      final tableRows = await _db
+          .customSelect("SELECT name FROM sqlite_master WHERE type='table';")
+          .get();
       for (final r in tableRows) {
         final name = r.data['name']?.toString();
         if (name != null) existingTables.add(name);
@@ -347,8 +371,12 @@ class DatabaseMigrationValidator {
       if (!existingTables.contains(tbl)) continue;
 
       try {
-        final colRows = await _db.customSelect('PRAGMA table_info($tbl);').get();
-        final existingCols = colRows.map((r) => r.data['name']?.toString()).whereType<String>().toSet();
+        final colRows =
+            await _db.customSelect('PRAGMA table_info($tbl);').get();
+        final existingCols = colRows
+            .map((r) => r.data['name']?.toString())
+            .whereType<String>()
+            .toSet();
         for (final reqCol in entry.value) {
           if (!existingCols.contains(reqCol)) {
             missingColumns.add('$tbl.$reqCol');
@@ -360,7 +388,9 @@ class DatabaseMigrationValidator {
     // 3. Check indexes
     final existingIndexes = <String>{};
     try {
-      final indexRows = await _db.customSelect("SELECT name FROM sqlite_master WHERE type='index';").get();
+      final indexRows = await _db
+          .customSelect("SELECT name FROM sqlite_master WHERE type='index';")
+          .get();
       for (final r in indexRows) {
         final name = r.data['name']?.toString();
         if (name != null) existingIndexes.add(name);

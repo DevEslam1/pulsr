@@ -103,7 +103,8 @@ class DspChainValidator {
       totalLatency += entry.value;
       final healthy = entry.value <= 20.0;
       if (!healthy) {
-        warnings.add('Stage ${entry.key} excessive latency: ${entry.value.toStringAsFixed(2)}ms');
+        warnings.add(
+            'Stage ${entry.key} excessive latency: ${entry.value.toStringAsFixed(2)}ms');
       }
       stages[entry.key] = StageHealth(
         stageName: entry.key,
@@ -116,7 +117,8 @@ class DspChainValidator {
       warnings.add('Chain THD exceeds 0.5%: ${thdPercent.toStringAsFixed(2)}%');
     }
     if (frequencyDeviationDb > 0.5) {
-      warnings.add('Chain frequency flatness exceeds ±0.5 dB: ${frequencyDeviationDb.toStringAsFixed(2)} dB');
+      warnings.add(
+          'Chain frequency flatness exceeds ±0.5 dB: ${frequencyDeviationDb.toStringAsFixed(2)} dB');
     }
 
     return DspDiagnosticReport(
@@ -151,12 +153,18 @@ class DspChainValidator {
 
     if (eqManager != null && eqManager.isEnabled) {
       final gains = eqManager.currentPreset.gains;
-      final isFlat = gains.every((g) => g.abs() < 0.1);
-      if (isFlat) {
-        eqFlatnessDelta = computeFlatnessDeltaDb(gains);
-        if (eqFlatnessDelta > 0.5) {
-          eqHealthy = false;
-          allWarnings.add('EQ frequency flatness deviates by ${eqFlatnessDelta.toStringAsFixed(2)} dB (target ±0.5 dB)');
+      if (gains.isNotEmpty) {
+        // Only audit flatness for curves that are meant to be flat (within
+        // 1 dB); a deliberate EQ curve would otherwise always trip the warning.
+        // The previous threshold (0.1 dB) made the >0.5 dB warning unreachable.
+        final isIntendedFlat = gains.every((g) => g.abs() < 1.0);
+        if (isIntendedFlat) {
+          eqFlatnessDelta = computeFlatnessDeltaDb(gains);
+          if (eqFlatnessDelta > 0.5) {
+            eqHealthy = false;
+            allWarnings.add(
+                'EQ frequency flatness deviates by ${eqFlatnessDelta.toStringAsFixed(2)} dB (target ±0.5 dB)');
+          }
         }
       }
     }
@@ -166,12 +174,15 @@ class DspChainValidator {
       isHealthy: eqHealthy,
       latencyMs: eqLatency,
       flatnessDeltaDb: eqFlatnessDelta,
-      message: eqHealthy ? 'Optimal flatness within ±0.5 dB' : 'Flatness tolerance exceeded',
+      message: eqHealthy
+          ? 'Optimal flatness within ±0.5 dB'
+          : 'Flatness tolerance exceeded',
     );
 
     // 2. Tube Amp / Saturation THD Stage
     const satLatency = 0.45;
-    double satThd = 1.85; // typical pleasing 2nd/3rd order harmonic distortion for tube saturation
+    double satThd =
+        1.85; // typical pleasing 2nd/3rd order harmonic distortion for tube saturation
     bool satHealthy = true;
 
     if (eqManager != null && eqManager.isSaturationEnabled) {
@@ -182,7 +193,8 @@ class DspChainValidator {
       satThd = computeThd(fundamental, harmonics);
       if (satThd > 10.0) {
         satHealthy = false;
-        allWarnings.add('Tube Amp / Saturation THD excessive: ${satThd.toStringAsFixed(2)}%');
+        allWarnings.add(
+            'Tube Amp / Saturation THD excessive: ${satThd.toStringAsFixed(2)}%');
       }
     }
 
@@ -201,7 +213,8 @@ class DspChainValidator {
       convolverLatency = (debugStatus['convolverLatencyMs'] as num).toDouble();
       if (convolverLatency > 20.0) {
         convolverHealthy = false;
-        allWarnings.add('Convolver latency elevated: ${convolverLatency.toStringAsFixed(1)}ms');
+        allWarnings.add(
+            'Convolver latency elevated: ${convolverLatency.toStringAsFixed(1)}ms');
       }
     }
 
@@ -228,10 +241,12 @@ class DspChainValidator {
     // 5. Total Latency & Overall Health
     final totalLatency = stages.values.fold(0.0, (sum, s) => sum + s.latencyMs);
     if (totalLatency > 40.0) {
-      allWarnings.add('Total DSP chain latency (${totalLatency.toStringAsFixed(1)}ms) exceeds standard budget (40ms)');
+      allWarnings.add(
+          'Total DSP chain latency (${totalLatency.toStringAsFixed(1)}ms) exceeds standard budget (40ms)');
     }
 
-    final allHealthy = stages.values.every((s) => s.isHealthy) && allWarnings.isEmpty;
+    final allHealthy =
+        stages.values.every((s) => s.isHealthy) && allWarnings.isEmpty;
 
     return DspDiagnosticReport(
       stages: stages,

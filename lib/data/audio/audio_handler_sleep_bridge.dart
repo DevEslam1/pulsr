@@ -7,12 +7,11 @@ mixin PulsrAudioSleepBridge on BaseAudioHandler {
   Stream<int?> get sleepTimerRemainingTracksStream =>
       _sleepTimerManager.sleepTimerRemainingTracksStream;
 
-  int? get sleepTimerRemainingTracks =>
-      (_sleepTimerManager.isArmed &&
-              (_sleepTimerManager.mode == SleepTimerMode.endOfTrack ||
-                  _sleepTimerManager.mode == SleepTimerMode.afterNTracks))
-          ? _sleepTimerManager.remainingTracks
-          : null;
+  int? get sleepTimerRemainingTracks => (_sleepTimerManager.isArmed &&
+          (_sleepTimerManager.mode == SleepTimerMode.endOfTrack ||
+              _sleepTimerManager.mode == SleepTimerMode.afterNTracks))
+      ? _sleepTimerManager.remainingTracks
+      : null;
 
   SleepTimerMode get sleepTimerMode => _sleepTimerManager.mode;
 
@@ -23,7 +22,10 @@ mixin PulsrAudioSleepBridge on BaseAudioHandler {
   /// [SleepTimerManager.onTrackCompleted] halved an "after N songs" timer.
   void notifySleepTrackCompleted() {
     final now = DateTime.now();
-    if (!PulsrAudioHandler.isDistinctSleepCompletion(_lastSleepTrackCompletedAt, now)) return;
+    if (!PulsrAudioHandler.isDistinctSleepCompletion(
+        _lastSleepTrackCompletedAt, now)) {
+      return;
+    }
     _lastSleepTrackCompletedAt = now;
     unawaited(_sleepTimerManager.onTrackCompleted());
   }
@@ -62,7 +64,9 @@ mixin PulsrAudioSleepBridge on BaseAudioHandler {
   void startAfterNTracksTimer(int trackCount, {bool fadeOut = true}) {
     final durations = <Duration>[];
     if (_songs.isNotEmpty && _currentIndex >= 0) {
-      for (int i = _currentIndex; i < _songs.length && durations.length < trackCount; i++) {
+      for (int i = _currentIndex;
+          i < _songs.length && durations.length < trackCount;
+          i++) {
         durations.add(Duration(milliseconds: _songs[i].durationMs));
       }
     }
@@ -87,34 +91,15 @@ mixin PulsrAudioSleepBridge on BaseAudioHandler {
     _sleepTimerManager.cancelSleepTimer();
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
   List<SongsTableData> get _songs;
   int get _currentIndex;
 
-  // Requires: provided by the composing class (same library).
   DateTime? get _lastSleepTrackCompletedAt;
   set _lastSleepTrackCompletedAt(DateTime? value);
 
-  // Requires: provided by the composing class (same library).
   SleepTimerManager get _sleepTimerManager;
 }

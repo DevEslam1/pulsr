@@ -76,12 +76,12 @@ void main() {
 
       const proxyEx = YtmException('YTM_PROXY_AUTH');
       final infoCode = YtmErrorClassifier.classify(proxyEx);
-      expect(
-          infoCode.recoveryAction, equals(YtmRecoveryAction.rotatePath));
+      expect(infoCode.recoveryAction, equals(YtmRecoveryAction.rotatePath));
     });
 
     test('classifies SABR enforced errors correctly', () {
-      const sabrEx = YtmException('SABR_ENFORCED', 'YouTube is forcing SABR streaming for this client');
+      const sabrEx = YtmException(
+          'SABR_ENFORCED', 'YouTube is forcing SABR streaming for this client');
       final info = YtmErrorClassifier.classify(sabrEx);
 
       expect(info.signal, equals(YtmBlockSignal.sabrEnforced));
@@ -101,7 +101,8 @@ void main() {
   // burned URL treated as a blip retries a dead URL until the attempts run out.
   group('isUrlBurned', () {
     test('is true for the statuses that spend a URL', () {
-      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP Status Error: 403')),
+      expect(
+          YtmErrorClassifier.isUrlBurned(Exception('HTTP Status Error: 403')),
           isTrue);
       expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP 404 on resume')),
           isTrue);
@@ -109,7 +110,8 @@ void main() {
           YtmErrorClassifier.isUrlBurned(
               const YtmException('YTM_429', 'HTTP 429 Retry-After: 30')),
           isTrue);
-      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP 410 Gone')), isTrue);
+      expect(
+          YtmErrorClassifier.isUrlBurned(Exception('HTTP 410 Gone')), isTrue);
       expect(
           YtmErrorClassifier.isUrlBurned(
               Exception('response code 416 Range Not Satisfiable')),
@@ -140,8 +142,8 @@ void main() {
       // A byte count, a bitrate or an itag in the message used to be read as an
       // HTTP verdict by a bare `contains('403')`.
       expect(
-          YtmErrorClassifier.isUrlBurned(
-              Exception('Connection closed before full body clen=4030099 itag=251')),
+          YtmErrorClassifier.isUrlBurned(Exception(
+              'Connection closed before full body clen=4030099 itag=251')),
           isFalse);
       expect(
           YtmErrorClassifier.isUrlBurned(
@@ -151,11 +153,10 @@ void main() {
 
     test('is true for a bot interstitial and a rate-limit phrase', () {
       expect(
-          YtmErrorClassifier.isUrlBurned(Exception(
-              'Sign in to confirm you’re not a bot')),
+          YtmErrorClassifier.isUrlBurned(
+              Exception('Sign in to confirm you’re not a bot')),
           isTrue);
-      expect(
-          YtmErrorClassifier.isUrlBurned(Exception('Too many requests')),
+      expect(YtmErrorClassifier.isUrlBurned(Exception('Too many requests')),
           isTrue);
     });
   });

@@ -14,7 +14,9 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('SettingsCache provides synchronous access and write-through persistence', () async {
+    test(
+        'SettingsCache provides synchronous access and write-through persistence',
+        () async {
       SharedPreferences.setMockInitialValues({
         'test_bool': true,
         'test_int': 42,
@@ -28,7 +30,8 @@ void main() {
       expect(cache.getBool('test_bool'), isTrue);
       expect(cache.getInt('test_int'), equals(42));
       expect(cache.getString('test_string'), equals('hello_pulsr'));
-      expect(cache.getString('non_existent', defaultValue: 'default_val'), equals('default_val'));
+      expect(cache.getString('non_existent', defaultValue: 'default_val'),
+          equals('default_val'));
 
       // Synchronous write-through
       await cache.setBool('dynamic_flag', true);
@@ -38,12 +41,14 @@ void main() {
       expect(cache.getString('mode'), equals('audiophile'));
 
       await cache.remove('test_string');
-      expect(cache.getString('test_string', defaultValue: 'none'), equals('none'));
+      expect(
+          cache.getString('test_string', defaultValue: 'none'), equals('none'));
     });
 
-    test('ArtworkCacheManager memory LRU and prefetch work without error', () async {
+    test('ArtworkCacheManager memory LRU and prefetch work without error',
+        () async {
       final manager = ArtworkCacheManager();
-      
+
       // Put test bytes
       final dummyBytes = Uint8List.fromList([1, 2, 3, 4, 5]);
       await manager.put('art_key_1', dummyBytes);

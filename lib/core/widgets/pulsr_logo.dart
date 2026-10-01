@@ -1,6 +1,7 @@
 // lib/core/widgets/pulsr_logo.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 import '../motion/pulsr_motion.dart';
 
 /// Highly optimized, scalable native vector rendering of the official Pulsr App Icon.
@@ -136,10 +137,9 @@ class _PulsrLogoPainter extends CustomPainter {
           radius: 0.75,
           colors: [
             color.withValues(alpha: 0.95),
-            Color.lerp(color, const Color(0xFF002288), 0.5) ??
-                const Color(0xFF0077FF),
-            const Color(0xFF001550),
-            const Color(0xFF0A0C12),
+            Color.lerp(color, AppColors.logoNavy, 0.5) ?? AppColors.logoBlue,
+            AppColors.logoMidnight,
+            AppColors.logoInk,
           ],
           stops: const [0.0, 0.4, 0.75, 1.0],
         ).createShader(const Rect.fromLTWH(0, 0, 512, 512));

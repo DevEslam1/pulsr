@@ -169,7 +169,6 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
 
     return Padding(
       padding: EdgeInsetsDirectional.only(
-
         start: AppSpacing.s20,
         end: AppSpacing.s20,
         top: AppSpacing.lg,
@@ -204,15 +203,16 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
             PulsrSwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.enableListenBrainz,
-                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body)),
+                  style: TextStyle(
+                      color: p.textPrimary, fontSize: AppFontSize.body)),
               value: _listenBrainzEnabled,
-              onChanged: (val) =>
-                  setState(() => _listenBrainzEnabled = val),
+              onChanged: (val) => setState(() => _listenBrainzEnabled = val),
             ),
             if (_listenBrainzEnabled) ...[
               TextField(
                 controller: _listenBrainzTokenController,
-                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                style: TextStyle(
+                    color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
                   labelText: context.l10n.userToken,
                   hintText: context.l10n.enterListenBrainzUserToken,
@@ -236,14 +236,16 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
             PulsrSwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(context.l10n.enableLastFmDirectScrobbling,
-                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body)),
+                  style: TextStyle(
+                      color: p.textPrimary, fontSize: AppFontSize.body)),
               value: _lastFmEnabled,
               onChanged: (val) => setState(() => _lastFmEnabled = val),
             ),
             if (_lastFmEnabled) ...[
               TextField(
                 controller: _lastFmApiKeyController,
-                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                style: TextStyle(
+                    color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
                   labelText: context.l10n.lastFmApiKey,
                   labelStyle: TextStyle(color: p.textSecondary),
@@ -255,7 +257,8 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
               const SizedBox(height: AppSpacing.s10),
               TextField(
                 controller: _lastFmSecretController,
-                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                style: TextStyle(
+                    color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
                   labelText: context.l10n.lastFmSharedSecret,
                   labelStyle: TextStyle(color: p.textSecondary),
@@ -267,7 +270,8 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
               const SizedBox(height: AppSpacing.s10),
               TextField(
                 controller: _lastFmSessionKeyController,
-                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                style: TextStyle(
+                    color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                 decoration: InputDecoration(
                   labelText: context.l10n.lastFmSessionKey,
                   labelStyle: TextStyle(color: p.textSecondary),

@@ -35,7 +35,8 @@ class RetryUtil {
       try {
         return await action();
       } catch (error, stackTrace) {
-        final canRetry = attempt < maxAttempts && (shouldRetry?.call(error) ?? true);
+        final canRetry =
+            attempt < maxAttempts && (shouldRetry?.call(error) ?? true);
         if (!canRetry) {
           rethrow;
         }
@@ -48,13 +49,18 @@ class RetryUtil {
         );
 
         final jitterOffset = jitter > 0
-            ? (currentDelay.inMilliseconds * jitter * (random.nextDouble() * 2 - 1)).round()
+            ? (currentDelay.inMilliseconds *
+                    jitter *
+                    (random.nextDouble() * 2 - 1))
+                .round()
             : 0;
-        final actualDelayMs = math.max(0, currentDelay.inMilliseconds + jitterOffset);
+        final actualDelayMs =
+            math.max(0, currentDelay.inMilliseconds + jitterOffset);
         await Future<void>.delayed(Duration(milliseconds: actualDelayMs));
 
         final nextMs = (currentDelay.inMilliseconds * multiplier).round();
-        currentDelay = Duration(milliseconds: math.min(nextMs, maxDelay.inMilliseconds));
+        currentDelay =
+            Duration(milliseconds: math.min(nextMs, maxDelay.inMilliseconds));
       }
     }
   }

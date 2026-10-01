@@ -125,7 +125,8 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s20),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.s20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -179,7 +180,9 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                 color: p.surfaceContainer.withValues(alpha: 0.7),
                 borderRadius: BorderRadius.circular(AppRadii.r16),
                 border: Border.all(
-                  color: _attenuationActive ? AppColors.error : p.hairline.withValues(alpha: 0.4),
+                  color: _attenuationActive
+                      ? AppColors.error
+                      : p.hairline.withValues(alpha: 0.4),
                   width: _attenuationActive ? 1.5 : 1.0,
                 ),
               ),
@@ -260,7 +263,8 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
               ),
               subtitle: Text(
                 "When weekly dose reaches 100%, smoothly engage lookahead safety limiter to clamp output peak to -6 dBFS.",
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.caption),
               ),
               value: _safetyEnabled,
               activeThumbColor: p.accent,

@@ -121,6 +121,9 @@ class AudioVisualizerState extends State<AudioVisualizer>
   final List<double> _targetData = List.filled(_numBands, 0.0);
   late final ValueNotifier<List<double>> _dataNotifier;
   DateTime _lastNativeDataTime = DateTime.fromMillisecondsSinceEpoch(0);
+  // Monotonic phase clock for the simulated visualizer. A wall-clock jump
+  // (NTP/timezone change) must not make the synthetic waves stutter.
+  final Stopwatch _simClock = Stopwatch()..start();
   MilkdropPreset _milkPreset = MilkdropPresetLibrary.defaultPreset;
   VisualizerPreset _customPreset = VisualizerPreset.fallback;
   ui.FragmentShader? _milkShader;
@@ -392,7 +395,12 @@ class AudioVisualizerState extends State<AudioVisualizer>
   }
 
   void _onTick() {
-    if (!mounted || !context.motionEnabled || !TickerMode.valuesOf(context).enabled || !_isAppActive) return;
+    if (!mounted ||
+        !context.motionEnabled ||
+        !TickerMode.valuesOf(context).enabled ||
+        !_isAppActive) {
+      return;
+    }
 
     if (!widget.isPlaying) {
       if (_isDecayedToBaseline()) {
@@ -417,7 +425,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
             _targetData[i] = 0.0;
           }
         } else {
-          final t = now.millisecondsSinceEpoch / 1000.0;
+          final t = _simClock.elapsedMilliseconds / 1000.0;
           final seed = AudioVisualizer.resolveSeed(
             trackSeed: widget.trackSeed,
             trackId: widget.trackId,
@@ -494,111 +502,133 @@ class AudioVisualizerState extends State<AudioVisualizer>
     final activeColor = widget.color ?? p.accent;
 
     return ExcludeSemantics(
-      child: Stack(
-        children: [
-          SizedBox(
-            width: widget.width,
-            height: widget.height,
-            child: ClipRect(
-              child: ValueListenableBuilder<List<double>>(
-          valueListenable: _dataNotifier,
-          builder: (context, data, _) {
-            return RepaintBoundary(
-              child: CustomPaint(
-                size: Size(widget.width, widget.height),
-                painter: switch (effectiveStyle) {
-                  VisualizerStyle.bar =>
-                    _BarVisualizerPainter(data: data, color: activeColor),
-                  VisualizerStyle.wave =>
-                    _WaveVisualizerPainter(data: data, color: activeColor),
-                  VisualizerStyle.circular =>
-                    _CircularVisualizerPainter(data: data, color: activeColor),
-                  VisualizerStyle.particles =>
-                    _ParticlesVisualizerPainter(data: data, color: activeColor),
-                  VisualizerStyle.terrain3D =>
-                    _Terrain3DVisualizerPainter(data: data, color: activeColor),
-                  VisualizerStyle.albumArtReactive =>
-                    _AlbumArtReactivePainter(data: data, color: activeColor),
-                  VisualizerStyle.custom => _CustomJsonVisualizerPainter(
-                      data: data,
-                      color: activeColor,
-                      preset: widget.customPreset ?? _customPreset,
-                    ),
-                  VisualizerStyle.milkdrop => (_milkShader != null)
-                      ? _MilkdropGpuPainter(
-                          shader: _milkShader!,
-                          data: data,
-                          color: activeColor,
-                          preset: widget.milkdropPreset ?? _milkPreset,
-                        )
-                      : _MilkdropPainter(
-                          data: data,
-                          color: activeColor,
-                          preset: widget.milkdropPreset ?? _milkPreset,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Resolve finite extents so an unbounded parent (e.g. a list item)
+          // never leaves the ClipRect/CustomPaint without a size.
+          final double resolvedWidth = widget.width.isFinite
+              ? widget.width
+              : (constraints.maxWidth.isFinite ? constraints.maxWidth : 300.0);
+          final double resolvedHeight = widget.height.isFinite
+              ? widget.height
+              : (constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : 160.0);
+          return Stack(
+            children: [
+              SizedBox(
+                width: resolvedWidth,
+                height: resolvedHeight,
+                child: ClipRect(
+                  child: ValueListenableBuilder<List<double>>(
+                    valueListenable: _dataNotifier,
+                    builder: (context, data, _) {
+                      return RepaintBoundary(
+                        child: CustomPaint(
+                          size: Size(resolvedWidth, resolvedHeight),
+                          painter: switch (effectiveStyle) {
+                            VisualizerStyle.bar => _BarVisualizerPainter(
+                                data: data, color: activeColor),
+                            VisualizerStyle.wave => _WaveVisualizerPainter(
+                                data: data, color: activeColor),
+                            VisualizerStyle.circular =>
+                              _CircularVisualizerPainter(
+                                  data: data, color: activeColor),
+                            VisualizerStyle.particles =>
+                              _ParticlesVisualizerPainter(
+                                  data: data, color: activeColor),
+                            VisualizerStyle.terrain3D =>
+                              _Terrain3DVisualizerPainter(
+                                  data: data, color: activeColor),
+                            VisualizerStyle.albumArtReactive =>
+                              _AlbumArtReactivePainter(
+                                  data: data, color: activeColor),
+                            VisualizerStyle.custom =>
+                              _CustomJsonVisualizerPainter(
+                                data: data,
+                                color: activeColor,
+                                preset: widget.customPreset ?? _customPreset,
+                              ),
+                            VisualizerStyle.milkdrop => (_milkShader != null)
+                                ? MilkdropGpuPainter(
+                                    shader: _milkShader!,
+                                    data: data,
+                                    color: activeColor,
+                                    preset:
+                                        widget.milkdropPreset ?? _milkPreset,
+                                  )
+                                : MilkdropCanvasPainter(
+                                    data: data,
+                                    color: activeColor,
+                                    preset:
+                                        widget.milkdropPreset ?? _milkPreset,
+                                  ),
+                            VisualizerStyle.off => null,
+                          },
                         ),
-                  VisualizerStyle.off => null,
-                },
-              ),
-            );
-          },
-        ),
-        ),
-      ),
-          // Honest degradation (16-01): when the MilkDrop GPU shader failed to
-          // compile, the Canvas painter above is NOT MilkDrop — say so instead
-          // of letting the user believe they are seeing it.
-          if (widget.style == VisualizerStyle.milkdrop && isFallbackActive)
-            PositionedDirectional(
-              top: 6,
-              end: 6,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
-                ),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                  child: Text(
-                    context.l10n.visualizerCpuFallbackBadge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: AppFontSize.tiny,
-                      fontWeight: FontWeight.w600,
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
-            ),
-          if (widget.style != VisualizerStyle.off &&
-              Platform.isAndroid &&
-              widget.isPlaying &&
-              !widget.preferSimulated &&
-              !_hasActiveSession &&
-              (widget.audioSessionId == null || widget.audioSessionId! <= 0))
-            PositionedDirectional(
-              bottom: 6,
-              start: 6,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                  child: Text(
-                    context.l10n.visualizerCpuFallbackBadge,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: AppFontSize.tiny,
-                      fontWeight: FontWeight.w600,
+              // Honest degradation (16-01): when the MilkDrop GPU shader failed to
+              // compile, the Canvas painter above is NOT MilkDrop — say so instead
+              // of letting the user believe they are seeing it.
+              if (widget.style == VisualizerStyle.milkdrop && isFallbackActive)
+                PositionedDirectional(
+                  top: 6,
+                  end: 6,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      child: Text(
+                        context.l10n.visualizerCpuFallbackBadge,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: AppFontSize.tiny,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-        ],
+              if (widget.style != VisualizerStyle.off &&
+                  Platform.isAndroid &&
+                  widget.isPlaying &&
+                  !widget.preferSimulated &&
+                  !_hasActiveSession &&
+                  (widget.audioSessionId == null ||
+                      widget.audioSessionId! <= 0))
+                PositionedDirectional(
+                  bottom: 6,
+                  start: 6,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      child: Text(
+                        context.l10n.visualizerCpuFallbackBadge,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: AppFontSize.tiny,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -985,7 +1015,10 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
       fill,
       Paint()
         ..shader = LinearGradient(
-          colors: [primary.withValues(alpha: 0.5), secondary.withValues(alpha: 0)],
+          colors: [
+            primary.withValues(alpha: 0.5),
+            secondary.withValues(alpha: 0)
+          ],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ).createShader(Offset.zero & size),
@@ -1012,10 +1045,9 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
       final angle = i / count * 2 * math.pi + rot;
       final v = (_valueAt(i, count) * preset.sensitivity).clamp(0.0, 1.0);
       final len = v * maxLen;
-      final start =
-          center + Offset(math.cos(angle), math.sin(angle)) * base;
-      final end = center +
-          Offset(math.cos(angle), math.sin(angle)) * (base + len);
+      final start = center + Offset(math.cos(angle), math.sin(angle)) * base;
+      final end =
+          center + Offset(math.cos(angle), math.sin(angle)) * (base + len);
       paint
         ..color = Color.lerp(primary, secondary, v)!.withValues(alpha: 0.85)
         ..strokeWidth = 2.0 + preset.glow * 3;
@@ -1076,6 +1108,3 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
 
 // --- PAINTER 8: MILKDROP PRESET VISUALIZER ---
 // Delegated to MilkdropRenderer in visualizer/milkdrop_renderer.dart
-typedef _MilkdropGpuPainter = MilkdropGpuPainter;
-typedef _MilkdropPainter = MilkdropCanvasPainter;
-

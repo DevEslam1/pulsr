@@ -218,8 +218,8 @@ class YtmBrowseService {
     } catch (_) {}
 
     try {
-      final onlineTracks =
-          await _ytmService.searchWithFallback('Popular Hits Playlist', limit: 15);
+      final onlineTracks = await _ytmService
+          .searchWithFallback('Popular Hits Playlist', limit: 15);
       if (onlineTracks.isNotEmpty) {
         return onlineTracks
             .take(8)

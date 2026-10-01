@@ -72,7 +72,9 @@ FILE "02_verse.flac" FLAC
       expect(chapters[1].end, isNull);
     });
 
-    test('Parses single-file multi-track CUE sheet with contiguous start and end times', () {
+    test(
+        'Parses single-file multi-track CUE sheet with contiguous start and end times',
+        () {
       const cueContent = '''
 FILE "full_album.flac" WAVE
   TRACK 01 AUDIO
@@ -89,13 +91,17 @@ FILE "full_album.flac" WAVE
       expect(chapters.length, equals(3));
       expect(chapters[0].start, equals(Duration.zero));
       expect(chapters[0].end, equals(const Duration(minutes: 3, seconds: 15)));
-      expect(chapters[1].start, equals(const Duration(minutes: 3, seconds: 15)));
+      expect(
+          chapters[1].start, equals(const Duration(minutes: 3, seconds: 15)));
       expect(chapters[1].end, equals(const Duration(minutes: 7, seconds: 45)));
-      expect(chapters[2].start, equals(const Duration(minutes: 7, seconds: 45)));
+      expect(
+          chapters[2].start, equals(const Duration(minutes: 7, seconds: 45)));
       expect(chapters[2].end, isNull);
     });
 
-    test('Ignores data tracks and pregaps gracefully, only capturing AUDIO tracks at INDEX 01', () {
+    test(
+        'Ignores data tracks and pregaps gracefully, only capturing AUDIO tracks at INDEX 01',
+        () {
       const cueContent = '''
 FILE "cd_image.bin" BINARY
   TRACK 01 MODE1/2352
@@ -110,7 +116,8 @@ FILE "cd_image.bin" BINARY
       expect(chapters.length, equals(1));
       expect(chapters.single.index, equals(2));
       expect(chapters.single.title, equals('Audio Track After Data'));
-      expect(chapters.single.start, equals(const Duration(minutes: 5, seconds: 2)));
+      expect(chapters.single.start,
+          equals(const Duration(minutes: 5, seconds: 2)));
     });
   });
 }

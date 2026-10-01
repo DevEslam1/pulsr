@@ -34,7 +34,8 @@ class PlaybackStateCoordinator {
   Stream<Duration> get positionStream => _positionSubject.stream;
 
   /// High-rate stream (~16ms, 60fps) for fluid waveform seeks.
-  Stream<Duration> get highRatePositionStream => _highRatePositionSubject.stream;
+  Stream<Duration> get highRatePositionStream =>
+      _highRatePositionSubject.stream;
 
   PlaybackStateCoordinator({
     required this.onSavePositionRequested,

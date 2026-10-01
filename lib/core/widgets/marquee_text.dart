@@ -115,7 +115,9 @@ class _MarqueeTextState extends State<MarqueeText> {
             curve: Curves.linear,
           );
 
-          if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
+          if (!mounted || !_isScrolling || !_scrollController.hasClients) {
+            return;
+          }
 
           _scrollTimer = Timer(widget.pauseDuration, () async {
             if (!mounted || !_isScrolling || !_scrollController.hasClients) {

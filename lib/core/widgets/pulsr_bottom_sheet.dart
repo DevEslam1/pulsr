@@ -33,7 +33,8 @@ class PulsrSheetHelper {
     bool wrapWithContainer = true,
   }) {
     final size = MediaQuery.sizeOf(context);
-    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     // Landscape phone: present as centered dialog to avoid bottom sheet clipping/distortion
     if (isLandscape && size.height < 480) {
@@ -43,12 +44,13 @@ class PulsrSheetHelper {
         barrierDismissible: isDismissible,
         builder: (ctx) {
           final built = builder(ctx);
-          final inner = (!wrapWithContainer || built is PulsrBottomSheetContainer)
-              ? built
-              : PulsrBottomSheetContainer(
-                  showDragHandle: false,
-                  child: built,
-                );
+          final inner =
+              (!wrapWithContainer || built is PulsrBottomSheetContainer)
+                  ? built
+                  : PulsrBottomSheetContainer(
+                      showDragHandle: false,
+                      child: built,
+                    );
           return Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -241,8 +243,9 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                                 width: AppSpacing.s38,
                                 height: 4.5,
                                 decoration: BoxDecoration(
-                                  color: (p.isDark ? Colors.white : Colors.black)
-                                      .withValues(alpha: 0.18),
+                                  color:
+                                      (p.isDark ? Colors.white : Colors.black)
+                                          .withValues(alpha: 0.18),
                                   borderRadius: AppRadii.full,
                                 ),
                               ),

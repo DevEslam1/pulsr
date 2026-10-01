@@ -73,11 +73,16 @@ Future<void> configureDependencies() async {
 }
 
 void validateDependencies(GetIt getIt) {
-  assert(getIt.isRegistered<AppDatabase>(), 'AppDatabase must be registered in DI');
-  assert(getIt.isRegistered<PulsrAudioHandler>(), 'PulsrAudioHandler must be registered in DI');
-  assert(getIt.isRegistered<PlayerCubit>(), 'PlayerCubit must be registered in DI');
-  assert(getIt.isRegistered<DownloadsCubit>(), 'DownloadsCubit must be registered in DI');
-  assert(getIt.isRegistered<YtmDownloadCubit>(), 'YtmDownloadCubit must be registered in DI');
+  assert(getIt.isRegistered<AppDatabase>(),
+      'AppDatabase must be registered in DI');
+  assert(getIt.isRegistered<PulsrAudioHandler>(),
+      'PulsrAudioHandler must be registered in DI');
+  assert(getIt.isRegistered<PlayerCubit>(),
+      'PlayerCubit must be registered in DI');
+  assert(getIt.isRegistered<DownloadsCubit>(),
+      'DownloadsCubit must be registered in DI');
+  assert(getIt.isRegistered<YtmDownloadCubit>(),
+      'YtmDownloadCubit must be registered in DI');
 }
 
 FutureOr<void> disposeHttpClient(HttpClient client) {

@@ -58,7 +58,8 @@ class SettingsCache {
     return _prefs?.getString(key) ?? defaultValue;
   }
 
-  List<String> getStringList(String key, {List<String> defaultValue = const []}) {
+  List<String> getStringList(String key,
+      {List<String> defaultValue = const []}) {
     final val = _cache[key];
     if (val is List<String>) return val;
     return _prefs?.getStringList(key) ?? defaultValue;

@@ -55,8 +55,7 @@ class LrcParser {
 
     final RegExp timeExp =
         RegExp(r'\[(-)?(\d{1,3}):(\d{2})(?:[.,:](\d{1,3}))?\]');
-    final RegExp wordTagExp =
-        RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
+    final RegExp wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,:]\d{1,3})?>');
 
     for (final rawLine in lines) {
       final line = rawLine.trim();
@@ -111,7 +110,9 @@ class LrcParser {
     for (int i = 0; i < result.length; i++) {
       final cur = result[i];
       if (merged.isNotEmpty &&
-          (cur.timestamp.inMilliseconds - merged.last.timestamp.inMilliseconds).abs() <= 50 &&
+          (cur.timestamp.inMilliseconds - merged.last.timestamp.inMilliseconds)
+                  .abs() <=
+              50 &&
           merged.last.translation == null &&
           cur.text != merged.last.text) {
         merged[merged.length - 1] = merged.last.copyWith(translation: cur.text);
@@ -207,7 +208,7 @@ class LrcParser {
   /// Helper to read a file and parse as LRC, returning null if file missing or
   /// content doesn't contain synced timestamps.
   static Future<List<LyricsLine>?> _tryParseLrcFile(
-    String path, LyricsSource source) async {
+      String path, LyricsSource source) async {
     try {
       final file = File(path);
       if (!await file.exists()) return null;
@@ -558,7 +559,6 @@ class LrcParser {
     int? durationSec,
     Object? lrclibService,
   }) async {
-
     // Check persistent disk cache before external searching or network lookups
     final diskCached = await _readFromDiskCache(cacheKey);
     if (diskCached != null) {
@@ -570,8 +570,8 @@ class LrcParser {
     List<LyricsLine>? embeddedPlainFallback;
 
     // 1. External .lrc file – highest priority for synced lyrics
-    final lrcLines = await findAndParseLrc(audioFilePath,
-        source: LyricsSource.externalLrc);
+    final lrcLines =
+        await findAndParseLrc(audioFilePath, source: LyricsSource.externalLrc);
     if (lrcLines != null && lrcLines.isNotEmpty) {
       final isSynced = lrcLines.any((l) => l.timestamp > Duration.zero);
       if (isSynced) {
@@ -639,8 +639,8 @@ class LrcParser {
       // across a long session of misses.
       if (_negativeCacheTimes.length > _maxCacheSize) {
         final now = DateTime.now();
-        _negativeCacheTimes.removeWhere(
-            (_, t) => now.difference(t) > _negativeCacheTtl);
+        _negativeCacheTimes
+            .removeWhere((_, t) => now.difference(t) > _negativeCacheTtl);
       }
       if (_lyricsCache.length >= _maxCacheSize) {
         final evictedKey = _lyricsCache.keys.first;

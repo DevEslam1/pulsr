@@ -61,7 +61,8 @@ class SortFilterSheet extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: screenHeight * 0.65),
         child: ListView.separated(
           shrinkWrap: true,
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s20),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s20),
           itemCount: sortOptions.length,
           separatorBuilder: (_, __) => Divider(
             color: p.hairline.withValues(alpha: 0.5),
@@ -89,8 +90,8 @@ class SortFilterSheet extends StatelessWidget {
                 Navigator.pop(context);
               },
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
                 child: Row(
                   children: [
                     Expanded(
@@ -98,9 +99,8 @@ class SortFilterSheet extends StatelessWidget {
                         option['label']!,
                         style: TextStyle(
                           color: isSelected ? p.accent : p.textPrimary,
-                          fontWeight: isSelected
-                              ? FontWeight.w800
-                              : FontWeight.w500,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w500,
                           fontSize: AppFontSize.callout,
                         ),
                       ),

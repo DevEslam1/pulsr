@@ -76,7 +76,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
         BatteryOptimizationService.isAggressiveOem(_manufacturer);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
@@ -91,7 +92,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
               Icon(Icons.battery_alert_rounded, color: p.accent, size: 22),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
-                child: Text(context.l10n.playbackStopsScreenOff,
+                child: Text(
+                  context.l10n.playbackStopsScreenOff,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -113,8 +115,12 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(context.l10n.batteryExemptionDesc,
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label, height: 1.4),
+          Text(
+            context.l10n.batteryExemptionDesc,
+            style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.label,
+                height: 1.4),
           ),
           const SizedBox(height: AppSpacing.sm),
           Row(
@@ -123,8 +129,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
                 style: FilledButton.styleFrom(
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                   textStyle: const TextStyle(
                       fontSize: AppFontSize.label, fontWeight: FontWeight.w700),
                 ),
@@ -145,7 +151,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
                     PulsrDialogHelper.showCustomDialog<void>(
                       context,
                       builder: (ctx) => PulsrDialog(
-                        title: context.l10n.settingsManufacturerBackgroundGuide(_manufacturer.toUpperCase()),
+                        title: context.l10n.settingsManufacturerBackgroundGuide(
+                            _manufacturer.toUpperCase()),
                         icon: Icons.battery_alert_rounded,
                         content: Text(
                           context.l10n.settingsAggressiveBatteryGuide(guideUrl),
@@ -159,7 +166,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard>
                       ),
                     );
                   },
-                  child: Text(context.l10n.deviceGuide,
+                  child: Text(
+                    context.l10n.deviceGuide,
                     style: TextStyle(
                         color: p.accent,
                         fontSize: AppFontSize.label,

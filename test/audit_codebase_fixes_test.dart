@@ -17,7 +17,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Audit Codebase Fixes Tests', () {
-    test('Bug 6 & 18: DsdDecoderHelper rejects oversized file > 300MB', () async {
+    test('Bug 6 & 18: DsdDecoderHelper rejects oversized file > 300MB',
+        () async {
       expect(DsdDecoderHelper.kMaxInMemoryDecodeBytes, 300 * 1024 * 1024);
 
       final tempDir = await Directory.systemTemp.createTemp('dsd_test_');
@@ -59,7 +60,8 @@ void main() {
       expect(MqaDecoderHelper.kMaxInMemoryDecodeBytes, 300 * 1024 * 1024);
     });
 
-    test('Bug 7: AdaptiveQualityManager resets cooldown on failed switch', () async {
+    test('Bug 7: AdaptiveQualityManager resets cooldown on failed switch',
+        () async {
       var callCount = 0;
       final mgr = AdaptiveQualityManager(
         currentQuality: 'high',
@@ -98,7 +100,8 @@ void main() {
           'setting_convolution_reverb_damping');
     });
 
-    test('Issue 13 & 14: PrefsRepository supports dispose and immediate async set',
+    test(
+        'Issue 13 & 14: PrefsRepository supports dispose and immediate async set',
         () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();

@@ -20,6 +20,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class MockPulsrAudioHandler extends BaseAudioHandler
@@ -138,7 +139,8 @@ void main() {
     );
   }
 
-  testWidgets('TabletPlayerBar renders with rounded corners in landscape dock', (tester) async {
+  testWidgets('TabletPlayerBar renders with rounded corners in landscape dock',
+      (tester) async {
     await tester.pumpWidget(buildSubject());
     await tester.pumpAndSettle();
 
@@ -149,8 +151,11 @@ void main() {
       find.descendant(
         of: find.byType(TabletPlayerBar),
         matching: find.byWidgetPredicate(
-          (w) => w is Container && w.decoration is BoxDecoration &&
-              (w.decoration as BoxDecoration).borderRadius == BorderRadius.circular(AppRadii.r20),
+          (w) =>
+              w is Container &&
+              w.decoration is BoxDecoration &&
+              (w.decoration as BoxDecoration).borderRadius ==
+                  BorderRadius.circular(AppRadii.r20),
         ),
       ),
     );
@@ -162,7 +167,9 @@ void main() {
     expect(PulsrDockTracker.dockHeight.value, greaterThan(0.0));
   });
 
-  testWidgets('ClassicPlayerTheme renders controls cleanly without an added wrapper box in landscape mode', (tester) async {
+  testWidgets(
+      'ClassicPlayerTheme renders controls cleanly without an added wrapper box in landscape mode',
+      (tester) async {
     final theme = AuraTheme.customTheme(
       const Color(0xFF00E5FF),
       brightness: Brightness.dark,

@@ -78,14 +78,16 @@ Third line of plain lyric
 [00:05.00]Positive offset lyric
 ''';
       final linesPos = LrcParser.parse(lrcPositive);
-      expect(linesPos[0].timestamp, const Duration(seconds: 5, milliseconds: 500));
+      expect(
+          linesPos[0].timestamp, const Duration(seconds: 5, milliseconds: 500));
 
       const lrcNegative = '''
 [offset:-500]
 [00:05.00]Negative offset lyric
 ''';
       final linesNeg = LrcParser.parse(lrcNegative);
-      expect(linesNeg[0].timestamp, const Duration(seconds: 4, milliseconds: 500));
+      expect(
+          linesNeg[0].timestamp, const Duration(seconds: 4, milliseconds: 500));
     });
 
     test('parses colon-separated hundredths ([mm:ss:xx])', () {
@@ -107,8 +109,13 @@ Third line of plain lyric
 
     test('formatToLrc formats lyrics back into standard LRC syntax', () {
       final input = [
-        LyricsLine(timestamp: const Duration(seconds: 5, milliseconds: 200), text: 'Line 1'),
-        LyricsLine(timestamp: const Duration(minutes: 1, seconds: 12, milliseconds: 450), text: 'Line 2'),
+        LyricsLine(
+            timestamp: const Duration(seconds: 5, milliseconds: 200),
+            text: 'Line 1'),
+        LyricsLine(
+            timestamp:
+                const Duration(minutes: 1, seconds: 12, milliseconds: 450),
+            text: 'Line 2'),
       ];
       final lrc = LrcParser.formatToLrc(input);
       expect(lrc, contains('[00:05.20]Line 1'));
@@ -123,7 +130,8 @@ Third line of plain lyric
       expect(result, isNull);
     });
 
-    test('cacheLyricsResult and getCachedLyrics work across songId and path', () {
+    test('cacheLyricsResult and getCachedLyrics work across songId and path',
+        () {
       final mockResult = LyricsResult(
         lines: [
           LyricsLine(timestamp: const Duration(seconds: 1), text: 'Cached'),
@@ -131,11 +139,13 @@ Third line of plain lyric
         source: LyricsSource.lrclib,
       );
 
-      LrcParser.cacheLyricsResult(mockResult, songId: 42, path: '/path/song.mp3');
+      LrcParser.cacheLyricsResult(mockResult,
+          songId: 42, path: '/path/song.mp3');
 
       expect(LrcParser.hasCachedLyrics(songId: 42), isTrue);
       expect(LrcParser.getCachedLyrics(songId: 42), equals(mockResult));
-      expect(LrcParser.getCachedLyrics(path: '/path/song.mp3'), equals(mockResult));
+      expect(LrcParser.getCachedLyrics(path: '/path/song.mp3'),
+          equals(mockResult));
 
       LrcParser.invalidateSong(songId: 42);
       expect(LrcParser.hasCachedLyrics(songId: 42), isFalse);
@@ -144,7 +154,9 @@ Third line of plain lyric
       expect(LrcParser.hasCachedLyrics(path: '/path/song.mp3'), isFalse);
     });
 
-    test('parses negative lead-in timestamps without crash, safely clamping to Duration.zero', () {
+    test(
+        'parses negative lead-in timestamps without crash, safely clamping to Duration.zero',
+        () {
       const lrc = '[-00:02.50]Negative intro count\n[00:01.00]Song begins';
       final lines = LrcParser.parse(lrc);
       expect(lines.length, 2);

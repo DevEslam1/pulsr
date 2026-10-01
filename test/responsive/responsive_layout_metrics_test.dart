@@ -73,7 +73,8 @@ void main() {
       expect(desktopLarge, PulsrBreakpoint.large);
     });
 
-    testWidgets('contentMaxWidth scales appropriately per tier', (tester) async {
+    testWidgets('contentMaxWidth scales appropriately per tier',
+        (tester) async {
       late double phonePortraitMax;
       late double tabletPortraitMax;
       late double tabletLandscapeMax;
@@ -119,7 +120,8 @@ void main() {
       expect(tabletLandscapeMax, 1000.0);
     });
 
-    testWidgets('heroHeight scales with orientation and screen size', (tester) async {
+    testWidgets('heroHeight scales with orientation and screen size',
+        (tester) async {
       late double phonePortraitHero;
       late double phoneLandscapeHero;
       late double tabletPortraitHero;
@@ -165,7 +167,9 @@ void main() {
       expect(tabletPortraitHero, inInclusiveRange(220.0, 380.0));
     });
 
-    testWidgets('isPlayerSplitMode cleanly distinguishes split vs single column', (tester) async {
+    testWidgets(
+        'isPlayerSplitMode cleanly distinguishes split vs single column',
+        (tester) async {
       late bool phonePortraitSplit;
       late bool phoneLandscapeSplit;
       late bool tabletPortraitSplit;
@@ -247,7 +251,8 @@ void main() {
           data: const MediaQueryData(size: Size(390, 844)),
           child: Builder(
             builder: (ctx) {
-              phonePortraitSheet = PulsrLayoutMetrics.shouldUseDialogForSheet(ctx);
+              phonePortraitSheet =
+                  PulsrLayoutMetrics.shouldUseDialogForSheet(ctx);
               return const SizedBox();
             },
           ),
@@ -259,7 +264,8 @@ void main() {
           data: const MediaQueryData(size: Size(844, 390)),
           child: Builder(
             builder: (ctx) {
-              phoneLandscapeSheet = PulsrLayoutMetrics.shouldUseDialogForSheet(ctx);
+              phoneLandscapeSheet =
+                  PulsrLayoutMetrics.shouldUseDialogForSheet(ctx);
               return const SizedBox();
             },
           ),
@@ -283,7 +289,8 @@ void main() {
       expect(tabletSheet, isTrue); // Centered dialog
     });
 
-    testWidgets('PulsrSearchField renders text field and clear button', (tester) async {
+    testWidgets('PulsrSearchField renders text field and clear button',
+        (tester) async {
       final controller = TextEditingController(text: 'Queen');
       bool cleared = false;
 
@@ -310,7 +317,9 @@ void main() {
       expect(cleared, isTrue);
     });
 
-    testWidgets('DetailScaffold switches between single-pane and two-pane correctly', (tester) async {
+    testWidgets(
+        'DetailScaffold switches between single-pane and two-pane correctly',
+        (tester) async {
       // Phone portrait: single column CustomScrollView
       await tester.pumpWidget(
         MaterialApp(
@@ -346,7 +355,8 @@ void main() {
       expect(find.byType(Row), findsOneWidget);
     });
 
-    testWidgets('TwoPaneScaffold renders master and detail with hinge support', (tester) async {
+    testWidgets('TwoPaneScaffold renders master and detail with hinge support',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: MediaQuery(

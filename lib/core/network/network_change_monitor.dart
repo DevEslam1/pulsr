@@ -20,8 +20,7 @@ class NetworkChangeMonitor {
   final Connectivity _connectivity;
 
   StreamSubscription<List<ConnectivityResult>>? _sub;
-  final StreamController<void> _controller =
-      StreamController<void>.broadcast();
+  final StreamController<void> _controller = StreamController<void>.broadcast();
 
   List<ConnectivityResult>? _lastResults;
   Timer? _debounce;

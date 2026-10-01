@@ -60,8 +60,7 @@ class SmartAudioPlan {
   });
 
   @override
-  String toString() =>
-      'SmartAudioPlan(${mode.name}/${decision.name}, profile: '
+  String toString() => 'SmartAudioPlan(${mode.name}/${decision.name}, profile: '
       '$headphoneProfileId, keepDsp: $keepDsp, bitPerfect: $preferBitPerfect, '
       'reason: $reason)';
 }

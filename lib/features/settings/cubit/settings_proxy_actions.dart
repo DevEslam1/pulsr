@@ -9,7 +9,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     // FIX-E03: Add platform check to prevent MissingPluginException on desktop
     if (!Platform.isAndroid && !Platform.isIOS) return;
     try {
-      await SettingsCubit._proxyChannel.invokeMethod('setProxy', config.toMap());
+      await SettingsCubit._proxyChannel
+          .invokeMethod('setProxy', config.toMap());
     } catch (e) {
       debugPrint('[SettingsCubit] Failed to sync proxy to native channel: $e');
     }
@@ -18,7 +19,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
   /// Reads the entry-ID-keyed proxy pool credentials out of secure storage.
   Future<Map<String, String>> _readProxyPoolSecrets() async {
     final secrets = <String, String>{};
-    final raw = await _safeSecureRead(SettingsCubit._keyProxyListPasswordsSecure);
+    final raw =
+        await _safeSecureRead(SettingsCubit._keyProxyListPasswordsSecure);
     if (raw == null || raw.isEmpty) return secrets;
     try {
       (jsonDecode(raw) as Map<String, dynamic>).forEach((id, value) {
@@ -120,7 +122,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
       }
     } catch (_) {}
     await prefs.remove(SettingsCubit._keyProxyPassword);
-    await prefs.setString(SettingsCubit._keyProxyBypassHosts, newConfig.bypassHosts);
+    await prefs.setString(
+        SettingsCubit._keyProxyBypassHosts, newConfig.bypassHosts);
 
     await _syncProxySettings(newConfig);
   }
@@ -138,7 +141,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     };
     try {
       if (secrets.isEmpty) {
-        await _secureStorage.delete(key: SettingsCubit._keyProxyListPasswordsSecure);
+        await _secureStorage.delete(
+            key: SettingsCubit._keyProxyListPasswordsSecure);
       } else {
         await _secureStorage.write(
           key: SettingsCubit._keyProxyListPasswordsSecure,
@@ -331,33 +335,6 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(proxyList: list));
     await _saveProxyList(list);
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // Requires: provided by the composing class (same library).
   FlutterSecureStorage get _secureStorage;

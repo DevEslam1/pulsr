@@ -52,7 +52,8 @@ class ClassicPlayerTheme extends StatefulWidget {
 }
 
 class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
-  final ValueNotifier<double?> _dragVolumeNotifier = ValueNotifier<double?>(null);
+  final ValueNotifier<double?> _dragVolumeNotifier =
+      ValueNotifier<double?>(null);
   final ScrollController _queueScrollController = ScrollController();
 
   @override
@@ -84,20 +85,24 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
     final song = state.currentSong;
     final isTablet = context.isTablet;
 
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe, :visualizerStyle, :waveformSeekBarEnabled) =
-        context.select<
-            SettingsCubit,
-            ({
-              NowPlayingDoubleTapAction nowPlayingDoubleTap,
-              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-              VisualizerStyle visualizerStyle,
-              bool waveformSeekBarEnabled,
-            })>((c) => (
-              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-              visualizerStyle: c.state.visualizerStyle,
-              waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
-            ));
+    final (
+      :nowPlayingDoubleTap,
+      :nowPlayingArtworkSwipe,
+      :visualizerStyle,
+      :waveformSeekBarEnabled
+    ) = context.select<
+        SettingsCubit,
+        ({
+          NowPlayingDoubleTapAction nowPlayingDoubleTap,
+          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+          VisualizerStyle visualizerStyle,
+          bool waveformSeekBarEnabled,
+        })>((c) => (
+          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+          visualizerStyle: c.state.visualizerStyle,
+          waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+        ));
 
     final artRadius = resolveCustomRadius(context, AppRadii.r28);
 
@@ -187,7 +192,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
         // 2. Main Foreground Layout
         SafeArea(
-          top: false,
+          top: true,
           bottom: false,
           left: !context.isLandscape,
           right: !context.isLandscape,
@@ -196,7 +201,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
               // Top Pull-down Handle Indicator & Top App Bar (hidden in landscape for immersive edge-to-edge view)
               if (!context.isLandscape) ...[
                 Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.s6, bottom: AppSpacing.xxs),
+                  padding: const EdgeInsets.only(
+                      top: AppSpacing.s6, bottom: AppSpacing.xxs),
                   child: Center(
                     child: Container(
                       width: 38,
@@ -250,7 +256,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                       // Center: "PLAYING FROM" / Album Header
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -297,7 +304,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                     .titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
+                                      fontSize: isTablet
+                                          ? AppFontSize.body
+                                          : AppFontSize.bodySmall,
                                       color: p.textPrimary,
                                     ),
                               ),
@@ -343,9 +352,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isLandscape =
-                        PulsrLayoutMetrics.isPlayerSplitMode(
-                            context, constraints);
+                    final isLandscape = PulsrLayoutMetrics.isPlayerSplitMode(
+                        context, constraints);
 
                     final double heightRatio =
                         (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
@@ -363,20 +371,24 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                         (isTablet ? 10.0 : 6.0) * heightRatio;
 
                     final double landscapeArtSize =
-                        (constraints.maxHeight - (isLandscape ? 56 : 24)).clamp(160.0, isTablet ? 520.0 : 310.0);
+                        (constraints.maxHeight - (isLandscape ? 56 : 24))
+                            .clamp(160.0, isTablet ? 520.0 : 310.0);
 
                     final double pillBarWidth = math.min(
                       constraints.maxWidth - (isTablet ? 64 : 28),
                       isTablet ? 440.0 : 336.0,
                     );
-                    final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+                    final double pillBarHeight = (isTablet ? 50.0 : 44.0) *
+                        heightRatio.clamp(0.85, 1.15);
 
                     final viewSwitcher = PlayerViewSwitcher(
                       state: state,
                       cubit: cubit,
                       activeColor: activeColor,
                       isTablet: isTablet,
-                      barWidth: isLandscape ? math.min(landscapeArtSize, 320.0) : pillBarWidth,
+                      barWidth: isLandscape
+                          ? math.min(landscapeArtSize, 320.0)
+                          : pillBarWidth,
                       barHeight: isLandscape ? 38.0 : pillBarHeight,
                       trackIcon: Icons.music_note_rounded,
                       surfaceFillAlpha: 0.06,
@@ -423,7 +435,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                 duration: context.motionMs(320),
                                 curve: context.motionCurve(Curves.easeOutCubic),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(artRadius),
+                                  borderRadius:
+                                      BorderRadius.circular(artRadius),
                                   border: Border.all(
                                     color: Colors.white.withValues(alpha: 0.14),
                                     width: 1.2,
@@ -438,14 +451,16 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                       offset: const Offset(0, 14),
                                     ),
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.40),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.40),
                                       blurRadius: 20,
                                       offset: const Offset(0, 8),
                                     ),
                                   ],
                                 ),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(artRadius),
+                                  borderRadius:
+                                      BorderRadius.circular(artRadius),
                                   child: song != null
                                       ? CachedArtwork(
                                           id: song.id,
@@ -470,11 +485,13 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               constraints: const BoxConstraints(maxWidth: 360),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
+                                    horizontal: AppSpacing.lg,
+                                    vertical: AppSpacing.xxs),
                                 child: AudioVisualizer(
                                   style: visualizerStyle,
                                   color: activeColor,
-                                  height: visualizerStyle == VisualizerStyle.circular
+                                  height: visualizerStyle ==
+                                          VisualizerStyle.circular
                                       ? 65
                                       : 36,
                                   isPlaying: state.isPlaying,
@@ -508,25 +525,34 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                           song: song,
                                           activeColor: activeColor,
                                           iconColor: p.textSecondary,
-                                          iconSize: isTablet ? 24 : (isShortLandscape ? 20 : 22),
+                                          iconSize: isTablet
+                                              ? 24
+                                              : (isShortLandscape ? 20 : 22),
                                         ),
                                       )
                                     : Material(
-                                        color: Colors.white.withValues(alpha: 0.06),
+                                        color: Colors.white
+                                            .withValues(alpha: 0.06),
                                         shape: const CircleBorder(),
                                         clipBehavior: Clip.antiAlias,
                                         child: InkWell(
                                           onTap: () {
                                             if (song != null) {
                                               HapticFeedback.lightImpact();
-                                              AddToPlaylistSheet.show(context, song: song);
+                                              AddToPlaylistSheet.show(context,
+                                                  song: song);
                                             }
                                           },
                                           child: Center(
                                             child: Icon(
                                               Icons.playlist_add_rounded,
-                                              semanticLabel: context.l10n.addToPlaylist,
-                                              size: isTablet ? 24 : (isShortLandscape ? 20 : 22),
+                                              semanticLabel:
+                                                  context.l10n.addToPlaylist,
+                                              size: isTablet
+                                                  ? 24
+                                                  : (isShortLandscape
+                                                      ? 20
+                                                      : 22),
                                               color: p.textSecondary,
                                             ),
                                           ),
@@ -538,32 +564,42 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               Expanded(
                                 child: Padding(
                                   padding: EdgeInsets.symmetric(
-                                    horizontal: isShortLandscape ? 6 : AppSpacing.s10,
+                                    horizontal:
+                                        isShortLandscape ? 6 : AppSpacing.s10,
                                   ),
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       MarqueeText(
-                                        text: song?.title ?? context.l10n.noTrackSelected,
+                                        text: song?.title ??
+                                            context.l10n.noTrackSelected,
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: isTablet
                                               ? AppFontSize.headline
-                                              : (isShortLandscape ? AppFontSize.body : AppFontSize.title),
+                                              : (isShortLandscape
+                                                  ? AppFontSize.body
+                                                  : AppFontSize.title),
                                           fontWeight: FontWeight.w900,
                                           color: p.textPrimary,
                                           height: 1.22,
                                           letterSpacing: AppTracking.title,
                                         ),
                                       ),
-                                      SizedBox(height: isShortLandscape ? 1 : AppSpacing.xxs),
+                                      SizedBox(
+                                          height: isShortLandscape
+                                              ? 1
+                                              : AppSpacing.xxs),
                                       MarqueeText(
-                                        text: song?.artist ?? context.l10n.unknownArtist,
+                                        text: song?.artist ??
+                                            context.l10n.unknownArtist,
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: isTablet
                                               ? AppFontSize.callout
-                                              : (isShortLandscape ? AppFontSize.caption : AppFontSize.bodySmall),
+                                              : (isShortLandscape
+                                                  ? AppFontSize.caption
+                                                  : AppFontSize.bodySmall),
                                           fontWeight: FontWeight.w600,
                                           color: p.textSecondary,
                                         ),
@@ -588,7 +624,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                         : context.l10n.like,
                                     favoriteColor: p.favorite,
                                     inactiveColor: p.textSecondary,
-                                    iconSize: isTablet ? 24 : (isShortLandscape ? 20 : 22),
+                                    iconSize: isTablet
+                                        ? 24
+                                        : (isShortLandscape ? 20 : 22),
                                     onTap: () {
                                       if (song != null) {
                                         cubit.toggleFavorite(song.id);
@@ -602,7 +640,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
                           // Symmetrical Audio Quality Badge
                           if (song != null) ...[
-                            SizedBox(height: isShortLandscape ? 2 : AppSpacing.xs),
+                            SizedBox(
+                                height: isShortLandscape ? 2 : AppSpacing.xs),
                             Center(
                               child: AudioQualityBadge(
                                 song: song,
@@ -623,7 +662,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                         children: [
                           trackInfoHeader,
 
-                          SizedBox(height: isShortLandscape ? 2.0 : spacingTrackToSeek),
+                          SizedBox(
+                              height:
+                                  isShortLandscape ? 2.0 : spacingTrackToSeek),
 
                           // Interactive Scrubber / Seek Bar
                           PlayerSeekBar(
@@ -636,7 +677,10 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             onSeek: (pos) => cubit.seek(pos),
                           ),
 
-                          SizedBox(height: isShortLandscape ? 2.0 : spacingSeekToControls),
+                          SizedBox(
+                              height: isShortLandscape
+                                  ? 2.0
+                                  : spacingSeekToControls),
 
                           // Primary Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
                           PlayerControls(
@@ -693,7 +737,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             PlayerBottomActionDock(
                               props: props,
                               isTablet: false,
-                              barWidth: math.min(constraints.maxWidth - 24, 380.0),
+                              barWidth:
+                                  math.min(constraints.maxWidth - 24, 380.0),
                               barHeight: 38.0,
                               dockIconStyle: PlayerDockIconStyle.classic,
                             ),
@@ -702,12 +747,13 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                       );
                     }
 
-                    // â”€â”€ Landscape / Tablet Two-Pane Mode (Inspired by Images 1 & 3) â”€â”€
+                    // ── Landscape / Tablet Two-Pane Mode (Inspired by Images 1 & 3) ──
                     // ── Landscape / Tablet Two-Pane Mode (Inspired by Apple Music) ──
                     if (isLandscape) {
                       final bool isLyricsMode = state.isLyricsVisible;
                       final bool isQueueMode = state.isQueueVisible;
-                      final bool isSplitContentMode = isLyricsMode || isQueueMode;
+                      final bool isSplitContentMode =
+                          isLyricsMode || isQueueMode;
 
                       final Widget leftPaneContent = isSplitContentMode
                           ? Center(
@@ -715,29 +761,33 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                 constraints: BoxConstraints(
                                   maxWidth: isTablet ? 440.0 : 380.0,
                                 ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // View Switcher Tabs at top of left pane
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // View Switcher Tabs at top of left pane
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                          bottom: isTablet
+                                              ? AppSpacing.lg
+                                              : AppSpacing.md,
+                                        ),
+                                        child: viewSwitcher,
                                       ),
-                                      child: viewSwitcher,
-                                    ),
-                                    // Controls directly below switcher (Cover and Volume Bar deleted in lyrics mode)
-                                    _buildSideControls(
-                                      context: context,
-                                      state: state,
-                                      cubit: cubit,
-                                      activeColor: activeColor,
-                                      p: p,
-                                      song: song,
-                                      isTablet: isTablet,
-                                      isShortLandscape: isShortLandscape,
-                                    ),
-                                  ],
+                                      // Controls directly below switcher (Cover and Volume Bar deleted in lyrics mode)
+                                      _buildSideControls(
+                                        context: context,
+                                        state: state,
+                                        cubit: cubit,
+                                        activeColor: activeColor,
+                                        p: p,
+                                        song: song,
+                                        isTablet: isTablet,
+                                        isShortLandscape: isShortLandscape,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             )
@@ -747,7 +797,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               children: [
                                 // Tabs directly above the hero cover
                                 Padding(
-                                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                                  padding: const EdgeInsets.only(
+                                      bottom: AppSpacing.s8),
                                   child: viewSwitcher,
                                 ),
                                 ConstrainedBox(
@@ -761,11 +812,14 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             );
 
                       final insets = MediaQuery.paddingOf(context);
-                      final horizontalPad = math.max(16.0, math.max(insets.left, insets.right));
+                      final horizontalPad =
+                          math.max(16.0, math.max(insets.left, insets.right));
 
                       return Padding(
                         padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? math.max(32.0, horizontalPad) : horizontalPad,
+                          horizontal: isTablet
+                              ? math.max(32.0, horizontalPad)
+                              : horizontalPad,
                           vertical: isShortLandscape ? 4.0 : 8.0,
                         ),
                         child: Row(
@@ -777,8 +831,24 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               child: Center(
                                 child: AnimatedSwitcher(
                                   duration: context.motionMs(260),
+                                  layoutBuilder:
+                                      (currentChild, previousChildren) {
+                                    return Stack(
+                                      fit: StackFit.expand,
+                                      alignment: Alignment.center,
+                                      children: <Widget>[
+                                        // BUG-FIX: previous panes are fading
+                                        // out — prevent them from stealing
+                                        // touch events from the incoming pane.
+                                        ...previousChildren.map(
+                                            (c) => IgnorePointer(child: c)),
+                                        if (currentChild != null) currentChild,
+                                      ],
+                                    );
+                                  },
                                   child: KeyedSubtree(
-                                    key: ValueKey('left_pane_${isSplitContentMode ? "split" : "art"}'),
+                                    key: ValueKey(
+                                        'left_pane_${isSplitContentMode ? "split" : "art"}'),
                                     child: leftPaneContent,
                                   ),
                                 ),
@@ -793,19 +863,25 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               child: SizedBox.expand(
                                 child: AnimatedSwitcher(
                                   duration: context.motionMs(260),
-                                  layoutBuilder: (currentChild, previousChildren) {
+                                  layoutBuilder:
+                                      (currentChild, previousChildren) {
                                     return Stack(
                                       fit: StackFit.expand,
                                       alignment: Alignment.center,
                                       children: <Widget>[
-                                        ...previousChildren,
+                                        // BUG-FIX: previous panes are fading
+                                        // out — prevent them from stealing
+                                        // touch events from the incoming pane.
+                                        ...previousChildren.map(
+                                            (c) => IgnorePointer(child: c)),
                                         if (currentChild != null) currentChild,
                                       ],
                                     );
                                   },
                                   child: state.isLyricsVisible
                                       ? LyricsView(
-                                          key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                          key: ValueKey(
+                                              'lyrics_${song?.id}_${song?.remoteId}'),
                                           lyrics: state.lyrics,
                                           isLoading: state.isLoadingLyrics,
                                           activeColor: activeColor,
@@ -813,7 +889,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                         )
                                       : state.isQueueVisible
                                           ? _buildContinuePlayingQueue(
-                                              key: const ValueKey('continue_playing_queue'),
+                                              key: const ValueKey(
+                                                  'continue_playing_queue'),
                                               context: context,
                                               state: state,
                                               cubit: cubit,
@@ -821,9 +898,11 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                                               p: p,
                                             )
                                           : Center(
-                                              key: const ValueKey('track_controls_pane'),
+                                              key: const ValueKey(
+                                                  'track_controls_pane'),
                                               child: SingleChildScrollView(
-                                                child: buildControlsColumn(includeVolume: true),
+                                                child: buildControlsColumn(
+                                                    includeVolume: true),
                                               ),
                                             ),
                                 ),
@@ -850,46 +929,61 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                             child: viewSwitcher,
                           )
                         else
-                          SizedBox(height: isTablet ? AppSpacing.sm : AppSpacing.xs),
+                          SizedBox(
+                              height: isTablet ? AppSpacing.sm : AppSpacing.xs),
 
                         // Center Display Area (Hero Artwork)
                         Expanded(
                           child: LayoutBuilder(
                             builder: (context, artConstraints) {
                               final double availableWidth =
-                                  artConstraints.maxWidth - (isTablet ? 48.0 : 32.0);
+                                  artConstraints.maxWidth -
+                                      (isTablet ? 48.0 : 32.0);
                               final double availableHeight =
-                                  artConstraints.maxHeight - (isTablet ? 20.0 : 12.0);
+                                  artConstraints.maxHeight -
+                                      (isTablet ? 20.0 : 12.0);
                               final double maxAllowed = isTablet
                                   ? (context.isLandscape ? 400.0 : 560.0)
                                   : 420.0;
-                              final double rawSize = math.min(availableWidth, availableHeight);
-                              final double dynamicArtSize = rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
+                              final double rawSize =
+                                  math.min(availableWidth, availableHeight);
+                              final double dynamicArtSize = rawSize <= 0
+                                  ? 0.0
+                                  : math.min(rawSize, maxAllowed);
 
                               return Center(
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
-                                    maxWidth: (state.isLyricsVisible || state.isQueueVisible) && !context.isLandscape
+                                    maxWidth: (state.isLyricsVisible ||
+                                                state.isQueueVisible) &&
+                                            !context.isLandscape
                                         ? (isTablet ? 560.0 : double.infinity)
                                         : dynamicArtSize,
-                                    maxHeight: (state.isLyricsVisible || state.isQueueVisible) && !context.isLandscape
+                                    maxHeight: (state.isLyricsVisible ||
+                                                state.isQueueVisible) &&
+                                            !context.isLandscape
                                         ? double.infinity
                                         : dynamicArtSize,
                                   ),
                                   child: AnimatedSwitcher(
                                     duration: context.motionMs(280),
-                                    child: (context.isLandscape || (!state.isLyricsVisible && !state.isQueueVisible))
+                                    child: (context.isLandscape ||
+                                            (!state.isLyricsVisible &&
+                                                !state.isQueueVisible))
                                         ? heroArtwork
                                         : (state.isLyricsVisible
                                             ? LyricsView(
-                                                key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                                key: ValueKey(
+                                                    'lyrics_${song?.id}_${song?.remoteId}'),
                                                 lyrics: state.lyrics,
-                                                isLoading: state.isLoadingLyrics,
+                                                isLoading:
+                                                    state.isLoadingLyrics,
                                                 activeColor: activeColor,
                                                 source: state.lyricsSource,
                                               )
                                             : _buildContinuePlayingQueue(
-                                                key: const ValueKey('portrait_queue_view'),
+                                                key: const ValueKey(
+                                                    'portrait_queue_view'),
                                                 context: context,
                                                 state: state,
                                                 cubit: cubit,
@@ -905,7 +999,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
                         if (showVisualizer && !context.isLandscape) visualizer,
 
-                        buildControlsColumn(includeVolume: context.isLandscape || isTablet),
+                        buildControlsColumn(
+                            includeVolume: context.isLandscape || isTablet),
                       ],
                     );
                   },
@@ -949,7 +1044,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                     MarqueeText(
                       text: song?.title ?? l10n.noTrackSelected,
                       style: TextStyle(
-                        fontSize: isTablet ? AppFontSize.title : (isShortLandscape ? 13.0 : 15.0),
+                        fontSize: isTablet
+                            ? AppFontSize.title
+                            : (isShortLandscape ? 13.0 : 15.0),
                         fontWeight: FontWeight.w800,
                         color: p.textPrimary,
                         letterSpacing: AppTracking.title,
@@ -957,11 +1054,14 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                     ),
                     const SizedBox(height: 2),
                     MarqueeText(
-                      text: (song?.artist != null && song!.artist.trim().isNotEmpty)
+                      text: (song?.artist != null &&
+                              song!.artist.trim().isNotEmpty)
                           ? song.artist.trim()
                           : l10n.unknownArtist,
                       style: TextStyle(
-                        fontSize: isTablet ? AppFontSize.bodySmall : (isShortLandscape ? 11.0 : 12.0),
+                        fontSize: isTablet
+                            ? AppFontSize.bodySmall
+                            : (isShortLandscape ? 11.0 : 12.0),
                         fontWeight: FontWeight.w600,
                         color: p.textSecondary,
                       ),
@@ -979,9 +1079,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                   clipBehavior: Clip.antiAlias,
                   child: PlayerAnimatedFavoriteButton(
                     isFavorite: song?.isFavorite == true,
-                    semanticLabel: song?.isFavorite == true
-                        ? l10n.unlike
-                        : l10n.like,
+                    semanticLabel:
+                        song?.isFavorite == true ? l10n.unlike : l10n.like,
                     favoriteColor: p.favorite,
                     inactiveColor: p.textSecondary,
                     iconSize: isShortLandscape ? 18 : 20,
@@ -1053,9 +1152,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ───────────────────────────────────────────────────────────────────────────
   // Continue Playing Queue View (Image 1)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ───────────────────────────────────────────────────────────────────────────
   Widget _buildContinuePlayingQueue({
     Key? key,
     required BuildContext context,
@@ -1164,7 +1263,8 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                   onTap: () {
                     PulsrHaptics.confirm();
                     if (state.currentSong != null) {
-                      AudioQualitySheet.show(context, state.currentSong!, activeColor);
+                      AudioQualitySheet.show(
+                          context, state.currentSong!, activeColor);
                     }
                   },
                 ),
@@ -1200,7 +1300,7 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
 
           const SizedBox(height: 8),
 
-          // Reorderable list of upcoming tracks with thumbnails, titles, and drag handles (â‰¡)
+          // Reorderable list of upcoming tracks with thumbnails, titles, and drag handles (≡)
           Expanded(
             child: queue.isEmpty
                 ? Center(
@@ -1234,13 +1334,15 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                         padding: const EdgeInsets.symmetric(vertical: 2.5),
                         child: Material(
                           color: isCurrent
-                              ? activeColor.withValues(alpha: isDark ? 0.16 : 0.10)
+                              ? activeColor.withValues(
+                                  alpha: isDark ? 0.16 : 0.10)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(AppRadii.r10),
                           clipBehavior: Clip.antiAlias,
                           child: ListTile(
                             dense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 0),
                             leading: ClipRRect(
                               borderRadius: BorderRadius.circular(AppRadii.r8),
                               child: CachedArtwork(
@@ -1256,7 +1358,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
                                 color: isCurrent ? activeColor : p.textPrimary,
                                 fontSize: AppFontSize.bodySmall,
                               ),
@@ -1296,9 +1400,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
     );
   }
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ───────────────────────────────────────────────────────────────────────────
   // Volume Slider Component (Image 3)
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ───────────────────────────────────────────────────────────────────────────
   Widget _buildVolumeSlider({
     required BuildContext context,
     required PlayerCubit cubit,
@@ -1314,13 +1418,16 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
         final isMuted = cubit.isMuted || effectiveVolume <= 0.0;
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 2.0),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: 2.0),
           child: Row(
             children: [
               IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget),
                 icon: Icon(
                   isMuted
                       ? Icons.volume_off_rounded
@@ -1361,7 +1468,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget),
                 icon: Icon(
                   Icons.volume_up_rounded,
                   color: p.textSecondary,
@@ -1381,9 +1490,9 @@ class _ClassicPlayerThemeState extends State<ClassicPlayerTheme> {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Action Pill Button (Image 1)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 class _ActionPillButton extends StatelessWidget {
   final IconData icon;
   final bool isActive;

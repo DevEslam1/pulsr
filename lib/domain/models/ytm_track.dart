@@ -185,8 +185,9 @@ class YtmStream {
 
   bool get isTaggable => container == 'm4a';
 
-  DateTime? get expiresAtDateTime =>
-      expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt!) : null;
+  DateTime? get expiresAtDateTime => expiresAt != null
+      ? DateTime.fromMillisecondsSinceEpoch(expiresAt!)
+      : null;
 
   bool get isExpired {
     if (expiresAt == null) return false;

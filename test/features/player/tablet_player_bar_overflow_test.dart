@@ -16,6 +16,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class MockPulsrAudioHandler extends BaseAudioHandler
@@ -137,7 +138,9 @@ void main() {
     );
   }
 
-  testWidgets('TabletPlayerBar renders without overflow on 1024px standard tablet width', (tester) async {
+  testWidgets(
+      'TabletPlayerBar renders without overflow on 1024px standard tablet width',
+      (tester) async {
     await tester.pumpWidget(createSubject(width: 1024));
     await tester.pumpAndSettle();
 
@@ -145,7 +148,9 @@ void main() {
     expect(find.byType(TabletPlayerBar), findsOneWidget);
   });
 
-  testWidgets('TabletPlayerBar renders without overflow on 600px narrow tablet width', (tester) async {
+  testWidgets(
+      'TabletPlayerBar renders without overflow on 600px narrow tablet width',
+      (tester) async {
     await tester.pumpWidget(createSubject(width: 600));
     await tester.pumpAndSettle();
 
@@ -153,7 +158,9 @@ void main() {
     expect(find.byType(TabletPlayerBar), findsOneWidget);
   });
 
-  testWidgets('TabletPlayerBar renders without overflow on constrained 420px width', (tester) async {
+  testWidgets(
+      'TabletPlayerBar renders without overflow on constrained 420px width',
+      (tester) async {
     await tester.pumpWidget(createSubject(width: 420));
     await tester.pumpAndSettle();
 
@@ -161,7 +168,9 @@ void main() {
     expect(find.byType(TabletPlayerBar), findsOneWidget);
   });
 
-  testWidgets('TabletPlayerBar renders without overflow on extremely narrow 320px width', (tester) async {
+  testWidgets(
+      'TabletPlayerBar renders without overflow on extremely narrow 320px width',
+      (tester) async {
     await tester.pumpWidget(createSubject(width: 320));
     await tester.pumpAndSettle();
 
@@ -169,7 +178,9 @@ void main() {
     expect(find.byType(TabletPlayerBar), findsOneWidget);
   });
 
-  testWidgets('TabletPlayerBar handles height constraint 77px cleanly without vertical overflow', (tester) async {
+  testWidgets(
+      'TabletPlayerBar handles height constraint 77px cleanly without vertical overflow',
+      (tester) async {
     await tester.pumpWidget(createSubject(width: 600, height: 77.0));
     await tester.pumpAndSettle();
 

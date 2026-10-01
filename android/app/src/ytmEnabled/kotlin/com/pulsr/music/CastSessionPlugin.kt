@@ -213,6 +213,33 @@ class CastSessionPlugin(
                     val positionMs = call.argument<Number>("positionMs")?.toLong()
                     result.success(setPlaybackState(action, positionMs))
                 }
+                "getVolume" -> {
+                    val session = currentSession()
+                    val volume = try { session?.volume } catch (_: Exception) { null }
+                    result.success(
+                        if (session == null || volume == null) {
+                            mapOf("success" to false)
+                        } else {
+                            mapOf("success" to true, "volume" to volume)
+                        }
+                    )
+                }
+                "setVolume" -> {
+                    val requested = call.argument<Number>("volume")?.toDouble()
+                    val session = currentSession()
+                    if (session == null || requested == null) {
+                        result.success(mapOf("success" to false))
+                    } else {
+                        try {
+                            session.volume = requested.coerceIn(0.0, 1.0)
+                            result.success(
+                                mapOf("success" to true, "volume" to session.volume)
+                            )
+                        } catch (_: Exception) {
+                            result.success(mapOf("success" to false))
+                        }
+                    }
+                }
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {

@@ -39,15 +39,16 @@ void main() {
     test('a 40-minute 256kbps track no longer demands ~5x its size', () {
       final stream = _stream(); // 2400s * 256kbps = 76.8 MB
       expect(YtDownloadService.estimateBytes(stream), equals(76800000));
-      expect(YtDownloadService.requiredPreflightBytes(stream),
-          equals(164085760));
+      expect(
+          YtDownloadService.requiredPreflightBytes(stream), equals(164085760));
       // Fits the "300MB free" case the old rule refused.
       expect(YtDownloadService.requiredPreflightBytes(stream),
           lessThan(300 * 1024 * 1024));
     });
 
     test('a tiny stream still asks for the 10MB floor', () {
-      final stream = _stream(bitrateKbps: 64, duration: const Duration(seconds: 30));
+      final stream =
+          _stream(bitrateKbps: 64, duration: const Duration(seconds: 30));
       expect(YtDownloadService.requiredPreflightBytes(stream),
           greaterThanOrEqualTo(10 * 1024 * 1024));
     });
@@ -84,7 +85,8 @@ void main() {
     test('falls back for anything that is not a bare container extension', () {
       expect(YtDownloadService.safeExtension(null), equals('m4a'));
       expect(YtDownloadService.safeExtension(''), equals('m4a'));
-      expect(YtDownloadService.safeExtension('../../etc/passwd'), equals('m4a'));
+      expect(
+          YtDownloadService.safeExtension('../../etc/passwd'), equals('m4a'));
       expect(YtDownloadService.safeExtension('m4a/..'), equals('m4a'));
       expect(YtDownloadService.safeExtension('exe'), equals('m4a'));
     });

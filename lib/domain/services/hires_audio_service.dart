@@ -87,8 +87,8 @@ class HiResAudioService {
       ...deviceSampleRates.where((r) => r > 0),
       ...directFormats.where((f) => f.supported).map((f) => f.sampleRate),
     };
-    final supported =
-        ladder.where((rate) => reported.contains(rate)).toList()..sort();
+    final supported = ladder.where((rate) => reported.contains(rate)).toList()
+      ..sort();
     if (supported.isNotEmpty) return supported;
     // No capability report at all: fall back to the only universally safe rates
     // rather than presenting unsupported hi-res tiers.
@@ -284,8 +284,8 @@ class HiResAudioService {
             'Bit-perfect rejected by device — falling back to DSP path',
             category: 'HiResAudio');
         try {
-          await _methodChannel.invokeMethod<bool>(
-              'setBitPerfectMode', {'enabled': false});
+          await _methodChannel
+              .invokeMethod<bool>('setBitPerfectMode', {'enabled': false});
         } catch (_) {}
         await getAudioOutputInfo();
         return false;
@@ -371,8 +371,8 @@ class HiResAudioService {
     // Validate before hitting native: 0 = auto, otherwise must be a sane
     // rate; bit depth must be 0 (auto), 16, 24 or 32.
     if (!validTargetSampleRates.contains(sampleRate)) {
-      ErrorLogger.log(
-          'Rejected invalid sample rate $sampleRate', category: 'HiResAudio');
+      ErrorLogger.log('Rejected invalid sample rate $sampleRate',
+          category: 'HiResAudio');
       return false;
     }
     if (!validTargetBitDepths.contains(bitDepth)) {

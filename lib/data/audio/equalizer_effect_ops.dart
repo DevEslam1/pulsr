@@ -9,7 +9,7 @@ extension EqualizerEffectOps on EqualizerManager {
   Future<void> setVirtualizerEnabled(bool enabled) async {
     // FIX M-9: skip no-op IPC when virtualizer is not supported
     if (!_effectsChannel.isVirtualizerSupported) return;
-    
+
     final previous = isVirtualizerEnabled;
     isVirtualizerEnabled = enabled;
     try {
@@ -37,7 +37,7 @@ extension EqualizerEffectOps on EqualizerManager {
   Future<void> setVirtualizerStrength(double strength) async {
     // FIX M-9: skip no-op IPC when virtualizer is not supported
     if (!_effectsChannel.isVirtualizerSupported) return;
-    
+
     virtualizerStrength = strength.clamp(0.0, 1.0);
     final applied = await _effectsChannel.setVirtualizerStrength(
       virtualizerStrength,
@@ -241,8 +241,7 @@ extension EqualizerEffectOps on EqualizerManager {
       // Wire values are ReverbPreset ordinals (0..N); anything else has no
       // synthesizable IR on the native side, so clamp instead of forwarding
       // garbage that would silently produce the wrong room.
-      reverbPreset =
-          preset.clamp(0, ReverbPreset.values.length - 1);
+      reverbPreset = preset.clamp(0, ReverbPreset.values.length - 1);
     }
     if (wetDry != null) reverbWetDry = wetDry.clamp(0.0, 1.0);
     if (predelayMs != null) reverbPredelayMs = predelayMs.clamp(0.0, 150.0);

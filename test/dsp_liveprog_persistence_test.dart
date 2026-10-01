@@ -31,7 +31,8 @@ void main() {
     restored.dispose();
   });
 
-  test('corrupt or out-of-range stored sliders are ignored on restore', () async {
+  test('corrupt or out-of-range stored sliders are ignored on restore',
+      () async {
     SharedPreferences.setMockInitialValues({
       'setting_live_prog_sliders': '{"1": 3.0, "9": 2.0, "bad": 1.0}',
     });

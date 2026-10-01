@@ -111,7 +111,9 @@ void main() {
       expect(info.tier, AudioQualityTier.compact);
     });
 
-    test('a downloaded Opus track with webm.oga or oga path is classified as OPUS not MP3', () {
+    test(
+        'a downloaded Opus track with webm.oga or oga path is classified as OPUS not MP3',
+        () {
       final info = AudioQualityInfo.fromSong(_song(
         path: '/storage/emulated/0/Music/Song.webm.oga',
         codec: 'OPUS',
@@ -123,7 +125,9 @@ void main() {
       expect(info.tier, AudioQualityTier.highQuality);
     });
 
-    test('a downloaded Opus track without explicit codec but webm path is classified as OPUS', () {
+    test(
+        'a downloaded Opus track without explicit codec but webm path is classified as OPUS',
+        () {
       final info = AudioQualityInfo.fromSong(_song(
         path: '/storage/emulated/0/Music/Song.webm',
         bitrateKbps: 160,

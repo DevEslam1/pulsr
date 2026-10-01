@@ -165,7 +165,8 @@ class FileIntentHandler {
           .first
           .timeout(
             const Duration(seconds: 5),
-            onTimeout: () => const Left(DatabaseFailure('Voice search query timeout')),
+            onTimeout: () =>
+                const Left(DatabaseFailure('Voice search query timeout')),
           );
       final match =
           res.fold((_) => null, (songs) => songs.isEmpty ? null : songs.first);

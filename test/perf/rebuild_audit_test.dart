@@ -14,7 +14,9 @@ import 'package:pulsr/features/tag_editor/tag_editor_state.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_state.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
+
 class MockMetadataSearchService extends Mock implements MetadataSearchService {}
+
 class MockYtmService extends Mock implements YtmService {}
 
 void main() {
@@ -35,7 +37,9 @@ void main() {
       isDownloaded: false,
     );
 
-    test('NowPlayingScreen buildWhen skips position-only state emissions (0 rebuilds)', () {
+    test(
+        'NowPlayingScreen buildWhen skips position-only state emissions (0 rebuilds)',
+        () {
       var state = const PlayerState(
         playback: PlaybackSlice(
           currentSong: testSong,
@@ -59,7 +63,8 @@ void main() {
       }
 
       expect(rebuildCount, equals(0),
-          reason: 'Position ticks must NEVER trigger NowPlayingScreen rebuilds');
+          reason:
+              'Position ticks must NEVER trigger NowPlayingScreen rebuilds');
     });
 
     test('MiniPlayer buildWhen condition ignores playback position ticks', () {
@@ -91,7 +96,8 @@ void main() {
       );
 
       expect(miniPlayerBuildWhen(state1, state2), isFalse,
-          reason: 'Position progression must not trigger MiniPlayer parent card rebuild');
+          reason:
+              'Position progression must not trigger MiniPlayer parent card rebuild');
     });
 
     test('TagEditorCubit guards saveTags when status is not loaded', () async {

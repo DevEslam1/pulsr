@@ -30,6 +30,9 @@ part 'equalizer_snapshot_ops.dart';
 part 'equalizer_effect_ops.dart';
 
 class EqualizerManager {
+  /// Native `ParametricEQ::MAX_BANDS` (android/app/src/main/cpp/ParametricEQ.h).
+  static const int equalizerMaxNativeBands = 64;
+
   final AndroidLoudnessEnhancer? loudnessEnhancerA;
   final AndroidLoudnessEnhancer? loudnessEnhancerB;
   final AudioEffectsChannel _effectsChannel = AudioEffectsChannel();
@@ -104,7 +107,8 @@ class EqualizerManager {
   double crossfeedDelayUs = 350.0; // 200 - 700 us
   double crossfeedFeedDb = -9.0; // -15 to -6 dB
   double crossfeedFcut = 650.0; // 200 - 2000 Hz (Custom-mode cutoff)
-  int crossfeedMode = 0; // 0=Bs2bDefault, 1=Bs2bChuMoy, 2=Bs2bJanMeier, 3=Custom
+  int crossfeedMode =
+      0; // 0=Bs2bDefault, 1=Bs2bChuMoy, 2=Bs2bJanMeier, 3=Custom
 
   bool isLimiterEnabled = false;
   double limiterThresholdDb = -0.2;
@@ -173,10 +177,34 @@ class EqualizerManager {
   // Native C++ 4-Band Multiband Compressor
   bool isMultibandCompressorEnabled = false;
   List<MultibandCompressorBandConfig> multibandCompressorBands = const [
-    MultibandCompressorBandConfig(thresholdDb: -20.0, ratio: 2.5, attackMs: 20.0, releaseMs: 120.0, kneeDb: 6.0, makeupGainDb: 0.0),
-    MultibandCompressorBandConfig(thresholdDb: -18.0, ratio: 2.0, attackMs: 15.0, releaseMs: 100.0, kneeDb: 6.0, makeupGainDb: 0.0),
-    MultibandCompressorBandConfig(thresholdDb: -16.0, ratio: 1.8, attackMs: 10.0, releaseMs: 80.0, kneeDb: 4.0, makeupGainDb: 0.0),
-    MultibandCompressorBandConfig(thresholdDb: -14.0, ratio: 1.5, attackMs: 5.0, releaseMs: 60.0, kneeDb: 4.0, makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(
+        thresholdDb: -20.0,
+        ratio: 2.5,
+        attackMs: 20.0,
+        releaseMs: 120.0,
+        kneeDb: 6.0,
+        makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(
+        thresholdDb: -18.0,
+        ratio: 2.0,
+        attackMs: 15.0,
+        releaseMs: 100.0,
+        kneeDb: 6.0,
+        makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(
+        thresholdDb: -16.0,
+        ratio: 1.8,
+        attackMs: 10.0,
+        releaseMs: 80.0,
+        kneeDb: 4.0,
+        makeupGainDb: 0.0),
+    MultibandCompressorBandConfig(
+        thresholdDb: -14.0,
+        ratio: 1.5,
+        attackMs: 5.0,
+        releaseMs: 60.0,
+        kneeDb: 4.0,
+        makeupGainDb: 0.0),
   ];
   double multibandCompressorF0 = 160.0;
   double multibandCompressorF1 = 1000.0;
@@ -329,10 +357,9 @@ class EqualizerManager {
       final customFreqsJson = prefs.getString(PrefsKeys.eqCustomFrequencies);
       if (customFreqsJson != null) {
         try {
-          final decodedFreqs =
-              (json.decode(customFreqsJson) as List<dynamic>)
-                  .map((e) => (e as num).toDouble())
-                  .toList();
+          final decodedFreqs = (json.decode(customFreqsJson) as List<dynamic>)
+              .map((e) => (e as num).toDouble())
+              .toList();
           if (decodedFreqs.length == 10 &&
               decodedFreqs.every((f) => f.isFinite && f > 0)) {
             customFrequencies = decodedFreqs;
@@ -434,8 +461,7 @@ class EqualizerManager {
       virtualizerStrength =
           prefs.getDouble(PrefsKeys.eqVirtualizerStrength) ?? 0.0;
 
-      final dynPresetStr =
-          prefs.getString(PrefsKeys.eqDynamicsPreset) ??
+      final dynPresetStr = prefs.getString(PrefsKeys.eqDynamicsPreset) ??
           DynamicsPreset.off.name;
       dynamicsPreset = DynamicsPreset.values.firstWhere(
         (d) => d.name == dynPresetStr,
@@ -470,9 +496,10 @@ class EqualizerManager {
       // Only forward compressor knobs to the HAL when the user actually saved
       // them: the native brickwall limiter defaults must not silently turn into
       // a 3:1 / 15 ms compressor for users who never opened the sheet.
-      _hasStoredCompressorParams = prefs.containsKey(PrefsKeys.compressorRatio) ||
-          prefs.containsKey(PrefsKeys.compressorAttackMs) ||
-          prefs.containsKey(PrefsKeys.compressorMakeupGainDb);
+      _hasStoredCompressorParams =
+          prefs.containsKey(PrefsKeys.compressorRatio) ||
+              prefs.containsKey(PrefsKeys.compressorAttackMs) ||
+              prefs.containsKey(PrefsKeys.compressorMakeupGainDb);
 
       isReverbEnabled =
           prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
@@ -510,8 +537,10 @@ class EqualizerManager {
         reverbPreset = storedReverb.wireValue;
       }
       reverbWetDry = prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ?? 0.20;
-      reverbPredelayMs = prefs.getDouble(PrefsKeys.convolutionReverbPredelayMs) ?? 0.0;
-      reverbDamping = prefs.getDouble(PrefsKeys.convolutionReverbDamping) ?? 0.5;
+      reverbPredelayMs =
+          prefs.getDouble(PrefsKeys.convolutionReverbPredelayMs) ?? 0.0;
+      reverbDamping =
+          prefs.getDouble(PrefsKeys.convolutionReverbDamping) ?? 0.5;
 
       stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
       monoMix = prefs.getBool(PrefsKeys.monoMix) ?? false;
@@ -582,53 +611,41 @@ class EqualizerManager {
           prefs.getBool(PrefsKeys.dynamicBassEnabled) ?? false;
       dynamicBassStrength =
           prefs.getDouble(PrefsKeys.dynamicBassStrength) ?? 1.0;
-      dynamicBassXLow =
-          prefs.getInt(PrefsKeys.dynamicBassXLow) ?? 100;
-      dynamicBassXHigh =
-          prefs.getInt(PrefsKeys.dynamicBassXHigh) ?? 5600;
-      dynamicBassYLow =
-          prefs.getInt(PrefsKeys.dynamicBassYLow) ?? 40;
-      dynamicBassYHigh =
-          prefs.getInt(PrefsKeys.dynamicBassYHigh) ?? 80;
+      dynamicBassXLow = prefs.getInt(PrefsKeys.dynamicBassXLow) ?? 100;
+      dynamicBassXHigh = prefs.getInt(PrefsKeys.dynamicBassXHigh) ?? 5600;
+      dynamicBassYLow = prefs.getInt(PrefsKeys.dynamicBassYLow) ?? 40;
+      dynamicBassYHigh = prefs.getInt(PrefsKeys.dynamicBassYHigh) ?? 80;
       dynamicBassSideGainLow =
           prefs.getDouble(PrefsKeys.dynamicBassSideGainLow) ?? 0.10;
       dynamicBassSideGainHigh =
           prefs.getDouble(PrefsKeys.dynamicBassSideGainHigh) ?? 0.50;
-      dynamicBassPreset =
-          prefs.getInt(PrefsKeys.dynamicBassPreset) ?? 0;
-      isViperDdcEnabled =
-          prefs.getBool(PrefsKeys.viperDdcEnabled) ?? false;
+      dynamicBassPreset = prefs.getInt(PrefsKeys.dynamicBassPreset) ?? 0;
+      isViperDdcEnabled = prefs.getBool(PrefsKeys.viperDdcEnabled) ?? false;
       viperDdcProfileName =
           prefs.getString(PrefsKeys.viperDdcProfileName) ?? '';
-      viperDdcContent =
-          prefs.getString(PrefsKeys.viperDdcContent) ?? '';
+      viperDdcContent = prefs.getString(PrefsKeys.viperDdcContent) ?? '';
       isArbitraryEqEnabled =
           prefs.getBool(PrefsKeys.arbitraryEqEnabled) ?? false;
-      arbitraryEqString =
-          prefs.getString(PrefsKeys.arbitraryEqString) ?? '';
+      arbitraryEqString = prefs.getString(PrefsKeys.arbitraryEqString) ?? '';
       arbitraryEqLinearPhase =
           prefs.getBool(PrefsKeys.arbitraryEqLinearPhase) ?? false;
-      isLiveProgEnabled =
-          prefs.getBool(PrefsKeys.liveProgEnabled) ?? false;
-      liveProgCode =
-          prefs.getString(PrefsKeys.liveProgCode) ?? '';
+      isLiveProgEnabled = prefs.getBool(PrefsKeys.liveProgEnabled) ?? false;
+      liveProgCode = prefs.getString(PrefsKeys.liveProgCode) ?? '';
       liveProgSliders
         ..clear()
         ..addAll(
-            decodeLiveProgSliders(prefs.getString(PrefsKeys.liveProgSliders)));      dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
+            decodeLiveProgSliders(prefs.getString(PrefsKeys.liveProgSliders)));
+      dspPreference = prefs.getString(PrefsKeys.dspPreference) ?? 'native';
       if (dspPreference != 'native' &&
           dspPreference != 'oem' &&
           dspPreference != 'auto') {
         dspPreference = 'native';
       }
-      final bitPerfect =
-          prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false;
-      final bypassDsp =
-          prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true;
+      final bitPerfect = prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false;
+      final bypassDsp = prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true;
       isBitPerfectBypass = bitPerfect && bypassDsp;
       isDitherEnabled = prefs.getBool(PrefsKeys.ditherEnabled) ?? false;
-      ditherTargetBitDepth =
-          prefs.getInt(PrefsKeys.ditherTargetBitDepth) ?? 16;
+      ditherTargetBitDepth = prefs.getInt(PrefsKeys.ditherTargetBitDepth) ?? 16;
       if (ditherTargetBitDepth != 16 &&
           ditherTargetBitDepth != 24 &&
           ditherTargetBitDepth != 32) {
@@ -654,11 +671,10 @@ class EqualizerManager {
       final dynEqJson = prefs.getString(PrefsKeys.dynamicEqBands);
       if (dynEqJson != null) {
         try {
-          final decoded =
-              (json.decode(dynEqJson) as List<dynamic>)
-                  .whereType<Map<String, dynamic>>()
-                  .map(DynamicEqBandConfig.fromJson)
-                  .toList();
+          final decoded = (json.decode(dynEqJson) as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map(DynamicEqBandConfig.fromJson)
+              .toList();
           if (decoded.isNotEmpty) dynamicEqBands = decoded;
         } catch (e, st) {
           ErrorLogger.log(
@@ -698,16 +714,17 @@ class EqualizerManager {
         pendingFutures.add(_effectsChannel.setEqPreamp(preampDb));
       }
       if (_effectsChannel.isVirtualizerSupported) {
-        pendingFutures.add(_effectsChannel.setVirtualizerEnabled(isVirtualizerEnabled));
+        pendingFutures
+            .add(_effectsChannel.setVirtualizerEnabled(isVirtualizerEnabled));
         if (isVirtualizerEnabled) {
           pendingFutures.add(
             _effectsChannel.setVirtualizerStrength(virtualizerStrength),
           );
         }
       }
-      
+
       pendingFutures.add(_applySpatializerWithFallback(isSpatializerEnabled));
-      
+
       if (isCrossfeedEnabled) {
         pendingFutures.add(
           _effectsChannel.setCrossfeedParams(
@@ -718,8 +735,9 @@ class EqualizerManager {
         );
         pendingFutures.add(_effectsChannel.setCrossfeedMode(crossfeedMode));
       }
-      pendingFutures.add(_effectsChannel.setCrossfeedEnabled(isCrossfeedEnabled));
-      
+      pendingFutures
+          .add(_effectsChannel.setCrossfeedEnabled(isCrossfeedEnabled));
+
       if (isLimiterEnabled) {
         pendingFutures.add(
           _effectsChannel.setLimiterParams(
@@ -734,7 +752,7 @@ class EqualizerManager {
         );
       }
       pendingFutures.add(_effectsChannel.setLimiterEnabled(isLimiterEnabled));
-      
+
       if (isReverbEnabled) {
         pendingFutures.add(_effectsChannel.setReverbPreset(reverbPreset));
         pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
@@ -747,12 +765,13 @@ class EqualizerManager {
         );
       }
       pendingFutures.add(_effectsChannel.setReverbEnabled(isReverbEnabled));
-      
+
       if (stereoBalance != 0.0) {
         pendingFutures.add(_effectsChannel.setStereoBalance(stereoBalance));
       }
       pendingFutures.add(_effectsChannel.setMonoMix(monoMix));
-      pendingFutures.add(_effectsChannel.setSincResamplerEnabled(isSincResamplerEnabled));
+      pendingFutures
+          .add(_effectsChannel.setSincResamplerEnabled(isSincResamplerEnabled));
 
       if (isSaturationEnabled) {
         pendingFutures.add(
@@ -767,7 +786,8 @@ class EqualizerManager {
           _effectsChannel.setSaturationMultiband(saturationMultiband),
         );
       }
-      pendingFutures.add(_effectsChannel.setSaturationEnabled(isSaturationEnabled));
+      pendingFutures
+          .add(_effectsChannel.setSaturationEnabled(isSaturationEnabled));
 
       if (isStereoWidthEnabled) {
         pendingFutures.add(
@@ -782,7 +802,8 @@ class EqualizerManager {
           ),
         );
       }
-      pendingFutures.add(_effectsChannel.setStereoWidthEnabled(isStereoWidthEnabled));
+      pendingFutures
+          .add(_effectsChannel.setStereoWidthEnabled(isStereoWidthEnabled));
 
       if (isLoudnessContourEnabled) {
         pendingFutures.add(
@@ -792,7 +813,8 @@ class EqualizerManager {
           ),
         );
       }
-      pendingFutures.add(_effectsChannel.setLoudnessContourEnabled(isLoudnessContourEnabled));
+      pendingFutures.add(
+          _effectsChannel.setLoudnessContourEnabled(isLoudnessContourEnabled));
 
       if (isSubCrossoverEnabled) {
         pendingFutures.add(
@@ -805,18 +827,21 @@ class EqualizerManager {
           ),
         );
       }
-      pendingFutures.add(_effectsChannel.setSubCrossoverEnabled(isSubCrossoverEnabled));
+      pendingFutures
+          .add(_effectsChannel.setSubCrossoverEnabled(isSubCrossoverEnabled));
 
       if (isDynamicEqEnabled) {
         pendingFutures.add(_pushDynamicEqConfig());
       }
-      pendingFutures.add(_effectsChannel.setDynamicEqEnabled(isDynamicEqEnabled));
+      pendingFutures
+          .add(_effectsChannel.setDynamicEqEnabled(isDynamicEqEnabled));
 
       if (isMultibandCompressorEnabled) {
         pendingFutures.add(_pushMultibandCompressorConfig());
       }
       pendingFutures.add(
-        _effectsChannel.setMultibandCompressorEnabled(isMultibandCompressorEnabled),
+        _effectsChannel
+            .setMultibandCompressorEnabled(isMultibandCompressorEnabled),
       );
 
       pendingFutures.add(
@@ -847,7 +872,8 @@ class EqualizerManager {
           linearPhase: arbitraryEqLinearPhase,
         ));
       }
-      pendingFutures.add(_effectsChannel.setArbitraryEqEnabled(isArbitraryEqEnabled));
+      pendingFutures
+          .add(_effectsChannel.setArbitraryEqEnabled(isArbitraryEqEnabled));
 
       if (isLiveProgEnabled && liveProgCode.isNotEmpty) {
         pendingFutures.add(_effectsChannel.loadLiveProgCode(liveProgCode));
@@ -1091,8 +1117,9 @@ class EqualizerManager {
     eqBandCount = count;
     final targetFreqs = activeFrequencies;
     _pendingBandGains.removeWhere((k, _) => k < 0 || k >= targetFreqs.length);
-    
-    final Map<int, List<double>> updatedBandsMap = Map<int, List<double>>.from(currentPreset.bandsMap);
+
+    final Map<int, List<double>> updatedBandsMap =
+        Map<int, List<double>>.from(currentPreset.bandsMap);
     final interpolated = EqPreset.interpolateGains(
       currentPreset.gains,
       targetFrequencies: targetFreqs,
@@ -1149,8 +1176,7 @@ class EqualizerManager {
 
   /// Backwards-compatible alias: `true` selects the 32-band plan, `false` the
   /// 10-band plan. New code should call [setBandMode] directly.
-  Future<void> set32BandMode(bool enabled) =>
-      setBandMode(enabled ? 32 : 10);
+  Future<void> set32BandMode(bool enabled) => setBandMode(enabled ? 32 : 10);
 
   Future<void> setEnabled(bool enabled) async {
     final previous = isEnabled;
@@ -1404,7 +1430,8 @@ class EqualizerManager {
     final prevProfile = selectedHeadphoneProfile;
     try {
       if (profile != null) {
-        if (profile.gains.isEmpty) {
+        final bool isParametric = profile.hasParametricFilters;
+        if (profile.gains.isEmpty && !isParametric) {
           ErrorLogger.log(
             'Headphone profile has empty gains — ignoring',
             category: 'EqualizerManager',
@@ -1419,8 +1446,14 @@ class EqualizerManager {
           return;
         }
         final targetFreqs = activeFrequencies;
+        // Derive the display/fallback gain curve from the true filters when the
+        // profile carries them, so the graph and the legacy postEq mirror stay
+        // consistent with what the native parametric engine plays.
+        final sourceGains = isParametric
+            ? profile.gainsFromFilters(centers: targetFreqs)
+            : profile.gains;
         final gains = EqPreset.interpolateGains(
-          profile.gains,
+          sourceGains,
           targetFrequencies: targetFreqs,
         );
         currentPreset = EqPreset(
@@ -1430,9 +1463,25 @@ class EqualizerManager {
         );
         comparisonSlots[activeComparisonSlot] = currentPreset;
         selectedHeadphoneProfile = profile;
-        await applyCurrentPreset();
+        // Parametric profiles bypass the flat 10/32/64 graphic path and drive
+        // the native 64-band parametric EQ directly with real freq/Q/gain/type.
+        if (isParametric) {
+          final applied = await _applyParametricProfile(profile);
+          if (!applied) {
+            // Native PEQ unavailable: fall back to the graphic-gain path using
+            // the filter-derived curve so the correction still applies.
+            await applyCurrentPreset();
+          }
+        } else {
+          await applyCurrentPreset();
+        }
         await setBassBoost(profile.bassBoost);
-        await setPreamp(profile.preampGain);
+        // Prefer the filter-derived safe headroom; fall back to the stored
+        // preamp for legacy gain-curve profiles.
+        final preamp = isParametric
+            ? profile.computeSafePreamp()
+            : profile.preampGain;
+        await setPreamp(preamp);
       } else {
         selectedHeadphoneProfile = null;
         await setPreamp(0.0);
@@ -1450,6 +1499,43 @@ class EqualizerManager {
     _debouncedSavePreferences();
   }
 
+  /// Pushes a profile's true parametric filters into the native 64-band EQ.
+  /// Returns true only when the native bulk call ACKs, so the caller can fall
+  /// back to the graphic-gain path on devices/paths without native PEQ.
+  Future<bool> _applyParametricProfile(HeadphoneProfile profile) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    final filters = profile.filters;
+    if (filters.isEmpty) return false;
+    if (filters.length > equalizerMaxNativeBands) {
+      ErrorLogger.log(
+        'Profile ${profile.id} has ${filters.length} filters, '
+        'exceeding the native $equalizerMaxNativeBands-band limit',
+        category: 'EqualizerManager',
+      );
+      return false;
+    }
+    final frequencies = <double>[];
+    final gains = <double>[];
+    final qs = <double>[];
+    final types = <int>[];
+    for (final f in filters) {
+      if (!f.frequency.isFinite || f.frequency <= 0 || !f.gain.isFinite) {
+        continue;
+      }
+      frequencies.add(f.frequency.clamp(10.0, 24000.0));
+      gains.add(f.gain.clamp(-24.0, 24.0));
+      qs.add(f.q.isFinite && f.q > 0 ? f.q.clamp(0.1, 18.0) : 1.414);
+      types.add(f.filterType);
+    }
+    if (frequencies.isEmpty) return false;
+    final ok = await _effectsChannel.setNativeEqBandsBulk(
+      frequencies: frequencies,
+      gains: gains,
+      qs: qs,
+      types: types,
+    );
+    return ok;
+  }
 
   bool _isDegradedForPower = false;
   bool _savedReverbEnabled = false;
@@ -1572,8 +1658,7 @@ class EqualizerManager {
         !changed.contains(PrefsKeys.lookaheadLimiterEnabled)) {
       await setLookaheadLimiter(true);
     }
-    if (_savedViperDdcEnabled &&
-        !changed.contains(PrefsKeys.viperDdcEnabled)) {
+    if (_savedViperDdcEnabled && !changed.contains(PrefsKeys.viperDdcEnabled)) {
       await setViperDdc(true);
     }
     // Re-pass the stored curves/code: the setters only (re)load native
@@ -1586,8 +1671,7 @@ class EqualizerManager {
         eqString: arbitraryEqString.isNotEmpty ? arbitraryEqString : null,
       );
     }
-    if (_savedLiveProgEnabled &&
-        !changed.contains(PrefsKeys.liveProgEnabled)) {
+    if (_savedLiveProgEnabled && !changed.contains(PrefsKeys.liveProgEnabled)) {
       await setLiveProg(
         true,
         code: liveProgCode.isNotEmpty ? liveProgCode : null,
@@ -1657,8 +1741,8 @@ class EqualizerManager {
   }) async {
     isViperDdcEnabled = enabled;
     if (profileName != null) viperDdcProfileName = profileName;
-    final resolvedContent =
-        ddcContent ?? (coeffs != null && coeffs.isNotEmpty ? coeffs.join(' ') : null);
+    final resolvedContent = ddcContent ??
+        (coeffs != null && coeffs.isNotEmpty ? coeffs.join(' ') : null);
     if (resolvedContent != null && resolvedContent.isNotEmpty) {
       viperDdcContent = resolvedContent;
     }
@@ -1708,10 +1792,12 @@ class EqualizerManager {
   Future<void> updateLoudnessVolume(double volumeLinear) async {
     loudnessVolumeLinear = volumeLinear.clamp(0.0, 1.0);
     if (autoLoudnessContour) {
-      if (loudnessVolumeLinear <= autoLoudnessLowThreshold && !isLoudnessContourEnabled) {
+      if (loudnessVolumeLinear <= autoLoudnessLowThreshold &&
+          !isLoudnessContourEnabled) {
         _autoLoudnessEngaged = true;
         await setLoudnessContour(true, intensity: 0.6);
-      } else if (loudnessVolumeLinear >= autoLoudnessHighThreshold && _autoLoudnessEngaged) {
+      } else if (loudnessVolumeLinear >= autoLoudnessHighThreshold &&
+          _autoLoudnessEngaged) {
         _autoLoudnessEngaged = false;
         await setLoudnessContour(false);
       }
@@ -1875,8 +1961,7 @@ class EqualizerManager {
     // Second pass: the clamps above can themselves collapse the ordering at
     // the range edges, so pull the lower crossover down instead.
     if (multibandCompressorF1 <= multibandCompressorF0) {
-      multibandCompressorF0 =
-          (multibandCompressorF1 - 50.0).clamp(40.0, 500.0);
+      multibandCompressorF0 = (multibandCompressorF1 - 50.0).clamp(40.0, 500.0);
     }
     if (multibandCompressorF2 <= multibandCompressorF1) {
       multibandCompressorF1 =
@@ -1985,8 +2070,12 @@ class EqualizerManager {
       if (xHigh != null) dynamicBassXHigh = xHigh.clamp(500, 12000);
       if (yLow != null) dynamicBassYLow = yLow.clamp(20, 200);
       if (yHigh != null) dynamicBassYHigh = yHigh.clamp(30, 300);
-      if (sideGainLow != null) dynamicBassSideGainLow = sideGainLow.clamp(0.0, 1.0);
-      if (sideGainHigh != null) dynamicBassSideGainHigh = sideGainHigh.clamp(0.0, 1.0);
+      if (sideGainLow != null) {
+        dynamicBassSideGainLow = sideGainLow.clamp(0.0, 1.0);
+      }
+      if (sideGainHigh != null) {
+        dynamicBassSideGainHigh = sideGainHigh.clamp(0.0, 1.0);
+      }
     }
 
     if (PlatformCapabilities.isAndroid) {
@@ -2005,7 +2094,6 @@ class EqualizerManager {
     _debouncedSavePreferences();
     _syncPipeline();
   }
-
 
   /// Owned bypass: stores state, pushes to native (with DoP mirror), and
   /// syncs the pipeline mirror so reattach/route resync restores it.
@@ -2029,7 +2117,6 @@ class EqualizerManager {
       );
     }
   }
-
 
   /// Owned DSP-preference routing. Persisted to the same key SettingsCubit
   /// uses, so both writers converge instead of diverging.
@@ -2121,6 +2208,7 @@ class EqualizerManager {
   Future<void> _reattachChain = Future<void>.value();
   int? _pendingReattachSessionId;
   int? _lastAppliedSessionId;
+
   /// Last audio session the HAL chain was successfully bound to.
   /// Exposed for diagnostics; written on reattach success, cleared on failure.
   int? get lastAppliedSessionId => _lastAppliedSessionId;
@@ -2178,13 +2266,13 @@ class EqualizerManager {
     _reattachChain = _reattachChain
         .then((_) => _pushFullEffectState())
         .catchError((Object e, StackTrace st) {
-          ErrorLogger.log(
-            'resyncActiveEffects failed',
-            error: e,
-            stackTrace: st,
-            category: 'EqualizerManager',
-          );
-        });
+      ErrorLogger.log(
+        'resyncActiveEffects failed',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+    });
     await _reattachChain;
   }
 
@@ -2357,8 +2445,7 @@ class EqualizerManager {
       );
       if (reverbPreset == ReverbPreset.custom.wireValue &&
           customImpulseResponse.isNotEmpty) {
-        futures.add(
-            _effectsChannel.loadImpulseResponse(customImpulseResponse));
+        futures.add(_effectsChannel.loadImpulseResponse(customImpulseResponse));
       } else {
         futures.add(_effectsChannel.setReverbPreset(reverbPreset));
       }
@@ -2511,11 +2598,13 @@ class EqualizerManager {
       final verified = await _effectsChannel.verifyState();
       if (verified != null) {
         bool matches = true;
-        if (verified.containsKey('eqEnabled') && verified['eqEnabled'] != isEnabled) {
+        if (verified.containsKey('eqEnabled') &&
+            verified['eqEnabled'] != isEnabled) {
           matches = false;
         }
         if (verified.containsKey('preampDb') && verified['preampDb'] is num) {
-          final diff = ((verified['preampDb'] as num).toDouble() - preampDb).abs();
+          final diff =
+              ((verified['preampDb'] as num).toDouble() - preampDb).abs();
           if (diff > 1e-4) matches = false;
         }
         if (!matches) {
@@ -2524,8 +2613,10 @@ class EqualizerManager {
           await _effectsChannel.setEqPreamp(preampDb);
           final recheck = await _effectsChannel.verifyState();
           if (recheck != null) {
-            final recheckPreamp = (recheck['preampDb'] as num?)?.toDouble() ?? preampDb;
-            if ((recheckPreamp - preampDb).abs() > 1e-4 || recheck['eqEnabled'] != isEnabled) {
+            final recheckPreamp =
+                (recheck['preampDb'] as num?)?.toDouble() ?? preampDb;
+            if ((recheckPreamp - preampDb).abs() > 1e-4 ||
+                recheck['eqEnabled'] != isEnabled) {
               ErrorLogger.log(
                 'DSP parameter readback verification mismatch after retry',
                 category: 'EqualizerManager',

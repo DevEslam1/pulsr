@@ -6,6 +6,22 @@ project(pulsr_dsp_tests CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Parity build: match production compiler flags so the tests exercise the same
+# optimized code the app ships (main/cpp uses -O3 -fno-strict-aliasing).
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+add_compile_options(-fno-strict-aliasing)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+# Opt-in ASan/UBSan for the sanitizer pass (host only). Enabled by the gradle
+# testNative task via -DPULSR_TEST_SANITIZERS=ON; not part of the parity build.
+option(PULSR_TEST_SANITIZERS "Build native DSP tests with ASan/UBSan" OFF)
+if(PULSR_TEST_SANITIZERS)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
 enable_testing()
 
 set(MAIN_CPP ${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp)
@@ -32,6 +48,7 @@ set(DSP_SRCS
     ${MAIN_CPP}/ArbitraryResponseEq.cpp
     ${MAIN_CPP}/LiveProg.cpp
     ${MAIN_CPP}/AudioDspEngine.cpp
+    ${MAIN_CPP}/UsbAudioSink.cpp
 )
 
 include_directories(${MAIN_CPP})

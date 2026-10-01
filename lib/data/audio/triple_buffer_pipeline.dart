@@ -161,7 +161,8 @@ class TripleBufferPipeline {
       return true;
     } catch (e) {
       clearPreload();
-      ErrorLogger.log('Preload attempt failed', error: e, category: 'TripleBuffer');
+      ErrorLogger.log('Preload attempt failed',
+          error: e, category: 'TripleBuffer');
       return false;
     }
   }

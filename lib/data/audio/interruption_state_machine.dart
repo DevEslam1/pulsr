@@ -1,7 +1,13 @@
 // lib/data/audio/interruption_state_machine.dart
 
 /// The kind of audio-focus interruption that began.
-enum InterruptionKind { duck, pause, systemUiSound, mediaButtonLongPress, unknown }
+enum InterruptionKind {
+  duck,
+  pause,
+  systemUiSound,
+  mediaButtonLongPress,
+  unknown
+}
 
 /// Pure, type-safe bookkeeping for audio-session interruptions.
 ///

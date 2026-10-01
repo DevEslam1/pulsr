@@ -39,7 +39,8 @@ class MockWidgetService extends Mock implements WidgetService {}
 
 class MockPlayerLyricsManager extends Mock implements PlayerLyricsManager {}
 
-class MockPlayerSponsorBlockManager extends Mock implements PlayerSponsorBlockManager {}
+class MockPlayerSponsorBlockManager extends Mock
+    implements PlayerSponsorBlockManager {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler
@@ -196,7 +197,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   HeadphoneProfile? _testSelectedHeadphoneProfile;
   @override
-  HeadphoneProfile? get selectedHeadphoneProfile => _testSelectedHeadphoneProfile;
+  HeadphoneProfile? get selectedHeadphoneProfile =>
+      _testSelectedHeadphoneProfile;
 
   @override
   Future<void> setVirtualizerEnabled(bool enabled) async {}
@@ -425,9 +427,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setMonoMix(bool mono) async {}
   @override
-  Future<void> setViperDdc(bool enabled, {String? profileName, List<double>? coeffs, String? ddcContent}) async {}
+  Future<void> setViperDdc(bool enabled,
+      {String? profileName, List<double>? coeffs, String? ddcContent}) async {}
   @override
-  Future<void> setArbitraryEq(bool enabled, {String? eqString, bool? linearPhase}) async {}
+  Future<void> setArbitraryEq(bool enabled,
+      {String? eqString, bool? linearPhase}) async {}
   @override
   Future<void> setLiveProg(bool enabled, {String? code}) async {}
   @override
@@ -602,7 +606,8 @@ void main() {
       cubit.close();
     });
 
-    test('TTFA playing mark only fires when ExoPlayer is ready AND playing, '
+    test(
+        'TTFA playing mark only fires when ExoPlayer is ready AND playing, '
         'never while loading', () async {
       final tracker = PlaybackLatencyTracker.withClock(const SystemClock());
       final cubit = PlayerCubit(
@@ -1604,7 +1609,9 @@ void main() {
       expect(cubit.state.queue.map((s) => s.id).toList(), [202, 201]);
     });
 
-    test('[C-01] setDspEffectsEnabled(false) resyncs and emits error when disable fails', () async {
+    test(
+        '[C-01] setDspEffectsEnabled(false) resyncs and emits error when disable fails',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1620,7 +1627,9 @@ void main() {
       }
     });
 
-    test('[C-02] playSong double load failure clears corrupted slot and enters terminal state', () async {
+    test(
+        '[C-02] playSong double load failure clears corrupted slot and enters terminal state',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1670,7 +1679,9 @@ void main() {
       }
     });
 
-    test('[C-14] resolveMediaItemId resolves numeric IDs directly and assigns collision-free monotonic negative IDs to virtual items', () async {
+    test(
+        '[C-14] resolveMediaItemId resolves numeric IDs directly and assigns collision-free monotonic negative IDs to virtual items',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1704,7 +1715,9 @@ void main() {
       }
     });
 
-    test('[H-01] clearing headphone profile preserves user-modified EQ instead of reverting to stale backup', () async {
+    test(
+        '[H-01] clearing headphone profile preserves user-modified EQ instead of reverting to stale backup',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1725,7 +1738,8 @@ void main() {
           bassBoost: 0.0,
         );
         await cubit.applyHeadphoneProfile(hp);
-        expect(cubit.state.dsp.selectedHeadphoneProfile?.name, 'Sony WH-1000XM4');
+        expect(
+            cubit.state.dsp.selectedHeadphoneProfile?.name, 'Sony WH-1000XM4');
         expect(cubit.state.dsp.eqPreset.name, 'Sony WH-1000XM4');
 
         // User modifies EQ preset while profile was active (e.g. adjusts band 0)
@@ -1743,7 +1757,9 @@ void main() {
       }
     });
 
-    test('[H-02] switchQueueSlot surfaces error message when another slot switch is already in progress', () async {
+    test(
+        '[H-02] switchQueueSlot surfaces error message when another slot switch is already in progress',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1765,7 +1781,9 @@ void main() {
       }
     });
 
-    test('[H-03] isUserSeeking starts false without magic number and reflects seek activity accurately', () async {
+    test(
+        '[H-03] isUserSeeking starts false without magic number and reflects seek activity accurately',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1783,7 +1801,9 @@ void main() {
       }
     });
 
-    test('[H-15] position stream fallback rethrows StateError when stream is disposed', () {
+    test(
+        '[H-15] position stream fallback rethrows StateError when stream is disposed',
+        () {
       final disposedHandler = _DisposedPositionAudioHandler();
       expect(
         () => PlayerCubit(
@@ -1795,7 +1815,9 @@ void main() {
       );
     });
 
-    test('[H-15] position stream fallback gracefully falls back to positionStream on stream error', () async {
+    test(
+        '[H-15] position stream fallback gracefully falls back to positionStream on stream error',
+        () async {
       final errorStreamHandler = _ErrorStreamAudioHandler();
       final cubit = PlayerCubit(
         audioHandler: errorStreamHandler,
@@ -1804,11 +1826,13 @@ void main() {
       );
       try {
         // compensatedPositionStream emits an error
-        errorStreamHandler.compensatedController.addError(Exception('DSP pipeline failure'));
+        errorStreamHandler.compensatedController
+            .addError(Exception('DSP pipeline failure'));
         await pumpEventQueue();
 
         // positionStream emits a valid position
-        errorStreamHandler.rawPositionController.add(const Duration(seconds: 42));
+        errorStreamHandler.rawPositionController
+            .add(const Duration(seconds: 42));
         await Future<void>.delayed(const Duration(milliseconds: 300));
 
         expect(cubit.state.position, equals(const Duration(seconds: 42)));
@@ -1817,7 +1841,9 @@ void main() {
       }
     });
 
-    test('[H-22] enrichTrackParallel surfaces error message when parallel enrichment completely fails', () async {
+    test(
+        '[H-22] enrichTrackParallel surfaces error message when parallel enrichment completely fails',
+        () async {
       final mockLyrics = MockPlayerLyricsManager();
       final mockSponsor = MockPlayerSponsorBlockManager();
       final mockRepo = MockMusicRepository();
@@ -1843,13 +1869,15 @@ void main() {
         playback: PlaybackSlice(currentSong: song),
       );
 
-      when(() => mockLyrics.getCachedLyrics(song)).thenThrow(Exception('Lyrics service down'));
+      when(() => mockLyrics.getCachedLyrics(song))
+          .thenThrow(Exception('Lyrics service down'));
       when(() => mockSponsor.loadSegmentsForSong(
             song,
             isOfflineOnly: any(named: 'isOfflineOnly'),
             isStale: any(named: 'isStale'),
           )).thenAnswer((_) => Future.error(Exception('SponsorBlock failure')));
-      when(() => mockRepo.getSongById(song.id)).thenAnswer((_) => Future.error(Exception('Database error')));
+      when(() => mockRepo.getSongById(song.id))
+          .thenAnswer((_) => Future.error(Exception('Database error')));
 
       final metadataController = PlayerMetadataController(
         lyricsManager: mockLyrics,
@@ -1869,7 +1897,9 @@ void main() {
       expect(state.errorMessage, contains('quality'));
     });
 
-    test('[M-01] setVolumeBoost uses latest preampDb dynamically to prevent clipping', () async {
+    test(
+        '[M-01] setVolumeBoost uses latest preampDb dynamically to prevent clipping',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -1887,7 +1917,8 @@ void main() {
         );
 
         await cubit.applyHeadphoneProfile(hp);
-        expect(cubit.state.dsp.selectedHeadphoneProfile?.preampGain, equals(3.0));
+        expect(
+            cubit.state.dsp.selectedHeadphoneProfile?.preampGain, equals(3.0));
 
         // Request 0.8 (8 dB boost). With preamp 3.0, total would be 11.0 > 6.0 dB.
         // It must clamp to (6.0 - 3.0) / 10.0 = 0.3.
@@ -1898,7 +1929,9 @@ void main() {
       }
     });
 
-    test('[M-02] loadLyrics generation and track change guards prevent stale lyrics emission', () async {
+    test(
+        '[M-02] loadLyrics generation and track change guards prevent stale lyrics emission',
+        () async {
       final mockLyrics = MockPlayerLyricsManager();
       final mockSponsor = MockPlayerSponsorBlockManager();
       final mockRepo = MockMusicRepository();
@@ -1938,7 +1971,8 @@ void main() {
       );
 
       var currentGeneration = 0;
-      when(() => mockLyrics.bumpGeneration()).thenAnswer((_) => ++currentGeneration);
+      when(() => mockLyrics.bumpGeneration())
+          .thenAnswer((_) => ++currentGeneration);
       when(() => mockLyrics.generation).thenAnswer((_) => currentGeneration);
       when(() => mockLyrics.getCachedLyrics(songA)).thenReturn(null);
       when(() => mockLyrics.hasFreshNegativeCache(songA)).thenReturn(false);
@@ -1963,11 +1997,14 @@ void main() {
       final loadFuture = metadataController.loadLyrics(songA);
 
       // Track switches to songB before resolveLyrics completes
-      state = state.copyWith(playback: state.playback.copyWith(currentSong: songB));
+      state =
+          state.copyWith(playback: state.playback.copyWith(currentSong: songB));
 
       // Resolve lyrics for songA
       completer.complete(const LyricsResult(
-        lines: [LyricsLine(timestamp: Duration.zero, text: 'Stale lyrics for Song A')],
+        lines: [
+          LyricsLine(timestamp: Duration.zero, text: 'Stale lyrics for Song A')
+        ],
         source: LyricsSource.lrclib,
       ));
 
@@ -1978,7 +2015,9 @@ void main() {
       expect(state.currentSong, equals(songB));
     });
 
-    test('[M-03] warmStreams timers are properly tracked and cancelled on dispose', () async {
+    test(
+        '[M-03] warmStreams timers are properly tracked and cancelled on dispose',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -2026,7 +2065,9 @@ void main() {
       }
     });
 
-    test('[M-04] togglePlayPause serializes rapid concurrent calls without racing state and engine', () async {
+    test(
+        '[M-04] togglePlayPause serializes rapid concurrent calls without racing state and engine',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -2064,7 +2105,9 @@ void main() {
       }
     });
 
-    test('[M-05] attachSettingsCubit binds settings stream and syncs audio effects correctly', () async {
+    test(
+        '[M-05] attachSettingsCubit binds settings stream and syncs audio effects correctly',
+        () async {
       final mockScannerService = MockMediaScannerService();
       final settingsCubit = SettingsCubit(scannerService: mockScannerService);
       final cubit = PlayerCubit(
@@ -2076,7 +2119,8 @@ void main() {
       try {
         cubit.attachSettingsCubit(settingsCubit);
         await settingsCubit.setCrossfade(4.5);
-        expect(testAudioHandler.crossfadeDuration, equals(const Duration(milliseconds: 4500)));
+        expect(testAudioHandler.crossfadeDuration,
+            equals(const Duration(milliseconds: 4500)));
       } finally {
         await cubit.close();
         await settingsCubit.close();
@@ -2087,18 +2131,20 @@ void main() {
 
 class _DisposedPositionAudioHandler extends TestPulsrAudioHandler {
   @override
-  Stream<Duration> get compensatedPositionStream => throw StateError('Stream closed/disposed');
+  Stream<Duration> get compensatedPositionStream =>
+      throw StateError('Stream closed/disposed');
 }
 
 class _ErrorStreamAudioHandler extends TestPulsrAudioHandler {
-  final StreamController<Duration> compensatedController = StreamController<Duration>.broadcast();
-  final StreamController<Duration> rawPositionController = StreamController<Duration>.broadcast();
+  final StreamController<Duration> compensatedController =
+      StreamController<Duration>.broadcast();
+  final StreamController<Duration> rawPositionController =
+      StreamController<Duration>.broadcast();
 
   @override
-  Stream<Duration> get compensatedPositionStream => compensatedController.stream;
+  Stream<Duration> get compensatedPositionStream =>
+      compensatedController.stream;
 
   @override
   Stream<Duration> get positionStream => rawPositionController.stream;
 }
-
-

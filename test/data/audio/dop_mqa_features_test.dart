@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +22,9 @@ void main() {
       expect(info.description.toLowerCase(), contains('not implemented'));
     });
 
-    test('DopEncoder.encodeToDopPcm24 produces valid DoP 0x05 / 0xFA marker bytes', () {
+    test(
+        'DopEncoder.encodeToDopPcm24 produces valid DoP 0x05 / 0xFA marker bytes',
+        () {
       final dsdLeft = Uint8List.fromList(List.generate(8, (i) => 0xAA));
       final dsdRight = Uint8List.fromList(List.generate(8, (i) => 0x55));
       final dopPcm = DopEncoder.encodeToDopPcm24(
@@ -43,7 +45,9 @@ void main() {
       expect(dopPcm[11], equals(0xFA));
     });
 
-    test('DsdDecoderHelper.buildDopWavContainer creates valid 24-bit PCM WAV header', () {
+    test(
+        'DsdDecoderHelper.buildDopWavContainer creates valid 24-bit PCM WAV header',
+        () {
       final dopData = Uint8List(480);
       final wav = DsdDecoderHelper.buildDopWavContainer(
         dopPcmBytes: dopData,
@@ -65,7 +69,9 @@ void main() {
       expect(byteData.getUint32(40, Endian.little), equals(480));
     });
 
-    test('PlaybackVolumeController locks volume strictly to 1.0 during DoP transmission', () async {
+    test(
+        'PlaybackVolumeController locks volume strictly to 1.0 during DoP transmission',
+        () async {
       final activePlayer = MockAudioPlayer();
       final inactivePlayer = MockAudioPlayer();
       when(() => activePlayer.setVolume(any())).thenAnswer((_) async {});
@@ -100,20 +106,40 @@ void main() {
   group('MQA Decoding & Core Unfolding Tests', () {
     test('MqaDecoderHelper.containsMqaSignature identifies MQA sync word', () {
       final mqaBytes = Uint8List.fromList([
-        0x00, 0x11, 0x22,
-        0xBE, 0x04, 0x98, 0xC4,
-        0x55, 0x66, 0x77,
+        0x00,
+        0x11,
+        0x22,
+        0xBE,
+        0x04,
+        0x98,
+        0xC4,
+        0x55,
+        0x66,
+        0x77,
       ]);
       expect(MqaDecoderHelper.containsMqaSignature(mqaBytes), isTrue);
 
-      final normalBytes = Uint8List.fromList([0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
+      final normalBytes =
+          Uint8List.fromList([0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
       expect(MqaDecoderHelper.containsMqaSignature(normalBytes), isFalse);
     });
 
-    test('MqaDecoderHelper.coreUnfoldPcm24 doubles frame count with reconstructed samples', () {
+    test(
+        'MqaDecoderHelper.coreUnfoldPcm24 doubles frame count with reconstructed samples',
+        () {
       final inBytes = Uint8List.fromList([
-        0x30, 0x20, 0x10, 0x60, 0x50, 0x40,
-        0x34, 0x24, 0x14, 0x64, 0x54, 0x44,
+        0x30,
+        0x20,
+        0x10,
+        0x60,
+        0x50,
+        0x40,
+        0x34,
+        0x24,
+        0x14,
+        0x64,
+        0x54,
+        0x44,
       ]);
 
       final unfolded = MqaDecoderHelper.coreUnfoldPcm24(
@@ -126,7 +152,8 @@ void main() {
       expect(unfolded.sublist(6, 12).length, equals(6));
     });
 
-    test('MqaDecoderHelper.buildWavHeader builds valid 96kHz 24-bit WAV header', () {
+    test('MqaDecoderHelper.buildWavHeader builds valid 96kHz 24-bit WAV header',
+        () {
       final header = MqaDecoderHelper.buildWavHeader(
         dataLength: 960,
         sampleRate: 96000,
@@ -143,7 +170,9 @@ void main() {
   });
 
   group('Custom IR File Parser Tests', () {
-    test('IrFileParser parses and converts 16-bit PCM WAV into float range [-1.0, 1.0]', () async {
+    test(
+        'IrFileParser parses and converts 16-bit PCM WAV into float range [-1.0, 1.0]',
+        () async {
       final samplesCount = 100;
       final pcmBytes = Uint8List(samplesCount * 2);
       final pcmView = ByteData.sublistView(pcmBytes);
@@ -208,7 +237,9 @@ void main() {
   });
 
   group('Adaptive Bitrate Switching Tests', () {
-    test('AdaptiveBufferEngine requests quality step-down upon >= 2 underruns within 30s', () async {
+    test(
+        'AdaptiveBufferEngine requests quality step-down upon >= 2 underruns within 30s',
+        () async {
       final engine = AdaptiveBufferEngine();
       final requestedQualities = <String>[];
 

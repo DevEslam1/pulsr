@@ -94,12 +94,16 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
   }
 
   Future<void> _setAction(
-      String key, HeadsetClickAction Function(HeadsetControlConfig) get,
+      String key,
+      HeadsetClickAction Function(HeadsetControlConfig) get,
       HeadsetClickAction v) async {
     final next = HeadsetControlConfig(
-      singleClick: key == PrefsKeys.headsetSingleClick ? v : _config.singleClick,
-      doubleClick: key == PrefsKeys.headsetDoubleClick ? v : _config.doubleClick,
-      tripleClick: key == PrefsKeys.headsetTripleClick ? v : _config.tripleClick,
+      singleClick:
+          key == PrefsKeys.headsetSingleClick ? v : _config.singleClick,
+      doubleClick:
+          key == PrefsKeys.headsetDoubleClick ? v : _config.doubleClick,
+      tripleClick:
+          key == PrefsKeys.headsetTripleClick ? v : _config.tripleClick,
       clickWindowMs: _config.clickWindowMs,
       seekSeconds: _config.seekSeconds,
     );
@@ -116,20 +120,20 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
     if (!_loaded) return const SizedBox.shrink();
     return SettingsSection(
       icon: Icons.headset_rounded,
-      title: 'Headset & background',
+      title: context.l10n.headsetSectionTitle,
       children: [
         SettingsSwitchTile(
           Icons.replay_rounded,
-          'Auto-resume on reconnect',
+          context.l10n.headsetAutoResume,
           _autoResume
-              ? 'Resume within $_autoResumeTimeout s when the headset reconnects.'
-              : 'Stay paused when headphones unplug.',
+              ? context.l10n.headsetResumeWithinNotice(_autoResumeTimeout)
+              : context.l10n.headsetStayPausedDesc,
           value: _autoResume,
           onChanged: _setAutoResume,
         ),
         if (_autoResume)
           SettingSliderRow(
-            label: 'Resume window',
+            label: context.l10n.headsetResumeWindow,
             value: _autoResumeTimeout.toDouble(),
             min: 15,
             max: 300,
@@ -140,25 +144,24 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
               setState(() => _autoResumeTimeout = v.round());
               try {
                 final prefs = await SharedPreferences.getInstance();
-                await prefs.setInt(
-                    PrefsKeys.autoResumeTimeoutSec, v.round());
+                await prefs.setInt(PrefsKeys.autoResumeTimeoutSec, v.round());
               } catch (_) {}
             },
           ),
         settingsCardDivider(p),
         SettingsSwitchTile(
           Icons.notifications_paused_rounded,
-          'Keep notification when paused',
+          context.l10n.headsetKeepNotification,
           _keepNotification
-              ? 'Controls stay in the shade after pause (restart required).'
-              : 'Notification is removed on pause to save battery.',
+              ? context.l10n.headsetKeepNotificationOnDesc
+              : context.l10n.headsetKeepNotificationOffDesc,
           value: _keepNotification,
           onChanged: _setKeepNotification,
         ),
         settingsCardDivider(p),
         _ClickActionTile(
           icon: Icons.touch_app_rounded,
-          title: 'Single press',
+          title: context.l10n.headsetSinglePress,
           value: _config.singleClick,
           onChanged: (v) =>
               _setAction(PrefsKeys.headsetSingleClick, (c) => c.singleClick, v),
@@ -166,7 +169,7 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
         settingsCardDivider(p),
         _ClickActionTile(
           icon: Icons.touch_app_rounded,
-          title: 'Double press',
+          title: context.l10n.headsetDoublePress,
           value: _config.doubleClick,
           onChanged: (v) =>
               _setAction(PrefsKeys.headsetDoubleClick, (c) => c.doubleClick, v),
@@ -174,15 +177,15 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
         settingsCardDivider(p),
         _ClickActionTile(
           icon: Icons.touch_app_rounded,
-          title: 'Triple press',
+          title: context.l10n.headsetTriplePress,
           value: _config.tripleClick,
           onChanged: (v) =>
               _setAction(PrefsKeys.headsetTripleClick, (c) => c.tripleClick, v),
         ),
         settingsCardDivider(p),
         SettingSliderRow(
-          label: 'Multi-press window',
-          subtitle: 'How long presses are grouped into double/triple.',
+          label: context.l10n.headsetMultiPressWindow,
+          subtitle: context.l10n.headsetMultiPressWindowDesc,
           value: _config.clickWindowMs.toDouble(),
           min: 150,
           max: 800,
@@ -199,14 +202,13 @@ class _HeadsetControlsSectionState extends State<HeadsetControlsSection> {
                 ));
             try {
               final prefs = await SharedPreferences.getInstance();
-              await prefs.setInt(
-                  PrefsKeys.headsetClickWindowMs, v.round());
+              await prefs.setInt(PrefsKeys.headsetClickWindowMs, v.round());
             } catch (_) {}
           },
         ),
         SettingSliderRow(
-          label: 'Seek step',
-          subtitle: 'Used when a press is mapped to seek forward/back.',
+          label: context.l10n.headsetSeekStep,
+          subtitle: context.l10n.headsetSeekStepDesc,
           value: _config.seekSeconds.toDouble(),
           min: 5,
           max: 60,
@@ -245,15 +247,15 @@ class _ClickActionTile extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const _labels = {
-    HeadsetClickAction.playPause: 'Play / pause',
-    HeadsetClickAction.next: 'Next track',
-    HeadsetClickAction.previous: 'Previous track',
-    HeadsetClickAction.stop: 'Stop',
-    HeadsetClickAction.seekForward: 'Seek forward',
-    HeadsetClickAction.seekBackward: 'Seek back',
-    HeadsetClickAction.none: 'Do nothing',
-  };
+  Map<HeadsetClickAction, String> _labels(BuildContext context) => {
+        HeadsetClickAction.playPause: context.l10n.headsetActionPlayPause,
+        HeadsetClickAction.next: context.l10n.headsetActionNextTrack,
+        HeadsetClickAction.previous: context.l10n.headsetActionPreviousTrack,
+        HeadsetClickAction.stop: context.l10n.headsetActionStop,
+        HeadsetClickAction.seekForward: context.l10n.headsetActionSeekForward,
+        HeadsetClickAction.seekBackward: context.l10n.headsetActionSeekBack,
+        HeadsetClickAction.none: context.l10n.headsetActionNone,
+      };
 
   void _showPicker(BuildContext context) {
     final p = context.palette;
@@ -261,13 +263,15 @@ class _ClickActionTile extends StatelessWidget {
       context: context,
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   title,
                   style: const TextStyle(
@@ -288,7 +292,7 @@ class _ClickActionTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadii.r12),
                     child: ListTile(
                       title: Text(
-                        _labels[action] ?? action.wireValue,
+                        _labels(context)[action] ?? action.wireValue,
                         style: TextStyle(
                           fontWeight:
                               isSelected ? FontWeight.w800 : FontWeight.w600,
@@ -318,7 +322,7 @@ class _ClickActionTile extends StatelessWidget {
     return SettingsNavTile(
       icon,
       title,
-      _labels[value] ?? value.wireValue,
+      _labels(context)[value] ?? value.wireValue,
       onTap: () => _showPicker(context),
     );
   }

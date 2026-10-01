@@ -33,7 +33,8 @@ void main() {
     });
 
     test('rejects invalid JSON syntax', () {
-      final result = EqPresetSchemaValidator.validateAndParse('{ invalid json: true }');
+      final result =
+          EqPresetSchemaValidator.validateAndParse('{ invalid json: true }');
       expect(result.isValid, isFalse);
       expect(result.errorMessage, contains('Malformed JSON structure'));
     });
@@ -89,10 +90,22 @@ void main() {
         name: 'Harmonic Warmth',
         gains: [3.0, 2.5, 1.5, 0.5, 0.0, 0.0, -0.5, -1.0, -1.5, -2.0],
         bassBoost: 0.15,
-        customFrequencies: [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+        customFrequencies: [
+          32,
+          64,
+          125,
+          250,
+          500,
+          1000,
+          2000,
+          4000,
+          8000,
+          16000
+        ],
       );
 
-      final jsonStr = EqPresetSchemaValidator.exportToJson(preset, pretty: true);
+      final jsonStr =
+          EqPresetSchemaValidator.exportToJson(preset, pretty: true);
       expect(jsonStr, contains('"schemaVersion": 1'));
       expect(jsonStr, contains('"Harmonic Warmth"'));
 

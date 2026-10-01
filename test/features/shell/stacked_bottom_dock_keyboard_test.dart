@@ -11,6 +11,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/shell/presentation/widgets/stacked_bottom_dock.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -40,7 +41,8 @@ void main() {
     settingsCubit = MockSettingsCubit();
 
     when(() => settingsCubit.state).thenReturn(const SettingsState());
-    when(() => settingsCubit.stream).thenAnswer((_) => const Stream<SettingsState>.empty());
+    when(() => settingsCubit.stream)
+        .thenAnswer((_) => const Stream<SettingsState>.empty());
     when(() => playerCubit.state).thenReturn(
       const PlayerState(
         playback: PlaybackSlice(
@@ -64,7 +66,8 @@ void main() {
   });
 
   group('[M-13] StackedBottomDock computeDockHeight keyboard visibility', () {
-    test('computeDockHeight returns 0.0 when keyboard is visible or inset > 0', () {
+    test('computeDockHeight returns 0.0 when keyboard is visible or inset > 0',
+        () {
       const navBarTotalHeight = 74.0;
 
       // Normal state with song
@@ -94,7 +97,9 @@ void main() {
       expect(keyboardInsetHeight, equals(0.0));
     });
 
-    testWidgets('StackedBottomDock updates PulsrDockTracker height to 0.0 when keyboard is open', (tester) async {
+    testWidgets(
+        'StackedBottomDock updates PulsrDockTracker height to 0.0 when keyboard is open',
+        (tester) async {
       tester.view.physicalSize = const Size(800, 1200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -107,7 +112,8 @@ void main() {
           ],
           child: MaterialApp(
             home: MediaQuery(
-              data: MediaQueryData(viewInsets: EdgeInsets.only(bottom: bottomInset)),
+              data: MediaQueryData(
+                  viewInsets: EdgeInsets.only(bottom: bottomInset)),
               child: Scaffold(
                 resizeToAvoidBottomInset: false,
                 body: StackedBottomDock(

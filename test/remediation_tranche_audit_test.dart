@@ -29,7 +29,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Remediation Tranche Audit Tests', () {
-    test('C1 & C2: BaseCubit autoSub returns cancelled subscription when closed and close() cleans up', () async {
+    test(
+        'C1 & C2: BaseCubit autoSub returns cancelled subscription when closed and close() cleans up',
+        () async {
       final cubit = _TestPulsrCubit();
       expect(cubit.activeSubscriptionCount, equals(0));
 
@@ -50,7 +52,8 @@ void main() {
       expect(cubit.activeSubscriptionCount, equals(0));
 
       // Attempting autoSub after close returns an already cancelled subscription (C1)
-      final postCloseSub = cubit.testAutoSub(controller.stream, (val) => dataReceived += val);
+      final postCloseSub =
+          cubit.testAutoSub(controller.stream, (val) => dataReceived += val);
       expect(postCloseSub, isNotNull);
 
       // Sending data should NOT reach callback
@@ -104,29 +107,34 @@ void main() {
     });
 
     test('L2: AppTiming provides standardized timing durations', () {
-      expect(AppTiming.debounceShort, equals(const Duration(milliseconds: 200)));
-      expect(AppTiming.debounceMedium, equals(const Duration(milliseconds: 300)));
+      expect(
+          AppTiming.debounceShort, equals(const Duration(milliseconds: 200)));
+      expect(
+          AppTiming.debounceMedium, equals(const Duration(milliseconds: 300)));
       expect(AppTiming.debounceLong, equals(const Duration(milliseconds: 500)));
-      expect(AppTiming.throttleProgress, equals(const Duration(milliseconds: 100)));
+      expect(AppTiming.throttleProgress,
+          equals(const Duration(milliseconds: 100)));
       expect(AppTiming.navThrottle, equals(const Duration(milliseconds: 200)));
       expect(AppTiming.staggerDelay, equals(const Duration(milliseconds: 500)));
     });
 
-    test('H7: Enhanced songs hash differentiates lists with identical endpoints and length', () {
+    test(
+        'H7: Enhanced songs hash differentiates lists with identical endpoints and length',
+        () {
       SongsTableData createSong(int id) => SongsTableData(
-        id: id,
-        title: 'Song $id',
-        artist: 'Artist',
-        album: 'Album',
-        durationMs: 1000,
-        path: '/$id.mp3',
-        source: SongSource.local,
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-      );
+            id: id,
+            title: 'Song $id',
+            artist: 'Artist',
+            album: 'Album',
+            durationMs: 1000,
+            path: '/$id.mp3',
+            source: SongSource.local,
+            isFavorite: false,
+            isMissing: false,
+            isDownloaded: false,
+            playCount: 0,
+            lastPositionMs: 0,
+          );
 
       // 12 songs: song 1 to 12
       final list1 = List.generate(12, (i) => createSong(i + 1));
@@ -140,7 +148,8 @@ void main() {
         return Object.hashAll([
           songs.length,
           for (final s in songs.take(10)) s.id,
-          for (final s in songs.skip(songs.length > 10 ? songs.length - 10 : 0)) s.id,
+          for (final s in songs.skip(songs.length > 10 ? songs.length - 10 : 0))
+            s.id,
         ]);
       }
 
@@ -150,10 +159,13 @@ void main() {
       expect(hash1, isNot(equals(hash2)));
     });
 
-    testWidgets('H12: GenreCategory clearCache and instance count reference management', (tester) async {
+    testWidgets(
+        'H12: GenreCategory clearCache and instance count reference management',
+        (tester) async {
       GenreCategory.clearCache();
 
-      const category = GenreCategory('Jazz', Icons.music_note, ['jazz', 'blues']);
+      const category =
+          GenreCategory('Jazz', Icons.music_note, ['jazz', 'blues']);
       expect(category.matches('Smooth Jazz Evening'), isTrue);
       expect(category.matches('Rock and Roll'), isFalse);
 
@@ -184,7 +196,9 @@ void main() {
       expect(category.matches('Bebop Jazz'), isTrue);
     });
 
-    test('Lyrics & Overlay: PlayerState differsFromBeyondPosition reacts immediately to lyrics and queue tabs', () {
+    test(
+        'Lyrics & Overlay: PlayerState differsFromBeyondPosition reacts immediately to lyrics and queue tabs',
+        () {
       const base = PlayerState(
         lyricsSlice: LyricsSlice(isLyricsVisible: false, isQueueVisible: false),
       );
@@ -194,7 +208,8 @@ void main() {
         lyricsSlice: base.lyricsSlice.copyWith(isLyricsVisible: true),
       );
       expect(base.differsFromBeyondPosition(lyricsTabActive), isTrue,
-          reason: 'Lyrics tab toggle must trigger rebuild immediately without reopen');
+          reason:
+              'Lyrics tab toggle must trigger rebuild immediately without reopen');
 
       // Tapping queue tab toggles isQueueVisible to true
       final queueTabActive = base.copyWith(

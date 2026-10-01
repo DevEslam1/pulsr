@@ -69,7 +69,8 @@ class PrefsRepository {
   Future<void> setDouble(String key, double value, {bool immediate = false}) =>
       set(key, value, immediate: immediate);
 
-  Future<void> setStringList(String key, List<String> value, {bool immediate = false}) =>
+  Future<void> setStringList(String key, List<String> value,
+          {bool immediate = false}) =>
       set(key, value, immediate: immediate);
 
   /// Cancels the batch timer and flushes any pending writes to prevent data loss.

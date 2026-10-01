@@ -186,7 +186,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     // 1. If any dialog, bottom sheet, or modal route is open on the root navigator, pop it first:
     final rootNav = rootNavigatorKey.currentState;
-    if (PulsrModalTracker.isModalOpen.value && rootNav != null && rootNav.canPop()) {
+    if (PulsrModalTracker.isModalOpen.value &&
+        rootNav != null &&
+        rootNav.canPop()) {
       _backPressStopwatch
         ..stop()
         ..reset();
@@ -203,7 +205,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     // 2. If side inspector is open in landscape mode, close it first:
     final inspectorOpen = isInspectorOpenOverride ??
-        (PulsrLayoutDelegate.of(context).showSideInspector && _isSideInspectorOpen);
+        (PulsrLayoutDelegate.of(context).showSideInspector &&
+            _isSideInspectorOpen);
     if (inspectorOpen) {
       _backPressStopwatch
         ..stop()
@@ -280,8 +283,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     // Never keep the inspector "open" once the layout no longer supports it
     // (e.g. rotating a tablet to a compact phone layout).
     final inspectorOpen = canShowInspector && _isSideInspectorOpen;
-    final extendedRail =
-        _isSidebarExtended ?? layoutDelegate.railExpanded;
+    final extendedRail = _isSidebarExtended ?? layoutDelegate.railExpanded;
 
     return BlocListener<PlayerCubit, PlayerState>(
       // Playback errors (bot/verification blocks, "multiple tracks failed",
@@ -341,7 +343,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     required bool inspectorOpen,
     required bool extendedRail,
   }) {
-
     // Phone / Compact Layout (bottom dock)
     if (!useRail) {
       return Scaffold(
@@ -392,7 +393,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       );
     }
 
-    // â”€â”€ Tablet Layout (side rail + docked player bar) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Tablet Layout (side rail + docked player bar) ──────────────────
     return Scaffold(
       body: Row(
         children: [
@@ -405,8 +406,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 setState(() => _isSidebarExtended = !extendedRail),
             onOpenNowPlaying: () => _openNowPlaying(context),
             onToggleSideInspector: canShowInspector
-                ? () => setState(
-                    () => _isSideInspectorOpen = !_isSideInspectorOpen)
+                ? () =>
+                    setState(() => _isSideInspectorOpen = !_isSideInspectorOpen)
                 : null,
             isSideInspectorOpen: inspectorOpen,
           ),

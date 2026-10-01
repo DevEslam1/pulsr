@@ -80,7 +80,8 @@ class CastSessionStatus {
 
   static const CastSessionStatus unavailable = CastSessionStatus();
 
-  factory CastSessionStatus.fromMap(Map<dynamic, dynamic> map) => CastSessionStatus(
+  factory CastSessionStatus.fromMap(Map<dynamic, dynamic> map) =>
+      CastSessionStatus(
         available: true,
         connected: map['connected'] == true,
         deviceName: map['deviceName'] as String?,
@@ -333,6 +334,25 @@ class CastService {
     }
   }
 
+  /// Reads the active Cast device volume (0.0 to 1.0).
+  ///
+  /// Returns `null` when there is no connected session or the platform build
+  /// does not expose receiver volume, so callers never display a fabricated
+  /// level.
+  Future<double?> getVolume() async {
+    if (!_isAndroid || !_sessionStatus.connected) return null;
+    try {
+      final dynamic res =
+          await _sessionChannel.invokeMethod<dynamic>('getVolume');
+      if (res is Map && res['success'] == true && res['volume'] is num) {
+        return (res['volume'] as num).toDouble().clamp(0.0, 1.0);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Casts the entire playback queue to the receiver for continuous playback.
   Future<CastResult> castQueue({
     required List<Map<String, dynamic>> queueItems,
@@ -438,12 +458,10 @@ class CastService {
       return const CastResult(success: false, error: 'unsupported_platform');
     }
     try {
-      final dynamic res = await _methodChannel
-          .invokeMethod<dynamic>('castTo', {
+      final dynamic res = await _methodChannel.invokeMethod<dynamic>('castTo', {
         'deviceId': deviceId,
         'appId': receiverAppId,
-      })
-          .timeout(const Duration(seconds: 8));
+      }).timeout(const Duration(seconds: 8));
       return _parseResult(res);
     } catch (e, st) {
       ErrorLogger.log('Cast castTo failed',

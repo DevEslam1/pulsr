@@ -74,8 +74,10 @@ class PlaybackLatencyReport {
         'startedAt': startedAt.toIso8601String(),
         'finishedAt': finishedAt.toIso8601String(),
         'totalMs': total.inMilliseconds,
-        'stageOffsetsMs': stageOffsets.map((k, v) => MapEntry(k.name, v.inMilliseconds)),
-        'stageDurationsMs': stageDurations.map((k, v) => MapEntry(k.name, v.inMilliseconds)),
+        'stageOffsetsMs':
+            stageOffsets.map((k, v) => MapEntry(k.name, v.inMilliseconds)),
+        'stageDurationsMs':
+            stageDurations.map((k, v) => MapEntry(k.name, v.inMilliseconds)),
         'success': success,
         'failureStage': failureStage,
         'bucket': bucket.name,
@@ -193,7 +195,9 @@ class PlaybackLatencyTracker {
   }
 
   Duration _markInternal(PlaybackStage stage,
-      {required DateTime at, Map<String, dynamic>? data, bool isStart = false}) {
+      {required DateTime at,
+      Map<String, dynamic>? data,
+      bool isStart = false}) {
     final session = _active!;
     final already = session.stageTimes[stage];
     if (already != null) {
@@ -208,7 +212,8 @@ class PlaybackLatencyTracker {
     try {
       if (Sentry.isEnabled && session.transaction != null) {
         // Child span: start = previous stage or session start, end = now
-        final previousTime = _previousStageTime(session, stage) ?? session.startTime;
+        final previousTime =
+            _previousStageTime(session, stage) ?? session.startTime;
         final span = session.transaction!.startChild(
           'playback.stage.$stageName',
           description: stageName,
@@ -279,7 +284,8 @@ class PlaybackLatencyTracker {
   PlaybackLatencyReport? finish({bool success = true, String? failureStage}) {
     if (_active == null || _active!.closed) return null;
     final now = _clock.now();
-    return _finishInternal(success: success, failureStage: failureStage, endTime: now);
+    return _finishInternal(
+        success: success, failureStage: failureStage, endTime: now);
   }
 
   /// Finishes with failure at a given stage.
@@ -287,7 +293,8 @@ class PlaybackLatencyTracker {
     if (_active == null || _active!.closed) return null;
     final now = _clock.now();
     final stageName = stage?.name ?? error.toString();
-    return _finishInternal(success: false, failureStage: stageName, endTime: now);
+    return _finishInternal(
+        success: false, failureStage: stageName, endTime: now);
   }
 
   PlaybackLatencyReport _finishInternal({
@@ -343,9 +350,12 @@ class PlaybackLatencyTracker {
         session.transaction!.setData('totalMs', total.inMilliseconds);
         session.transaction!.setData('bucket', bucket.name);
         session.transaction!.setData('success', success);
-        if (failureStage != null) session.transaction!.setData('failureStage', failureStage);
+        if (failureStage != null) {
+          session.transaction!.setData('failureStage', failureStage);
+        }
         for (final entry in offsets.entries) {
-          session.transaction!.setData('offset_${entry.key.name}_ms', entry.value.inMilliseconds);
+          session.transaction!.setData(
+              'offset_${entry.key.name}_ms', entry.value.inMilliseconds);
         }
         session.transaction!.finish(
           status: success ? SpanStatus.ok() : SpanStatus.internalError(),

@@ -39,7 +39,8 @@ class DeviceProfileEntry {
   final String deviceKey;
   final String deviceLabel;
 
-  const DeviceProfileEntry({required this.deviceKey, required this.deviceLabel});
+  const DeviceProfileEntry(
+      {required this.deviceKey, required this.deviceLabel});
 }
 
 /// Auto per-output-device profiles: links devices to [SettingsProfile]s and
@@ -70,8 +71,7 @@ class DeviceProfileService {
     // Every Bluetooth transport shares one namespace: the same earbuds report
     // activeDeviceType 'ble' over LE Audio and 'bluetooth' over A2DP, and the
     // user's profile has to follow them across that renegotiation.
-    final type =
-        isBluetooth ? 'bluetooth' : deviceType.trim().toLowerCase();
+    final type = isBluetooth ? 'bluetooth' : deviceType.trim().toLowerCase();
     if (type.isEmpty || type == 'builtin') return 'builtin:speaker';
     final name =
         deviceName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -127,16 +127,16 @@ class DeviceProfileService {
       deviceLabel: deviceLabel,
     );
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyLinks,
-        json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+    await prefs.setString(
+        _keyLinks, json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
   }
 
   Future<void> forgetLink(String deviceKey) async {
     final links = await getLinks();
     if (links.remove(deviceKey) == null) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyLinks,
-        json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+    await prefs.setString(
+        _keyLinks, json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
   }
 
   /// Remembers a seen device for the UI list (bounded, most recent kept).
@@ -164,7 +164,8 @@ class DeviceProfileService {
       await prefs.setString(
         _keyRegistry,
         json.encode(capped
-            .map((e) => {'deviceKey': e.deviceKey, 'deviceLabel': e.deviceLabel})
+            .map(
+                (e) => {'deviceKey': e.deviceKey, 'deviceLabel': e.deviceLabel})
             .toList()),
       );
     } catch (e, st) {
@@ -181,7 +182,8 @@ class DeviceProfileService {
       final decoded = json.decode(raw) as List<dynamic>;
       return decoded
           .map((e) => DeviceProfileEntry(
-                deviceKey: (e as Map<String, dynamic>)['deviceKey'] as String? ?? '',
+                deviceKey:
+                    (e as Map<String, dynamic>)['deviceKey'] as String? ?? '',
                 deviceLabel: e['deviceLabel'] as String? ?? '',
               ))
           .toList();
@@ -205,12 +207,13 @@ class DeviceProfileService {
       final links = await getLinks();
       for (final entry in decoded.entries) {
         if (entry.value is Map<String, dynamic>) {
-          links[entry.key] = DeviceProfileLink.fromJson(entry.value as Map<String, dynamic>);
+          links[entry.key] =
+              DeviceProfileLink.fromJson(entry.value as Map<String, dynamic>);
         }
       }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyLinks,
-          json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+      await prefs.setString(
+          _keyLinks, json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
       return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to import device profile links from JSON',

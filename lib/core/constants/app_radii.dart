@@ -45,14 +45,14 @@ abstract class AppRadii {
       BorderRadius.all(Radius.circular(miniPlayer));
   static const BorderRadius dialogRadius =
       BorderRadius.all(Radius.circular(dialog));
-  static const BorderRadius full =
-      BorderRadius.all(Radius.circular(999.0));
+  static const BorderRadius full = BorderRadius.all(Radius.circular(999.0));
 
   // ── Continuous Curvature / Squircles (iOS HIG) ──────────────────────────
   /// Multiplier to match visual curvature of continuous superellipses to circular radii.
   static const double squircleMultiplier = 2.2;
 
-  static ShapeBorder squircle(double radius, {BorderSide side = BorderSide.none}) =>
+  static ShapeBorder squircle(double radius,
+          {BorderSide side = BorderSide.none}) =>
       ContinuousRectangleBorder(
         borderRadius: BorderRadius.circular(radius * squircleMultiplier),
         side: side,

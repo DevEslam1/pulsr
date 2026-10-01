@@ -7,7 +7,9 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 
 void main() {
   group('Phase E: Performance & Memory Ceiling Tests', () {
-    testWidgets('ListView with 1,000 items renders smoothly within frame budget', (tester) async {
+    testWidgets(
+        'ListView with 1,000 items renders smoothly within frame budget',
+        (tester) async {
       final items = List.generate(
         1000,
         (i) => SongsTableData(
@@ -62,7 +64,9 @@ void main() {
       expect(scrollPumpMs, lessThan(1000));
     });
 
-    test('PlayerState differsFromBeyondPosition executes 5,000 times in under 50ms', () {
+    test(
+        'PlayerState differsFromBeyondPosition executes 5,000 times in under 50ms',
+        () {
       const state1 = PlayerState(
         playback: PlaybackSlice(
           position: Duration(seconds: 10),
@@ -89,10 +93,12 @@ void main() {
 
       expect(allFalse, isTrue);
       expect(sw.elapsedMilliseconds, lessThan(250),
-          reason: 'O(1) differsFromBeyondPosition benchmark must be hyper-fast');
+          reason:
+              'O(1) differsFromBeyondPosition benchmark must be hyper-fast');
     });
 
-    test('Queue slot lookup cache prunes inactive entries beyond 1500 limit', () {
+    test('Queue slot lookup cache prunes inactive entries beyond 1500 limit',
+        () {
       final slotLookupCache = <int, SongsTableData>{};
       final activeSongIds = <int>{1, 2, 3};
 
@@ -149,7 +155,8 @@ void main() {
       expect(cache.containsKey('item_79'), isTrue);
     });
 
-    test('Large queue slicing to 500 items operates in sub-millisecond time', () {
+    test('Large queue slicing to 500 items operates in sub-millisecond time',
+        () {
       final largeQueue = List.generate(
         10000,
         (i) => SongsTableData(

@@ -30,7 +30,9 @@ void main() {
     // 1. Crossfade Engine Concurrency & Safety (C-02, M-04, M-05)
     // -------------------------------------------------------------------------
     group('1. Crossfade Engine Concurrency & Safety', () {
-      test('Canceling active fades is idempotent and prevents double-completion', () async {
+      test(
+          'Canceling active fades is idempotent and prevents double-completion',
+          () async {
         final manager = CrossfadeManager();
         final playerA = MockAudioPlayer();
         final playerB = MockAudioPlayer();
@@ -57,7 +59,8 @@ void main() {
         manager.dispose();
       });
 
-      test('dispose clears native curves and cancels pending timers safely', () {
+      test('dispose clears native curves and cancels pending timers safely',
+          () {
         final manager = CrossfadeManager();
         expect(() => manager.dispose(), returnsNormally);
         // Repeated dispose must not throw
@@ -159,7 +162,9 @@ FILE "album.wav" WAVE
         expect(analytics.preloadSuccessRate, closeTo(0.666, 0.01));
       });
 
-      test('Preload failure blacklisting prevents immediate redundant preload attempts', () {
+      test(
+          'Preload failure blacklisting prevents immediate redundant preload attempts',
+          () {
         final playerA = MockAudioPlayer();
         final playerB = MockAudioPlayer();
         final pipeline = TripleBufferPipeline(
@@ -185,7 +190,9 @@ FILE "album.wav" WAVE
     // 5. Smart Preload Scheduler & Metered Policy (Prompt 4.8)
     // -------------------------------------------------------------------------
     group('5. Smart Preload Sizing & Metered Policy', () {
-      test('On metered connection, caps preload count to 1 and skips tracks > 10 minutes', () async {
+      test(
+          'On metered connection, caps preload count to 1 and skips tracks > 10 minutes',
+          () async {
         final preloaded = <int>[];
         final scheduler = SmartPreloadScheduler(
           onPreloadRequested: (song, {required priority}) async {
@@ -254,7 +261,8 @@ FILE "album.wav" WAVE
         expect(preloaded.contains(2), isFalse);
       });
 
-      test('Preload data usage counter accumulates and resets properly', () async {
+      test('Preload data usage counter accumulates and resets properly',
+          () async {
         SharedPreferences.setMockInitialValues({});
         await SmartPreloadScheduler.initDataUsage();
         SmartPreloadScheduler.recordPreloadDataUsage(2500000);
@@ -284,7 +292,8 @@ FILE "album.wav" WAVE
         expect(ViperDdcParser.validateFilterStability(-1.975, 0.985), isTrue);
       });
 
-      test('Rejects unstable biquad filters failing Jury stability pole test', () {
+      test('Rejects unstable biquad filters failing Jury stability pole test',
+          () {
         // a2 >= 1.0 is an unstable explosive pole outside the unit circle
         expect(ViperDdcParser.validateFilterStability(-2.5, 1.5), isFalse);
         expect(ViperDdcParser.validateFilterStability(2.1, 0.9), isFalse);
@@ -312,7 +321,9 @@ FILE "album.wav" WAVE
         expect(avg[3], equals(0.0));
       });
 
-      test('SNR calculation produces valid dB range from PCM signal and noise floor', () {
+      test(
+          'SNR calculation produces valid dB range from PCM signal and noise floor',
+          () {
         final pcm = Int16List(4096);
         for (int i = 0; i < 2048; i++) {
           pcm[i] = (math.sin(i * 0.1) * 20000).toInt(); // High signal
@@ -345,7 +356,9 @@ FILE "album.wav" WAVE
     // 8. Gapless Transition Monitor & Codec Trimming (Prompt 1B)
     // -------------------------------------------------------------------------
     group('8. Gapless Transition Monitor & Codec Trimming', () {
-      test('GaplessTransitionMonitor tracks clean forward boundary transitions without glitch', () {
+      test(
+          'GaplessTransitionMonitor tracks clean forward boundary transitions without glitch',
+          () {
         final monitor = GaplessTransitionMonitor();
         monitor.onTrackTransition(0);
         expect(monitor.gapEventCount, equals(0));
@@ -361,7 +374,9 @@ FILE "album.wav" WAVE
         expect(monitor.gapEventCount, equals(0));
       });
 
-      test('GaplessTransitionMonitor increments gapEventCount on backward jumps > 5ms', () {
+      test(
+          'GaplessTransitionMonitor increments gapEventCount on backward jumps > 5ms',
+          () {
         final monitor = GaplessTransitionMonitor();
         monitor.onTrackTransition(0);
         monitor.onPositionUpdate(const Duration(milliseconds: 100));
@@ -385,7 +400,9 @@ FILE "album.wav" WAVE
     // 9. Crossfade Sample-Accuracy & Complementary Curve (Prompt 1C)
     // -------------------------------------------------------------------------
     group('9. Crossfade Sample-Accuracy & Complementary Curve', () {
-      test('Complement curve sums to <= 1.0 (sum-safe ceiling) at every sample point', () {
+      test(
+          'Complement curve sums to <= 1.0 (sum-safe ceiling) at every sample point',
+          () {
         final manager = CrossfadeManager();
         manager.curve = CrossfadeCurve.linear;
 
@@ -405,7 +422,8 @@ FILE "album.wav" WAVE
         }
       });
 
-      test('crossfadeGlitchCount starts at 0 and is exposed for diagnostics', () {
+      test('crossfadeGlitchCount starts at 0 and is exposed for diagnostics',
+          () {
         final manager = CrossfadeManager();
         expect(manager.crossfadeGlitchCount, equals(0));
       });
@@ -433,7 +451,8 @@ FILE "album.wav" WAVE
         expect(restored.timestamp, equals(1700000000000));
       });
 
-      test('shouldPreferCrashGuard logic prefers newer crash guard snapshot', () async {
+      test('shouldPreferCrashGuard logic prefers newer crash guard snapshot',
+          () async {
         SharedPreferences.setMockInitialValues({
           PositionCrashGuard.keyLastCleanShutdownTs: 1000,
         });
@@ -453,9 +472,14 @@ FILE "album.wav" WAVE
     // 11. Interruption State Machine Flawless Handling (Prompt 1D)
     // -------------------------------------------------------------------------
     group('11. Interruption State Machine Flawless Handling', () {
-      test('InterruptionKind includes systemUiSound and mediaButtonLongPress', () {
-        expect(InterruptionKind.values.contains(InterruptionKind.systemUiSound), isTrue);
-        expect(InterruptionKind.values.contains(InterruptionKind.mediaButtonLongPress), isTrue);
+      test('InterruptionKind includes systemUiSound and mediaButtonLongPress',
+          () {
+        expect(InterruptionKind.values.contains(InterruptionKind.systemUiSound),
+            isTrue);
+        expect(
+            InterruptionKind.values
+                .contains(InterruptionKind.mediaButtonLongPress),
+            isTrue);
       });
 
       test('systemUiSound is identified as transient and ducking', () {
@@ -470,7 +494,8 @@ FILE "album.wav" WAVE
         expect(machine.isActive, isFalse);
       });
 
-      test('mediaButtonLongPress pauses without losing pre-interruption state', () {
+      test('mediaButtonLongPress pauses without losing pre-interruption state',
+          () {
         final machine = InterruptionStateMachine();
         machine.begin(InterruptionKind.mediaButtonLongPress, playing: true);
         expect(machine.isDuck, isFalse);

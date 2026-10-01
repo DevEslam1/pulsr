@@ -12,6 +12,7 @@ import 'package:pulsr/features/shell/presentation/bottom_nav_bar.dart';
 import 'package:pulsr/features/shell/presentation/widgets/stacked_bottom_dock.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -107,7 +108,8 @@ void main() {
     );
   }
 
-  testWidgets('StackedBottomDock renders only PulsrBottomNavBar when no song is playing',
+  testWidgets(
+      'StackedBottomDock renders only PulsrBottomNavBar when no song is playing',
       (tester) async {
     await tester.pumpWidget(
       buildTestWidget(
@@ -122,7 +124,8 @@ void main() {
     expect(find.text('Test Track'), findsNothing);
   });
 
-  testWidgets('StackedBottomDock gestures: swipe down stacks, swipe down again swaps, swipe up restores',
+  testWidgets(
+      'StackedBottomDock gestures: swipe down stacks, swipe down again swaps, swipe up restores',
       (tester) async {
     DockStackMode currentMode = DockStackMode.defaultLayout;
 

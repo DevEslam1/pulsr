@@ -183,9 +183,8 @@ class AuraTheme {
       Color accent, Brightness brightness, bool isAmoled,
       {bool dimWhitePoint = false}) {
     final isDark = brightness == Brightness.dark;
-    final onAccent = accent.computeLuminance() > 0.5
-        ? AppColors.onBright
-        : Colors.white;
+    final onAccent =
+        accent.computeLuminance() > 0.5 ? AppColors.onBright : Colors.white;
 
     if (!isDark) {
       return PulsrPalette(
@@ -272,8 +271,8 @@ class AuraTheme {
     bool isBoldText = false,
     bool dimWhitePoint = false,
   }) {
-    final p = _palette(accent, brightness, isAmoled,
-        dimWhitePoint: dimWhitePoint);
+    final p =
+        _palette(accent, brightness, isAmoled, dimWhitePoint: dimWhitePoint);
     final isDark = p.isDark;
     const fontFamily = 'Manrope';
     const fontFallbacks = [
@@ -465,9 +464,13 @@ class AuraTheme {
         selectedIconTheme: IconThemeData(color: p.accent, size: 24),
         unselectedIconTheme: IconThemeData(color: p.textSecondary, size: 24),
         selectedLabelTextStyle: TextStyle(
-            color: p.accent, fontWeight: FontWeight.w800, fontSize: AppFontSize.label),
+            color: p.accent,
+            fontWeight: FontWeight.w800,
+            fontSize: AppFontSize.label),
         unselectedLabelTextStyle: TextStyle(
-            color: p.textSecondary, fontWeight: FontWeight.w600, fontSize: AppFontSize.label),
+            color: p.textSecondary,
+            fontWeight: FontWeight.w600,
+            fontSize: AppFontSize.label),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: p.accent,
@@ -476,9 +479,10 @@ class AuraTheme {
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: p.hairline,
         labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: AppFontSize.body),
-        unselectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
+        labelStyle: const TextStyle(
+            fontWeight: FontWeight.w800, fontSize: AppFontSize.body),
+        unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.transparent,
@@ -492,14 +496,19 @@ class AuraTheme {
         disabledColor: p.surfaceContainer.withValues(alpha: 0.5),
         selectedColor: p.accentContainer,
         secondarySelectedColor: p.accentContainer,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         shape: RoundedRectangleBorder(
             borderRadius: AppRadii.chipRadius,
             side: BorderSide(color: p.hairline)),
         labelStyle: TextStyle(
-            color: p.textSecondary, fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w600),
+            color: p.textSecondary,
+            fontSize: AppFontSize.bodySmall,
+            fontWeight: FontWeight.w600),
         secondaryLabelStyle: TextStyle(
-            color: p.accent, fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w700),
+            color: p.accent,
+            fontSize: AppFontSize.bodySmall,
+            fontWeight: FontWeight.w700),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surface,
@@ -523,9 +532,12 @@ class AuraTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: p.surfaceContainerHigh,
         contentTextStyle: TextStyle(
-            color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: AppFontSize.bodySmall),
+            color: p.textPrimary,
+            fontWeight: FontWeight.w600,
+            fontSize: AppFontSize.bodySmall),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r14)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.r14)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -548,8 +560,8 @@ class AuraTheme {
         activeTrackColor: p.accent,
         // 0.20 (was 0.14) keeps the inactive track visible over bright artwork
         // in the player, matching iOS/Apple Music track legibility.
-        inactiveTrackColor: (p.isDark ? Colors.white : Colors.black)
-            .withValues(alpha: 0.20),
+        inactiveTrackColor:
+            (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.20),
         thumbColor: Colors.white,
         overlayColor: p.accent.withValues(alpha: 0.16),
         trackHeight: 6.0,
@@ -567,8 +579,8 @@ class AuraTheme {
         filled: true,
         fillColor: p.surfaceContainer,
         hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.body),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.s14),
         border: outlineBorder,
         enabledBorder: outlineBorder,
         focusedBorder: OutlineInputBorder(
@@ -580,11 +592,12 @@ class AuraTheme {
         style: FilledButton.styleFrom(
           backgroundColor: p.accent,
           foregroundColor: p.onAccent,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
           shape:
               const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+          textStyle: const TextStyle(
+              fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -592,21 +605,24 @@ class AuraTheme {
           backgroundColor: p.accent,
           foregroundColor: p.onAccent,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.s14),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg, vertical: AppSpacing.s14),
           shape:
               const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.w800, fontSize: AppFontSize.body),
+          textStyle: const TextStyle(
+              fontWeight: FontWeight.w800, fontSize: AppFontSize.body),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: p.textPrimary,
           side: BorderSide(color: p.hairline),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s14),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s20, vertical: AppSpacing.s14),
           shape:
               const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
-          textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+          textStyle: const TextStyle(
+              fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
         ),
       ),
       textButtonTheme: TextButtonThemeData(

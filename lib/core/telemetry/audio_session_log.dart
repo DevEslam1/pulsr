@@ -42,8 +42,8 @@ enum AudioInterruptionKind {
 
   static AudioInterruptionKind fromWire(String? value) {
     if (value == 'becoming-noisy') return AudioInterruptionKind.becomingNoisy;
-    return AudioInterruptionKind.values
-        .firstWhere((e) => e.name == value, orElse: () => AudioInterruptionKind.unknown);
+    return AudioInterruptionKind.values.firstWhere((e) => e.name == value,
+        orElse: () => AudioInterruptionKind.unknown);
   }
 }
 
@@ -261,7 +261,8 @@ class AudioSessionLog {
     return _run(() async {
       await _finalizeActive();
       _active = AudioSessionRecord(
-        sessionId: 'sess_${_clock().toUtc().microsecondsSinceEpoch}_${_sessionCounter++}',
+        sessionId:
+            'sess_${_clock().toUtc().microsecondsSinceEpoch}_${_sessionCounter++}',
         trackId: trackId,
         trackTitle: trackTitle,
         startedAt: _nowIso(),
@@ -368,8 +369,8 @@ class AudioSessionLog {
         try {
           final decoded = jsonDecode(line);
           if (decoded is Map) {
-            records.add(
-                AudioSessionRecord.fromJson(Map<String, dynamic>.from(decoded)));
+            records.add(AudioSessionRecord.fromJson(
+                Map<String, dynamic>.from(decoded)));
           }
         } catch (_) {
           // Skip a corrupt line rather than failing the whole export.
@@ -391,10 +392,8 @@ class AudioSessionLog {
       final dir = await _directoryProvider();
       if (dir == null) return null;
       final records = await readAll();
-      final stamp = _clock()
-          .toUtc()
-          .toIso8601String()
-          .replaceAll(RegExp(r'[:.]'), '-');
+      final stamp =
+          _clock().toUtc().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
       final file = File(
           '${dir.path}${Platform.pathSeparator}pulsr_audio_session_logs_$stamp.jsonl');
       final buffer = StringBuffer();

@@ -19,7 +19,8 @@ void main() {
       expect(stats.usedPercentage, equals(0.25));
     });
 
-    testWidgets('renders used and free storage readouts accurately', (tester) async {
+    testWidgets('renders used and free storage readouts accurately',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: const [

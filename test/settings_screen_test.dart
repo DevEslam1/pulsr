@@ -116,7 +116,8 @@ void main() {
       // Header title and search box
       expect(find.text('Settings'), findsWidgets);
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('Search settings, sound, appearance...'), findsOneWidget);
+      expect(
+          find.text('Search settings, sound, appearance...'), findsOneWidget);
 
       // Hero Account / Cloud card
       expect(find.byType(SettingsHeroCard), findsOneWidget);
@@ -138,7 +139,8 @@ void main() {
       expect(find.text('Appearance'), findsWidgets);
     });
 
-    testWidgets('live search filters settings correctly and displays category badge',
+    testWidgets(
+        'live search filters settings correctly and displays category badge',
         (tester) async {
       await pumpScreen(tester);
 
@@ -167,10 +169,12 @@ void main() {
       await tester.enterText(find.byType(TextField), 'xyznonexistent123');
       await settleAnims(tester);
 
-      expect(find.text('No settings found for "xyznonexistent123"'), findsOneWidget);
+      expect(find.text('No settings found for "xyznonexistent123"'),
+          findsOneWidget);
     });
 
-    testWidgets('tapping category filter changes active category', (tester) async {
+    testWidgets('tapping category filter changes active category',
+        (tester) async {
       await pumpScreen(tester);
 
       // Tap "Playback" category filter pill
@@ -180,17 +184,16 @@ void main() {
       await settleAnims(tester);
 
       // Only playback section is visible in filtered mode (scroll: lazy list)
-      for (var i = 0;
-          i < 8 && find.text('PLAYBACK').evaluate().isEmpty;
-          i++) {
-        await tester.dragFrom(
-            const Offset(200, 500), const Offset(0, -500));
+      for (var i = 0; i < 8 && find.text('PLAYBACK').evaluate().isEmpty; i++) {
+        await tester.dragFrom(const Offset(200, 500), const Offset(0, -500));
         await settleAnims(tester);
       }
       expect(find.text('PLAYBACK'), findsWidgets);
     });
 
-    testWidgets('[H-16] search entry memoization survives unrelated state changes like scan progress', (tester) async {
+    testWidgets(
+        '[H-16] search entry memoization survives unrelated state changes like scan progress',
+        (tester) async {
       await pumpScreen(tester);
 
       await tester.enterText(find.byType(TextField), 'crossfade');
@@ -209,13 +212,16 @@ void main() {
       expect(find.text('Crossfade & Gapless'), findsOneWidget);
     });
 
-    testWidgets('[M-22] search results list is memoized across rebuilds with identical query', (tester) async {
+    testWidgets(
+        '[M-22] search results list is memoized across rebuilds with identical query',
+        (tester) async {
       await pumpScreen(tester);
 
       await tester.enterText(find.byType(TextField), 'crossfade');
       await settleAnims(tester);
 
-      final state = tester.state<SettingsScreenState>(find.byType(SettingsScreen));
+      final state =
+          tester.state<SettingsScreenState>(find.byType(SettingsScreen));
       final initialResults = state.memoizedSearchResults;
       expect(initialResults, isNotNull);
       expect(initialResults, isNotEmpty);

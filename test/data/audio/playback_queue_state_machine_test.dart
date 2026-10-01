@@ -196,7 +196,9 @@ void main() {
         );
       });
 
-      test('returns previous index if forcePrevious is true even when position > 3 seconds', () {
+      test(
+          'returns previous index if forcePrevious is true even when position > 3 seconds',
+          () {
         sm.setCurrentIndex(2);
         expect(
           sm.getPreviousIndex(
@@ -268,8 +270,10 @@ void main() {
 
       test('returns true in shuffle mode or LoopMode.all', () {
         sm.setCurrentIndex(4);
-        expect(sm.hasQueueNeighbour(forward: true, shuffleModeEnabled: true), isTrue);
-        expect(sm.hasQueueNeighbour(forward: true, loopMode: LoopMode.all), isTrue);
+        expect(sm.hasQueueNeighbour(forward: true, shuffleModeEnabled: true),
+            isTrue);
+        expect(sm.hasQueueNeighbour(forward: true, loopMode: LoopMode.all),
+            isTrue);
       });
 
       test('linear forward/backward neighbor checks', () {

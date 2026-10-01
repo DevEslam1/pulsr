@@ -75,7 +75,8 @@ void main() {
       );
     });
 
-    testWidgets('Foldable hinge detection and layout adaptation', (tester) async {
+    testWidgets('Foldable hinge detection and layout adaptation',
+        (tester) async {
       tester.view.physicalSize = const Size(800, 600);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);

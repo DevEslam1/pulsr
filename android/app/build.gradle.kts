@@ -201,16 +201,12 @@ tasks.matching { it.name.startsWith("package") && it.name.endsWith("UnitTestForU
 
 tasks.register("testNative") {
     group = "verification"
-    description = "Compiles and executes native C++ DSP test suite on host (both parity and debug/sanitizer builds)."
+    description = "Compiles and executes the full native C++ DSP test suite on the host via CMake/CTest (parity -O3 + sanitizer/debug builds)."
     doLast {
         val testDir = file("src/test/cpp")
-        val mainDir = file("src/main/cpp")
-        val outDir = file("build/testNative").apply { mkdirs() }
         val isWindows = org.apache.tools.ant.taskdefs.condition.Os.isFamily(org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS)
-        val exeParity = file("${outDir.absolutePath}/test_native_parity" + if (isWindows) ".exe" else "")
-        val exeDebug = file("${outDir.absolutePath}/test_native_debug" + if (isWindows) ".exe" else "")
 
-        // Host C++ compiler discovery
+        // Host C++ compiler discovery (mirrors the CMake toolchain expectation).
         val compiler = if (project.hasProperty("hostClangPath")) {
             project.property("hostClangPath").toString()
         } else if (System.getenv("HOST_CLANG") != null) {
@@ -222,49 +218,40 @@ tasks.register("testNative") {
             "clang++"
         }
 
-        val targetFlags = if (isWindows) listOf("--target=x86_64-w64-windows-gnu") else emptyList<String>()
+        // Locate the CMake executable: prefer an explicit override, then PATH,
+        // then the Android SDK's bundled cmake (which ships a host cmake binary).
+        fun findCmake(): String {
+            if (project.hasProperty("cmakePath")) return project.property("cmakePath").toString()
+            val envCmake = System.getenv("CMAKE")
+            if (!envCmake.isNullOrBlank()) return envCmake
+            val onPath = try {
+                val proc = ProcessBuilder(if (isWindows) listOf("where", "cmake") else listOf("which", "cmake"))
+                    .redirectErrorStream(true).start()
+                val out = proc.inputStream.bufferedReader().readText().trim().lines().firstOrNull()
+                proc.waitFor()
+                out?.takeIf { it.isNotBlank() }
+            } catch (_: Throwable) { null }
+            if (onPath != null) return onPath
 
-        val dspSources = listOf(
-            "ParametricEQ.cpp",
-            "Crossfeed.cpp",
-            "LookaheadLimiter.cpp",
-            "ConvolutionReverb.cpp",
-            "SincResampler.cpp",
-            "DsdDecoder.cpp",
-            "SpatialPanner.cpp",
-            "HarmonicSaturation.cpp",
-            "StereoWidth.cpp",
-            "LoudnessContour.cpp",
-            "SubCrossover.cpp",
-            "DynamicEQ.cpp",
-            "MultibandCompressor.cpp",
-            "DynamicBass.cpp",
-            "ViperDdc.cpp",
-            "ArbitraryResponseEq.cpp",
-            "LiveProg.cpp",
-            "AudioDspEngine.cpp",
-            "UsbAudioSink.cpp"
-        ).map { file("${mainDir.absolutePath}/$it").absolutePath }
-
-        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -std=c++20)
-        println("[testNative] Compiling parity build (-O3 -std=c++20)...")
-        val parityCompileCmd = mutableListOf<String>().apply {
-            add(compiler)
-            addAll(targetFlags)
-            add("-std=c++20")
-            add("-O3")
-            add("-fno-strict-aliasing")
-            add("-I")
-            add(mainDir.absolutePath)
-            add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
-            addAll(dspSources)
-            if (isWindows) add("-static")
-            add("-o")
-            add(exeParity.absolutePath)
+            val sdkRoot = System.getenv("ANDROID_HOME")
+                ?: System.getenv("ANDROID_SDK_ROOT")
+                ?: (if (isWindows) System.getenv("LOCALAPPDATA")?.let { "$it/Android/Sdk" } else null)
+            if (sdkRoot != null) {
+                val cmakeDir = file("$sdkRoot/cmake")
+                if (cmakeDir.exists()) {
+                    val candidates = cmakeDir.listFiles()?.sortedByDescending { it.name } ?: emptyList()
+                    for (dir in candidates) {
+                        val exe = file("${dir.absolutePath}/bin/cmake" + if (isWindows) ".exe" else "")
+                        if (exe.exists()) return exe.absolutePath
+                    }
+                }
+            }
+            return "cmake"
         }
 
-        fun executeCmd(cmd: List<String>, desc: String) {
+        fun executeCmd(cmd: List<String>, desc: String, workingDir: File? = null) {
             val pb = ProcessBuilder(cmd).redirectErrorStream(true)
+            if (workingDir != null) pb.directory(workingDir)
             val proc = pb.start()
             proc.inputStream.bufferedReader().useLines { lines ->
                 lines.forEach { println("[$desc] $it") }
@@ -275,41 +262,41 @@ tasks.register("testNative") {
             }
         }
 
-        executeCmd(parityCompileCmd, "testNative-compile-parity")
+        fun runBuild(configName: String, sanitizers: Boolean) {
+            val buildDir = file("build/testNative/$configName").apply { mkdirs() }
+            val cmake = findCmake()
+            val configureArgs = mutableListOf(
+                cmake,
+                "-S", testDir.absolutePath,
+                "-B", buildDir.absolutePath,
+                "-DCMAKE_BUILD_TYPE=$configName",
+                "-DCMAKE_CXX_COMPILER=$compiler",
+            )
+            if (sanitizers && !isWindows) {
+                configureArgs += "-DPULSR_TEST_SANITIZERS=ON"
+            }
+            println("[testNative] Configuring $configName build ...")
+            executeCmd(configureArgs, "testNative-configure-$configName")
 
-        println("[testNative] Running parity test suite...")
-        executeCmd(listOf(exeParity.absolutePath), "testNative-run-parity")
+            println("[testNative] Building $configName ...")
+            executeCmd(
+                listOf(cmake, "--build", buildDir.absolutePath, "--parallel"),
+                "testNative-build-$configName"
+            )
 
-        // 2. Build & Run (b): Sanitizer / Debug build
-        println("[testNative] Compiling debug/sanitizer build...")
-        val sanitizerArgs = if (!isWindows) {
-            listOf("-std=c++20", "-fsanitize=address,undefined", "-O1")
-        } else {
-            println("[testNative] sanitizers unavailable on Windows")
-            listOf("-std=c++20", "-O1")
+            println("[testNative] Running $configName test suite via CTest ...")
+            executeCmd(
+                listOf("ctest", "--test-dir", buildDir.absolutePath, "--output-on-failure"),
+                "testNative-run-$configName"
+            )
         }
 
-        val debugCompileCmd = mutableListOf<String>().apply {
-            add(compiler)
-            addAll(targetFlags)
-            addAll(sanitizerArgs)
-            add("-fno-strict-aliasing")
-            add("-I")
-            add(mainDir.absolutePath)
-            add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
-            addAll(dspSources)
-            if (isWindows) add("-static")
-            // B1 fix: deduplicated sanitizer flag
-            add("-o")
-            add(exeDebug.absolutePath)
-        }
+        // (a) Parity build: exact production flags (-O3 -std=c++20).
+        runBuild("Release", sanitizers = false)
+        // (b) Sanitizer / debug build: ASan+UBSan where the host supports it.
+        runBuild("Debug", sanitizers = true)
 
-        executeCmd(debugCompileCmd, "testNative-compile-debug")
-
-        println("[testNative] Running debug/sanitizer test suite...")
-        executeCmd(listOf(exeDebug.absolutePath), "testNative-run-debug")
-
-        println("[testNative] PASSED: Both parity (-O3) and debug/sanitizer test suites passed 100%.")
+        println("[testNative] PASSED: parity (-O3) and sanitizer/debug native DSP suites passed 100%.")
     }
 }
 

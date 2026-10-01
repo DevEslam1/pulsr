@@ -40,9 +40,9 @@ String? validateProxyHostAndPort({
   // Single-label LAN hosts (proxy, gateway, router) are valid.
   final isSingleLabel =
       RegExp(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$').hasMatch(h);
-  final isHostname = RegExp(
-          r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
-      .hasMatch(h);
+  final isHostname =
+      RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
+          .hasMatch(h);
   if (!isIp && !isHostname && !isSingleLabel && !isLocalhost) {
     return 'Invalid proxy host format';
   }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/models/dsp_telemetry.dart';
@@ -107,7 +108,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, PulsrPalette p, DspTelemetry telemetry) {
+  Widget _buildHeader(
+      BuildContext context, PulsrPalette p, DspTelemetry telemetry) {
     final rtf = telemetry.rollingRtf;
     final rtfPct = telemetry.rtfPercent;
     final Color rtfColor = rtf > 0.85
@@ -135,7 +137,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
             Text(
               context.l10n.dspEngineTelemetry,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: AppFontSize.bodySmall,
                 color: p.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
@@ -154,7 +156,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                   context.l10n.dspStatusDegraded,
                   style: TextStyle(
                     color: p.error,
-                    fontSize: 9,
+                    fontSize: AppFontSize.micro,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -162,7 +164,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
             Text(
               context.l10n.rtfPercent(rtfPct.toStringAsFixed(1)),
               style: TextStyle(
-                fontSize: 12,
+                fontSize: AppFontSize.label,
                 color: rtfColor,
                 fontWeight: FontWeight.w600,
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -170,7 +172,9 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
             ),
             const SizedBox(width: AppSpacing.xs),
             Icon(
-              _isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              _isExpanded
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
               size: 20,
               color: p.textSecondary,
             ),
@@ -180,7 +184,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildExpandedBody(BuildContext context, PulsrPalette p, DspTelemetry telemetry) {
+  Widget _buildExpandedBody(
+      BuildContext context, PulsrPalette p, DspTelemetry telemetry) {
     return Padding(
       padding: const EdgeInsetsDirectional.fromSTEB(
         AppSpacing.s14,
@@ -203,7 +208,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildLimiterMeter(BuildContext context, PulsrPalette p, double limiterGrDb) {
+  Widget _buildLimiterMeter(
+      BuildContext context, PulsrPalette p, double limiterGrDb) {
     final clampedGr = limiterGrDb.clamp(-24.0, 0.0);
     final ratio = (-clampedGr / 24.0).clamp(0.0, 1.0);
 
@@ -217,14 +223,14 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
               context.l10n.limiterReduction,
               style: TextStyle(
                 color: p.textSecondary,
-                fontSize: 11,
+                fontSize: AppFontSize.caption,
               ),
             ),
             Text(
               '${limiterGrDb.toStringAsFixed(1)} dB',
               style: TextStyle(
                 color: limiterGrDb < -0.1 ? p.warning : p.textSecondary,
-                fontSize: 11,
+                fontSize: AppFontSize.caption,
                 fontFeatures: const [FontFeature.tabularFigures()],
                 fontWeight: FontWeight.w600,
               ),
@@ -247,7 +253,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildMultibandMeter(BuildContext context, PulsrPalette p, List<double> mbGr) {
+  Widget _buildMultibandMeter(
+      BuildContext context, PulsrPalette p, List<double> mbGr) {
     final bandLabels = ['Low', 'Lo-Mid', 'Hi-Mid', 'High'];
 
     return Column(
@@ -257,7 +264,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
           context.l10n.multibandCompReduction,
           style: TextStyle(
             color: p.textSecondary,
-            fontSize: 11,
+            fontSize: AppFontSize.caption,
           ),
         ),
         const SizedBox(height: 4),
@@ -275,7 +282,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                       child: LinearProgressIndicator(
                         value: ratio,
                         minHeight: 5,
-                        backgroundColor: p.surfaceContainerHigh.withValues(alpha: 0.4),
+                        backgroundColor:
+                            p.surfaceContainerHigh.withValues(alpha: 0.4),
                         valueColor: AlwaysStoppedAnimation<Color>(p.accent),
                       ),
                     ),
@@ -284,7 +292,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                       bandLabels[i],
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 9,
+                        fontSize: AppFontSize.micro,
                       ),
                     ),
                   ],
@@ -297,7 +305,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
     );
   }
 
-  Widget _buildDynEqMeter(BuildContext context, PulsrPalette p, List<double> dynEqGr) {
+  Widget _buildDynEqMeter(
+      BuildContext context, PulsrPalette p, List<double> dynEqGr) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -305,13 +314,14 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
           context.l10n.dynamicEqAdjustments,
           style: TextStyle(
             color: p.textSecondary,
-            fontSize: 11,
+            fontSize: AppFontSize.caption,
           ),
         ),
         const SizedBox(height: 4),
         Row(
           children: List.generate(8, (i) {
-            final adj = i < dynEqGr.length ? dynEqGr[i].clamp(-18.0, 18.0) : 0.0;
+            final adj =
+                i < dynEqGr.length ? dynEqGr[i].clamp(-18.0, 18.0) : 0.0;
             final isCut = adj < 0;
             final ratio = (adj.abs() / 18.0).clamp(0.0, 1.0);
             return Expanded(
@@ -324,7 +334,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                       child: LinearProgressIndicator(
                         value: ratio,
                         minHeight: 4,
-                        backgroundColor: p.surfaceContainerHigh.withValues(alpha: 0.4),
+                        backgroundColor:
+                            p.surfaceContainerHigh.withValues(alpha: 0.4),
                         valueColor: AlwaysStoppedAnimation<Color>(
                           isCut ? p.warning : p.accent,
                         ),
@@ -335,7 +346,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                       'B${i + 1}',
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: 8,
+                        fontSize: AppFontSize.nano,
                       ),
                     ),
                   ],

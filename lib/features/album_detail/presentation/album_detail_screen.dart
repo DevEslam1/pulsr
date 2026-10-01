@@ -103,7 +103,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     final out = List<SongsTableData>.of(songs);
     switch (_sort) {
       case _AlbumSort.title:
-        out.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        out.sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
       case _AlbumSort.duration:
         out.sort((a, b) => a.durationMs.compareTo(b.durationMs));
       case _AlbumSort.track:
@@ -154,245 +155,256 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                     if (mounted) setState(() {});
                   },
                   child: CustomScrollView(
-                  slivers: [
-                    SliverAppBar(
-                      leading: const PulsrBackButton(),
-                      expandedHeight: expandedHeight,
-                      pinned: true,
-                    backgroundColor: p.bg,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [p.accentContainer, p.bg],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
+                    slivers: [
+                      SliverAppBar(
+                        leading: const PulsrBackButton(),
+                        expandedHeight: expandedHeight,
+                        pinned: true,
+                        backgroundColor: p.bg,
+                        flexibleSpace: FlexibleSpaceBar(
+                          background: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [p.accentContainer, p.bg],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                            child: SafeArea(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Hero(
+                                    tag: widget.heroTag ?? 'album_${album.id}',
+                                    child: CachedArtwork(
+                                      id: album.id,
+                                      type: ArtworkType.ALBUM,
+                                      size: artworkSize,
+                                      borderRadius: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Text(album.title,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall),
+                                  const SizedBox(height: AppSpacing.xxs),
+                                  Text(
+                                      '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
+                                      style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.bodySmall)),
+                                  const SizedBox(height: AppSpacing.md),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        child: SafeArea(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          child: Row(
                             children: [
-                              Hero(
-                                tag: widget.heroTag ?? 'album_${album.id}',
-                                child: CachedArtwork(
-                                  id: album.id,
-                                  type: ArtworkType.ALBUM,
-                                  size: artworkSize,
-                                  borderRadius: 24,
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: songs.isEmpty
+                                      ? null
+                                      : () => context
+                                          .read<PlayerCubit>()
+                                          .playSong(songs.first, queue: songs),
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: Text(context.l10n.playAll),
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(album.title,
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall),
-                              const SizedBox(height: AppSpacing.xxs),
-                              Text(
-                                  '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
-                                  style: TextStyle(
-                                      color: p.textSecondary, fontSize: AppFontSize.bodySmall)),
-                              const SizedBox(height: AppSpacing.md),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: songs.isEmpty
+                                      ? null
+                                      : () {
+                                          final shuffled =
+                                              List<SongsTableData>.from(songs)
+                                                ..shuffle();
+                                          context.read<PlayerCubit>().playSong(
+                                              shuffled.first,
+                                              queue: shuffled);
+                                        },
+                                  icon: Icon(Icons.shuffle_rounded,
+                                      color: p.accent),
+                                  label: Text(context.l10n.shuffle),
+                                ),
+                              ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: songs.isEmpty
-                                  ? null
-                                  : () => context
-                                      .read<PlayerCubit>()
-                                      .playSong(songs.first, queue: songs),
-                              icon: const Icon(Icons.play_arrow_rounded),
-                              label: Text(context.l10n.playAll),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: songs.isEmpty
-                                  ? null
-                                  : () {
-                                      final shuffled =
-                                          List<SongsTableData>.from(songs)
-                                            ..shuffle();
-                                      context.read<PlayerCubit>().playSong(
-                                          shuffled.first,
-                                          queue: shuffled);
-                                    },
-                              icon:
-                                  Icon(Icons.shuffle_rounded, color: p.accent),
-                              label: Text(context.l10n.shuffle),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
-                      child: Row(
-                        children: [
-                          Text(
-                            context.l10n.queue,
-                            style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.label,
-                                fontWeight: FontWeight.w700),
-                          ),
-                          const Spacer(),
-                          // In-list sort (gap 07-01, persisted per session).
-                          DropdownButton<_AlbumSort>(
-                            value: _sort,
-                            underline: const SizedBox.shrink(),
-                            icon: Icon(Icons.sort_rounded,
-                                color: p.textSecondary, size: 18),
-                            items: [
-                              DropdownMenuItem(
-                                  value: _AlbumSort.track,
-                                  child: Text(context.l10n.sortTrackNumber)),
-                              DropdownMenuItem(
-                                  value: _AlbumSort.title,
-                                  child: Text(context.l10n.sortAZ)),
-                              DropdownMenuItem(
-                                  value: _AlbumSort.duration,
-                                  child: Text(context.l10n.sortDuration)),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) {
-                                setState(() => _sort = v);
-                                _persistSort(v);
-                              }
-                            },
-                          ),
-                          // Album-level queue actions (gap 07-03).
-                          PopupMenuButton<String>(
-                            icon: Icon(Icons.more_horiz_rounded,
-                                color: p.textSecondary),
-                            onSelected: (v) async {
-                              final cubit = context.read<PlayerCubit>();
-                              final target = _selectedIds.isEmpty
-                                  ? songs
-                                  : songs
-                                      .where((s) => _selectedIds.contains(s.id))
-                                      .toList();
-                              if (v == 'add') {
-                                await cubit.addAllToQueue(target);
-                                if (mounted) {
-                                  setState(() => _selectedIds.clear());
-                                }
-                              } else if (v == 'next' && target.isNotEmpty) {
-                                for (final s in target.reversed) {
-                                  await cubit.playNext(s);
-                                }
-                                if (mounted) {
-                                  setState(() => _selectedIds.clear());
-                                }
-                              } else if (v == 'clear') {
-                                setState(() => _selectedIds.clear());
-                              }
-                            },
-                            itemBuilder: (c) => [
-                              PopupMenuItem(
-                                  value: 'add',
-                                  child: Text(context.l10n.addToQueue)),
-                              PopupMenuItem(
-                                  value: 'next',
-                                  child: Text(context.l10n.playNext)),
-                              if (_selectedIds.isNotEmpty)
-                                PopupMenuItem(
-                                    value: 'clear',
-                                    child: Text(
-                                        '${context.l10n.clear} (${_selectedIds.length})')),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
-                    sliver: SliverList.builder(
-                      addAutomaticKeepAlives: false,
-                      addRepaintBoundaries: true,
-                      itemCount: songs.length,
-                      itemBuilder: (context, index) {
-                        // Disc grouping (gap 07-02): data is already ordered by
-                        // discNumber/trackNumber; render a header on change.
-                        final song = songs[index];
-                        final showDiscHeader = index == 0 ||
-                            (song.discNumber ?? 1) !=
-                                (songs[index - 1].discNumber ?? 1);
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (showDiscHeader &&
-                                songs.any((s) => (s.discNumber ?? 1) > 1))
-                              Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xxs),
-                                child: Text(
-                                  '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
-                                  style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w800),
-                                ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          child: Row(
+                            children: [
+                              Text(
+                                context.l10n.queue,
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: FontWeight.w700),
                               ),
-                            SongTile(
-                              song: song,
-                              index: index,
-                              showArtwork: false,
-                              // Batch multi-select (gap 07-04): long-press toggles,
-                              // tap plays (or toggles when selection active).
-                              selected: _selectedIds.contains(song.id),
-                              onLongPress: () => setState(() {
-                                if (_selectedIds.contains(song.id)) {
-                                  _selectedIds.remove(song.id);
-                                } else {
-                                  _selectedIds.add(song.id);
-                                }
-                              }),
-                              onTap: () {
-                                if (_selectedIds.isNotEmpty) {
-                                  setState(() {
+                              const Spacer(),
+                              // In-list sort (gap 07-01, persisted per session).
+                              DropdownButton<_AlbumSort>(
+                                value: _sort,
+                                underline: const SizedBox.shrink(),
+                                icon: Icon(Icons.sort_rounded,
+                                    color: p.textSecondary, size: 18),
+                                items: [
+                                  DropdownMenuItem(
+                                      value: _AlbumSort.track,
+                                      child:
+                                          Text(context.l10n.sortTrackNumber)),
+                                  DropdownMenuItem(
+                                      value: _AlbumSort.title,
+                                      child: Text(context.l10n.sortAZ)),
+                                  DropdownMenuItem(
+                                      value: _AlbumSort.duration,
+                                      child: Text(context.l10n.sortDuration)),
+                                ],
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    setState(() => _sort = v);
+                                    _persistSort(v);
+                                  }
+                                },
+                              ),
+                              // Album-level queue actions (gap 07-03).
+                              PopupMenuButton<String>(
+                                icon: Icon(Icons.more_horiz_rounded,
+                                    color: p.textSecondary),
+                                onSelected: (v) async {
+                                  final cubit = context.read<PlayerCubit>();
+                                  final target = _selectedIds.isEmpty
+                                      ? songs
+                                      : songs
+                                          .where((s) =>
+                                              _selectedIds.contains(s.id))
+                                          .toList();
+                                  if (v == 'add') {
+                                    await cubit.addAllToQueue(target);
+                                    if (mounted) {
+                                      setState(() => _selectedIds.clear());
+                                    }
+                                  } else if (v == 'next' && target.isNotEmpty) {
+                                    for (final s in target.reversed) {
+                                      await cubit.playNext(s);
+                                    }
+                                    if (mounted) {
+                                      setState(() => _selectedIds.clear());
+                                    }
+                                  } else if (v == 'clear') {
+                                    setState(() => _selectedIds.clear());
+                                  }
+                                },
+                                itemBuilder: (c) => [
+                                  PopupMenuItem(
+                                      value: 'add',
+                                      child: Text(context.l10n.addToQueue)),
+                                  PopupMenuItem(
+                                      value: 'next',
+                                      child: Text(context.l10n.playNext)),
+                                  if (_selectedIds.isNotEmpty)
+                                    PopupMenuItem(
+                                        value: 'clear',
+                                        child: Text(
+                                            '${context.l10n.clear} (${_selectedIds.length})')),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.only(
+                            top: AppSpacing.xs,
+                            bottom: AppSpacing.scrollBottom),
+                        sliver: SliverList.builder(
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          itemCount: songs.length,
+                          itemBuilder: (context, index) {
+                            // Disc grouping (gap 07-02): data is already ordered by
+                            // discNumber/trackNumber; render a header on change.
+                            final song = songs[index];
+                            final showDiscHeader = index == 0 ||
+                                (song.discNumber ?? 1) !=
+                                    (songs[index - 1].discNumber ?? 1);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (showDiscHeader &&
+                                    songs.any((s) => (s.discNumber ?? 1) > 1))
+                                  Padding(
+                                    padding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                            AppSpacing.md,
+                                            AppSpacing.sm,
+                                            AppSpacing.md,
+                                            AppSpacing.xxs),
+                                    child: Text(
+                                      '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
+                                      style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.label,
+                                          fontWeight: FontWeight.w800),
+                                    ),
+                                  ),
+                                SongTile(
+                                  song: song,
+                                  index: index,
+                                  showArtwork: false,
+                                  // Batch multi-select (gap 07-04): long-press toggles,
+                                  // tap plays (or toggles when selection active).
+                                  selected: _selectedIds.contains(song.id),
+                                  onLongPress: () => setState(() {
                                     if (_selectedIds.contains(song.id)) {
                                       _selectedIds.remove(song.id);
                                     } else {
                                       _selectedIds.add(song.id);
                                     }
-                                  });
-                                } else {
-                                  context
-                                      .read<PlayerCubit>()
-                                      .playSong(song, queue: songs);
-                                }
-                              },
-                              onMorePressed: () => SongInfoSheet.show(context, song: song),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
+                                  }),
+                                  onTap: () {
+                                    if (_selectedIds.isNotEmpty) {
+                                      setState(() {
+                                        if (_selectedIds.contains(song.id)) {
+                                          _selectedIds.remove(song.id);
+                                        } else {
+                                          _selectedIds.add(song.id);
+                                        }
+                                      });
+                                    } else {
+                                      context
+                                          .read<PlayerCubit>()
+                                          .playSong(song, queue: songs);
+                                    }
+                                  },
+                                  onMorePressed: () =>
+                                      SongInfoSheet.show(context, song: song),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      },
-      ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -409,38 +421,39 @@ class _AlbumErrorView extends StatelessWidget {
     return PulsrPagePopScope(
       child: Scaffold(
         appBar: AppBar(leading: const PulsrBackButton()),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.error_outline_rounded, color: p.error, size: 48),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                context.l10n.couldNotLoadAlbumSongs,
-                style: TextStyle(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: AppFontSize.bodyLarge),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                context.l10n.libraryReadError,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-              ),
-              const SizedBox(height: AppSpacing.s20),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(context.l10n.retry),
-              ),
-            ],
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline_rounded, color: p.error, size: 48),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  context.l10n.couldNotLoadAlbumSongs,
+                  style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppFontSize.bodyLarge),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  context.l10n.libraryReadError,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                ),
+                const SizedBox(height: AppSpacing.s20),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text(context.l10n.retry),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

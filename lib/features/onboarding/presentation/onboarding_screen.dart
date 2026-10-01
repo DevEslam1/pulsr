@@ -236,7 +236,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   if (_currentPage < _lastPage)
                     TextButton(
                       onPressed: _skipToFinal,
-                      child: Text(context.l10n.skipAction,
+                      child: Text(
+                        context.l10n.skipAction,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -244,7 +245,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     )
                   else
-                    SizedBox(height: isLandscape ? AppSpacing.lg : AppSpacing.s40),
+                    SizedBox(
+                        height: isLandscape ? AppSpacing.lg : AppSpacing.s40),
                 ],
               ),
             ),
@@ -286,9 +288,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       final isActive = index == _currentPage;
                       return AnimatedContainer(
                         duration: context.motionMs(300),
-                        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xxs),
                         height: isLandscape ? 6 : 8,
-                        width: isActive ? (isLandscape ? 18 : 24) : (isLandscape ? 6 : 8),
+                        width: isActive
+                            ? (isLandscape ? 18 : 24)
+                            : (isLandscape ? 6 : 8),
                         decoration: BoxDecoration(
                           color: isActive ? p.accent : p.hairline,
                           borderRadius: BorderRadius.circular(AppRadii.r4),
@@ -422,7 +427,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       fontWeight: FontWeight.w800,
                       letterSpacing: AppTracking.heading,
                     ),
-              ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(200))
+                  .slideY(begin: 0.1, end: 0),
               const SizedBox(height: AppSpacing.md),
               Text(
                 context.l10n.onboardingPrivacyDesc,
@@ -431,7 +439,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: p.textSecondary,
                       height: 1.5,
                     ),
-              ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(400))
+                  .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.xl),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -508,8 +519,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     _buildPlaybackFeatureIcon(Icons.equalizer_rounded,
                         context.l10n.browseTenBandGraphicEq, p.accent),
-                    _buildPlaybackFeatureIcon(
-                        Icons.tune_rounded, context.l10n.browseCrossfade, p.accent),
+                    _buildPlaybackFeatureIcon(Icons.tune_rounded,
+                        context.l10n.browseCrossfade, p.accent),
                     _buildPlaybackFeatureIcon(
                         Icons.timer_rounded, context.l10n.sleepTimer, p.accent),
                   ],
@@ -526,7 +537,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       fontWeight: FontWeight.w800,
                       letterSpacing: AppTracking.heading,
                     ),
-              ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(200))
+                  .slideY(begin: 0.1, end: 0),
               const SizedBox(height: AppSpacing.md),
               Text(
                 context.l10n.onboardingPowerfulDesc,
@@ -535,7 +549,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: p.textSecondary,
                       height: 1.5,
                     ),
-              ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(400))
+                  .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.lg),
               Wrap(
                 spacing: 8,
@@ -608,18 +625,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ],
                     ),
-                    SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
+                    SizedBox(
+                        height: isLandscape ? AppSpacing.xs : AppSpacing.md),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildThemeSwatch('Pulsr Modern',
-                            const [Color(0xFF9B9EF5), Color(0xFF6C70DC)]),
+                            const [AppColors.primary, AppColors.secondary]),
                         _buildThemeSwatch('Glassmorphism',
-                            const [Color(0xFF00E676), Color(0xFF1DE9B6)]),
-                        _buildThemeSwatch('Dynamic Palette',
-                            const [Color(0xFFFF9100), Color(0xFFFF4081)]),
+                            const [AppColors.swatchGreen, AppColors.mint]),
+                        _buildThemeSwatch('Dynamic Palette', const [
+                          AppColors.swatchAmber,
+                          AppColors.swatchPink
+                        ]),
                         _buildThemeSwatch('Cyberpunk Aura',
-                            const [Color(0xFFD500F9), AppColors.skyBlue]),
+                            const [AppColors.swatchPurple, AppColors.skyBlue]),
                       ],
                     ),
                   ],
@@ -636,7 +656,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       fontWeight: FontWeight.w800,
                       letterSpacing: AppTracking.heading,
                     ),
-              ).animate().fadeIn(delay: context.motionMs(200)).slideY(begin: 0.1, end: 0),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(200))
+                  .slideY(begin: 0.1, end: 0),
               const SizedBox(height: AppSpacing.md),
               Text(
                 context.l10n.onboardingBeautifulDesc,
@@ -645,7 +668,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: p.textSecondary,
                       height: 1.5,
                     ),
-              ).animate().fadeIn(delay: context.motionMs(400)).slideY(begin: 0.1, end: 0),
+              )
+                  .animate()
+                  .fadeIn(delay: context.motionMs(400))
+                  .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],
           ),
@@ -659,14 +685,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final p = context.palette;
     final isLandscape = context.isLandscape;
     final gestures = <(IconData, String, String)>[
-      (Icons.swipe_up_rounded, context.l10n.onboardingGestureSwipeUpTitle,
-          context.l10n.onboardingGestureSwipeUpDesc),
-      (Icons.swipe_down_rounded, context.l10n.onboardingGestureSwipeDownTitle,
-          context.l10n.onboardingGestureSwipeDownDesc),
-      (Icons.favorite_rounded, context.l10n.onboardingGestureDoubleTapTitle,
-          context.l10n.onboardingGestureDoubleTapDesc),
-      (Icons.touch_app_rounded, context.l10n.onboardingGestureLongPressTitle,
-          context.l10n.onboardingGestureLongPressDesc),
+      (
+        Icons.swipe_up_rounded,
+        context.l10n.onboardingGestureSwipeUpTitle,
+        context.l10n.onboardingGestureSwipeUpDesc
+      ),
+      (
+        Icons.swipe_down_rounded,
+        context.l10n.onboardingGestureSwipeDownTitle,
+        context.l10n.onboardingGestureSwipeDownDesc
+      ),
+      (
+        Icons.favorite_rounded,
+        context.l10n.onboardingGestureDoubleTapTitle,
+        context.l10n.onboardingGestureDoubleTapDesc
+      ),
+      (
+        Icons.touch_app_rounded,
+        context.l10n.onboardingGestureLongPressTitle,
+        context.l10n.onboardingGestureLongPressDesc
+      ),
     ];
     return Center(
       child: ConstrainedBox(
@@ -757,8 +795,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       if (title != gestures.last.$2)
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xs),
                           child: Divider(
                               height: 1,
                               color: p.hairline.withValues(alpha: 0.4)),
@@ -830,9 +868,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           color: color,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: isSelected
-                                ? p.textPrimary
-                                : Colors.transparent,
+                            color:
+                                isSelected ? p.textPrimary : Colors.transparent,
                             width: isSelected ? 3 : 1,
                           ),
                         ),
@@ -936,7 +973,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.s6),
-        SizedBox(width: AppSpacing.s64,
+        SizedBox(
+          width: AppSpacing.s64,
           child: Text(
             name,
             textAlign: TextAlign.center,
@@ -963,7 +1001,8 @@ class _FeatureBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: BorderRadius.circular(AppRadii.r20),

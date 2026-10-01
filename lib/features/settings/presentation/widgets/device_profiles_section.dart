@@ -54,7 +54,9 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
       String? currentKey;
       try {
         final info = getIt<HiResAudioService>().currentOutputInfo;
-        if (info != null) currentKey = DeviceProfileService.deviceKeyFromInfo(info);
+        if (info != null) {
+          currentKey = DeviceProfileService.deviceKeyFromInfo(info);
+        }
       } catch (_) {}
       if (!mounted) return;
       setState(() {
@@ -76,7 +78,8 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     setState(() => _autoEnabled = value);
   }
 
-  Future<void> _assignProfile(String deviceKey, String deviceLabel, String? profileId) async {
+  Future<void> _assignProfile(
+      String deviceKey, String deviceLabel, String? profileId) async {
     final deviceService = _deviceService;
     if (profileId == null) {
       await deviceService.forgetLink(deviceKey);
@@ -105,7 +108,9 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     await context.read<PlayerCubit>().applyProfile(profile, manual: true);
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(content: Text(context.l10n.appliedProfileTpl(l10n.applyProfileNow, profile.name))),
+      SnackBar(
+          content: Text(context.l10n
+              .appliedProfileTpl(l10n.applyProfileNow, profile.name))),
     );
   }
 
@@ -187,8 +192,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
             ),
           )
         else
-          for (final device in _devices)
-            _deviceRow(context, device, l10n),
+          for (final device in _devices) _deviceRow(context, device, l10n),
         const SizedBox(height: AppSpacing.xs),
         Text(
           l10n.customProfilesTitle,
@@ -198,8 +202,7 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
               ?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: AppSpacing.xxs),
-        for (final profile in _profiles)
-          _profileRow(context, profile, l10n),
+        for (final profile in _profiles) _profileRow(context, profile, l10n),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
@@ -255,7 +258,8 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
                 ),
                 if (isCurrent)
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(start: AppSpacing.s6),
+                    padding:
+                        const EdgeInsetsDirectional.only(start: AppSpacing.s6),
                     child: Text(
                       l10n.currentDeviceBadge,
                       style: Theme.of(context).textTheme.labelSmall,
@@ -272,8 +276,8 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
                   for (final p in _profiles)
                     DropdownMenuItem<String>(value: p.id, child: Text(p.name)),
                 ],
-                onChanged: (profileId) =>
-                    _assignProfile(device.deviceKey, device.deviceLabel, profileId),
+                onChanged: (profileId) => _assignProfile(
+                    device.deviceKey, device.deviceLabel, profileId),
               ),
             ],
           ),
@@ -288,7 +292,8 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
           icon: const Icon(Icons.link_off_rounded),
           onPressed: link == null
               ? null
-              : () => _assignProfile(device.deviceKey, device.deviceLabel, null),
+              : () =>
+                  _assignProfile(device.deviceKey, device.deviceLabel, null),
         ),
       ],
     );

@@ -100,7 +100,8 @@ class WidgetService {
     if (_artworkResolveInFlight) return;
     if (_pendingArtworkQueue.isEmpty) return;
     final next = _pendingArtworkQueue.removeFirst();
-    if (next.id == _lastSavedArtworkSongId && _artworkCache.containsKey(next.id)) {
+    if (next.id == _lastSavedArtworkSongId &&
+        _artworkCache.containsKey(next.id)) {
       _drainPendingArtwork();
       return;
     }
@@ -220,7 +221,8 @@ class WidgetService {
       );
       if (artPath != null && artPath.isNotEmpty) {
         // Generation check: skip updating UI if newer songs are queued.
-        if (_pendingArtworkQueue.isNotEmpty && _pendingArtworkQueue.any((s) => s.id != song.id)) {
+        if (_pendingArtworkQueue.isNotEmpty &&
+            _pendingArtworkQueue.any((s) => s.id != song.id)) {
           return;
         }
         _lastSavedArtworkSongId = song.id;
@@ -235,7 +237,8 @@ class WidgetService {
         );
       } else {
         // FIX-G03 / I12: Push empty string and flag error on failure
-        if (_pendingArtworkQueue.isNotEmpty && _pendingArtworkQueue.any((s) => s.id != song.id)) {
+        if (_pendingArtworkQueue.isNotEmpty &&
+            _pendingArtworkQueue.any((s) => s.id != song.id)) {
           return;
         }
         _lastSavedArtworkSongId = song.id;
@@ -292,7 +295,8 @@ class WidgetService {
         iOSName: iOSWidgetName,
       );
     } catch (e, st) {
-      ErrorLogger.log('updateProgress failed', error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log('updateProgress failed',
+          error: e, stackTrace: st, category: 'WidgetService');
     }
   }
 
@@ -366,9 +370,8 @@ class WidgetService {
                 final res =
                     await req.close().timeout(const Duration(seconds: 8));
                 if (res.statusCode == 200) {
-                  final fetched =
-                      await consolidateHttpClientResponseBytes(res)
-                          .timeout(const Duration(seconds: 8));
+                  final fetched = await consolidateHttpClientResponseBytes(res)
+                      .timeout(const Duration(seconds: 8));
                   if (fetched.isNotEmpty) {
                     rawBytes = fetched;
                     unawaited(ArtworkCacheManager().put(targetUrl, fetched));
@@ -482,7 +485,8 @@ class WidgetService {
   }
 
   @visibleForTesting
-  Future<void> pruneOldWidgetArtwork(Directory dir) => _pruneOldWidgetArtwork(dir);
+  Future<void> pruneOldWidgetArtwork(Directory dir) =>
+      _pruneOldWidgetArtwork(dir);
 
   Future<void> _pruneOldWidgetArtwork(Directory dir) async {
     try {
@@ -500,7 +504,8 @@ class WidgetService {
       final stats = <({File file, DateTime? modified})>[];
       const batchSize = 20; // limit concurrency
       for (var i = 0; i < files.length; i += batchSize) {
-        final end = (i + batchSize < files.length) ? i + batchSize : files.length;
+        final end =
+            (i + batchSize < files.length) ? i + batchSize : files.length;
         final batchStats = await Future.wait(
           files.sublist(i, end).map((f) async {
             try {
@@ -530,12 +535,14 @@ class WidgetService {
       // Enforce the total-count limit oldest-first.
       if (survivors.length > _maxCacheSize) {
         survivors.sort((a, b) => a.modified.compareTo(b.modified));
-        stale.addAll(
-            survivors.take(survivors.length - _maxCacheSize).map((s) => s.file));
+        stale.addAll(survivors
+            .take(survivors.length - _maxCacheSize)
+            .map((s) => s.file));
       }
 
       for (var i = 0; i < stale.length; i += batchSize) {
-        final end = (i + batchSize < stale.length) ? i + batchSize : stale.length;
+        final end =
+            (i + batchSize < stale.length) ? i + batchSize : stale.length;
         await Future.wait(stale.sublist(i, end).map((f) async {
           try {
             await f.delete();

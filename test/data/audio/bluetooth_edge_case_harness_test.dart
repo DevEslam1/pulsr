@@ -194,8 +194,7 @@ void main() {
 
     setUp(() => scanner = MockMediaScannerService());
 
-    test('output-format negotiation defaults ON and persists OFF/ON',
-        () async {
+    test('output-format negotiation defaults ON and persists OFF/ON', () async {
       final cubit = SettingsCubit(scannerService: scanner);
       await pumpEventQueue();
       expect(cubit.state.outputFormatNegotiationEnabled, isTrue,

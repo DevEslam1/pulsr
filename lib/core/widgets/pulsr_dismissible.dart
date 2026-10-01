@@ -33,8 +33,10 @@ class PulsrDismissible extends StatefulWidget {
   final Map<DismissDirection, double>? dismissThresholds;
   final Widget? background;
   final Widget? secondaryBackground;
-  final Widget Function(BuildContext context, bool isConfirming)? backgroundBuilder;
-  final Widget Function(BuildContext context, bool isConfirming)? secondaryBackgroundBuilder;
+  final Widget Function(BuildContext context, bool isConfirming)?
+      backgroundBuilder;
+  final Widget Function(BuildContext context, bool isConfirming)?
+      secondaryBackgroundBuilder;
   final String? startToEndLabel;
   final String? endToStartLabel;
   final FutureOr<bool> Function(DismissDirection direction) onConfirm;
@@ -74,15 +76,20 @@ class PulsrDismissible extends StatefulWidget {
     BorderRadiusGeometry? borderRadius,
   }) {
     final effectiveLabel = isConfirming ? 'Confirm $label' : label;
-    final effectiveIcon = isConfirming ? Icons.check_circle_outline_rounded : icon;
+    final effectiveIcon =
+        isConfirming ? Icons.check_circle_outline_rounded : icon;
 
     return Container(
-      margin: margin ?? const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+      margin: margin ??
+          const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: borderRadius ?? BorderRadius.circular(AppRadii.r16),
       ),
-      alignment: isEnd ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+      alignment: isEnd
+          ? AlignmentDirectional.centerEnd
+          : AlignmentDirectional.centerStart,
       padding: EdgeInsetsDirectional.only(
         start: isEnd ? 0 : 20,
         end: isEnd ? 20 : 0,
@@ -98,7 +105,8 @@ class PulsrDismissible extends StatefulWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: color,
-                      fontWeight: isConfirming ? FontWeight.w900 : FontWeight.w700,
+                      fontWeight:
+                          isConfirming ? FontWeight.w900 : FontWeight.w700,
                       letterSpacing: isConfirming ? 0.2 : null,
                     ),
                   ),
@@ -116,7 +124,8 @@ class PulsrDismissible extends StatefulWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: color,
-                      fontWeight: isConfirming ? FontWeight.w900 : FontWeight.w700,
+                      fontWeight:
+                          isConfirming ? FontWeight.w900 : FontWeight.w700,
                       letterSpacing: isConfirming ? 0.2 : null,
                     ),
                   ),
@@ -307,7 +316,8 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
           ),
           duration: widget.confirmTimeout,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r10)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.r10)),
         ),
       );
     }
@@ -480,15 +490,20 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
 
     final bg = widget.backgroundBuilder?.call(context, isStartConfirming) ??
         widget.background;
-    final secBg = widget.secondaryBackgroundBuilder
-            ?.call(context, isEndConfirming) ??
-        widget.secondaryBackground;
+    final secBg =
+        widget.secondaryBackgroundBuilder?.call(context, isEndConfirming) ??
+            widget.secondaryBackground;
 
     return SizeTransition(
       sizeFactor: _resizeAnimation,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          _itemWidth = constraints.maxWidth;
+          // Guard against unbounded horizontal constraints: an infinite
+          // `maxWidth` would make `offset * _itemWidth` NaN and leave the
+          // sliding/`ClipRRect` layers without a size.
+          _itemWidth = constraints.maxWidth.isFinite
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width;
 
           final content = Stack(
             clipBehavior: Clip.hardEdge,

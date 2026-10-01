@@ -119,8 +119,7 @@ class RoomCorrectionService {
     final framesPerTone = sampleRate * toneMs ~/ 1000;
     final lead = sampleRate * leadMs ~/ 1000;
     final tail = sampleRate * tailMs ~/ 1000;
-    final usableTones =
-        math.min(tones.length, pcm.length ~/ framesPerTone);
+    final usableTones = math.min(tones.length, pcm.length ~/ framesPerTone);
     final raw = List<double>.filled(usableTones, 0.0);
     for (var i = 0; i < usableTones; i++) {
       final start = i * framesPerTone + lead;
@@ -153,25 +152,27 @@ class RoomCorrectionService {
     double maxAdjacentDeltaDb = 8.0,
   }) {
     if (responseDb.isEmpty || tones.isEmpty || centers.isEmpty) return [];
-    if (!maxGainDb.isFinite || maxGainDb <= 0) return List.filled(centers.length, 0.0);
+    if (!maxGainDb.isFinite || maxGainDb <= 0) {
+      return List.filled(centers.length, 0.0);
+    }
     if (!maxAdjacentDeltaDb.isFinite || maxAdjacentDeltaDb < 0) {
       maxAdjacentDeltaDb = 8.0;
     }
-    // Sanitize inputs: non-finite tones/measurements carry no information.
-    final cleanTones = tones.where((t) => t.isFinite && t > 0).toList();
-    final cleanResponse = <double>[];
-    for (var i = 0; i < responseDb.length && i < tones.length; i++) {
-      if (tones[i].isFinite && tones[i] > 0 && responseDb[i].isFinite) {
-        cleanResponse.add(responseDb[i]);
+    // Sanitize inputs as *pairs*: a non-finite tone OR response drops exactly
+    // that measurement. Filtering the two arrays independently would shift
+    // every index after the dropped value and corrupt the fit.
+    final tonesA = <double>[];
+    final respA = <double>[];
+    final pairCount = math.min(responseDb.length, tones.length);
+    for (var i = 0; i < pairCount; i++) {
+      final t = tones[i];
+      final r = responseDb[i];
+      if (t.isFinite && t > 0 && r.isFinite) {
+        tonesA.add(t);
+        respA.add(r);
       }
     }
-    // Align lengths after sanitizing.
-    final n = cleanTones.length < cleanResponse.length
-        ? cleanTones.length
-        : cleanResponse.length;
-    if (n == 0) return List.filled(centers.length, 0.0);
-    final tonesA = cleanTones.sublist(0, n);
-    final respA = cleanResponse.sublist(0, n);
+    if (tonesA.isEmpty) return List.filled(centers.length, 0.0);
     final gains = <double>[];
     for (final center in centers) {
       if (!center.isFinite || center <= 0) {
@@ -220,6 +221,77 @@ class RoomCorrectionService {
     );
   }
 
+  /// The negative preamp (dB) that keeps a correction curve from clipping when
+  /// summed boosts overlap. Bounded by the largest positive band gain plus a
+  /// small safety margin, and never positive. Returns 0.0 for a curve with no
+  /// boost.
+  static double computeSafePreamp(
+    List<double> gains, {
+    double safetyMarginDb = 0.5,
+    double minPreampDb = -15.0,
+  }) {
+    if (!minPreampDb.isFinite || minPreampDb > 0) minPreampDb = -15.0;
+    var maxBoost = 0.0;
+    for (final g in gains) {
+      if (g.isFinite && g > maxBoost) maxBoost = g;
+    }
+    if (maxBoost <= 0) return 0.0;
+    // The EQ preamp cannot go below [minPreampDb]; returning the clamped value
+    // keeps the caller truthful about the headroom actually applied instead of
+    // handing back a number that is silently clamped downstream.
+    return (-(maxBoost + safetyMarginDb)).clamp(minPreampDb, 0.0).toDouble();
+  }
+
+  /// Log-interpolated correction gain (dB) for [freq] from the fitted [gains]
+  /// over [centers]. Mirrors the interpolation used by the FIR designer so the
+  /// predicted response and the exported impulse response agree.
+  static double correctionGainDbAt(
+    List<double> gains,
+    List<double> centers,
+    double freq,
+  ) {
+    final n = math.min(gains.length, centers.length);
+    if (n == 0 || !freq.isFinite) return 0.0;
+    final lo = math.log(centers.first);
+    final hi = math.log(centers.last);
+    final logF = math.log(freq.clamp(centers.first, centers.last).toDouble());
+    for (var i = 0; i < n - 1; i++) {
+      final l0 = math.log(centers[i]);
+      final l1 = math.log(centers[i + 1]);
+      if (logF >= l0 && logF <= l1) {
+        final t = (l1 - l0) < 1e-9 ? 0.0 : (logF - l0) / (l1 - l0);
+        final g = gains[i] * (1 - t) + gains[i + 1] * t;
+        return g.isFinite ? g : 0.0;
+      }
+    }
+    if (logF <= lo) return gains.first.isFinite ? gains.first : 0.0;
+    if (logF >= hi) return gains.last.isFinite ? gains.last : 0.0;
+    return 0.0;
+  }
+
+  /// Predicts the post-correction response at [tones] by adding the applied
+  /// correction curve to the measured [preResponseDb]. Because the wizard's
+  /// measurement sweep runs through a standalone player, an acoustic re-measure
+  /// only contains the correction when the active DSP owner is the in-stream
+  /// native engine — not the session-bound HAL chain. This model-based
+  /// prediction is deterministic and device-independent, so the verification
+  /// cannot silently certify an uncorrected signal.
+  static List<double> predictCorrectedResponse({
+    required List<double> preResponseDb,
+    required List<double> tones,
+    required List<double> gains,
+    List<double> centers = EqPreset.centerFrequencies,
+  }) {
+    final n = math.min(preResponseDb.length, tones.length);
+    if (n == 0 || gains.isEmpty || centers.isEmpty) {
+      return List<double>.from(preResponseDb);
+    }
+    return List<double>.generate(n, (i) {
+      final correction = correctionGainDbAt(gains, centers, tones[i]);
+      return preResponseDb[i] + correction;
+    });
+  }
+
   /// Merges a room-correction curve with a headphone AutoEQ curve band-wise.
   /// Both [roomGains] and [headphoneGains] must share [centers] length;
   /// shorter inputs are zero-padded, result clamped to +/- [maxGainDb].
@@ -263,12 +335,13 @@ class RoomCorrectionService {
     ));
   }
 
-  static Float32List _computeCorrectionTask(({
-    List<double> gains,
-    List<double> centers,
-    int sampleRate,
-    int taps,
-  }) p) {
+  static Float32List _computeCorrectionTask(
+      ({
+        List<double> gains,
+        List<double> centers,
+        int sampleRate,
+        int taps,
+      }) p) {
     return exportCorrectionImpulseResponse(
       p.gains,
       centers: p.centers,
@@ -290,20 +363,13 @@ class RoomCorrectionService {
       // loading a pass-through (identity) IR that appears to "correct" nothing.
       return Float32List(0);
     }
-    double magAt(double freq) {
-      final f = freq.clamp(centers.first, centers.last).toDouble();
-      final logF = math.log(f);
-      for (var i = 0; i < centers.length - 1; i++) {
-        final l0 = math.log(centers[i]);
-        final l1 = math.log(centers[i + 1]);
-        if (logF >= l0 && logF <= l1) {
-          final t = (l1 - l0) < 1e-9 ? 0.0 : (logF - l0) / (l1 - l0);
-          final gDb = gains[i] * (1 - t) + gains[i + 1] * t;
-          return math.pow(10.0, gDb / 20.0).toDouble();
-        }
-      }
-      return math.pow(10.0, gains.last / 20.0).toDouble();
-    }
+    // The design crops n taps out of a fixed 512-point IDFT and divides by
+    // (n - 1) in the Hamming window; reject sizes that would divide by zero or
+    // read past the transform.
+    if (n < 3 || n > 512) return Float32List(0);
+    double magAt(double freq) => math
+        .pow(10.0, correctionGainDbAt(gains, centers, freq) / 20.0)
+        .toDouble();
 
     // Even-length FFT for symmetric bins; design half spectrum then mirror.
     final fftSize = 512;
@@ -312,7 +378,10 @@ class RoomCorrectionService {
     final imag = List<double>.filled(fftSize, 0.0);
     for (var k = 0; k <= half; k++) {
       final freq = k * sampleRate / fftSize;
-      final mag = k == 0 ? 1.0 : magAt(freq.clamp(20.0, sampleRate / 2 - 1));
+      // k=0 is DC and must carry the curve's low-frequency gain, not unity,
+      // otherwise the filter silently flattens all sub-bin bass correction.
+      final mag =
+          k == 0 ? magAt(0.0) : magAt(freq.clamp(20.0, sampleRate / 2 - 1));
       // Linear phase: delay = (n-1)/2 samples.
       final delay = (n - 1) / 2;
       final phase = -2 * math.pi * k * delay / fftSize;
@@ -342,16 +411,10 @@ class RoomCorrectionService {
       final w = 0.54 - 0.46 * math.cos(2 * math.pi * i / (n - 1));
       ir[i] = (time[start + i] * w).toDouble();
     }
-    // Unity-DC normalize so bypass transparency holds when curve is flat.
-    var dcSum = 0.0;
-    for (final v in ir) {
-      dcSum += v;
-    }
-    if (dcSum.abs() > 1e-9) {
-      for (var i = 0; i < ir.length; i++) {
-        ir[i] = ir[i] / dcSum;
-      }
-    }
+    // No level re-normalization: the Hamming window's peak sits exactly on the
+    // linear-phase impulse at index (n-1)/2 where the window equals 1.0, so a
+    // flat curve already yields unity DC. Forcing DC to unity here would erase
+    // any genuine broadband/bass correction.
     return ir;
   }
 
@@ -386,8 +449,8 @@ class RoomCorrectionService {
         ErrorLogger.log('Room-correction capture stream error',
             error: e, category: 'RoomCorrection');
       });
-      final ok = await _method.invokeMethod<bool>('startCapture',
-          {'sampleRate': sampleRate});
+      final ok = await _method
+          .invokeMethod<bool>('startCapture', {'sampleRate': sampleRate});
       _capturing = ok ?? false;
       return _capturing;
     } catch (e, st) {
@@ -413,8 +476,7 @@ class RoomCorrectionService {
     final bytes = _pcmBuffer.takeBytes();
     // Align to whole samples (16-bit).
     final sampleBytes = bytes.length - (bytes.length % 2);
-    return Int16List.view(
-        bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
+    return Int16List.view(bytes.buffer, bytes.offsetInBytes, sampleBytes ~/ 2);
   }
 
   /// Closed-loop convergence verification (Pillar 2).
@@ -506,6 +568,52 @@ class RoomCorrectionService {
       isWithinGate: isWithinGate,
     );
   }
+
+  /// Runs the closed-loop verification produced by the wizard: compares the
+  /// pre-correction measured response against the post-correction response and
+  /// gates the residual flatness. Pure, so the outcome is unit-testable and the
+  /// UI can render it without owning any math.
+  ///
+  /// [measuredPostDb] is the freshly captured response with the fitted
+  /// correction active; the second (loopback) gate checks how close the
+  /// post-correction response sits to a flat 0 dB target.
+  static RoomVerification verify({
+    required List<double> preResponseDb,
+    required List<double> postResponseDb,
+    double gateThresholdDb = 0.5,
+  }) {
+    final convergence = computeConvergence(
+      preResponseDb: preResponseDb,
+      postResponseDb: postResponseDb,
+    );
+    final flatTarget = List<double>.filled(postResponseDb.length, 0.0);
+    final loopback = evaluateLoopback(
+      measuredDb: postResponseDb,
+      targetDb: flatTarget,
+      gateThresholdDb: gateThresholdDb,
+    );
+    return RoomVerification(
+      convergence: convergence,
+      loopback: loopback,
+      passed: convergence.converged && loopback.isWithinGate,
+    );
+  }
+}
+
+/// Combined closed-loop verification outcome shown after a correction is
+/// applied: the pre→post convergence plus the flatness gate.
+class RoomVerification {
+  final ConvergenceResult convergence;
+  final LoopbackVerificationResult loopback;
+
+  /// True only when both the convergence check and the ±gate pass.
+  final bool passed;
+
+  const RoomVerification({
+    required this.convergence,
+    required this.loopback,
+    required this.passed,
+  });
 }
 
 class ConvergenceResult {

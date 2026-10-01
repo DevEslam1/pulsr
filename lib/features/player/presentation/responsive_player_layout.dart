@@ -88,8 +88,10 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     final width = mediaQuery.size.width;
     final hinge = _findHorizontalHinge(context);
 
-    // 1. Tabletop Mode for Foldables (horizontal fold detected)
-    if (hinge != null) {
+    // 1. Tabletop Mode for Foldables (horizontal fold detected).
+    // A zero-height hinge (degenerate/zero-width report) must not produce a
+    // tabletop layout with no usable halves — fall through to split/single pane.
+    if (hinge != null && hinge.bounds.height > 0) {
       final topHeight = hinge.bounds.top;
       final bottomHeight = mediaQuery.size.height - hinge.bounds.bottom;
 
@@ -160,9 +162,10 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     // Must be an actual tablet or desktop (height >= 550) to prevent landscape phones
     // (which have width 840-932 but height ~360-430) from triggering the 2-pane tablet split.
     // Landscape phones render the immersive full-screen player theme directly.
-    final isTabletLandscape =
-        (width >= 840 && mediaQuery.size.height >= 550) ||
-        (Adaptive.isTablet(context) && width >= 720 && mediaQuery.size.height >= 550);
+    final isTabletLandscape = (width >= 840 && mediaQuery.size.height >= 550) ||
+        (Adaptive.isTablet(context) &&
+            width >= 720 &&
+            mediaQuery.size.height >= 550);
     if (isTabletLandscape) {
       final p = context.palette;
       return Stack(
@@ -175,7 +178,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Color.lerp(widget.bgColor, Colors.black, 0.45) ?? widget.bgColor,
+                    Color.lerp(widget.bgColor, Colors.black, 0.45) ??
+                        widget.bgColor,
                     p.bg,
                     p.deepShade,
                   ],
@@ -239,7 +243,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
 
           // 2. Foreground 2-Pane Split (Apple Music Element Ordering)
           SafeArea(
-            top: false,
+            top: true,
             bottom: false,
             child: Row(
               children: [
@@ -281,10 +285,13 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               dividerColor: Colors.transparent,
                               indicatorSize: TabBarIndicatorSize.tab,
                               indicator: BoxDecoration(
-                                color: widget.activeColor.withValues(alpha: 0.28),
-                                borderRadius: BorderRadius.circular(AppRadii.r16),
+                                color:
+                                    widget.activeColor.withValues(alpha: 0.28),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r16),
                                 border: Border.all(
-                                  color: widget.activeColor.withValues(alpha: 0.45),
+                                  color: widget.activeColor
+                                      .withValues(alpha: 0.45),
                                   width: 1,
                                 ),
                               ),
@@ -292,11 +299,11 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               unselectedLabelColor:
                                   Colors.white.withValues(alpha: 0.60),
                               labelStyle: const TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,
                               ),
                               unselectedLabelStyle: const TextStyle(
-                                fontSize: 12,
+                                fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w500,
                               ),
                               tabs: [
@@ -304,7 +311,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.lyrics_rounded, size: 15),
+                                      const Icon(Icons.lyrics_rounded,
+                                          size: 15),
                                       const SizedBox(width: 6),
                                       Text(context.l10n.lyrics),
                                     ],
@@ -314,7 +322,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Icon(Icons.queue_music_rounded, size: 15),
+                                      const Icon(Icons.queue_music_rounded,
+                                          size: 15),
                                       const SizedBox(width: 6),
                                       Text(context.l10n.queueTab),
                                     ],

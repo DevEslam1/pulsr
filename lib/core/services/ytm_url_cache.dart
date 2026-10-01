@@ -83,6 +83,7 @@ class YtmUrlCache {
       LinkedHashMap<String, YtmUrlCacheEntry>();
 
   static const String _diskFileName = 'ytm_url_cache_v1.json';
+
   /// Restored entries are only worth keeping if they have meaningful life left;
   /// a URL that expires moments after launch would just 403 on first play.
   static const Duration _restoreMinTtl = Duration(minutes: 10);
@@ -99,7 +100,8 @@ class YtmUrlCache {
         _ttl = defaultTtl;
 
   @visibleForTesting
-  YtmUrlCache.withClock(this._clock, {int capacity = defaultCapacity, Duration ttl = defaultTtl})
+  YtmUrlCache.withClock(this._clock,
+      {int capacity = defaultCapacity, Duration ttl = defaultTtl})
       : _capacity = capacity,
         _ttl = ttl;
 
@@ -169,7 +171,8 @@ class YtmUrlCache {
             userAgent: userAgent,
             stream: rebuilt);
       }
-      debugPrint('[YtmUrlCache] Restored ${_cache.length} cached stream URL(s)');
+      debugPrint(
+          '[YtmUrlCache] Restored ${_cache.length} cached stream URL(s)');
     } catch (e) {
       debugPrint('[YtmUrlCache] restore failed: $e');
     }
@@ -216,7 +219,8 @@ class YtmUrlCache {
     } catch (_) {}
   }
 
-  String _buildKey(String videoId, String quality) => '$videoId:${quality.toLowerCase()}';
+  String _buildKey(String videoId, String quality) =>
+      '$videoId:${quality.toLowerCase()}';
 
   /// Retrieves cached entry if present and not expired. Moves entry to MRU position.
   YtmUrlCacheEntry? get(String videoId, {String quality = 'high'}) {
@@ -304,8 +308,7 @@ class YtmUrlCache {
       if (explicitExpiry != null) explicitExpiry,
       if (stampExpiry != null) stampExpiry,
     ];
-    final computedExpiry =
-        candidates.reduce((a, b) => a.isBefore(b) ? a : b);
+    final computedExpiry = candidates.reduce((a, b) => a.isBefore(b) ? a : b);
 
     if (!computedExpiry.isAfter(now)) {
       // Already expired, or inside the safety margin: caching it would only
@@ -335,10 +338,8 @@ class YtmUrlCache {
                     cookies: cookies ?? previous.cookies,
                   )
                 : null));
-    final effectiveUserAgent =
-        userAgent ?? previous?.userAgent;
-    final effectiveCookies =
-        cookies ?? previous?.cookies;
+    final effectiveUserAgent = userAgent ?? previous?.userAgent;
+    final effectiveCookies = cookies ?? previous?.cookies;
 
     final entry = YtmUrlCacheEntry(
       videoId: videoId,
@@ -384,7 +385,8 @@ class YtmUrlCache {
       _cache.remove(_buildKey(videoId, quality));
     } else {
       final prefix = '$videoId:';
-      final keysToRemove = _cache.keys.where((k) => k.startsWith(prefix)).toList();
+      final keysToRemove =
+          _cache.keys.where((k) => k.startsWith(prefix)).toList();
       for (final k in keysToRemove) {
         _cache.remove(k);
       }

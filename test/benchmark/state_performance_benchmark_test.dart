@@ -9,7 +9,9 @@ import 'package:pulsr/data/db/app_database.dart';
 
 void main() {
   group('Performance Benchmarks (A4)', () {
-    test('PlayerState.differsFromBeyondPosition completes 10,000 checks in <500ms', () {
+    test(
+        'PlayerState.differsFromBeyondPosition completes 10,000 checks in <500ms',
+        () {
       final songA = SongsTableData(
         id: 1,
         title: 'Song A',

@@ -100,7 +100,8 @@ class _WaveformLogoState extends State<WaveformLogo>
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: List.generate(5, (index) {
-                          final pulse = 0.85 + (t * 0.3) * ((index % 3) + 1) / 3;
+                          final pulse =
+                              0.85 + (t * 0.3) * ((index % 3) + 1) / 3;
                           final barHeightRatio = barHeights[index] * pulse;
                           return _buildBar(
                               effectiveSize, barHeightRatio, themeColor);

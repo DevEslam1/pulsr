@@ -85,66 +85,34 @@ class MainActivity : AudioServiceActivity() {
     }
  
     private fun isAudioIntent(intent: Intent, uri: Uri): Boolean {
-        val scheme = uri.scheme?.lowercase() ?: return false
-        if (scheme == "pulsrwidget") return false
-        if (isYouTubeUri(uri)) return true
-        if (intent.action == Intent.ACTION_SEND) {
-            val text = intent.getStringExtra(Intent.EXTRA_TEXT)
-            if (!text.isNullOrEmpty() && (isYouTubeUrl(text) || isProxyText(text))) return true
-            return intent.type?.startsWith("audio/") == true ||
-                intent.type?.startsWith("text/") == true ||
-                (scheme == "content" && intent.type == null)
-        }
-        if (intent.type?.startsWith("audio/") == true || intent.type?.startsWith("text/") == true) return true
-        val path = uri.path?.lowercase() ?: ""
-        val isAudioExt = path.endsWith(".mp3") || path.endsWith(".flac") || path.endsWith(".wav") ||
-            path.endsWith(".aac") || path.endsWith(".m4a") || path.endsWith(".ogg") ||
-            path.endsWith(".opus") || path.endsWith(".mka") || path.endsWith(".dsf") ||
-            path.endsWith(".dff") || path.endsWith(".aiff") || path.endsWith(".alac")
-        val isTextExt = path.endsWith(".txt") || path.endsWith(".list") || path.endsWith(".conf") || path.endsWith(".csv")
-        return isAudioExt || isTextExt || (scheme == "content" && intent.type == null)
+        return AudioIntentClassifier.isAudioIntent(intent, uri)
     }
 
     private fun isProxyText(text: String): Boolean {
-        val pattern = Regex("""\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{2,5})\b""")
-        return pattern.containsMatchIn(text) && pattern.find(text)?.let { m ->
-            val octets = (1..4).map { m.groupValues[it].toIntOrNull() ?: 256 }
-            val port = m.groupValues[5].toIntOrNull() ?: 0
-            octets.all { it in 0..255 } && port in 1..65535
-        } ?: false
-    }
-
-    private fun isYouTubeUri(uri: Uri): Boolean {
-        val host = uri.host?.lowercase() ?: ""
-        return host.endsWith("youtu.be") || host.endsWith("youtube.com")
+        return AudioIntentClassifier.isProxyText(text)
     }
 
     private fun isYouTubeUrl(text: String): Boolean {
-        val lower = text.lowercase()
-        return lower.contains("youtu.be") || lower.contains("youtube.com")
+        return AudioIntentClassifier.isYouTubeUrl(text)
     }
 
     private fun isSafeUri(uri: Uri): Boolean {
-        val scheme = uri.scheme?.lowercase() ?: return false
-        val allowedSchemes = listOf("content", "file", "http", "https", "pulsr")
-        if (scheme !in allowedSchemes) {
-            Log.w("MainActivity", "Rejected URI with unsafe scheme: $scheme")
-            return false
+        // The current user-facing roots; kept here so the classifier stays pure.
+        @Suppress("DEPRECATION")
+        val extStorage = android.os.Environment.getExternalStorageDirectory()?.path
+        val roots = listOfNotNull(
+            extStorage,
+            getExternalFilesDir(null)?.path,
+            filesDir?.path,
+            cacheDir?.path,
+            "/storage",
+            "/sdcard",
+        )
+        val safe = AudioIntentClassifier.isSafeUri(uri, roots)
+        if (!safe) {
+            Log.w("MainActivity", "Rejected URI with unsafe scheme or path: $uri")
         }
-        if (scheme == "file") {
-            val path = uri.path ?: return false
-            @Suppress("DEPRECATION")
-            val extStorage = android.os.Environment.getExternalStorageDirectory()?.path
-            val extFilesPath = getExternalFilesDir(null)?.path
-            val filesDirPath = filesDir?.path
-            val cacheDirPath = cacheDir?.path
-            val allowedRoots = listOfNotNull(extStorage, extFilesPath, filesDirPath, cacheDirPath, "/storage", "/sdcard")
-            if (!allowedRoots.any { path.startsWith(it) }) {
-                Log.w("MainActivity", "Rejected file URI outside allowed directories: $path")
-                return false
-            }
-        }
-        return true
+        return safe
     }
 
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {

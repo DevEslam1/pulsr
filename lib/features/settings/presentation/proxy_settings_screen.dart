@@ -129,13 +129,16 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       if (!_hostFocusNode.hasFocus && _hostController.text != state.proxyHost) {
         _hostController.text = state.proxyHost;
       }
-      if (!_portFocusNode.hasFocus && _portController.text != state.proxyPort.toString()) {
+      if (!_portFocusNode.hasFocus &&
+          _portController.text != state.proxyPort.toString()) {
         _portController.text = state.proxyPort.toString();
       }
-      if (!_usernameFocusNode.hasFocus && _usernameController.text != state.proxyUsername) {
+      if (!_usernameFocusNode.hasFocus &&
+          _usernameController.text != state.proxyUsername) {
         _usernameController.text = state.proxyUsername;
       }
-      if (!_bypassFocusNode.hasFocus && _bypassController.text != state.proxyBypassHosts) {
+      if (!_bypassFocusNode.hasFocus &&
+          _bypassController.text != state.proxyBypassHosts) {
         _bypassController.text = state.proxyBypassHosts;
       }
       // Password lives in secure storage (not in SettingsState) — rehydrate it
@@ -147,7 +150,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
           }
         } else {
           context.read<SettingsCubit>().getProxyPassword().then((pw) {
-            if (mounted && !_passwordFocusNode.hasFocus && _passwordController.text != pw) {
+            if (mounted &&
+                !_passwordFocusNode.hasFocus &&
+                _passwordController.text != pw) {
               _passwordController.text = pw;
             }
           });
@@ -281,7 +286,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
             ),
             child: Material(
               color: p.surfaceContainerHigh,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadii.r28)),
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
@@ -292,220 +298,230 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                     top: 20,
                     bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
                   ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.xs),
-                              decoration: BoxDecoration(
-                                color: p.accentContainer,
-                                borderRadius: BorderRadius.circular(AppRadii.r10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(AppSpacing.xs),
+                                decoration: BoxDecoration(
+                                  color: p.accentContainer,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r10),
+                                ),
+                                child: Icon(Icons.file_upload_outlined,
+                                    color: p.accent, size: 20),
                               ),
-                              child: Icon(Icons.file_upload_outlined,
-                                  color: p.accent, size: 20),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Text(context.l10n.importProxies,
-                              style: TextStyle(
-                                color: p.textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: AppFontSize.title,
+                              const SizedBox(width: AppSpacing.sm),
+                              Text(
+                                context.l10n.importProxies,
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.title,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          tooltip: context.l10n.close,
-                          icon:
-                              Icon(Icons.close_rounded, color: p.textSecondary),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(context.l10n.pasteOrPick,
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final data =
-                                await Clipboard.getData(Clipboard.kTextPlain);
-                            if (data != null &&
-                                data.text != null &&
-                                data.text!.isNotEmpty) {
-                              textController.text = data.text!;
-                            }
-                          },
-                          icon: Icon(Icons.content_paste_rounded,
-                              size: 16, color: p.accent),
-                          label: Text(context.l10n.pasteClipboard,
-                              style: TextStyle(
-                                  color: p.textPrimary, fontSize: AppFontSize.label)),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: p.hairline),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r10)),
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            try {
-                              final result = await FilePicker.pickFile(
-                                type: FileType.custom,
-                                allowedExtensions: [
-                                  'txt',
-                                  'csv',
-                                  'list',
-                                  'conf'
-                                ],
-                              );
-                              if (result != null) {
-                                final file = SafeFilePath.validate(result.path,
-                                    allowedExtensions: [
-                                      'txt',
-                                      'csv',
-                                      'list',
-                                      'conf'
-                                    ]);
-                                if (file != null) {
-                                  final content = await file.readAsString();
-                                  textController.text = content;
+                          IconButton(
+                            tooltip: context.l10n.close,
+                            icon: Icon(Icons.close_rounded,
+                                color: p.textSecondary),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        context.l10n.pasteOrPick,
+                        style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.bodySmall),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final data =
+                                  await Clipboard.getData(Clipboard.kTextPlain);
+                              if (data != null &&
+                                  data.text != null &&
+                                  data.text!.isNotEmpty) {
+                                textController.text = data.text!;
+                              }
+                            },
+                            icon: Icon(Icons.content_paste_rounded,
+                                size: 16, color: p.accent),
+                            label: Text(context.l10n.pasteClipboard,
+                                style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.label)),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: p.hairline),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r10)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: AppSpacing.xs),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              try {
+                                final result = await FilePicker.pickFile(
+                                  type: FileType.custom,
+                                  allowedExtensions: [
+                                    'txt',
+                                    'csv',
+                                    'list',
+                                    'conf'
+                                  ],
+                                );
+                                if (result != null) {
+                                  final file = SafeFilePath.validate(
+                                      result.path,
+                                      allowedExtensions: [
+                                        'txt',
+                                        'csv',
+                                        'list',
+                                        'conf'
+                                      ]);
+                                  if (file != null) {
+                                    final content = await file.readAsString();
+                                    textController.text = content;
+                                  }
+                                }
+                              } catch (e) {
+                                if (ctx.mounted) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(ctx.l10n
+                                          .pickFileFailed(e.toString())),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
                                 }
                               }
-                            } catch (e) {
+                            },
+                            icon: Icon(Icons.folder_open_rounded,
+                                size: 16, color: p.accent),
+                            label: Text(context.l10n.pickFile,
+                                style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.label)),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: p.hairline),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r10)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.sm,
+                                  vertical: AppSpacing.xs),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextField(
+                        controller: textController,
+                        maxLines: 6,
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontFamily: 'monospace',
+                            fontSize: AppFontSize.label),
+                        decoration: InputDecoration(
+                          hintText:
+                              '31.59.20.176:6754:username:password\n45.38.107.97:6014\nsocks5://user:pass@127.0.0.1:1080',
+                          hintStyle: TextStyle(
+                              color: p.textTertiary,
+                              fontFamily: 'monospace',
+                              fontSize: AppFontSize.label),
+                          filled: true,
+                          fillColor: p.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderSide: BorderSide(color: p.hairline),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderSide: BorderSide(color: p.hairline),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderSide: BorderSide(color: p.accent, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: Text(context.l10n.cancel,
+                                style: TextStyle(color: p.textSecondary)),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          FilledButton.icon(
+                            onPressed: () async {
+                              final raw = textController.text.trim();
+                              if (raw.isEmpty) return;
+                              final count = await context
+                                  .read<SettingsCubit>()
+                                  .importProxiesFromText(raw);
                               if (ctx.mounted) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                Navigator.of(ctx).pop();
+                              }
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text(ctx.l10n
-                                        .pickFileFailed(e.toString())),
+                                    content: Row(
+                                      children: [
+                                        Icon(Icons.check_circle_rounded,
+                                            color: p.success, size: 20),
+                                        const SizedBox(width: AppSpacing.s10),
+                                        Text(context.l10n.proxyImported(count)),
+                                      ],
+                                    ),
+                                    backgroundColor: p.surfaceContainerHigh,
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               }
-                            }
-                          },
-                          icon: Icon(Icons.folder_open_rounded,
-                              size: 16, color: p.accent),
-                          label: Text(context.l10n.pickFile,
-                              style: TextStyle(
-                                  color: p.textPrimary, fontSize: AppFontSize.label)),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: p.hairline),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r10)),
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: p.accent,
+                              foregroundColor: p.onAccent,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r12)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.md,
+                                  vertical: AppSpacing.s10),
+                            ),
+                            icon: const Icon(Icons.download_rounded, size: 18),
+                            label: Text(context.l10n.importParse,
+                                style: TextStyle(fontWeight: FontWeight.w700)),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    TextField(
-                      controller: textController,
-                      maxLines: 6,
-                      style: TextStyle(
-                          color: p.textPrimary,
-                          fontFamily: 'monospace',
-                          fontSize: AppFontSize.label),
-                      decoration: InputDecoration(
-                        hintText:
-                            '31.59.20.176:6754:username:password\n45.38.107.97:6014\nsocks5://user:pass@127.0.0.1:1080',
-                        hintStyle: TextStyle(
-                            color: p.textTertiary,
-                            fontFamily: 'monospace',
-                            fontSize: AppFontSize.label),
-                        filled: true,
-                        fillColor: p.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
-                          borderSide: BorderSide(color: p.hairline),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
-                          borderSide: BorderSide(color: p.hairline),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
-                          borderSide: BorderSide(color: p.accent, width: 2),
-                        ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(),
-                          child: Text(context.l10n.cancel,
-                              style: TextStyle(color: p.textSecondary)),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        FilledButton.icon(
-                          onPressed: () async {
-                            final raw = textController.text.trim();
-                            if (raw.isEmpty) return;
-                            final count = await context
-                                .read<SettingsCubit>()
-                                .importProxiesFromText(raw);
-                            if (ctx.mounted) {
-                              Navigator.of(ctx).pop();
-                            }
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      Icon(Icons.check_circle_rounded,
-                                          color: p.success, size: 20),
-                                      const SizedBox(width: AppSpacing.s10),
-                                      Text(context.l10n
-                                          .proxyImported(count)),
-                                    ],
-                                  ),
-                                  backgroundColor: p.surfaceContainerHigh,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: p.accent,
-                            foregroundColor: p.onAccent,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r12)),
-                            padding: const EdgeInsets.symmetric(
-
-                                horizontal: AppSpacing.md, vertical: AppSpacing.s10),
-                          ),
-                          icon: const Icon(Icons.download_rounded, size: 18),
-                          label: Text(context.l10n.importParse,
-                              style: TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
   }
 
   @override
@@ -537,117 +553,120 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
               elevation: 0,
               leading: const PulsrBackButton(),
               title: Text(
-              context.l10n.proxySettings,
-              style: TextStyle(
-                color: p.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: AppFontSize.title,
+                context.l10n.proxySettings,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: AppFontSize.title,
+                ),
               ),
-            ),
-            actions: [
-              IconButton(
-                tooltip: context.l10n.settingsImportPasteProxies,
-                icon: Icon(Icons.file_upload_outlined, color: p.accent),
-                onPressed: () => _showImportDialog(),
-              ),
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: AppSpacing.sm),
-                child: FilledButton.tonalIcon(
-                  onPressed: _saveSettings,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: p.accentContainer,
-                    foregroundColor: p.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+              actions: [
+                IconButton(
+                  tooltip: context.l10n.settingsImportPasteProxies,
+                  icon: Icon(Icons.file_upload_outlined, color: p.accent),
+                  onPressed: () => _showImportDialog(),
+                ),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.sm),
+                  child: FilledButton.tonalIcon(
+                    onPressed: _saveSettings,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: p.accentContainer,
+                      foregroundColor: p.accent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
                     ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: Text(context.l10n.save,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
                   ),
-                  icon: const Icon(Icons.check_rounded, size: 16),
-                  label: Text(context.l10n.save,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
-              ),
-            ],
-          ),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Form(
-                key: _formKey,
-                child: FocusTraversalGroup(
-                  policy: ReadingOrderTraversalPolicy(),
-                  child: ListView(
-                    padding:
-                        EdgeInsetsDirectional.fromSTEB(horizontalPad, AppSpacing.xs, horizontalPad, AppSpacing.xxl),
-                  children: [
-                    // Master Switch Card
-                    _buildMasterToggle(p),
-                    const SizedBox(height: AppSpacing.s20),
+              ],
+            ),
+            body: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Form(
+                  key: _formKey,
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: ListView(
+                      padding: EdgeInsetsDirectional.fromSTEB(horizontalPad,
+                          AppSpacing.xs, horizontalPad, AppSpacing.xxl),
+                      children: [
+                        // Master Switch Card
+                        _buildMasterToggle(p),
+                        const SizedBox(height: AppSpacing.s20),
 
-                    // Multi-Proxy Pool Section
-                    _buildProxyPoolSection(p, state, proxyList, isTestingAll),
-                    const SizedBox(height: AppSpacing.s20),
+                        // Multi-Proxy Pool Section
+                        _buildProxyPoolSection(
+                            p, state, proxyList, isTestingAll),
+                        const SizedBox(height: AppSpacing.s20),
 
-                    // Protocol Selection Card
-                    _buildProtocolSection(p),
-                    const SizedBox(height: AppSpacing.s20),
+                        // Protocol Selection Card
+                        _buildProtocolSection(p),
+                        const SizedBox(height: AppSpacing.s20),
 
-                    // Active Server Address & Port
-                    _buildServerConfigSection(p),
-                    const SizedBox(height: AppSpacing.s20),
+                        // Active Server Address & Port
+                        _buildServerConfigSection(p),
+                        const SizedBox(height: AppSpacing.s20),
 
-                    // Authentication (Optional)
-                    _buildAuthSection(p),
-                    const SizedBox(height: AppSpacing.s20),
+                        // Authentication (Optional)
+                        _buildAuthSection(p),
+                        const SizedBox(height: AppSpacing.s20),
 
-                    // Bypass Hosts
-                    _buildBypassSection(p),
-                    const SizedBox(height: AppSpacing.lg),
+                        // Bypass Hosts
+                        _buildBypassSection(p),
+                        const SizedBox(height: AppSpacing.lg),
 
-                    // Test Active Proxy Connection Button
-                    FilledButton.icon(
-                      onPressed: _isTesting ? null : _runTest,
-                      icon: _isTesting
-                          ? SizedBox(width: AppSpacing.s18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: p.onAccent,
-                              ),
-                            )
-                          : const Icon(Icons.speed_rounded),
-                      label: Text(
-                        _isTesting
-                            ? context.l10n.settingsTestingProxyConnectivity
-                            : context.l10n.testProxy,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: p.accent,
-                        foregroundColor: p.onAccent,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                        // Test Active Proxy Connection Button
+                        FilledButton.icon(
+                          onPressed: _isTesting ? null : _runTest,
+                          icon: _isTesting
+                              ? SizedBox(
+                                  width: AppSpacing.s18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: p.onAccent,
+                                  ),
+                                )
+                              : const Icon(Icons.speed_rounded),
+                          label: Text(
+                            _isTesting
+                                ? context.l10n.settingsTestingProxyConnectivity
+                                : context.l10n.testProxy,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: AppSpacing.s14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppRadii.r14),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
 
-                    if (_testResult != null) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _buildTestResultCard(p, _testResult!),
-                    ],
-                  ],
+                        if (_testResult != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          _buildTestResultCard(p, _testResult!),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  },
-  );
-}
+  }
 
   Widget _buildMasterToggle(PulsrPalette p) {
     return Container(
@@ -662,7 +681,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       child: Material(
         color: Colors.transparent,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           child: Row(
             children: [
               Container(
@@ -689,7 +709,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                   children: [
                     Row(
                       children: [
-                        Text(context.l10n.enableProxy,
+                        Text(
+                          context.l10n.enableProxy,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontWeight: FontWeight.w700,
@@ -699,8 +720,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                         const SizedBox(width: AppSpacing.xs),
                         Container(
                           padding: const EdgeInsets.symmetric(
-
-                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                              horizontal: AppSpacing.s6,
+                              vertical: AppSpacing.s2),
                           decoration: BoxDecoration(
                             color: _enabled
                                 ? p.success.withValues(alpha: 0.15)
@@ -708,7 +729,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                             borderRadius: BorderRadius.circular(AppRadii.r6),
                           ),
                           child: Text(
-                            _enabled ? context.l10n.settingsActiveBadge : context.l10n.settingsDisabledBadge,
+                            _enabled
+                                ? context.l10n.settingsActiveBadge
+                                : context.l10n.settingsDisabledBadge,
                             style: TextStyle(
                               color: _enabled ? p.success : p.textTertiary,
                               fontSize: AppFontSize.micro,
@@ -724,7 +747,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                       _enabled
                           ? context.l10n.settingsProxyActiveDesc
                           : context.l10n.settingsProxyInactiveDesc,
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                      style: TextStyle(
+                          color: p.textSecondary, fontSize: AppFontSize.label),
                     ),
                   ],
                 ),
@@ -748,7 +772,6 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     );
   }
 
-
   @override
   Widget _buildSection({
     required PulsrPalette p,
@@ -759,7 +782,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s6, 0, 0, AppSpacing.xs),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s6, 0, 0, AppSpacing.xs),
           child: Text(
             title,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -799,7 +823,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -848,7 +873,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isSuccess ? context.l10n.settingsConnectionSuccessful : context.l10n.settingsConnectionFailed,
+                  isSuccess
+                      ? context.l10n.settingsConnectionSuccessful
+                      : context.l10n.settingsConnectionFailed,
                   style: TextStyle(
                     color: color,
                     fontWeight: FontWeight.w700,
@@ -859,7 +886,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                 Text(
                   isSuccess
                       ? context.l10n.settingsLatencyMs(result.latencyMs)
-                      : (result.error ?? context.l10n.settingsUnknownConnectionFailure),
+                      : (result.error ??
+                          context.l10n.settingsUnknownConnectionFailure),
                   style: TextStyle(
                     color: p.textSecondary,
                     fontSize: AppFontSize.label,

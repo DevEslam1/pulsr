@@ -24,8 +24,8 @@ class YtmClientVersionResolver {
   static Future<void> _pushToNative(String version) async {
     if (version.isEmpty) return;
     try {
-      await _nativeChannel.invokeMethod<bool>(
-          'setClientVersion', {'clientVersion': version});
+      await _nativeChannel
+          .invokeMethod<bool>('setClientVersion', {'clientVersion': version});
     } catch (_) {}
   }
 
@@ -62,18 +62,24 @@ class YtmClientVersionResolver {
 
   String get clientVersion => _clientVersion;
   String get apiKey => _apiKey;
-  int get sts => _sts ?? (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 86400000);
+  int get sts =>
+      _sts ?? (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 86400000);
 
   String get androidMusicVersion =>
-      const String.fromEnvironment('YTM_ANDROID_MUSIC_VERSION', defaultValue: '8.32.50');
+      const String.fromEnvironment('YTM_ANDROID_MUSIC_VERSION',
+          defaultValue: '8.32.50');
   String get iosMusicVersion =>
-      const String.fromEnvironment('YTM_IOS_MUSIC_VERSION', defaultValue: '8.32.1');
+      const String.fromEnvironment('YTM_IOS_MUSIC_VERSION',
+          defaultValue: '8.32.1');
   String get androidVrVersion =>
-      const String.fromEnvironment('YTM_ANDROID_VR_VERSION', defaultValue: '1.63.27');
+      const String.fromEnvironment('YTM_ANDROID_VR_VERSION',
+          defaultValue: '1.63.27');
   String get androidVersion =>
-      const String.fromEnvironment('YTM_ANDROID_VERSION', defaultValue: '19.44.38');
+      const String.fromEnvironment('YTM_ANDROID_VERSION',
+          defaultValue: '19.44.38');
   String get androidCreatorVersion =>
-      const String.fromEnvironment('YTM_ANDROID_CREATOR_VERSION', defaultValue: '24.45.100');
+      const String.fromEnvironment('YTM_ANDROID_CREATOR_VERSION',
+          defaultValue: '24.45.100');
 
   String clientVersionFor(String clientType) {
     switch (clientType) {

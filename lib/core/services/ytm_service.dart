@@ -186,6 +186,7 @@ class YtmService {
   /// remote backend instead of piling up doomed chains (which also starves
   /// the native thread pool into cascading YTM_TIMEOUTs).
   static const _botCooldown = Duration(seconds: 45);
+
   /// Extended cooldown for IP-level blocks (every client fails instantly).
   static const _ipBlockCooldown = Duration(seconds: 180);
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
@@ -415,9 +416,8 @@ class YtmService {
   /// "Video unavailable". Used by the Dart account chain's guest pass.
   Future<String?> getPlayerPoToken(String videoId) async {
     try {
-      final token = await _channel
-          .invokeMethod<String>('getPlayerPoToken', {'videoId': videoId})
-          .timeout(const Duration(seconds: 4));
+      final token = await _channel.invokeMethod<String>('getPlayerPoToken',
+          {'videoId': videoId}).timeout(const Duration(seconds: 4));
       return (token == null || token.isEmpty) ? null : token;
     } catch (_) {
       return null;
@@ -785,7 +785,8 @@ class YtmService {
               if (titleRuns != null && titleRuns.isNotEmpty) {
                 title = titleRuns[0]['text'] as String? ?? title;
                 videoId ??= (titleRuns[0]['navigationEndpoint']
-                    as Map<String, dynamic>?)?['watchEndpoint']?['videoId'] as String?;
+                        as Map<String, dynamic>?)?['watchEndpoint']?['videoId']
+                    as String?;
               }
               final subObj = r['subtitle'] as Map<String, dynamic>?;
               final subRuns = subObj?['runs'] as List<dynamic>?;
@@ -836,8 +837,7 @@ class YtmService {
           int.tryParse(response.headers['retry-after'] ?? ''),
         );
       }
-      debugPrint(
-          '[YTM_SERVICE] Innertube search HTTP ${response.statusCode}');
+      debugPrint('[YTM_SERVICE] Innertube search HTTP ${response.statusCode}');
     } catch (e) {
       debugPrint('[YTM_SERVICE] Innertube search error: $e');
     }
@@ -992,10 +992,11 @@ class YtmService {
     final key = '$videoId:${quality.toLowerCase()}${preferM4a ? ":m4a" : ""}';
     final existing = _inFlightStreamResolves[key];
     if (existing != null) {
-      return existing.timeout(_defaultResolveTimeout + const Duration(seconds: 5));
+      return existing
+          .timeout(_defaultResolveTimeout + const Duration(seconds: 5));
     }
-    final fut =
-        _resolveStreamInner(videoId, quality: quality, forceRefresh: false, preferM4a: preferM4a);
+    final fut = _resolveStreamInner(videoId,
+        quality: quality, forceRefresh: false, preferM4a: preferM4a);
     _inFlightStreamResolves[key] = fut;
     return fut.whenComplete(() {
       if (identical(_inFlightStreamResolves[key], fut)) {
@@ -1020,8 +1021,8 @@ class YtmService {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
         return cachedEntry.toStream(quality: quality);
       }
     }
@@ -1043,7 +1044,8 @@ class YtmService {
 
     void recordError(Object? err) {
       if (err == null) return;
-      if (firstError == null || errorPriority(err) > errorPriority(firstError)) {
+      if (firstError == null ||
+          errorPriority(err) > errorPriority(firstError)) {
         firstError = err;
       }
     }
@@ -1069,8 +1071,8 @@ class YtmService {
             inBotCooldown = false;
           }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
       } else {
         debugPrint(
             '[YTM_SERVICE] Block cooldown active (${lastSignal?.name ?? 'unknown'}); failing fast for $videoId');
@@ -1118,7 +1120,8 @@ class YtmService {
             // resolve with the account-bound token; the current resolve proceeds
             // on the guest/native chain meanwhile.
             if (account.dataSyncId == null || account.dataSyncId!.isEmpty) {
-              debugPrint('[YTM_SERVICE] Tier-1 running as guest pass for $videoId: '
+              debugPrint(
+                  '[YTM_SERVICE] Tier-1 running as guest pass for $videoId: '
                   'dataSyncId not yet ready; bootstrapping in background.');
               unawaited(account.ensureDataSyncId());
             }
@@ -1126,16 +1129,16 @@ class YtmService {
               _tracker?.markStage(PlaybackStage.clientRequestSent);
               _tracker?.markStage(PlaybackStage.poTokenNeeded);
             } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+              // Best-effort: failure intentionally ignored on this non-critical path.
+            }
             final directStream =
                 await account.resolvePlayerStream(videoId, quality: quality);
             if (directStream != null) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
               } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+                // Best-effort: failure intentionally ignored on this non-critical path.
+              }
               // putStream, not put: the entry keeps the real container, MIME and
               // bitrate. put() alone let a later cache hit rebuild the stream by
               // guessing them from the URL, which wrote Opus bytes into a .m4a.
@@ -1152,10 +1155,12 @@ class YtmService {
         // streams that work logged-out. Auth is only surfaced if every tier fails
         // (see final rethrow below).
         if (e is YtmException && e.isAuth) {
-          debugPrint('[YTM_SERVICE] Direct account stream auth failure, falling back to guest engines: $e');
+          debugPrint(
+              '[YTM_SERVICE] Direct account stream auth failure, falling back to guest engines: $e');
           recordError(e);
         } else {
-          debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
+          debugPrint(
+              '[YTM_SERVICE] Direct account stream resolution fallback: $e');
           recordError(e);
         }
         // If the account tier hit an IP-level block or a bot challenge, activate
@@ -1188,8 +1193,8 @@ class YtmService {
           // Check poToken state heuristically: if we have a cached token, this is warm
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
         // maxRetries: 0 — the native side already runs its own multi-client
         // hedged chain with internal retries. A Dart-level timeout retry can't
         // cancel the still-running native call, so it just stacks a *second* full
@@ -1210,8 +1215,8 @@ class YtmService {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
           } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
           urlCache?.putStream(stream, quality: cacheQuality);
           _noteResolveSuccess(videoId: videoId);
           return stream;
@@ -1302,14 +1307,17 @@ class YtmService {
         nativeErr.signal == YtmBlockSignal.poTokenInvalid &&
         breaker.shouldAllow(YtmBlockSignal.poTokenInvalid)) {
       try {
-        debugPrint('[YTM_SERVICE] Tier-2.5 poToken refresh-and-retry for $videoId');
+        debugPrint(
+            '[YTM_SERVICE] Tier-2.5 poToken refresh-and-retry for $videoId');
         await invalidatePoToken().timeout(const Duration(seconds: 3));
-        final ready = await ensurePoTokenReady().timeout(const Duration(seconds: 6));
+        final ready =
+            await ensurePoTokenReady().timeout(const Duration(seconds: 6));
         if (ready) {
           // maxRetries: 0 — this tier IS the single deliberate retry; a
           // timeout retry here would stack a second native chain (see tier 2).
           final raw = await _guard(
-            () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
+            () =>
+                _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
               'videoId': videoId,
               'quality': quality,
               if (preferM4a) 'preferM4a': true,
@@ -1322,8 +1330,8 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
             } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+              // Best-effort: failure intentionally ignored on this non-critical path.
+            }
             urlCache?.putStream(stream, quality: cacheQuality);
             _noteResolveSuccess(videoId: videoId);
             return stream;
@@ -1342,7 +1350,9 @@ class YtmService {
     if (inBotCooldown) {
       final blocked = firstError;
       if (blocked is YtmException &&
-          (blocked.isBotBlocked || blocked.isIpBlocked || blocked.isThrottled)) {
+          (blocked.isBotBlocked ||
+              blocked.isIpBlocked ||
+              blocked.isThrottled)) {
         throw blocked;
       }
       throw const YtmException('BOT_CHALLENGE',
@@ -1351,14 +1361,16 @@ class YtmService {
 
     // 3. Pure-Dart InnerTube Stream Resolver (Desktop / Non-Android / Native Plugin Fallback)
     try {
-      debugPrint('[YTM_SERVICE] Attempting Dart InnerTube stream resolution for $videoId');
-      final dartStream = await _resolveStreamDart(videoId, quality: quality, preferM4a: preferM4a);
+      debugPrint(
+          '[YTM_SERVICE] Attempting Dart InnerTube stream resolution for $videoId');
+      final dartStream = await _resolveStreamDart(videoId,
+          quality: quality, preferM4a: preferM4a);
       if (dartStream != null) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
         urlCache?.putStream(dartStream, quality: cacheQuality);
         _noteResolveSuccess(videoId: videoId);
         return dartStream;
@@ -1374,7 +1386,8 @@ class YtmService {
     final err = firstError;
     if (err is YtmException) throw err;
     if (err != null) throw err;
-    throw const YtmException('YTM_FAILED', 'No stream returned from any engine');
+    throw const YtmException(
+        'YTM_FAILED', 'No stream returned from any engine');
   }
 
   /// Pure-Dart fallback that directly queries InnerTube player API using
@@ -1537,29 +1550,27 @@ class YtmService {
       }
 
       final m4a = audioFormats
-          .where((f) =>
-              ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
+          .where(
+              (f) => ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
           .toList();
       final pool = (preferM4a && m4a.isNotEmpty)
           ? m4a
           : (m4a.isNotEmpty ? m4a : audioFormats);
 
       final selected = switch (quality.toLowerCase()) {
-        'low' => pool.reduce((a, b) =>
-            ((a.format['bitrate'] as num?) ?? 0) <
-                    ((b.format['bitrate'] as num?) ?? 0)
-                ? a
-                : b),
+        'low' => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) <
+                ((b.format['bitrate'] as num?) ?? 0)
+            ? a
+            : b),
         'medium' => pool.reduce((a, b) =>
             (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
                     (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
                 ? a
                 : b),
-        _ => pool.reduce((a, b) =>
-            ((a.format['bitrate'] as num?) ?? 0) >
-                    ((b.format['bitrate'] as num?) ?? 0)
-                ? a
-                : b),
+        _ => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) >
+                ((b.format['bitrate'] as num?) ?? 0)
+            ? a
+            : b),
       };
 
       final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';

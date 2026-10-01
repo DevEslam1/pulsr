@@ -27,7 +27,8 @@ void main() {
       expect(find.text('#'), findsOneWidget);
     });
 
-    testWidgets('invokes onLetterSelected and shows bubble on drag', (tester) async {
+    testWidgets('invokes onLetterSelected and shows bubble on drag',
+        (tester) async {
       String? selectedLetter;
 
       await tester.pumpWidget(

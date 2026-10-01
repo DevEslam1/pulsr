@@ -53,8 +53,12 @@ class PulsrModalObserver extends NavigatorObserver {
   void didReplace({Route? newRoute, Route? oldRoute}) {
     if (oldRoute != null && _isModal(oldRoute)) PulsrModalTracker.pop();
     if (newRoute != null && _isModal(newRoute)) PulsrModalTracker.push();
-    if (oldRoute != null && _isNowPlaying(oldRoute)) PulsrDockTracker.setNowPlayingOpen(false);
-    if (newRoute != null && _isNowPlaying(newRoute)) PulsrDockTracker.setNowPlayingOpen(true);
+    if (oldRoute != null && _isNowPlaying(oldRoute)) {
+      PulsrDockTracker.setNowPlayingOpen(false);
+    }
+    if (newRoute != null && _isNowPlaying(newRoute)) {
+      PulsrDockTracker.setNowPlayingOpen(true);
+    }
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 
@@ -72,4 +76,3 @@ class PulsrModalObserver extends NavigatorObserver {
       route.settings.name == 'now-playing' ||
       route.settings.name == '/now-playing';
 }
-

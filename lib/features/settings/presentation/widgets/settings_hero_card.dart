@@ -115,27 +115,32 @@ class SettingsHeroCard extends StatelessWidget {
                                   ),
                                   child: user?.photoURL != null
                                       ? ClipOval(
-                                           child: Image.network(
-                                             user!.photoURL!,
-                                             fit: BoxFit.cover,
-                                             cacheWidth: 104,
-                                             cacheHeight: 104,
-                                             loadingBuilder: (context, child, progress) => progress == null
-                                                 ? child
-                                                 : Center(
-                                                     child: SizedBox(
-                                                       width: 16,
-                                                       height: 16,
-                                                       child: CircularProgressIndicator(
-                                                           strokeWidth: 2, color: p.accent),
-                                                     ),
-                                                   ),
-                                             errorBuilder: (_, __, ___) => Icon(
-                                               Icons.person_rounded,
-                                               color: p.accent,
-                                               size: 26,
-                                             ),
-                                           ),
+                                          child: Image.network(
+                                            user!.photoURL!,
+                                            fit: BoxFit.cover,
+                                            cacheWidth: 104,
+                                            cacheHeight: 104,
+                                            loadingBuilder:
+                                                (context, child, progress) =>
+                                                    progress == null
+                                                        ? child
+                                                        : Center(
+                                                            child: SizedBox(
+                                                              width: 16,
+                                                              height: 16,
+                                                              child: CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                  color:
+                                                                      p.accent),
+                                                            ),
+                                                          ),
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              Icons.person_rounded,
+                                              color: p.accent,
+                                              size: 26,
+                                            ),
+                                          ),
                                         )
                                       : Icon(
                                           user != null
@@ -191,13 +196,13 @@ class SettingsHeroCard extends StatelessWidget {
                                         const SizedBox(width: AppSpacing.s6),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
-
-                                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                                              horizontal: AppSpacing.s6,
+                                              vertical: AppSpacing.s2),
                                           decoration: BoxDecoration(
                                             color: p.accent
                                                 .withValues(alpha: 0.15),
-                                            borderRadius:
-                                                BorderRadius.circular(AppRadii.r6),
+                                            borderRadius: BorderRadius.circular(
+                                                AppRadii.r6),
                                           ),
                                           child: Text(
                                             context.l10n.syncedLabel,
@@ -234,8 +239,8 @@ class SettingsHeroCard extends StatelessWidget {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   padding: const EdgeInsets.symmetric(
-
-                                      horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+                                      horizontal: AppSpacing.s14,
+                                      vertical: AppSpacing.xs),
                                   textStyle: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: AppFontSize.bodySmall,
@@ -256,10 +261,12 @@ class SettingsHeroCard extends StatelessWidget {
                                       backgroundColor:
                                           p.accent.withValues(alpha: 0.15),
                                       foregroundColor: p.accent,
-                                      padding: const EdgeInsets.all(AppSpacing.xs),
+                                      padding:
+                                          const EdgeInsets.all(AppSpacing.xs),
                                     ),
                                     icon: isSyncing
-                                        ? SizedBox(width: AppSpacing.s18,
+                                        ? SizedBox(
+                                            width: AppSpacing.s18,
                                             height: 18,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
@@ -290,8 +297,8 @@ class SettingsHeroCard extends StatelessWidget {
                           const SizedBox(height: AppSpacing.s10),
                           Container(
                             padding: const EdgeInsets.symmetric(
-
-                                horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                                horizontal: AppSpacing.s10,
+                                vertical: AppSpacing.s6),
                             decoration: BoxDecoration(
                               color: p.error.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -321,7 +328,8 @@ class SettingsHeroCard extends StatelessWidget {
                       if (AppConfig.isCloudSyncAllowed &&
                           AppConfig.ytmEnabled) ...[
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm),
                           child: Divider(
                             height: 1,
                             thickness: 1,
@@ -393,9 +401,7 @@ class SettingsHeroCard extends StatelessWidget {
                         ),
                         child: Icon(
                           Icons.play_circle_fill_rounded,
-                          color: isLoggedIn
-                              ? AppColors.ytRed
-                              : p.textSecondary,
+                          color: isLoggedIn ? AppColors.ytRed : p.textSecondary,
                           size: 26,
                         ),
                       ),
@@ -444,15 +450,17 @@ class SettingsHeroCard extends StatelessWidget {
                               const SizedBox(width: AppSpacing.s6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-
-                                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                                    horizontal: AppSpacing.s6,
+                                    vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.success.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(AppRadii.r6),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r6),
                                 ),
                                 child: Builder(
                                   builder: (_) {
-                                    final status = context.l10n.settingsBadgeConnected;
+                                    final status =
+                                        context.l10n.settingsBadgeConnected;
                                     return Text(
                                       status,
                                       style: TextStyle(
@@ -503,8 +511,8 @@ class SettingsHeroCard extends StatelessWidget {
                         backgroundColor: AppColors.ytRed,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+                            horizontal: AppSpacing.s14,
+                            vertical: AppSpacing.xs),
                         textStyle: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: AppFontSize.bodySmall,

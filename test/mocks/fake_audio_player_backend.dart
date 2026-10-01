@@ -122,7 +122,9 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
 
   /// Advances the simulated playback clock by [delta], advancing position and emitting updates.
   void tickClock(Duration delta) {
-    if (!_playing || _processingState != ProcessingState.ready || _disposed) return;
+    if (!_playing || _processingState != ProcessingState.ready || _disposed) {
+      return;
+    }
     _position += delta;
     if (_duration != null && _position >= _duration!) {
       if (_loopMode == LoopMode.one) {

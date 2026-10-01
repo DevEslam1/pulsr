@@ -530,16 +530,15 @@ class AudioPlayer {
   bool get skipSilenceEnabled => _skipSilenceEnabledSubject.nvalue!;
 
   /// The current audio load configuration of the player.
-  AudioLoadConfiguration? get audioLoadConfiguration =>
-      _audioLoadConfiguration;
+  AudioLoadConfiguration? get audioLoadConfiguration => _audioLoadConfiguration;
 
   /// Reconfigures the player's audio load configuration.
   Future<void> setAudioLoadConfiguration(
       AudioLoadConfiguration configuration) async {
     _audioLoadConfiguration = configuration;
     if (configuration.darwinLoadControl != null) {
-      _automaticallyWaitsToMinimizeStalling = configuration
-          .darwinLoadControl!.automaticallyWaitsToMinimizeStalling;
+      _automaticallyWaitsToMinimizeStalling =
+          configuration.darwinLoadControl!.automaticallyWaitsToMinimizeStalling;
     }
   }
 
@@ -1812,8 +1811,8 @@ class AudioPlayer {
       // (default) or 24/32-bit float DSP path.
       if (active && !_isUnitTest()) {
         try {
-          final dspChannel = MethodChannel(
-              'com.ryanheise.just_audio.methods.${platform.id}');
+          final dspChannel =
+              MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
           await dspChannel.invokeMethod<bool>(
               'dspSetFloatOutput', {'enabled': _floatOutputEnabled});
           await dspChannel.invokeMethod<bool>('dspSetAaudioOutput', {
@@ -3648,7 +3647,8 @@ class LockCachingAudioSource extends StreamAudioSource {
         partialCacheFile.existsSync() ? partialCacheFile : cacheFile;
 
     if (_disposed) throw Exception('LockCachingAudioSource disposed');
-    final httpClient = _httpClient = _createHttpClient(userAgent: _player?._userAgent);
+    final httpClient =
+        _httpClient = _createHttpClient(userAgent: _player?._userAgent);
     final httpRequest = await _getUrl(httpClient, uri, headers: headers);
     final response = await httpRequest.close();
     if (_disposed) {
@@ -3888,7 +3888,8 @@ class LockCachingAudioSource extends StreamAudioSource {
     } catch (_) {}
     _httpClient = null;
     for (final req in _requests) {
-      req.fail(Exception('LockCachingAudioSource disposed'), StackTrace.current);
+      req.fail(
+          Exception('LockCachingAudioSource disposed'), StackTrace.current);
     }
     _requests.clear();
     if (!_downloadProgressSubject.isClosed) {

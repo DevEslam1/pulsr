@@ -2262,6 +2262,40 @@ class AppLocalizationsAr extends AppLocalizations {
   String get rcFittedEqGain => 'كسب المعادل المطابق';
 
   @override
+  String get rcVerify => 'التحقق من التصحيح';
+
+  @override
+  String get rcVerifyHint =>
+      'أعد القياس مع تفعيل التصحيح للتأكد من تسطيح الغرفة.';
+
+  @override
+  String get rcVerifying => 'جارٍ التحقق من التصحيح - ابقَ هادئاً...';
+
+  @override
+  String get rcVerification => 'التحقق';
+
+  @override
+  String get rcConverged => 'تم تسطيح الغرفة';
+
+  @override
+  String get rcNotConverged => 'التحسين محدود';
+
+  @override
+  String get rcApplyAndVerify => 'تطبيق والتحقق';
+
+  @override
+  String get rcResidual => 'التباين المتبقي';
+
+  @override
+  String get rcImprovement => 'التحسين';
+
+  @override
+  String get rcTargetGatePassed => 'داخل الهدف ±0.5 ديسيبل';
+
+  @override
+  String get rcTargetGateFailed => 'خارج الهدف ±0.5 ديسيبل';
+
+  @override
   String get fetchMissingArtworkTitle => 'جلب الأغلفة المفقودة؟';
 
   @override
@@ -3251,6 +3285,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get refHpProfiles => 'ملفات مرجعية';
+
+  @override
+  String get dspViperDdcDemoTitle => 'ملفات تجريبية / مبدئية';
+
+  @override
+  String get dspViperDdcDemoNote =>
+      'الملفات المضمّنة توضيحية فقط. حمّل ملف .vdc حقيقي للحصول على تصحيح مقاس.';
 
   @override
   String get bookmarkLabel => 'علامة';
@@ -7175,9 +7216,664 @@ class AppLocalizationsAr extends AppLocalizations {
   String get onboardingGestureLongPressDesc => 'يفتح خيارات نمط الإرساء';
 
   @override
+  String get headsetSectionTitle => 'السماعة والخلفية';
+
+  @override
+  String get headsetAutoResume => 'الاستئناف التلقائي عند إعادة الاتصال';
+
+  @override
+  String headsetResumeWithinNotice(int seconds) {
+    return 'الاستئناف خلال $seconds ثانية عند إعادة اتصال السماعة.';
+  }
+
+  @override
+  String get headsetStayPausedDesc => 'البقاء في وضع الإيقاف عند فصل السماعات.';
+
+  @override
+  String get headsetResumeWindow => 'نافذة الاستئناف';
+
+  @override
+  String get headsetKeepNotification =>
+      'الإبقاء على الإشعار عند الإيقاف المؤقت';
+
+  @override
+  String get headsetKeepNotificationOnDesc =>
+      'تبقى عناصر التحكم في لوحة الإشعارات بعد الإيقاف (يتطلب إعادة التشغيل).';
+
+  @override
+  String get headsetKeepNotificationOffDesc =>
+      'يُزال الإشعار عند الإيقاف المؤقت لتوفير البطارية.';
+
+  @override
+  String get headsetSinglePress => 'ضغطة واحدة';
+
+  @override
+  String get headsetDoublePress => 'ضغطتان';
+
+  @override
+  String get headsetTriplePress => 'ثلاث ضغطات';
+
+  @override
+  String get headsetMultiPressWindow => 'نافذة الضغط المتعدد';
+
+  @override
+  String get headsetMultiPressWindowDesc =>
+      'مدة تجميع الضغطات في ضغطة مزدوجة أو ثلاثية.';
+
+  @override
+  String get headsetSeekStep => 'خطوة التنقل';
+
+  @override
+  String get headsetSeekStepDesc =>
+      'يُستخدم عند تعيين ضغطة للتقديم أو الإرجاع.';
+
+  @override
+  String get headsetActionPlayPause => 'تشغيل / إيقاف مؤقت';
+
+  @override
+  String get headsetActionNextTrack => 'المقطع التالي';
+
+  @override
+  String get headsetActionPreviousTrack => 'المقطع السابق';
+
+  @override
+  String get headsetActionStop => 'إيقاف';
+
+  @override
+  String get headsetActionSeekForward => 'تقديم';
+
+  @override
+  String get headsetActionSeekBack => 'إرجاع';
+
+  @override
+  String get headsetActionNone => 'عدم القيام بأي شيء';
+
+  @override
+  String get karaokePracticeMode => 'وضع التدريب (تكرار السطر الحالي)';
+
+  @override
+  String get karaokePitchMeter => 'مقياس حدة الصوت (خوارزمية YIN)';
+
+  @override
+  String get karaokeLyricsFontSize => 'حجم خط الكلمات';
+
+  @override
+  String karaokeScore(int score) {
+    return 'النتيجة: $score';
+  }
+
+  @override
+  String get karaokeTapRhythm => 'اضغط على الإيقاع';
+
+  @override
+  String radioNoStationsMatch(String query) {
+    return 'لا توجد محطات تطابق \"$query\"';
+  }
+
+  @override
+  String get radioNoStationsMatchDesc => 'جرّب البحث بنوع أو رابط محطة مختلف';
+
+  @override
+  String get radioErrorEnterUrl => 'الرجاء إدخال رابط';
+
+  @override
+  String get radioErrorUrlScheme => 'يجب أن يبدأ الرابط بـ http:// أو https://';
+
+  @override
+  String get radioErrorInvalidUrl => 'تنسيق رابط غير صالح';
+
+  @override
+  String get radioGenreLabel => 'النوع / الفئة (اختياري)';
+
+  @override
+  String get radioGenreHint => 'مثال: هادئ، كلاسيكي، جاز، قرآن...';
+
+  @override
+  String get storageBreakdown => 'تفصيل التخزين';
+
+  @override
+  String storageLegendArtwork(String size) {
+    return 'الأغلفة: $size';
+  }
+
+  @override
+  String storageLegendStreams(String size) {
+    return 'البث: $size';
+  }
+
+  @override
+  String storageLegendLyrics(String size) {
+    return 'الكلمات: $size';
+  }
+
+  @override
+  String storageLegendCacheDb(String size) {
+    return 'الذاكرة المؤقتة / قاعدة البيانات: $size';
+  }
+
+  @override
+  String developerLabel(String name) {
+    return 'المطوّر: $name';
+  }
+
+  @override
+  String get whatsNewInPulsr => 'الجديد في Pulsr';
+
+  @override
+  String get whatsNewBitPerfectTitle => 'إخراج بت مثالي وعالي الدقة';
+
+  @override
+  String get whatsNewBitPerfectDesc =>
+      'بث مباشر عبر منفذ USB DAC، وتحكم في مستوى الصوت بالعتاد، وتشغيل DSD/DoP أصلي.';
+
+  @override
+  String get whatsNewProDspTitle => 'مجموعة معالجة DSP الاستوديو الاحترافية';
+
+  @override
+  String get whatsNewProDspDesc =>
+      'معادل بارامتري باستجابة حرة، وضاغط متعدد النطاقات، ومحدّد مسبق، وتغذية بسماعية.';
+
+  @override
+  String get whatsNewThemesTitle => 'سمات مشغّل تكيفية';
+
+  @override
+  String get whatsNewThemesDesc =>
+      'ثماني سمات مشغّل مصممة يدويًا مع الوضع الأفقي للهاتف ولوحة مزدوجة للأجهزة اللوحية وتحسين AMOLED.';
+
+  @override
+  String get whatsNewAccessibilityTitle => 'إمكانية الوصول والإيماءات السلسة';
+
+  @override
+  String get whatsNewAccessibilityDesc =>
+      'التوافق مع تباين WCAG 2.1 AA، ودعم نوع الخط الديناميكي 2.0x، ودلالات كاملة لقارئ الشاشة.';
+
+  @override
+  String get proxyInvalidHostFormat => 'تنسيق مضيف الوكيل غير صالح';
+
+  @override
+  String get eqMacroBassTitle => 'الجهير والقوة';
+
+  @override
+  String get eqMacroBassDesc => 'قوة ودفء الجهير المنخفض (31 هرتز – 125 هرتز)';
+
+  @override
+  String get eqMacroMidTitle => 'الغناء والحضور';
+
+  @override
+  String get eqMacroMidDesc =>
+      'الغناء الرئيسي والحضور الصوتي (500 هرتز – 2 كيلوهرتز)';
+
+  @override
+  String get eqMacroTrebleTitle => 'الوضوح والنقاء';
+
+  @override
+  String get eqMacroTrebleDesc =>
+      'لمعان الأصوات العالية والتفاصيل المكانية (4 كيلوهرتز – 16 كيلوهرتز)';
+
+  @override
+  String get eqIrCustomLoaded => 'مخصص (محمّل)';
+
+  @override
+  String get eqIrLoadWav => 'تحميل WAV IR (≤25 ميغابايت)...';
+
+  @override
+  String get eqAuditionFiveSeconds => 'تجربة (5 ثوانٍ)';
+
+  @override
+  String get eqAuditioningCrossfeed =>
+      'جارٍ تجربة إعداد التغذية البسماعية (5 ثوانٍ)...';
+
+  @override
   String get onboardingPersonalizeTitle => 'اجعله يناسبك';
 
   @override
   String get onboardingPersonalizeDesc =>
       'اختر لونًا الآن — يمكنك تغييره في أي وقت من الإعدادات.';
+
+  @override
+  String get featureInfoBitPerfectTitle => 'تمرير USB بتقنية Bit-Perfect';
+
+  @override
+  String get featureInfoBitPerfectSubtitle =>
+      'بث مباشر عبر العتاد إلى DAC USB / سلكي';
+
+  @override
+  String get featureInfoBitPerfectDescription =>
+      'يتجاوز مُعيد أخذ العينات AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC عبر AudioMixerAttributes (API 34) لـ USB، أو عبر direct/offload للسلكي. لا يُطبَّق أي مستوى صوت أو DSP برمجي. يتطلب أندرويد 14+ لـ USB، أو جهازًا سلكيًا يدعم FLOAT/24 بت ومعدلات عالية الدقة. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
+
+  @override
+  String get featureInfoBypassDspTitle => 'تجاوز DSP في وضع Bit-Perfect';
+
+  @override
+  String get featureInfoBypassDspSubtitle => 'تيار بتات نقي بلا تلوين إلى DAC';
+
+  @override
+  String get featureInfoBypassDspDescription =>
+      'عند التفعيل، يؤدي الدخول إلى Bit-Perfect إلى تعطيل EQ وVirtualizer وDynamics وCrossfeed وLimiter وReverb وموازن الستيريو ومُعيد أخذ العينات Sinc فورًا (القناع الأصلي = 0). يُقفل مستوى الصوت على DAC العتادي. أوقفه إذا أردت EQ + Bit-Perfect (ليس Bit-Perfect حقيقيًا، لكن بعض أجهزة DAC تتحمله).';
+
+  @override
+  String get featureInfoFollowTrackSampleRateTitle =>
+      'متابعة معدل عينات المقطع';
+
+  @override
+  String get featureInfoFollowTrackSampleRateSubtitle =>
+      'إعادة تهيئة الإخراج إلى المعدل الأصلي لكل مقطع';
+
+  @override
+  String get featureInfoFollowTrackSampleRateDescription =>
+      'عند كل تغيير للمقطع، يطلب معدل العينات الخاص بالمقطع من جهاز الإخراج فلا حاجة إلى إعادة أخذ عينات برمجية. تتم إزالة التكرار حتى لا تؤدي المقاطع ذات المعدل المشترك إلى إعادة تهيئة أصلية متكررة. يُتخطى في البلوتوث، حيث يملك رابط AVRCP/الترميز المعدل. قد يظل الجهاز يحد من المعدل؛ ويُعرض التنسيق المتفاوض عليه في تشخيص مسار الإخراج.';
+
+  @override
+  String get featureInfoStrictBitPerfectTitle =>
+      'Bit-Perfect صارم (بلا إعادة أخذ عينات)';
+
+  @override
+  String get featureInfoStrictBitPerfectSubtitle =>
+      'بتات المصدر الدقيقة، بلا مُعيد أخذ عينات — مراحل DSP متوقفة';
+
+  @override
+  String get featureInfoStrictBitPerfectDescription =>
+      'يفرض إخراج Bit-Perfect وتجاوز DSP، ثم يتابع معدل العينات الأصلي لكل مقطع كي يتلقى DAC عينات المصدر الدقيقة دون إعادة أخذ عينات. ولأنه صارم، لا يمكن تشغيل EQ وReplayGain وVirtualizer/Dynamics وCrossfade: إذ ستُغيّر تيار البتات. يتطلب مسارًا يعلن دعم Bit-Perfect الحصري (DAC USB على أندرويد 14+)؛ وإلا يُعطَّل المفتاح مع سبب النظام الأساسي.';
+
+  @override
+  String get featureInfoEqualizerTitle => 'موازن بارامتري 10 / 32 نطاقًا';
+
+  @override
+  String get featureInfoEqualizerSubtitle =>
+      '±15 dB لكل نطاق، Q=1.414، مسطح افتراضيًا';
+
+  @override
+  String get featureInfoEqualizerDescription =>
+      'سلسلة biquad أصلية بلغة C++ (بحد أقصى 32 نطاقًا، 8 قنوات). تستخدم قفزة JNI دفعية واحدة (≈1 ms) مع تجاوز بلا تكلفة عند التعطيل. تدمج ملفات AutoEQ على ترددات لوغاريتمية. لا يمكن أن تكون نشطة مع تجاوز Bit-Perfect (ستعيد أخذ العينات وتغيّر البتات).';
+
+  @override
+  String get featureInfoBassBoostTitle => 'مُعزِّز الجهير';
+
+  @override
+  String get featureInfoBassBoostSubtitle =>
+      'كسب منخفض الترددات بنمط shelf (جزء من محرك EQ)';
+
+  @override
+  String get featureInfoBassBoostDescription =>
+      'يضيف رفعًا منخفضًا low-shelf دون ~150 Hz عبر سلسلة biquad الأصلية للـ EQ. يتشارك نفس مرحلة المعالجة مع الموازن الرسومي، لذا يُعطَّل أثناء تفعيل تجاوز Bit-Perfect. أبقِه معتدلًا لتجنب حجب التفاصيل.';
+
+  @override
+  String get featureInfoCrossfeedTitle => 'Crossfeed للسماعات';
+
+  @override
+  String get featureInfoCrossfeedSubtitle =>
+      'تأخير 200–700 µs، تسرب من –15 إلى –6 dB';
+
+  @override
+  String get featureInfoCrossfeedDescription =>
+      'مزيج Chu Moy / Linkwitz يجعل السماعات تبدو كمكبرات صوت (يقلل الفصل الحاد بين اليسار/اليمين). يضيف ~0.05 ms زمن استجابة. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoLimiterTitle => 'محدد Brickwall بنظرة مسبقة';
+
+  @override
+  String get featureInfoLimiterSubtitle => 'True-peak، نظرة مسبقة 0.5–20 ms';
+
+  @override
+  String get featureInfoLimiterDescription =>
+      'محدد true-peak تكيفي بفرط أخذ عينات 4×. يحمي من القص عند تعزيز EQ. يضيف ~5 ms زمن استجابة. المرحلة الأخيرة قبل DAC. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoReverbTitle => 'ريفرب بالالتفاف';
+
+  @override
+  String get featureInfoReverbSubtitle =>
+      '8 غرف (RT60 0.35–5 s)، تداخل بين القنوات، أو IR مخصص';
+
+  @override
+  String get featureInfoReverbDescription =>
+      'الالتفاف المُقسَّم (كتل من 512 إطارًا) مقابل استجابة نبضية لغرفة مُصنَّعة أو استجابة نبضية مخصصة تحمّلها. يتميز بتداخل قابل للضبط بين القنوات لتوطين ستيريو binaural IRS أصيل. صفر تخصيصات في كومة الذاكرة داخل حلقة الصوت. يحتاج مسار DSP الأصلي؛ معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoPannerTitle => 'موازنة ستيريو ومزج أحادي';
+
+  @override
+  String get featureInfoPannerSubtitle =>
+      '–1.0 يسار … +1.0 يمين، دمج إلى أحادي';
+
+  @override
+  String get featureInfoPannerDescription =>
+      'مُوزِّع ثابت القدرة + خلط أحادي (L+R / 2). مفيد لسماع عدم التماثل. يطوي مسرح الصوت عند تفعيل الأحادي. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoResamplerTitle => 'مُعيد أخذ عينات Sinc متعدد الأطوار';
+
+  @override
+  String get featureInfoResamplerSubtitle =>
+      '32 طورًا × 32 صنبورًا (محرك متعدد الأطوار)';
+
+  @override
+  String get featureInfoResamplerDescription =>
+      'محرك استيفاء Sinc متعدد الأطوار. يُبقي مسار التشغيل المتدفق عدد إطارات المصدر، لذا يقوم الإخراج الأساسي (AudioTrack) بتحويل معدل المقطع→الجهاز؛ ويُطبَّق المحرك متعدد الأطوار داخليًا في المسار الرطب لريفرب الالتفاف فوق 48 kHz. معطَّل أثناء Bit-Perfect (تدفق مباشر 1:1).';
+
+  @override
+  String get featureInfoVirtualizerTitle => 'توسيع مسرح الصوت (Virtualizer)';
+
+  @override
+  String get featureInfoVirtualizerSubtitle =>
+      'توسعة ستيريو عبر Virtualizer في أندرويد';
+
+  @override
+  String get featureInfoVirtualizerDescription =>
+      'يوسّع الحقل الستيريو عبر AudioEffect Virtualizer (0–1000 mB). في الأجهزة المزودة بـ Spatializer عتادي، تكون الأولوية لـ Spatializer ويُتجاوَز Virtualizer. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoSpatializerTitle => 'Spatializer عتادي';
+
+  @override
+  String get featureInfoSpatializerSubtitle =>
+      'واجهة Spatializer في أندرويد + تتبع الرأس';
+
+  @override
+  String get featureInfoSpatializerDescription =>
+      'يستخدم AudioManager.spatializer عند توفره (أندرويد 12L+). يوفّر صوتًا مكانيًا حقيقيًا إذا دعمه الجهاز؛ وإلا يحاكي عبر Virtualizer. يُدار بالتبادل مع Virtualizer.';
+
+  @override
+  String get featureInfoDynamicsTitle => 'ديناميكيات الاستوديو وMBC';
+
+  @override
+  String get featureInfoDynamicsSubtitle =>
+      'MBC ثلاثي النطاقات + إعدادات المحدد';
+
+  @override
+  String get featureInfoDynamicsDescription =>
+      'ضاغط متعدد النطاقات DynamicsProcessing (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). يتحكم في العابر والجهارة. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoRoomCorrectionTitle => 'معالج تصحيح الغرفة';
+
+  @override
+  String get featureInfoRoomCorrectionSubtitle =>
+      'قياس بمسح نغمي متدرج + مواءمة EQ';
+
+  @override
+  String get featureInfoRoomCorrectionDescription =>
+      'يشغّل مسحًا نغميًا قصيرًا عبر مكبرات الصوت، ويسجله بالميكروفون، ويوفّق إعداد EQ لتصحيح الغرفة يسطّح الاستجابة المقيسة (مقيّد بنطاق EQ من +/-15 dB مع تنعيم النطاقات المتجاورة). يُطبَّق عبر مسار EQ العادي، لذا يشارك في تجاوز Bit-Perfect كأي إعداد EQ. ليس بديلًا عن المعالجة الصوتية.';
+
+  @override
+  String get featureInfoDsdNativeTitle => 'DSD (فك ترميز PCM / إخراج DoP)';
+
+  @override
+  String get featureInfoDsdNativeSubtitle =>
+      'PCM افتراضيًا — DoP فقط مع DAC USB متوافق';
+
+  @override
+  String get featureInfoDsdNativeDescription =>
+      'تُفكَّك ملفات DSD (DSF/DFF) إلى PCM عبر مفكك ترميز DSD الأصلي افتراضيًا وتتبع مسار DSP العادي. عندما يختار المستخدم إخراج DoP ويكون DAC USB قادر على حمله متصلًا، يُطوَّق تيار بتات DSD الخام كـ DSD over PCM (علامات متبادلة 0x05/0xFA) بمعدل DSD / 16 (DSD64 → 176.4 kHz، DSD128 → 352.8 kHz، DSD256 → 705.6 kHz) كي يبثّ DAC DSD أصليًا، في حاويات 24 بت أو 32 بت معبأة بالأصفار (قابلة للاختيار لأجهزة DAC التي تتطلب إطارات USB بسعة 32 بت). لا يُفعَّل DoP تلقائيًا أبدًا ويظل غير متاح عند عدم اكتشاف DAC USB متوافق. البث المباشر لـ DSD الأصلي الذي يتجاوز DoP غير مُنفَّذ في هذا الإصدار، لذا لا تُدَّعى قدرة DSD الأصلية بأكثر من DAC USB المكتشف.';
+
+  @override
+  String get featureInfoMqaTitle => 'MQA (Master Quality Authenticated)';
+
+  @override
+  String get featureInfoMqaSubtitle =>
+      'مكتشف — فتح أساسي فقط، بلا عرض مصادق عليه';
+
+  @override
+  String get featureInfoMqaDescription =>
+      'تُكتشف الملفات المشفرة بـ MQA من توقيعها وتُوسَم باسم \"MQA\" في ورقة الجودة. يتولى مفكك الترميز داخل التطبيق الفتح الأساسي؛ وعرض MQA الكامل المصادق عليه/الأصلي غير متاح في هذا الإصدار، لذا لا يُبلَّغ عن حالة MQA بصمت كـ lossless عادي ولا يُدَّعى إخراج MQA مصادق عليه أبدًا.';
+
+  @override
+  String get featureInfoGaplessTitle => 'تشغيل دون فواصل';
+
+  @override
+  String get featureInfoGaplessSubtitle => 'ConcatenatingAudioSource، بلا فجوة';
+
+  @override
+  String get featureInfoGaplessDescription =>
+      'يربط المقاطع المتتالية بدقة العينة دون صمت. مثالي للألبومات الحية. متبادل الاستبعاد مع Crossfade — تفعيل أحدهما يفرض إيقاف الآخر.';
+
+  @override
+  String get featureInfoCrossfadeTitle => 'Crossfade';
+
+  @override
+  String get featureInfoCrossfadeSubtitle => 'تلاشٍ متداخل بمشغلين من 0–12 s';
+
+  @override
+  String get featureInfoCrossfadeDescription =>
+      'يخفت المقطع الحالي بينما يظهر التالي عبر ExoPlayer مزدوج. يتطلب تعطيل Gapless (لا يمكن أن يكون دون فواصل ومتخافتًا في آن واحد).';
+
+  @override
+  String get featureInfoReplayGainTitle => 'تطبيع ReplayGain';
+
+  @override
+  String get featureInfoReplayGainSubtitle =>
+      'وسوم كسب المقطع / الألبوم في كسب مسبق أصلي';
+
+  @override
+  String get featureInfoReplayGainDescription =>
+      'كسب مسبق أصلي شفاف بتاتيًا مدفوع بوسوم Track/Album Gain (تنعيم 20 ms، هامش 0.5 dB بين العينات، آمن من القص). ثم يحمل خلاط Dart مستوى صوت المستخدم فقط فلا يُطبَّق الكسب مرتين؛ ويلجأ DoP وأنظمة غير أندرويد إلى حسابات Dart. يتعارض مع تجاوز Bit-Perfect (أي كسب سيغيّر البتات). اضبطه على Off للحصول على حصري حقيقي.';
+
+  @override
+  String get featureInfoOemTitle => 'تحذير صوت OEM';
+
+  @override
+  String get featureInfoOemSubtitle =>
+      'معالجة مزدوجة من Dolby / Dirac / SoundAlive';
+
+  @override
+  String get featureInfoOemDescription =>
+      'تعمل التأثيرات على مستوى النظام (Dolby Atmos وXiaomi Sound وDirac) خارج التطبيق. وتشغيل DSP الخاص بـ Pulsr فوقها يسبب EQ مزدوجًا وقصًا. استخدم تفضيل DSP = أصلي أو عطّل تأثيرات النظام لأصفى صوت.';
+
+  @override
+  String get featureInfoVolumeBoostTitle => 'تعزيز مستوى الصوت';
+
+  @override
+  String get featureInfoVolumeBoostSubtitle => 'LoudnessEnhancer +10 dB';
+
+  @override
+  String get featureInfoVolumeBoostDescription =>
+      'كسب LoudnessEnhancer العتادي (0–1000 mB). محدود بـ +6 dB مع مضخم السماعات لتجنب القص. معطَّل أثناء تجاوز Bit-Perfect (مستوى DAC العتادي فقط).';
+
+  @override
+  String get featureInfoSaturationTitle => 'تشبع توافقي / مُنشِّط';
+
+  @override
+  String get featureInfoSaturationSubtitle =>
+      'شريط، صمام مفرغ (التوافقي الثاني)، أو Clase A تناظري بفرط أخذ عينات sinc 4×';
+
+  @override
+  String get featureInfoSaturationDescription =>
+      'يولّد دفئًا تناظريًا غنيًا وكثافة توافقية. يقدّم 3 ملفات لون قابلة للاختيار: شريط (تشبع ناعم فردي الرتبة)، وصمام مفرغ (ثلاثي 6J1 غير متماثل بتوافقيات ثانية دافئة زوجية)، وClase A تناظري (استجابة محول عتيقة كاملة). يتميز بمانع تشويه aliasing متعدد الأطوار 4× وحجب DC. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoStereoWidthTitle =>
+      'صورة ستيريو ثلاثية النطاقات وجهير أحادي';
+
+  @override
+  String get featureInfoStereoWidthSubtitle =>
+      'عرض متعدد النطاقات + حماية طورية أحادية للجهير العميق';
+
+  @override
+  String get featureInfoStereoWidthDescription =>
+      'صورة ستيريو متعددة النطاقات Mid/Side تستخدم تقاطعات Linkwitz-Riley خطية الطور. تتضمن عناصر تحكم بعرض مخصصة للمنخفض (<160 Hz) والمتوسط (160 Hz–2.5 kHz) والمرتفع (>2.5 kHz). يلغي عزل الجهير العميق الأحادي إلغاء الطور الستيريو للترددات المنخفضة والترشيح المشطي. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoLoudnessContourTitle =>
+      'محيط الجهارة (Fletcher–Munson)';
+
+  @override
+  String get featureInfoLoudnessContourSubtitle =>
+      'تعويض الجهير والأجيس المرتبط بمستوى الصوت';
+
+  @override
+  String get featureInfoLoudnessContourDescription =>
+      'تقريب الجهارة المتساوية: مع انخفاض مستوى التشغيل، يُطبَّق رفع ناعم low-shelf (~100 Hz) ورفع أصغر high-shelf (~8 kHz) يتلاشيان عند المستوى الأقصى. يعمل في نطاق الكسب لكنه مكمّل لـ ReplayGain — فـ ReplayGain يسوّي المقاطع إلى هدف مشترك، بينما يواءم هذا المحيط النغمة مع مستوى الاستماع؛ ويمكن تشغيلهما معًا. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoSubCrossoverTitle =>
+      'تقاطع مكبر الصوت الفرعي (إعادة توجيه الجهير)';
+
+  @override
+  String get featureInfoSubCrossoverSubtitle =>
+      'Linkwitz-Riley من 60–150 Hz، جهير أحادي + تحديد مانع للفرقعات';
+
+  @override
+  String get featureInfoSubCrossoverDescription =>
+      'إعادة توجيه الجهير لأنظمة الستيريو: يُمزج مجموع أحادي تمرير منخفض Linkwitz-Riley من الرتبة الرابعة في كلتا القناتين. يتميز بطرح القناة الجانبية للجهير الأحادي لإبقاء الجهير العميق قويًا ومتمركزًا أحاديًا، مع تحديد ناعم tanh مضاد للفرقعات لإزالة النقرات. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoDynamicEqTitle => 'EQ ديناميكي (خفض ورفع)';
+
+  @override
+  String get featureInfoDynamicEqSubtitle =>
+      'مرشحات ديناميكية متعددة الأوضاع (Peaking، Low-Shelf، High-Shelf)';
+
+  @override
+  String get featureInfoDynamicEqDescription =>
+      'معادلة ديناميكية لكل نطاق تدعم وضعي الخفض (ترويض الرنين) والرفع (توسيع العابر). قابلة للاختيار بين استجابات ديناميكية Peaking biquad وLow-Shelf وHigh-Shelf مع كشف ناعم للركبة. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoMultibandCompressorTitle =>
+      'ضاغط متعدد النطاقات أصلي رباعي النطاقات';
+
+  @override
+  String get featureInfoMultibandCompressorSubtitle =>
+      'تقاطعات Linkwitz-Riley من الرتبة الرابعة متوافقة الطور، C++ بلا زمن استجابة';
+
+  @override
+  String get featureInfoMultibandCompressorDescription =>
+      'ضاغط ماسترينج استوديو احترافي رباعي النطاقات مدمج مباشرة في محرك DSP الأصلي بلغة C++. يستخدم تقاطعات Linkwitz-Riley من الرتبة الرابعة (LR4) لجمع مقدار مسطح بدقة مع صفر تشويه طور. يتميز بعتبة ونسبة وهجوم وإطلاق وركبة ناعمة وكسب تعويضي مستقلة لكل نطاق. يستبدل مسارات ضاغط HAL الهشة. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoDynamicBassTitle =>
+      'الجهير الديناميكي (Dynamic System)';
+
+  @override
+  String get featureInfoDynamicBassSubtitle =>
+      'دفعة جهير عميق متكيفة مع الغلاف وتوطين للسماعات';
+
+  @override
+  String get featureInfoDynamicBassDescription =>
+      'مستوحى من Dynamic System الشهير في ViPER4Android. يستعيد الثقل المادي والدفعة الملموسة للسماعات عبر توسيع مقاطع الجهير الهادئة ديناميكيًا وتشبع ناعم للقمم العالية. يتميز باستخلاص Mid-Side للجهير العميق، وتركيب توافقي نفسي-صوتي، و9 إعدادات معايرة كلاسيكية لأجهزة السماعات. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoViperDdcTitle =>
+      'ViPER-DDC (التصحيح الديناميكي الرقمي)';
+
+  @override
+  String get featureInfoViperDdcSubtitle => 'طابع سماعة العتاد وخطية التردد';
+
+  @override
+  String get featureInfoViperDdcDescription =>
+      'يحمّل ملفات تصحيح ViPER-DDC (.vdc) الأصلية. ينفّذ ترشيح ستيريو Direct Form II لأقسام من الرتبة الثانية (SOS) عالية الرتبة مع تكييف معدل العينات في الوقت الحقيقي (44.1 kHz / 48 kHz). يحيّد بدقة رنين كل سماعة على حدة. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoArbitraryEqTitle => 'EQ استجابة تعسفية (GraphicEq)';
+
+  @override
+  String get featureInfoArbitraryEqSubtitle =>
+      'محلل منحنى GraphicEq من EqualizerAPO ومرشح FIR بـ512 صنبورًا';
+
+  @override
+  String get featureInfoArbitraryEqDescription =>
+      'يحلل مواصفات المنحنى القياسية من EqualizerAPO \"GraphicEq: <freq> <gain>; ...\". يحسب استجابة التردد المستوفاة لوغاريتميًا ويصنع استجابة نبضية FIR مُنوَّفة بـ512 صنبورًا للمطابقة الصوتية الدقيقة. طور أدنى افتراضيًا (بلا تأخير إضافي)؛ فعّل FIR خطي الطور لتأخير مجموعة ثابت وطور دقيق بتكلفة رنين مسبق. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get featureInfoLiveProgTitle => 'DSP قابل للبرمجة مباشرة (برمجة EEL)';
+
+  @override
+  String get featureInfoLiveProgSubtitle =>
+      'آلة بايت كود DSP صوتية مخصصة في الوقت الحقيقي';
+
+  @override
+  String get featureInfoLiveProgDescription =>
+      'اكتب خوارزميات DSP صوتية مخصصة بصياغة برمجة Jesusonic / EEL مباشرة على هاتفك. يُترجم الكود مباشرة إلى بايت كود آمن بلا زمن استجابة يُنفَّذ لكل عينة داخل خيط الصوت الأصلي عالي الأولوية. يدعم @init و@sample والمنزلقات 1..8 ودوال رياضية متسامية شاملة. معطَّل أثناء Bit-Perfect.';
+
+  @override
+  String get conflictWithAllDspBypassDsp => 'كل DSP عند تفعيل \"تجاوز DSP\"';
+
+  @override
+  String get conflictWithBitPerfect => 'تجاوز Bit-Perfect';
+
+  @override
+  String get conflictWithEqReplayGainEffectsCrossfade =>
+      'EQ / ReplayGain / التأثيرات / Crossfade';
+
+  @override
+  String get conflictWithCrossfade => 'Crossfade (>0 s)';
+
+  @override
+  String get conflictWithGapless => 'دون فواصل';
+
+  @override
+  String get conflictWithResampler => 'تجاوز Bit-Perfect / مباشر';
+
+  @override
+  String get conflictWithVirtualizer => 'تجاوز Bit-Perfect، Spatializer عتادي';
+
+  @override
+  String get conflictAaudioDirect =>
+      'معطَّل: AAudio Direct مفعّل — يتجاوز سلسلة DSP في ExoPlayer (EQ، السرعة/النغمة، تخطي الصمت، Crossfade). أوقفه لإعادة تفعيل DSP.';
+
+  @override
+  String get conflictDsdDop =>
+      'معطَّل: يجري تشغيل DSD over PCM (DoP) — أي DSP أو كسب سيفسد حامل DoP. بدّل إخراج DSD إلى PCM لإعادة تفعيل DSP.';
+
+  @override
+  String get conflictDspBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — سيغيّر هذا DSP التيار البتاتي الحصري. أوقف Bit-Perfect أو \"تجاوز DSP\" لتمكينه.';
+
+  @override
+  String get conflictBtBitPerfectUnsupported =>
+      'لا يمكن التفعيل: البلوتوث يحوّل الترميز (SBC/AAC/LDAC/LC3) — Bit-Perfect فقط على DAC USB.';
+
+  @override
+  String get conflictRequiresAndroid14 =>
+      'يتطلب أندرويد 14+ لإخراج Bit-Perfect عبر USB.';
+
+  @override
+  String get conflictExclusiveRequiresUsbDac =>
+      'لا يمكن التفعيل: لا يكشف أندرويد الإخراج الحصري إلا لأجهزة DAC USB. تظل الدقة العالية السلكية تُشغَّل مباشرة عندما يدعمها الجهاز.';
+
+  @override
+  String get conflictNoMixerAttributes =>
+      'لا يعلن DAC USB هذا عن تهيئة خلاط حصرية.';
+
+  @override
+  String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
+    return 'معطَّل: Crossfade عند $crossfadeSeconds s — التشغيل دون فواصل يتطلب 0 s. اضبط Crossfade على 0 لتمكين التشغيل دون فواصل.';
+  }
+
+  @override
+  String get conflictCrossfadeNeedsGaplessOff =>
+      'معطَّل: التشغيل دون فواصل مفعّل — يحتاج Crossfade إلى إيقافه. عطّل التشغيل دون فواصل لتمكين Crossfade.';
+
+  @override
+  String get conflictStrictBitPerfectActive =>
+      'Bit-Perfect الصارم مفعّل: EQ وReplayGain وVirtualizer/Dynamics وCrossfade مكتومة كي تصل عينات المصدر الدقيقة إلى DAC. أوقف Bit-Perfect الصارم لإعادة تفعيلها.';
+
+  @override
+  String get conflictCrossfadeBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — يتداخل Crossfade بين مقطعين وسيغيّر تيار البتات. أوقف Bit-Perfect (أو تجاوز DSP الخاص به) لاستخدام Crossfade.';
+
+  @override
+  String get conflictNoDeviceDetected =>
+      'لا يمكن التفعيل: لم يُكتشف أي جهاز إخراج بعد. وصّل DAC USB وأعد المحاولة.';
+
+  @override
+  String get conflictNoExclusiveMixer =>
+      'لا يمكن التفعيل: مسار الإخراج هذا لا يكشف سمات خلاط Bit-Perfect حصرية.';
+
+  @override
+  String get conflictAaudioDirectCrossfade =>
+      'معطَّل: AAudio Direct مفعّل — يُطبَّق Crossfade في سلسلة DSP في ExoPlayer التي يتجاوزها. أوقف AAudio Direct لاستخدام Crossfade.';
+
+  @override
+  String get conflictOemDoubleProcessing =>
+      'تحذير: Dolby/Dirac في النظام نشط — تشغيل DSP الخاص بـ Pulsr فوقه يسبب معالجة مزدوجة. يُفضَّل تفضيل DSP = أصلي وتعطيل تأثيرات النظام.';
+
+  @override
+  String conflictVolumeBoostClipping(
+      String preampDb, String boostDb, String totalDb) {
+    return 'خطر القص: مضخم EQ المسبق ($preampDb dB) + التعزيز (+$boostDb dB) = +$totalDb dB > هامش 6 dB.';
+  }
+
+  @override
+  String get conflictHighBoostDistortion =>
+      'قد يسبب التعزيز العالي تشوهًا أو إجهادًا سمعيًا.';
 }

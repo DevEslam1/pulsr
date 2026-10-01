@@ -51,8 +51,7 @@ void main() {
     test('custom ceiling is honored', () {
       final mgr = CrossfadeManager()..curve = CrossfadeCurve.equalPower;
       for (var i = 0; i <= 100; i++) {
-        final (o, n) =
-            mgr.evaluateSumSafeGainPair(i / 100, sumCeiling: 0.8);
+        final (o, n) = mgr.evaluateSumSafeGainPair(i / 100, sumCeiling: 0.8);
         expect(o + n, lessThanOrEqualTo(0.8 + 1e-9));
       }
     });

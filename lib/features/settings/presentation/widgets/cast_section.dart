@@ -224,8 +224,7 @@ class _CastSectionState extends State<CastSection> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.speaker_group_outlined,
-                size: 36, color: p.textTertiary),
+            Icon(Icons.speaker_group_outlined, size: 36, color: p.textTertiary),
             const SizedBox(height: AppSpacing.s6),
             Text(
               l10n.noDevicesSeen,
@@ -278,7 +277,8 @@ class _CastSectionState extends State<CastSection> {
           : null,
       trailing: IconButton(
         icon: _scanning
-            ? SizedBox(width: AppSpacing.md,
+            ? SizedBox(
+                width: AppSpacing.md,
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
@@ -349,7 +349,6 @@ class _CastSectionState extends State<CastSection> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
@@ -378,14 +377,16 @@ class _CastSectionState extends State<CastSection> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.s10),
                         ),
                         onPressed: _busy ? null : _castCurrent,
                         icon: const Icon(Icons.play_arrow_rounded, size: 18),
                         label: Text(
                           l10n.castCurrentTrack,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: AppFontSize.bodySmall),
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppFontSize.bodySmall),
                         ),
                       ),
                     ),
@@ -397,8 +398,8 @@ class _CastSectionState extends State<CastSection> {
                           borderRadius: BorderRadius.circular(AppRadii.r10),
                         ),
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+                            horizontal: AppSpacing.s14,
+                            vertical: AppSpacing.s10),
                       ),
                       onPressed:
                           _busy ? null : () async => _service.disconnect(),
@@ -428,7 +429,8 @@ class _CastSectionState extends State<CastSection> {
               (entry) {
                 final i = entry.key;
                 final r = entry.value;
-                final isSelected = r.selected || (_session.connected && _session.deviceName == r.name);
+                final isSelected = r.selected ||
+                    (_session.connected && _session.deviceName == r.name);
 
                 return Column(
                   children: [
@@ -438,7 +440,6 @@ class _CastSectionState extends State<CastSection> {
                       onTap: _busy ? null : () => _connect(r),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(
-
                             horizontal: AppSpacing.md, vertical: AppSpacing.s2),
                         leading: SettingsIconBox(
                           isSelected
@@ -448,9 +449,8 @@ class _CastSectionState extends State<CastSection> {
                         title: Text(
                           r.name,
                           style: TextStyle(
-                            fontWeight: isSelected
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w600,
                             fontSize: AppFontSize.body,
                             color: isSelected ? p.accent : p.textPrimary,
                           ),
@@ -465,11 +465,12 @@ class _CastSectionState extends State<CastSection> {
                         trailing: isSelected
                             ? Container(
                                 padding: const EdgeInsets.symmetric(
-
-                                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                                    horizontal: AppSpacing.xs,
+                                    vertical: AppSpacing.xxs),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(AppRadii.r6),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r6),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -516,7 +517,6 @@ class _CastSectionState extends State<CastSection> {
                       onTap: () => _fallbackCast(d),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(
-
                             horizontal: AppSpacing.md, vertical: AppSpacing.s2),
                         leading: const SettingsIconBox(Icons.cast_rounded),
                         title: Text(
@@ -548,8 +548,10 @@ class _CastSectionState extends State<CastSection> {
 
         // Footnote info card
         Container(
-          margin: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, AppSpacing.sm),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+          margin: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.surfaceContainerHigh.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -558,14 +560,11 @@ class _CastSectionState extends State<CastSection> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded,
-                  size: 15, color: p.textTertiary),
+              Icon(Icons.info_outline_rounded, size: 15, color: p.textTertiary),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
-                  _sdk
-                      ? l10n.settingsCastSdkDesc
-                      : l10n.settingsCastNoSdkDesc,
+                  _sdk ? l10n.settingsCastSdkDesc : l10n.settingsCastNoSdkDesc,
                   style: TextStyle(
                     fontSize: AppFontSize.label,
                     color: p.textTertiary,

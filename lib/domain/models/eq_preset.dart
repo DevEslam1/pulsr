@@ -96,7 +96,8 @@ class EqPreset {
         'bassBoost': bassBoost,
         if (customFrequencies != null) 'customFrequencies': customFrequencies,
         if (qFactors != null) 'qFactors': qFactors,
-        if (bandsMap.isNotEmpty) 'bandsMap': bandsMap.map((k, v) => MapEntry(k.toString(), v)),
+        if (bandsMap.isNotEmpty)
+          'bandsMap': bandsMap.map((k, v) => MapEntry(k.toString(), v)),
       };
 
   factory EqPreset.fromJson(Map<String, dynamic> json) {
@@ -106,14 +107,15 @@ class EqPreset {
     final customFreqs = rawFreqs?.map((e) => (e as num).toDouble()).toList();
     final rawQs = json['qFactors'] as List<dynamic>?;
     final qs = rawQs?.map((e) => (e as num).toDouble()).toList();
-    
+
     final rawBandsMap = json['bandsMap'] as Map<String, dynamic>?;
     final parsedBandsMap = <int, List<double>>{};
     if (rawBandsMap != null) {
       rawBandsMap.forEach((key, value) {
         final intKey = int.tryParse(key);
         if (intKey != null && value is List) {
-          parsedBandsMap[intKey] = value.map((e) => (e as num).toDouble()).toList();
+          parsedBandsMap[intKey] =
+              value.map((e) => (e as num).toDouble()).toList();
         }
       });
     }
@@ -190,7 +192,8 @@ class EqPreset {
       _logSpread(64, const [20.0, 20000.0]);
 
   /// The 5-band centers used before 10-band migration.
-  @Deprecated('Used solely for backward compatibility migrations from 5-band EQ presets')
+  @Deprecated(
+      'Used solely for backward compatibility migrations from 5-band EQ presets')
   static const List<double> legacyFrequencies = [60, 230, 910, 3600, 14000];
 
   /// Maps [source] gains onto target frequencies (defaults to [targetFrequencies] or 10-band).
@@ -203,7 +206,7 @@ class EqPreset {
     if (bandsMap != null && currentBandCount != null) {
       bandsMap[currentBandCount] = List<double>.from(source);
     }
-    
+
     final n = targetFrequencies.length;
     if (bandsMap != null && bandsMap.containsKey(n)) {
       return List<double>.from(bandsMap[n]!);

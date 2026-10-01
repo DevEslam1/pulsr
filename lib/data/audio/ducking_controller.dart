@@ -26,9 +26,8 @@ class DuckingController {
   void setMode(DuckingMode m) => mode = m;
   void setLevel(double v) => level = v.clamp(0.05, 1.0);
 
-  static DuckingMode parseMode(String? raw) => DuckingMode.values.firstWhere(
-      (e) => e.name == raw,
-      orElse: () => DuckingMode.duck);
+  static DuckingMode parseMode(String? raw) => DuckingMode.values
+      .firstWhere((e) => e.name == raw, orElse: () => DuckingMode.duck);
 
   Future<void> load() async {
     try {

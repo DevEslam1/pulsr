@@ -10,8 +10,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Phase 3: P2 Edge Cases & UX Polish', () {
-    testWidgets('M1: GenreCategory cache is populated and clearCache wipes entries', (tester) async {
-      const category = GenreCategory('Rock', Icons.music_note, ['rock', 'metal']);
+    testWidgets(
+        'M1: GenreCategory cache is populated and clearCache wipes entries',
+        (tester) async {
+      const category =
+          GenreCategory('Rock', Icons.music_note, ['rock', 'metal']);
       expect(category.matches('Hard Rock 90s'), isTrue);
       expect(category.matches('Pop Ballad'), isFalse);
 
@@ -20,7 +23,9 @@ void main() {
       expect(category.matches('Alternative Metal'), isTrue);
     });
 
-    testWidgets('M7: SortFilterSheet exposes fileSize and sampleRate sort options', (tester) async {
+    testWidgets(
+        'M7: SortFilterSheet exposes fileSize and sampleRate sort options',
+        (tester) async {
       tester.view.physicalSize = const Size(1080, 1920);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -61,7 +66,9 @@ void main() {
       expect(selectedAsc, isTrue);
     });
 
-    test('M10: _SweepSource handles out-of-bounds start and end safely without RangeError', () async {
+    test(
+        'M10: _SweepSource handles out-of-bounds start and end safely without RangeError',
+        () async {
       final sampleBytes = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8]);
       final total = sampleBytes.length;
 

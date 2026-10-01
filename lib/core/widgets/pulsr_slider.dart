@@ -2,6 +2,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
@@ -183,7 +184,8 @@ class _PulsrSliderState extends State<PulsrSlider>
     final step = (widget.divisions != null && widget.divisions! > 0)
         ? (range / widget.divisions!)
         : (range / 20.0);
-    final target = (widget.value + (step * multiplier)).clamp(widget.min, widget.max);
+    final target =
+        (widget.value + (step * multiplier)).clamp(widget.min, widget.max);
     HapticFeedback.selectionClick();
     widget.onChanged(target);
     widget.onChangeEnd?.call(target);
@@ -193,16 +195,21 @@ class _PulsrSliderState extends State<PulsrSlider>
   Widget build(BuildContext context) {
     final p = context.palette;
     final range = widget.max - widget.min;
-    final t = range <= 0 ? 0.0 : ((widget.value - widget.min) / range).clamp(0.0, 1.0);
+    final t = range <= 0
+        ? 0.0
+        : ((widget.value - widget.min) / range).clamp(0.0, 1.0);
 
     return FocusableActionDetector(
       onFocusChange: (focused) => setState(() => _isFocused = focused),
       onShowHoverHighlight: (hovered) => setState(() => _isHovered = hovered),
       shortcuts: <ShortcutActivator, Intent>{
-        LogicalKeySet(LogicalKeyboardKey.arrowRight): const _SliderStepIntent(1),
+        LogicalKeySet(LogicalKeyboardKey.arrowRight):
+            const _SliderStepIntent(1),
         LogicalKeySet(LogicalKeyboardKey.arrowUp): const _SliderStepIntent(1),
-        LogicalKeySet(LogicalKeyboardKey.arrowLeft): const _SliderStepIntent(-1),
-        LogicalKeySet(LogicalKeyboardKey.arrowDown): const _SliderStepIntent(-1),
+        LogicalKeySet(LogicalKeyboardKey.arrowLeft):
+            const _SliderStepIntent(-1),
+        LogicalKeySet(LogicalKeyboardKey.arrowDown):
+            const _SliderStepIntent(-1),
         LogicalKeySet(LogicalKeyboardKey.pageUp): const _SliderStepIntent(4),
         LogicalKeySet(LogicalKeyboardKey.pageDown): const _SliderStepIntent(-4),
       },
@@ -225,9 +232,10 @@ class _PulsrSliderState extends State<PulsrSlider>
         child: Container(
           decoration: _isFocused
               ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadii.r8),
                   border: Border.all(
-                    color: (widget.activeColor ?? p.accent).withValues(alpha: 0.6),
+                    color:
+                        (widget.activeColor ?? p.accent).withValues(alpha: 0.6),
                     width: 1.5,
                   ),
                 )
@@ -264,7 +272,8 @@ class _PulsrSliderState extends State<PulsrSlider>
                 },
                 child: RepaintBoundary(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_expandAnimation, _waveController]),
+                    animation:
+                        Listenable.merge([_expandAnimation, _waveController]),
                     builder: (context, _) {
                       return CustomPaint(
                         painter: _PulsrSliderPainter(
@@ -364,7 +373,8 @@ class _PulsrSliderPainter extends CustomPainter {
 
       if (!isWavy || thumbX < 14.0) {
         // Flat straight line for short segments or non-wavy mode
-        canvas.drawLine(Offset(0, centerY), Offset(thumbX, centerY), activePaint);
+        canvas.drawLine(
+            Offset(0, centerY), Offset(thumbX, centerY), activePaint);
       } else {
         final wavePath = Path();
         wavePath.moveTo(0, centerY);
@@ -381,8 +391,8 @@ class _PulsrSliderPainter extends CustomPainter {
           } else if (thumbX - x < fadeDistance) {
             env = ((thumbX - x) / fadeDistance).clamp(0.0, 1.0);
           }
-          final y =
-              centerY + amplitude * env * sin((x / wavelength) * 2 * pi - wavePhase);
+          final y = centerY +
+              amplitude * env * sin((x / wavelength) * 2 * pi - wavePhase);
           wavePath.lineTo(x, y);
         }
         wavePath.lineTo(thumbX, centerY);

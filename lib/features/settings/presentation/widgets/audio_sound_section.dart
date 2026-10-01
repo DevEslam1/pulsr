@@ -73,8 +73,7 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
     if (!context.mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
-      content:
-          Text(context.l10n.bpResolved),
+      content: Text(context.l10n.bpResolved),
     ));
   }
 
@@ -212,7 +211,8 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
     try {
       final file = await AudioSessionLog.instance.exportToFile();
       if (file == null || await file.length() == 0) {
-        messenger?.showSnackBar(SnackBar(content: Text(noLogsText),
+        messenger?.showSnackBar(SnackBar(
+          content: Text(noLogsText),
         ));
         return;
       }
@@ -231,7 +231,11 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
       BuildContext context, SettingsCubit cubit, String currentPref) {
     final p = context.palette;
     final options = [
-      ('native', context.l10n.dspEngineNative, context.l10n.settingsDspNativeDesc),
+      (
+        'native',
+        context.l10n.dspEngineNative,
+        context.l10n.settingsDspNativeDesc
+      ),
       ('oem', context.l10n.dspEngineOem, context.l10n.settingsDspOemDesc),
       ('auto', context.l10n.dspEngineAuto, context.l10n.settingsDspAutoDesc),
     ];
@@ -240,14 +244,16 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 context.l10n.dspEnginePreference,
-                style: const TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                    fontSize: AppFontSize.title, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: AppSpacing.md),
               ...options.map((opt) {
@@ -255,10 +261,12 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
                 return ListTile(
                   title: Text(opt.$2,
                       style: TextStyle(
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.normal)),
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.normal)),
                   subtitle: Text(opt.$3,
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
+                      style: TextStyle(
+                          color: p.textSecondary, fontSize: AppFontSize.label)),
                   trailing: isSelected
                       ? Icon(Icons.check_circle, color: p.accent)
                       : null,
@@ -279,4 +287,3 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
     );
   }
 }
-

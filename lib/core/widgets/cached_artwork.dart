@@ -142,6 +142,7 @@ class CachedArtwork extends StatefulWidget {
   final String? remoteUrl;
 
   final bool highQuality;
+
   /// Explicit decode dimensions. Defaults to [decodeDim] computed from widget.size.
   final int? cacheWidth;
   final int? cacheHeight;
@@ -181,7 +182,8 @@ class CachedArtwork extends StatefulWidget {
 
 class _CachedArtworkState extends State<CachedArtwork> {
   static final OnAudioQuery _audioQuery = OnAudioQuery();
-  static const int _maxRemoteBytes = 10 * 1024 * 1024; // 10 MB max for HQ covers
+  static const int _maxRemoteBytes =
+      10 * 1024 * 1024; // 10 MB max for HQ covers
   Uint8List? _cachedBytes;
   int _loadToken = 0;
 
@@ -190,8 +192,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
-  String get _baseKey =>
-      widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
+  String get _baseKey => widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
 
   String get _cacheKey => _isHighRes ? '${_baseKey}_hq' : _baseKey;
 
@@ -245,8 +246,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
         // If maxresdefault failed on YouTube, try sddefault then original
         final fallbackUrls = <String>[];
         if (targetUrl.contains('maxresdefault.jpg')) {
-          fallbackUrls.add(targetUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'));
-          fallbackUrls.add(targetUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg'));
+          fallbackUrls
+              .add(targetUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'));
+          fallbackUrls
+              .add(targetUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg'));
         }
         fallbackUrls.add(url);
 
@@ -354,7 +357,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
     // If HQ disk cache is empty, check base disk cache as intermediate preview
     if (isHq && _cachedBytes == null) {
       final baseDiskBytes = await ArtworkCacheManager().get(baseKey);
-      if (baseDiskBytes != null && baseDiskBytes.isNotEmpty && mounted && token == _loadToken) {
+      if (baseDiskBytes != null &&
+          baseDiskBytes.isNotEmpty &&
+          mounted &&
+          token == _loadToken) {
         _cache.put(baseKey, baseDiskBytes, persistToDisk: false);
         setState(() {
           _cachedBytes = baseDiskBytes;
@@ -417,15 +423,26 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final hasBoundedConstraints =
+            constraints.biggest.shortestSide.isFinite &&
+                constraints.biggest.shortestSide > 0;
         final effectiveSize = isBounded
             ? widget.size
-            : (constraints.biggest.shortestSide.isFinite &&
-                    constraints.biggest.shortestSide > 0
+            : (hasBoundedConstraints
                 ? constraints.biggest.shortestSide
                 : 200.0);
 
+        // When the caller asked to fill the parent (`size: double.infinity`)
+        // but the incoming constraints are unbounded, resolve a finite extent
+        // so the RenderBox always receives a size. Without this the ClipRRect
+        // and its child are left unlaid-out, cascading into
+        // "RenderBox was not laid out" / "child.hasSize is not true" crashes.
+        final double? extent = isBounded
+            ? effectiveSize
+            : (hasBoundedConstraints ? null : effectiveSize);
+
         final placeholder = ArtworkPlaceholder(
-          size: isBounded ? effectiveSize : double.infinity,
+          size: extent ?? double.infinity,
           borderRadius: effectiveBorderRadius,
           icon: widget.fallbackIcon,
         );
@@ -444,8 +461,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
               ? Image.memory(
                   _cachedBytes!,
                   key: ValueKey(_cacheKey),
-                  width: isBounded ? effectiveSize : null,
-                  height: isBounded ? effectiveSize : null,
+                  width: extent,
+                  height: extent,
                   cacheWidth: widget.cacheWidth ?? decodeDim,
                   cacheHeight: widget.cacheHeight ?? decodeDim,
                   fit: BoxFit.cover,
@@ -455,8 +472,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 )
               : SizedBox(
                   key: const ValueKey('artwork_placeholder'),
-                  width: isBounded ? effectiveSize : null,
-                  height: isBounded ? effectiveSize : null,
+                  width: extent,
+                  height: extent,
                   child: placeholder,
                 ),
         );
@@ -464,8 +481,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
         return ClipRRect(
           borderRadius: BorderRadius.circular(effectiveBorderRadius),
           child: SizedBox(
-            width: isBounded ? effectiveSize : null,
-            height: isBounded ? effectiveSize : null,
+            width: extent,
+            height: extent,
             child: Semantics(
               label: 'Album artwork',
               image: true,

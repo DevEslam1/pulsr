@@ -38,8 +38,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     if (songs.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
-              Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+              16, Adaptive.pagePadding(context), 160),
         );
       }
       return _buildEmpty(context,
@@ -59,8 +59,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           addAutomaticKeepAlives: false,
           addRepaintBoundaries: true,
-          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
-              Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+              16, Adaptive.pagePadding(context), 160),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(
               context,
@@ -106,7 +106,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: p.accent.withValues(alpha: 0.45),
-                                borderRadius: BorderRadius.circular(AppRadii.r18),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r18),
                               ),
                               child: const Center(
                                 child: Icon(Icons.check_circle_rounded,
@@ -122,7 +123,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             shape: const CircleBorder(),
                             child: InkWell(
                               customBorder: const CircleBorder(),
-                              onTap: () => SongInfoSheet.show(context, song: song),
+                              onTap: () =>
+                                  SongInfoSheet.show(context, song: song),
                               child: const Padding(
                                 padding: EdgeInsets.all(AppSpacing.s6),
                                 child: Icon(Icons.more_vert_rounded,
@@ -149,7 +151,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     song.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                    style: TextStyle(
+                        color: p.textSecondary, fontSize: AppFontSize.label),
                   ),
                 ],
               ),
@@ -166,14 +169,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
 
     Widget buildLoadMoreTile() {
       if (!state.isLoadingMore) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: p.accent,
-          ),
-        ),
+      return const SkeletonShimmer(
+        child: SkeletonSongRow(artworkSize: 40),
       );
     }
 
@@ -182,7 +179,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         key: ValueKey('song_${song.id}'),
         startToEndLabel: context.l10n.playNext,
         endToStartLabel: context.l10n.favorite,
-        backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+        backgroundBuilder: (context, isConfirming) =>
+            PulsrDismissible.buildActionBackground(
           context: context,
           icon: Icons.playlist_play_rounded,
           label: context.l10n.playNext,
@@ -190,7 +188,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           backgroundColor: p.accentContainer,
           isConfirming: isConfirming,
         ),
-        secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+        secondaryBackgroundBuilder: (context, isConfirming) =>
+            PulsrDismissible.buildActionBackground(
           context: context,
           icon: Icons.favorite_rounded,
           label: context.l10n.favorite,
@@ -230,67 +229,73 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           state.sortBy == 'title' &&
           constraints.maxHeight >= 500;
       return RefreshIndicator(
-      color: p.accent,
-      backgroundColor: p.surfaceContainer,
-      onRefresh: () => _handleRefresh(context),
-      child: Stack(
-        children: [
-          trackCols > 1
-              ? GridView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  controller: _songsScrollController,
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: const EdgeInsetsDirectional.only(
-
-                      bottom: AppSpacing.scrollBottom, top: AppSpacing.xs, start: AppSpacing.s6, end: AppSpacing.s6),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: trackCols,
-                    mainAxisExtent: 72,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 4,
+        color: p.accent,
+        backgroundColor: p.surfaceContainer,
+        onRefresh: () => _handleRefresh(context),
+        child: Stack(
+          children: [
+            trackCols > 1
+                ? GridView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: _songsScrollController,
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSpacing.scrollBottom,
+                        top: AppSpacing.xs,
+                        start: AppSpacing.s6,
+                        end: AppSpacing.s6),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: trackCols,
+                      mainAxisExtent: 72,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 4,
+                    ),
+                    itemCount: songs.length + (hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index >= songs.length) return buildLoadMoreTile();
+                      return StaggeredReveal(
+                        index: index,
+                        groupKey: '${state.sortBy}-${state.ascending}',
+                        child: buildSongItem(songs[index], index),
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    controller: _songsScrollController,
+                    itemExtent: songs.length > 500
+                        ? _LibraryScreenState._songRowExtent
+                        : null,
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSpacing.scrollBottom,
+                        top: AppSpacing.xs,
+                        start: AppSpacing.xxs,
+                        end: AppSpacing.xxs),
+                    itemCount: songs.length + (hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index >= songs.length) return buildLoadMoreTile();
+                      return StaggeredReveal(
+                        index: index,
+                        groupKey: '${state.sortBy}-${state.ascending}',
+                        child: buildSongItem(songs[index], index),
+                      );
+                    },
                   ),
-                  itemCount: songs.length + (hasMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index >= songs.length) return buildLoadMoreTile();
-                    return StaggeredReveal(
-                      index: index,
-                      groupKey: '${state.sortBy}-${state.ascending}',
-                      child: buildSongItem(songs[index], index),
-                    );
-                  },
-                )
-              : ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  controller: _songsScrollController,
-                  itemExtent: songs.length > 500 ? _LibraryScreenState._songRowExtent : null,
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: const EdgeInsetsDirectional.only(
-
-                      bottom: AppSpacing.scrollBottom, top: AppSpacing.xs, start: AppSpacing.xxs, end: AppSpacing.xxs),
-                  itemCount: songs.length + (hasMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index >= songs.length) return buildLoadMoreTile();
-                    return StaggeredReveal(
-                      index: index,
-                      groupKey: '${state.sortBy}-${state.ascending}',
-                      child: buildSongItem(songs[index], index),
-                    );
-                  },
+            if (showAlphabet)
+              PositionedDirectional(
+                end: 4,
+                top: 8,
+                bottom: 150,
+                child: AlphabetQuickScroll(
+                  availableLetters: alphabet,
+                  onLetterSelected: (l) => _scrollToLetter(l, songs),
                 ),
-          if (showAlphabet)
-            PositionedDirectional(
-              end: 4,
-              top: 8,
-              bottom: 150,
-              child: AlphabetQuickScroll(
-                availableLetters: alphabet,
-                onLetterSelected: (l) => _scrollToLetter(l, songs),
               ),
-            ),
-        ],
-      ),
+          ],
+        ),
       );
     });
   }
@@ -326,8 +331,11 @@ mixin LibrarySongsTab on State<LibraryScreen> {
         children: [
           // ---------- Header Card with Play All & Shuffle ----------
           Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 12,
-                Adaptive.pagePadding(context), 8),
+            padding: EdgeInsetsDirectional.fromSTEB(
+                Adaptive.pagePadding(context),
+                12,
+                Adaptive.pagePadding(context),
+                8),
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
@@ -414,7 +422,10 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
                     padding: const EdgeInsetsDirectional.only(
-                        bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.s6, end: AppSpacing.s6),
+                        bottom: AppSpacing.scrollBottom,
+                        top: AppSpacing.xxs,
+                        start: AppSpacing.s6,
+                        end: AppSpacing.s6),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: trackCols,
                       mainAxisExtent: 72,
@@ -428,7 +439,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         key: ValueKey('dl_${song.id}'),
                         startToEndLabel: context.l10n.playNext,
                         endToStartLabel: context.l10n.favorite,
-                        backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                        backgroundBuilder: (context, isConfirming) =>
+                            PulsrDismissible.buildActionBackground(
                           context: context,
                           icon: Icons.playlist_play_rounded,
                           label: context.l10n.playNext,
@@ -436,7 +448,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           backgroundColor: p.accentContainer,
                           isConfirming: isConfirming,
                         ),
-                        secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                        secondaryBackgroundBuilder: (context, isConfirming) =>
+                            PulsrDismissible.buildActionBackground(
                           context: context,
                           icon: Icons.favorite_rounded,
                           label: context.l10n.favorite,
@@ -465,7 +478,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             }
                           },
                           onLongPress: () => cubit.toggleSongSelection(song.id),
-                          onMorePressed: () => SongInfoSheet.show(context, song: song),
+                          onMorePressed: () =>
+                              SongInfoSheet.show(context, song: song),
                         ),
                       );
                     },
@@ -474,8 +488,11 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
-                    padding:
-                        const EdgeInsetsDirectional.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs, start: AppSpacing.xxs, end: AppSpacing.xxs),
+                    padding: const EdgeInsetsDirectional.only(
+                        bottom: AppSpacing.scrollBottom,
+                        top: AppSpacing.xxs,
+                        start: AppSpacing.xxs,
+                        end: AppSpacing.xxs),
                     itemCount: downloaded.length,
                     itemBuilder: (context, index) {
                       final song = downloaded[index];
@@ -483,7 +500,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         key: ValueKey('dl_${song.id}'),
                         startToEndLabel: context.l10n.playNext,
                         endToStartLabel: context.l10n.favorite,
-                        backgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                        backgroundBuilder: (context, isConfirming) =>
+                            PulsrDismissible.buildActionBackground(
                           context: context,
                           icon: Icons.playlist_play_rounded,
                           label: context.l10n.playNext,
@@ -491,7 +509,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           backgroundColor: p.accentContainer,
                           isConfirming: isConfirming,
                         ),
-                        secondaryBackgroundBuilder: (context, isConfirming) => PulsrDismissible.buildActionBackground(
+                        secondaryBackgroundBuilder: (context, isConfirming) =>
+                            PulsrDismissible.buildActionBackground(
                           context: context,
                           icon: Icons.favorite_rounded,
                           label: context.l10n.favorite,
@@ -520,7 +539,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             }
                           },
                           onLongPress: () => cubit.toggleSongSelection(song.id),
-                          onMorePressed: () => SongInfoSheet.show(context, song: song),
+                          onMorePressed: () =>
+                              SongInfoSheet.show(context, song: song),
                         ),
                       );
                     },
@@ -533,31 +553,16 @@ mixin LibrarySongsTab on State<LibraryScreen> {
 
   bool _isOnlineDownload(SongsTableData s) => isDownloadedOnlineTrack(s);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   // Requires: provided by the composing class (same library).
-  Widget _buildEmpty( BuildContext context, { required String title, required String subtitle, required IconData icon, String? actionLabel, IconData? actionIcon, VoidCallback? onAction, });
+  Widget _buildEmpty(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    String? actionLabel,
+    IconData? actionIcon,
+    VoidCallback? onAction,
+  });
 
   // Requires: provided by the composing class (same library).
   Future<void> _handleRefresh(BuildContext context);

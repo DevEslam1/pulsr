@@ -153,261 +153,275 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
 
     String labelFor(Duration d) =>
         '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
-    final increasedLabel = labelFor(
-        clampDuration(currentDuration + const Duration(seconds: 10)));
-    final decreasedLabel = labelFor(
-        clampDuration(currentDuration - const Duration(seconds: 10)));
+    final increasedLabel =
+        labelFor(clampDuration(currentDuration + const Duration(seconds: 10)));
+    final decreasedLabel =
+        labelFor(clampDuration(currentDuration - const Duration(seconds: 10)));
 
     return RepaintBoundary(
       child: Semantics(
-      slider: true,
-      label: widget.semanticLabel ?? context.l10n.seekLabel,
-      value: valueLabel,
-      increasedValue: increasedLabel,
-      decreasedValue: decreasedLabel,
-      onIncrease: () => widget.onSeek(
-          clampDuration(currentDuration + const Duration(seconds: 10))),
-      onDecrease: () => widget.onSeek(
-          clampDuration(currentDuration - const Duration(seconds: 10))),
-      child: Directionality(
-      textDirection: Directionality.of(context),
-      child: RepaintBoundary(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Interactive Waveform Area with Pinch-to-Zoom
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final trackWidth = constraints.maxWidth;
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onDoubleTap: () {
-                      if (_zoomScale > 1.0) {
-                        HapticFeedback.selectionClick();
-                        setState(() => _zoomScale = 1.0);
-                      }
-                    },
-                    onScaleUpdate: (details) {
-                      if (details.scale != 1.0) {
-                        final now = DateTime.now().millisecondsSinceEpoch;
-                        if (now - _lastScaleMs >= 33) {
-                          _lastScaleMs = now;
-                          setState(() {
-                            // BUG-28: clamp the gesture factor before applying
-                            // it so an extreme pinch cannot overflow.
-                            final clampedScale =
-                                details.scale.clamp(0.1, 10.0);
-                            _zoomScale = (_zoomScale * clampedScale).clamp(
-                                PlayerConstants.waveformMinZoom,
-                                PlayerConstants.waveformMaxZoom);
-                            // BUG-08: if a scrub is in progress, re-freeze the
-                            // window at the new zoom so coordinate mapping stays
-                            // accurate.
-                            if (_dragFrozenWindow != null) {
-                              _dragFrozenWindow = _computeWindow(totalCount);
-                            }
-                          });
-                        }
-                      }
-                    },
-                    onHorizontalDragStart: (details) {
-                      if (trackWidth > 0 && maxDuration > 0) {
-                        HapticFeedback.selectionClick();
-                        _dragFrozenWindow = _visibleWindow(totalCount);
-                        final ratio =
-                            _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
-                        setState(() {
-                          _dragValue = (ratio * maxDuration).clamp(0.0, maxDuration);
-                        });
-                      }
-                    },
-                    onHorizontalDragUpdate: (details) {
-                      if (trackWidth > 0 && maxDuration > 0) {
-                        final ratio =
-                            _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
-                        setState(() {
-                          _dragValue = (ratio * maxDuration).clamp(0.0, maxDuration);
-                        });
-                      }
-                    },
-                    onHorizontalDragEnd: (details) {
-                      if (_dragValue != null) {
-                        HapticFeedback.lightImpact();
-                        widget.onSeek(
-                            Duration(milliseconds: _dragValue!.round()));
-                        setState(() {
-                          _dragValue = null;
-                          _dragFrozenWindow = null;
-                        });
-                      }
-                    },
-                    onHorizontalDragCancel: () {
-                      if (_dragValue != null) {
-                        setState(() {
-                          _dragValue = null;
-                          _dragFrozenWindow = null;
-                        });
-                      }
-                    },
-                    onTapDown: (details) {
-                      if (trackWidth > 0 && maxDuration > 0) {
-                        HapticFeedback.selectionClick();
-                        final ratio =
-                            _ratioForDx(details.localPosition.dx, trackWidth, totalCount);
-                        final seekMs = ratio * maxDuration;
-                        widget.onSeek(Duration(milliseconds: seekMs.round()));
-                      }
-                    },
-                    child: SizedBox(
-                      height: widget.height,
-                      width: double.infinity,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned.fill(
-                            child: RepaintBoundary(
-                              child: Semantics(
-                                label: context.l10n.waveformSeekBar,
-                                value:
-                                    '${Formatters.formatDuration(currentDuration)} / '
-                                    '${Formatters.formatDuration(widget.duration)}',
-                                child: CustomPaint(
-                                  painter: _WaveformPainter(
-                                    samples: widget.samples,
-                                    progress: progressPercent,
-                                    activeColor: widget.activeColor,
-                                    inactiveColor: inactiveColor,
-                                    chapterMarkers: widget.chapterMarkers,
-                                    duration: widget.duration,
-                                    loopPointA: widget.loopPointA,
-                                    loopPointB: widget.loopPointB,
-                                    crossfadeDuration: widget.crossfadeDuration,
-                                    zoomScale: _zoomScale,
-                                    visibleStart: window.startIndex,
-                                    visibleCount: window.visibleCount,
-                                    style: widget.style,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Scrub preview bubble follows the finger while dragging.
-                          if (_dragValue != null)
-                            PositionedDirectional(
-                              top: -30,
-                              start: (progressPercent * trackWidth - 32)
-                                  .clamp(0.0, (trackWidth - 64).clamp(0.0, trackWidth)),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.xs,
-                                    vertical: AppSpacing.s2),
-                                decoration: BoxDecoration(
-                                  color: context.palette.surfaceContainerHigh,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r8),
-                                  border:
-                                      Border.all(color: context.palette.hairline),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.25),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  Formatters.formatDuration(currentDuration),
-                                  style: TextStyle(
-                                    color: context.palette.textPrimary,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              // Timestamps Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        slider: true,
+        label: widget.semanticLabel ?? context.l10n.seekLabel,
+        value: valueLabel,
+        increasedValue: increasedLabel,
+        decreasedValue: decreasedLabel,
+        onIncrease: () => widget.onSeek(
+            clampDuration(currentDuration + const Duration(seconds: 10))),
+        onDecrease: () => widget.onSeek(
+            clampDuration(currentDuration - const Duration(seconds: 10))),
+        child: Directionality(
+          textDirection: Directionality.of(context),
+          child: RepaintBoundary(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    Formatters.formatDuration(
-                      _dragValue != null
-                          ? Duration(milliseconds: _dragValue!.round())
-                          : widget.position,
-                    ),
-                    style: TextStyle(
-                      color: context.palette.textSecondary,
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (_zoomScale > 1.05)
-                    Semantics(
-                      button: true,
-                      label: context.l10n.resetWaveformZoom,
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _zoomScale = 1.0);
+                  // Interactive Waveform Area with Pinch-to-Zoom
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final trackWidth = constraints.maxWidth;
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onDoubleTap: () {
+                          if (_zoomScale > 1.0) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _zoomScale = 1.0);
+                          }
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
-                          decoration: BoxDecoration(
-                            color: context.palette.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r6),
-                            border: Border.all(
-                              color: context.palette.accent.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        onScaleUpdate: (details) {
+                          if (details.scale != 1.0) {
+                            final now = DateTime.now().millisecondsSinceEpoch;
+                            if (now - _lastScaleMs >= 33) {
+                              _lastScaleMs = now;
+                              setState(() {
+                                // BUG-28: clamp the gesture factor before applying
+                                // it so an extreme pinch cannot overflow.
+                                final clampedScale =
+                                    details.scale.clamp(0.1, 10.0);
+                                _zoomScale = (_zoomScale * clampedScale).clamp(
+                                    PlayerConstants.waveformMinZoom,
+                                    PlayerConstants.waveformMaxZoom);
+                                // BUG-08: if a scrub is in progress, re-freeze the
+                                // window at the new zoom so coordinate mapping stays
+                                // accurate.
+                                if (_dragFrozenWindow != null) {
+                                  _dragFrozenWindow =
+                                      _computeWindow(totalCount);
+                                }
+                              });
+                            }
+                          }
+                        },
+                        onHorizontalDragStart: (details) {
+                          if (trackWidth > 0 && maxDuration > 0) {
+                            HapticFeedback.selectionClick();
+                            _dragFrozenWindow = _visibleWindow(totalCount);
+                            final ratio = _ratioForDx(details.localPosition.dx,
+                                trackWidth, totalCount);
+                            setState(() {
+                              _dragValue =
+                                  (ratio * maxDuration).clamp(0.0, maxDuration);
+                            });
+                          }
+                        },
+                        onHorizontalDragUpdate: (details) {
+                          if (trackWidth > 0 && maxDuration > 0) {
+                            final ratio = _ratioForDx(details.localPosition.dx,
+                                trackWidth, totalCount);
+                            setState(() {
+                              _dragValue =
+                                  (ratio * maxDuration).clamp(0.0, maxDuration);
+                            });
+                          }
+                        },
+                        onHorizontalDragEnd: (details) {
+                          if (_dragValue != null) {
+                            HapticFeedback.lightImpact();
+                            widget.onSeek(
+                                Duration(milliseconds: _dragValue!.round()));
+                            setState(() {
+                              _dragValue = null;
+                              _dragFrozenWindow = null;
+                            });
+                          }
+                        },
+                        onHorizontalDragCancel: () {
+                          if (_dragValue != null) {
+                            setState(() {
+                              _dragValue = null;
+                              _dragFrozenWindow = null;
+                            });
+                          }
+                        },
+                        onTapDown: (details) {
+                          if (trackWidth > 0 && maxDuration > 0) {
+                            HapticFeedback.selectionClick();
+                            final ratio = _ratioForDx(details.localPosition.dx,
+                                trackWidth, totalCount);
+                            final seekMs = ratio * maxDuration;
+                            widget
+                                .onSeek(Duration(milliseconds: seekMs.round()));
+                          }
+                        },
+                        child: SizedBox(
+                          height: widget.height,
+                          width: double.infinity,
+                          child: Stack(
+                            clipBehavior: Clip.none,
                             children: [
-                              Text(
-                                '${_zoomScale.toStringAsFixed(1)}x',
-                                style: TextStyle(
-                                  color: context.palette.accent,
-                                  fontSize: AppFontSize.tiny,
-                                  fontWeight: FontWeight.w800,
+                              Positioned.fill(
+                                child: RepaintBoundary(
+                                  child: Semantics(
+                                    label: context.l10n.waveformSeekBar,
+                                    value:
+                                        '${Formatters.formatDuration(currentDuration)} / '
+                                        '${Formatters.formatDuration(widget.duration)}',
+                                    child: CustomPaint(
+                                      painter: _WaveformPainter(
+                                        samples: widget.samples,
+                                        progress: progressPercent,
+                                        activeColor: widget.activeColor,
+                                        inactiveColor: inactiveColor,
+                                        chapterMarkers: widget.chapterMarkers,
+                                        duration: widget.duration,
+                                        loopPointA: widget.loopPointA,
+                                        loopPointB: widget.loopPointB,
+                                        crossfadeDuration:
+                                            widget.crossfadeDuration,
+                                        zoomScale: _zoomScale,
+                                        visibleStart: window.startIndex,
+                                        visibleCount: window.visibleCount,
+                                        style: widget.style,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: AppSpacing.s2),
-                              Icon(
-                                Icons.close_rounded,
-                                size: 12,
-                                color: context.palette.accent,
-                              ),
+                              // Scrub preview bubble follows the finger while dragging.
+                              if (_dragValue != null)
+                                PositionedDirectional(
+                                  top: -30,
+                                  start: (progressPercent * trackWidth - 32)
+                                      .clamp(
+                                          0.0,
+                                          (trackWidth - 64)
+                                              .clamp(0.0, trackWidth)),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.xs,
+                                        vertical: AppSpacing.s2),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          context.palette.surfaceContainerHigh,
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.r8),
+                                      border: Border.all(
+                                          color: context.palette.hairline),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.25),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      Formatters.formatDuration(
+                                          currentDuration),
+                                      style: TextStyle(
+                                        color: context.palette.textPrimary,
+                                        fontSize: AppFontSize.caption,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  // Timestamps Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        Formatters.formatDuration(
+                          _dragValue != null
+                              ? Duration(milliseconds: _dragValue!.round())
+                              : widget.position,
+                        ),
+                        style: TextStyle(
+                          color: context.palette.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  Text(
-                    Formatters.formatDuration(widget.duration),
-                    style: TextStyle(
-                      color: context.palette.textSecondary,
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w600,
-                    ),
+                      if (_zoomScale > 1.05)
+                        Semantics(
+                          button: true,
+                          label: context.l10n.resetWaveformZoom,
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _zoomScale = 1.0);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s6,
+                                  vertical: AppSpacing.s2),
+                              decoration: BoxDecoration(
+                                color: context.palette.accent
+                                    .withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r6),
+                                border: Border.all(
+                                  color: context.palette.accent
+                                      .withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_zoomScale.toStringAsFixed(1)}x',
+                                    style: TextStyle(
+                                      color: context.palette.accent,
+                                      fontSize: AppFontSize.tiny,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.s2),
+                                  Icon(
+                                    Icons.close_rounded,
+                                    size: 12,
+                                    color: context.palette.accent,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      Text(
+                        Formatters.formatDuration(widget.duration),
+                        style: TextStyle(
+                          color: context.palette.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
-        ),
       ),
-    ),
     );
   }
 }
@@ -487,8 +501,8 @@ class _WaveformPainter extends CustomPainter {
       switch (style) {
         case WaveformVisualizerStyle.mirroredBars:
           for (int i = 0; i < count; i++) {
-            final double barHeight =
-                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double barHeight = (visibleSamples[i] * size.height)
+                .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing);
             final double y = (size.height - barHeight) / 2;
             final rect = RRect.fromRectAndRadius(
@@ -500,8 +514,8 @@ class _WaveformPainter extends CustomPainter {
           break;
         case WaveformVisualizerStyle.roundedTopBars:
           for (int i = 0; i < count; i++) {
-            final double barHeight =
-                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double barHeight = (visibleSamples[i] * size.height)
+                .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing);
             final double y = size.height - barHeight;
             final rect = RRect.fromRectAndCorners(
@@ -515,8 +529,8 @@ class _WaveformPainter extends CustomPainter {
         case WaveformVisualizerStyle.continuousEnvelope:
           final topPath = Path();
           for (int i = 0; i < count; i++) {
-            final double barHeight =
-                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double barHeight = (visibleSamples[i] * size.height)
+                .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double topY = (size.height - barHeight) / 2;
             if (i == 0) {
@@ -528,8 +542,8 @@ class _WaveformPainter extends CustomPainter {
           final combined = Path.from(topPath);
           combined.lineTo(size.width, size.height / 2);
           for (int i = count - 1; i >= 0; i--) {
-            final double barHeight =
-                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double barHeight = (visibleSamples[i] * size.height)
+                .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double bottomY = (size.height + barHeight) / 2;
             combined.lineTo(x, bottomY);
@@ -540,8 +554,8 @@ class _WaveformPainter extends CustomPainter {
         case WaveformVisualizerStyle.neonGlowLine:
           final linePath = Path();
           for (int i = 0; i < count; i++) {
-            final double barHeight =
-                (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+            final double barHeight = (visibleSamples[i] * size.height)
+                .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double y = (size.height - barHeight) / 2;
             if (i == 0) {
@@ -624,10 +638,12 @@ class _WaveformPainter extends CustomPainter {
 
       // Shade the looping region so the A-B span reads clearly at any zoom scale.
       if (loopPointA != null && loopPointB != null) {
-        final double ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds)
-            .clamp(0.0, 1.0);
-        final double ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds)
-            .clamp(0.0, 1.0);
+        final double ratioA =
+            (loopPointA!.inMilliseconds / duration.inMilliseconds)
+                .clamp(0.0, 1.0);
+        final double ratioB =
+            (loopPointB!.inMilliseconds / duration.inMilliseconds)
+                .clamp(0.0, 1.0);
         final double globalMin = math.min(ratioA, ratioB);
         final double globalMax = math.max(ratioA, ratioB);
 

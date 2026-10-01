@@ -77,7 +77,8 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
   Widget build(BuildContext context) {
     final p = context.palette;
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.s2),
       leading: Icon(Icons.download_for_offline_rounded, color: p.accent),
       title: Text(
         context.l10n.settingsDownloadConcurrent,
@@ -89,13 +90,15 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
       ),
       subtitle: Text(
         context.l10n.settingsDownloadConcurrentSubtitle,
-        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label, height: 1.32),
+        style: TextStyle(
+            color: p.textSecondary, fontSize: AppFontSize.label, height: 1.32),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
             margin: const EdgeInsetsDirectional.only(end: 6),
             decoration: BoxDecoration(
               color: p.accent.withValues(alpha: 0.12),
@@ -130,7 +133,8 @@ class DownloadLocationTile extends StatelessWidget {
     final p = context.palette;
     return ListTile(
       enabled: false,
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.s2),
       leading: Icon(Icons.folder_outlined, color: p.textTertiary),
       title: Text(
         context.l10n.settingsDownloadLocation,
@@ -143,7 +147,8 @@ class DownloadLocationTile extends StatelessWidget {
       ),
       subtitle: Text(
         context.l10n.settingsDownloadLocationUnsupported,
-        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label, height: 1.32),
+        style: TextStyle(
+            color: p.textTertiary, fontSize: AppFontSize.label, height: 1.32),
       ),
     );
   }

@@ -43,13 +43,15 @@ void main() {
     );
   }
 
-  testWidgets('H-07: peeking state resets when orientation changes', (tester) async {
+  testWidgets('H-07: peeking state resets when orientation changes',
+      (tester) async {
     // 1. Start in landscape mode
     await tester.binding.setSurfaceSize(const Size(1000, 600));
     await tester.pumpWidget(buildWidget(screenSize: const Size(1000, 600)));
     await tester.pumpAndSettle();
 
-    final state = tester.state<LandscapeSidebarState>(find.byType(LandscapeSidebar));
+    final state =
+        tester.state<LandscapeSidebarState>(find.byType(LandscapeSidebar));
     expect(state.isPeeking, isFalse);
 
     // 2. Trigger peek

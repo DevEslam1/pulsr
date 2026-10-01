@@ -65,7 +65,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           final granted = await _service.requestPermission();
           if (!granted) {
             if (mounted) {
-              ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(context.l10n.usbPermDenied),
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+                content: Text(context.l10n.usbPermDenied),
               ));
             }
             await _refresh();
@@ -114,7 +115,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           if (mounted) {
             final rateKhz = (sampleRate / 1000).toStringAsFixed(1);
             ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-              content: Text('${context.l10n.usbBpFailed}: ${res.toUserMessage()} ($rateKhz kHz)'),
+              content: Text(
+                  '${context.l10n.usbBpFailed}: ${res.toUserMessage()} ($rateKhz kHz)'),
               action: SnackBarAction(
                 label: 'Retry',
                 onPressed: () => _toggleStreaming(true),
@@ -140,8 +142,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     final hasHwVolume = _status.hasVolumeControl;
     final minDb = _status.minVolumeDb ?? -60.0;
     final maxDb = _status.maxVolumeDb ?? 0.0;
-    final currentDb = (_pendingDb ?? _status.hardwareVolumeDb ?? maxDb)
-        .clamp(minDb, maxDb);
+    final currentDb =
+        (_pendingDb ?? _status.hardwareVolumeDb ?? maxDb).clamp(minDb, maxDb);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -155,12 +157,14 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                   _status.uacLabel, _status.deviceName ?? '')
               : context.l10n.settingsUsbHwVolumeGrant,
           value: enabled && hasHwVolume,
-          disabledReason: hasHwVolume ? null : context.l10n.settingsDacNoUacVolume,
+          disabledReason:
+              hasHwVolume ? null : context.l10n.settingsDacNoUacVolume,
           onChanged: hasHwVolume ? _onToggle : (v) {},
         ),
         if (enabled && hasHwVolume)
           Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -197,8 +201,9 @@ class _UsbDacSectionState extends State<UsbDacSection> {
               ? context.l10n.settingsStreamingClaimed
               : context.l10n.settingsExclusiveUsbDesc,
           value: _status.exclusiveActive,
-          disabledReason:
-              _status.exclusiveSupported ? null : context.l10n.settingsRequiresUacDac,
+          disabledReason: _status.exclusiveSupported
+              ? null
+              : context.l10n.settingsRequiresUacDac,
           onChanged: _status.exclusiveSupported
               ? (v) async {
                   await _service.setExclusive(v);
@@ -214,7 +219,8 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                 ? context.l10n.settingsUsbStreamingActive
                 : context.l10n.settingsUsbStreamingDesc,
             value: _status.streamingActive,
-            disabledReason: _streamingBusy ? context.l10n.settingsStarting : null,
+            disabledReason:
+                _streamingBusy ? context.l10n.settingsStarting : null,
             onChanged: _streamingBusy ? (v) {} : _toggleStreaming,
           ),
       ],

@@ -32,7 +32,8 @@ void main() {
       }
     }
     expect(count, lessThanOrEqualTo(baseline),
-        reason: 'empty catch blocks grew ($count > $baseline). Replace the bare '
+        reason:
+            'empty catch blocks grew ($count > $baseline). Replace the bare '
             'catch with at least `ErrorLogger.log(...)` so the failure is '
             'visible. Offenders:\n${offenders.join('\n')}');
   });

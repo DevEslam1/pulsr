@@ -330,8 +330,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           // last_played is written in milliseconds (recordPlayHistory), unlike
           // date_added which is MediaStore seconds. Comparing it to a seconds
           // cutoff matched every track, so use a millisecond cutoff here.
-          final cutoffMs = DateTime.now().millisecondsSinceEpoch -
-              (days * 86400 * 1000);
+          final cutoffMs =
+              DateTime.now().millisecondsSinceEpoch - (days * 86400 * 1000);
           return t.lastPlayed.isNotNull() &
               t.lastPlayed.isBiggerOrEqualValue(cutoffMs);
         }
@@ -415,7 +415,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   (int, int)? _parseIntBetween(String valStr) {
     // Fix: previously `RegExp(r'[,.\s-]+|to|\.\.')` had `to` inside char class matching single t/o; now correctly handles "100 to 200" and "100..200"
-    final normalized = valStr.replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ').replaceAll('..', ' ');
+    final normalized = valStr
+        .replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ')
+        .replaceAll('..', ' ');
     final parts = normalized
         .split(RegExp(r'[,;\s-]+'))
         .map((e) => int.tryParse(e.trim()))
@@ -430,7 +432,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   (double, double)? _parseDoubleBetween(String valStr) {
-    final normalized = valStr.replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ').replaceAll('..', ' ');
+    final normalized = valStr
+        .replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ')
+        .replaceAll('..', ' ');
     final parts = normalized
         .split(RegExp(r'[,;\s-]+'))
         .map((e) => double.tryParse(e.trim()))
@@ -446,9 +450,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   @override
   Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async {
-    final dartRules = criteria.rules
-        .where((r) => _isDartRule(r.field))
-        .toList();
+    final dartRules =
+        criteria.rules.where((r) => _isDartRule(r.field)).toList();
     if (dartRules.isEmpty) {
       final list = await _buildQuery(criteria).get();
       return _postProcess(list, criteria, const []);
@@ -458,9 +461,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       return _postProcess(base, criteria, dartRules);
     }
     // matchAny: union of SQL matches and prefs-backed matches.
-    final sqlRules = criteria.rules
-        .where((r) => !_isDartRule(r.field))
-        .toList();
+    final sqlRules =
+        criteria.rules.where((r) => !_isDartRule(r.field)).toList();
     final base = sqlRules.isEmpty
         ? <SongsTableData>[]
         : await _buildQuery(_withoutDartRules(criteria)).get();
@@ -473,12 +475,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
 
   @override
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) {
-    final dartRules = criteria.rules
-        .where((r) => _isDartRule(r.field))
-        .toList();
+    final dartRules =
+        criteria.rules.where((r) => _isDartRule(r.field)).toList();
     if (dartRules.isEmpty) {
-      final stream =
-          _buildQuery(criteria).watch().debounceTime(const Duration(milliseconds: 500));
+      final stream = _buildQuery(criteria)
+          .watch()
+          .debounceTime(const Duration(milliseconds: 500));
       if (criteria.sortBy == 'rating') {
         return stream.map((list) => _postProcess(list, criteria, const []));
       }
@@ -490,9 +492,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           .debounceTime(const Duration(milliseconds: 500))
           .map((list) => _postProcess(list, criteria, dartRules));
     }
-    final sqlRules = criteria.rules
-        .where((r) => !_isDartRule(r.field))
-        .toList();
+    final sqlRules =
+        criteria.rules.where((r) => !_isDartRule(r.field)).toList();
     final baseStream = sqlRules.isEmpty
         ? Stream.value(<SongsTableData>[])
         : _buildQuery(_withoutDartRules(criteria)).watch();
@@ -505,17 +506,13 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           ..addAll(all.where((s) => !baseIds.contains(s.id)));
         return (merged, baseIds);
       },
-    )
-        .debounceTime(const Duration(milliseconds: 500))
-        .map((parts) =>
-            _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
+    ).debounceTime(const Duration(milliseconds: 500)).map(
+        (parts) => _postProcessAny(parts.$1, parts.$2, criteria, dartRules));
   }
 
   /// [criteria] with prefs-backed rules removed (SQL shape only).
   SmartCriteria _withoutDartRules(SmartCriteria criteria) => SmartCriteria(
-        rules: criteria.rules
-            .where((r) => !_isDartRule(r.field))
-            .toList(),
+        rules: criteria.rules.where((r) => !_isDartRule(r.field)).toList(),
         matchAll: criteria.matchAll,
         sortAscending: criteria.sortAscending,
       );

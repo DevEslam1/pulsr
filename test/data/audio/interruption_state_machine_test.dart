@@ -62,7 +62,8 @@ void main() {
       expect(m.isActive, isTrue);
     });
 
-    test('begin is stack-safe: an overlapping begin keeps the original snapshot',
+    test(
+        'begin is stack-safe: an overlapping begin keeps the original snapshot',
         () {
       final m = InterruptionStateMachine();
       m.begin(InterruptionKind.duck, playing: true);

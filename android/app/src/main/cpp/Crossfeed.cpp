@@ -66,6 +66,14 @@ void Crossfeed::setMode(CrossfeedMode mode) {
             break;
         case CrossfeedMode::Custom:
             break;
+        default:
+            // Out-of-range mode: fall back to the default preset rather than
+            // silently reusing whatever stale fcut_/feedDb_/delayUs_ were set.
+            mode_ = CrossfeedMode::Bs2bDefault;
+            fcut_ = 700.0;
+            feedDb_ = -4.5;
+            delayUs_ = 300.0;
+            break;
     }
     initBs2b(fcut_, feedDb_);
     configure(delayUs_, feedDb_, fcut_);

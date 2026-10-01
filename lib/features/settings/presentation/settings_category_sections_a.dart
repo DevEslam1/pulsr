@@ -24,7 +24,8 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
       [
         // Theme selector segment
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -69,7 +70,8 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
 
         // Accent Color Palette
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -104,7 +106,8 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
                     final isSelected =
                         state.customAccentColorValue == color.toARGB32();
                     return Padding(
-                      padding: const EdgeInsetsDirectional.only(end: AppSpacing.sm),
+                      padding:
+                          const EdgeInsetsDirectional.only(end: AppSpacing.sm),
                       child: GestureDetector(
                         onTap: () => cubit.setCustomAccentColor(color),
                         child: AnimatedContainer(
@@ -191,7 +194,8 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
         ),
         _divider(p),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -378,7 +382,8 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
           context,
           Icons.gesture_rounded,
           context.l10n.artworkSwipe,
-          getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe, context.l10n),
+          getNowPlayingArtworkSwipeTitle(
+              state.nowPlayingArtworkSwipe, context.l10n),
           onTap: () => showNowPlayingArtworkSwipePickerSheet(
             context,
             cubit,
@@ -518,53 +523,6 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
     );
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   // Requires: provided by the composing class (same library).
   _Category _catById(String id);
 
@@ -575,17 +533,45 @@ mixin SettingsCategorySectionsA on State<SettingsScreen> {
   Future<void> _fetchMissingArtwork(BuildContext context);
 
   // Requires: provided by the composing class (same library).
-  Widget _navTile( BuildContext context, IconData icon, String title, String subtitle, { Widget? trailing, String? trailingBadge, VoidCallback? onTap, });
+  Widget _navTile(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle, {
+    Widget? trailing,
+    String? trailingBadge,
+    VoidCallback? onTap,
+  });
 
   // Requires: provided by the composing class (same library).
-  Future<void> _removeMissingFiles( BuildContext context, SettingsCubit cubit, );
+  Future<void> _removeMissingFiles(
+    BuildContext context,
+    SettingsCubit cubit,
+  );
 
   // Requires: provided by the composing class (same library).
-  Widget _section( BuildContext context, String title, String subtitle, List<Widget> children, { GlobalKey? key, });
+  Widget _section(
+    BuildContext context,
+    String title,
+    String subtitle,
+    List<Widget> children, {
+    GlobalKey? key,
+  });
 
   // Requires: provided by the composing class (same library).
-  void _showDurationFilterDialog( BuildContext context, SettingsCubit cubit, int currentSec, );
+  void _showDurationFilterDialog(
+    BuildContext context,
+    SettingsCubit cubit,
+    int currentSec,
+  );
 
   // Requires: provided by the composing class (same library).
-  Widget _switchTile( BuildContext context, IconData icon, String title, String subtitle, { required bool value, required ValueChanged<bool> onChanged, });
+  Widget _switchTile(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String subtitle, {
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  });
 }

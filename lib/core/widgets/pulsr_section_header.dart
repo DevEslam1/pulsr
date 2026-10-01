@@ -36,10 +36,8 @@ class PulsrSectionHeader extends StatelessWidget {
           Expanded(
             child: Text(
               title.toUpperCase(),
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: p.textTertiary, letterSpacing: AppTracking.wide),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: p.textTertiary, letterSpacing: AppTracking.wide),
             ),
           ),
           if (trailing != null)

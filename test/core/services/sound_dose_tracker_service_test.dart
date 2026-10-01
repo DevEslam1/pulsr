@@ -11,7 +11,8 @@ void main() {
       tracker = SoundDoseTrackerService();
     });
 
-    test('calculates correct dose for 40 hours at 80 dBA as exactly 100%', () async {
+    test('calculates correct dose for 40 hours at 80 dBA as exactly 100%',
+        () async {
       tracker.recordSession(
         duration: const Duration(hours: 40),
         estimatedDba: 80.0,
@@ -21,7 +22,8 @@ void main() {
       expect(dose, closeTo(100.0, 0.01));
     });
 
-    test('halves allowed time every 3 dB (20 hours at 83 dBA = 100%)', () async {
+    test('halves allowed time every 3 dB (20 hours at 83 dBA = 100%)',
+        () async {
       tracker.recordSession(
         duration: const Duration(hours: 20),
         estimatedDba: 83.0,

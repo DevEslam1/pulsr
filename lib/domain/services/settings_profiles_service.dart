@@ -182,4 +182,3 @@ class SettingsProfilesService {
         _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
   }
 }
-

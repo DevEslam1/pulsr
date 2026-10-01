@@ -29,6 +29,7 @@ import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class CassettePlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
@@ -519,18 +520,20 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     constraints: BoxConstraints(
                       maxWidth: isTablet ? 440.0 : 380.0,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                            ),
+                            child: viewSwitcher,
                           ),
-                          child: viewSwitcher,
-                        ),
-                        controlsColumn,
-                      ],
+                          controlsColumn,
+                        ],
+                      ),
                     ),
                   ),
                 )
@@ -584,7 +587,10 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                             fit: StackFit.expand,
                             alignment: Alignment.center,
                             children: <Widget>[
-                              ...previousChildren,
+                              // BUG-FIX: previous panes are fading out —
+                              // prevent them from stealing touch events.
+                              ...previousChildren.map(
+                                  (c) => IgnorePointer(child: c)),
                               if (currentChild != null) currentChild,
                             ],
                           );
@@ -832,7 +838,7 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
-          border: Border.all(color: Colors.grey.shade400, width: 3),
+          border: Border.all(color: AppColors.discSilver, width: 3),
         ),
         child: Center(
           child: Container(

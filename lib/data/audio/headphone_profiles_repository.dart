@@ -63,7 +63,8 @@ class HeadphoneProfilesRepository {
   Future<void> addCustomProfile(HeadphoneProfile profile) async {
     if (profile.gains.isEmpty ||
         profile.gains.any((g) => !g.isFinite || g.abs() > 15)) {
-      ErrorLogger.log('Rejected custom profile with invalid gains: ${profile.id}',
+      ErrorLogger.log(
+          'Rejected custom profile with invalid gains: ${profile.id}',
           category: 'HeadphoneProfilesRepository');
       return;
     }

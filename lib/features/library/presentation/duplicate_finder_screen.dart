@@ -13,6 +13,7 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/song_tile.dart';
+import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -104,19 +105,22 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     int updatedCount = 0;
     for (final group in _duplicateGroups) {
       if (group.songs.isEmpty) continue;
-      final sorted = List<SongsTableData>.from(group.songs)..sort((a, b) {
-        final aBitrate = a.bitrateKbps ?? 0;
-        final bBitrate = b.bitrateKbps ?? 0;
-        if (aBitrate != bBitrate) return bBitrate.compareTo(aBitrate);
+      final sorted = List<SongsTableData>.from(group.songs)
+        ..sort((a, b) {
+          final aBitrate = a.bitrateKbps ?? 0;
+          final bBitrate = b.bitrateKbps ?? 0;
+          if (aBitrate != bBitrate) return bBitrate.compareTo(aBitrate);
 
-        final aIsLossless = a.path.endsWith('.flac') || a.path.endsWith('.wav');
-        final bIsLossless = b.path.endsWith('.flac') || b.path.endsWith('.wav');
-        if (aIsLossless != bIsLossless) return aIsLossless ? -1 : 1;
+          final aIsLossless =
+              a.path.endsWith('.flac') || a.path.endsWith('.wav');
+          final bIsLossless =
+              b.path.endsWith('.flac') || b.path.endsWith('.wav');
+          if (aIsLossless != bIsLossless) return aIsLossless ? -1 : 1;
 
-        final aSize = a.fileSize ?? 0;
-        final bSize = b.fileSize ?? 0;
-        return bSize.compareTo(aSize);
-      });
+          final aSize = a.fileSize ?? 0;
+          final bSize = b.fileSize ?? 0;
+          return bSize.compareTo(aSize);
+        });
 
       final bestSong = sorted.first;
       _keptSongByGroup[group.key] = bestSong.id;
@@ -126,7 +130,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     if (!mounted) return;
     PulsrToast.show(
       context,
-                            message: context.l10n.selectedHighestQuality(updatedCount),
+      message: context.l10n.selectedHighestQuality(updatedCount),
       icon: Icons.auto_awesome_rounded,
     );
   }
@@ -252,7 +256,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             if (_duplicateGroups.isNotEmpty)
               IconButton(
                 icon: Icon(Icons.auto_awesome_rounded, color: p.accent),
-                        tooltip: context.l10n.keepBestQualityForAll,
+                tooltip: context.l10n.keepBestQualityForAll,
                 constraints: const BoxConstraints(
                   minWidth: AppSpacing.minTouchTarget,
                   minHeight: AppSpacing.minTouchTarget,
@@ -261,7 +265,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               ),
             IconButton(
               icon: _isFetchingArtwork
-                  ? SizedBox(width: AppSpacing.s20,
+                  ? SizedBox(
+                      width: AppSpacing.s20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
@@ -299,19 +304,17 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Widget _buildBody(PulsrPalette p) {
     if (_isScanning) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(height: MediaQuery.sizeOf(context).height * 0.3),
-          Center(child: CircularProgressIndicator(color: p.primary)),
-        ],
+      return const SkeletonList(
+        padding: EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
       );
     }
 
     if (_duplicateGroups.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, 96, AppSpacing.lg, AppSpacing.lg),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.lg, 96, AppSpacing.lg, AppSpacing.lg),
         children: [
           Icon(Icons.check_circle_outline_rounded, size: 64, color: p.accent),
           const SizedBox(height: AppSpacing.md),
@@ -327,7 +330,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           Text(
             context.l10n.libraryCleanlyOrganized,
             textAlign: TextAlign.center,
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.bodySmall),
           ),
         ],
       );
@@ -335,7 +339,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
       itemCount: _duplicateGroups.length,
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
       itemBuilder: (context, index) {
@@ -366,15 +371,17 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                   ),
                   const SizedBox(width: AppSpacing.xs),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
                       borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Text(
                       context.l10n.tracksCount(group.songs.length),
-                      style: TextStyle(fontSize: AppFontSize.caption, color: p.textSecondary),
+                      style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          color: p.textSecondary),
                     ),
                   ),
                 ],
@@ -391,8 +398,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       if (song.id == keptId)
                         Container(
                           padding: const EdgeInsets.symmetric(
-
-                              horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                              horizontal: AppSpacing.xs,
+                              vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: p.accent.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(AppRadii.r8),

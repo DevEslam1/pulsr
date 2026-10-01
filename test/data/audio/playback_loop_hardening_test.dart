@@ -266,7 +266,9 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   Future<void> removeQueueItemAt(int index) async {}
   @override
   Future<void> loadQueue(List<SongsTableData> songs,
-      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true}) async {}
+      {int initialIndex = 0,
+      Duration? initialPosition,
+      bool autoPlay = true}) async {}
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
   @override

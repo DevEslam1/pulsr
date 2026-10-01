@@ -68,7 +68,8 @@ class PerSongVolumeStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_overrides.length > maxEntries) {
-        final keysToRemove = _overrides.keys.take(_overrides.length - maxEntries).toList();
+        final keysToRemove =
+            _overrides.keys.take(_overrides.length - maxEntries).toList();
         for (final k in keysToRemove) {
           _overrides.remove(k);
         }

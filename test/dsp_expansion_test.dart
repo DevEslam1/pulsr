@@ -68,13 +68,13 @@ void main() {
 
       // Panner drops out when balance returns to 0 and monoMix is off.
       pipeline.updateState(stereoBalance: 0.0);
-      expect(pipeline.getActiveStages(), isNot(contains(DspStage.stereoPanner)));
+      expect(
+          pipeline.getActiveStages(), isNot(contains(DspStage.stereoPanner)));
 
       // Dynamic EQ alone toggles only its own stage.
       final dynOnly = OptimizedDspPipeline()
         ..updateState(isDynamicEqEnabled: true);
-      expect(dynOnly.getActiveStages(),
-          [DspStage.dynamicEq, DspStage.volume]);
+      expect(dynOnly.getActiveStages(), [DspStage.dynamicEq, DspStage.volume]);
     });
 
     test('bit-perfect bypass zeroes estimated latency regardless of stages',
@@ -88,7 +88,8 @@ void main() {
         ..updateNativeLatency(frames: 512, sampleRate: 48000.0);
 
       // Without bypass the measured native latency is used: 512/48k = ~10.67 ms.
-      expect(pipeline.calculateTotalEstimatedLatencyMs(), closeTo(10.667, 0.01));
+      expect(
+          pipeline.calculateTotalEstimatedLatencyMs(), closeTo(10.667, 0.01));
 
       pipeline.updateState(bitPerfectBypass: true);
       expect(pipeline.calculateTotalEstimatedLatencyMs(), 0.0);
@@ -212,16 +213,13 @@ void main() {
         releaseMs: 200.0,
         maxCutDb: -9.0,
       );
-      expect(restored.dynamicEqBands.first.frequency,
-          expectedBand.frequency);
+      expect(restored.dynamicEqBands.first.frequency, expectedBand.frequency);
       expect(restored.dynamicEqBands.first.q, expectedBand.q);
-      expect(restored.dynamicEqBands.first.thresholdDb,
-          expectedBand.thresholdDb);
+      expect(
+          restored.dynamicEqBands.first.thresholdDb, expectedBand.thresholdDb);
       expect(restored.dynamicEqBands.first.ratio, expectedBand.ratio);
-      expect(restored.dynamicEqBands.first.attackMs,
-          expectedBand.attackMs);
-      expect(restored.dynamicEqBands.first.releaseMs,
-          expectedBand.releaseMs);
+      expect(restored.dynamicEqBands.first.attackMs, expectedBand.attackMs);
+      expect(restored.dynamicEqBands.first.releaseMs, expectedBand.releaseMs);
       expect(restored.dynamicEqBands.first.maxCutDb, expectedBand.maxCutDb);
       expect(restored.dynamicEqBands.first.enabled, expectedBand.enabled);
       restored.dispose();

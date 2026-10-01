@@ -23,8 +23,8 @@ class SilenceSkipController {
     try {
       final prefs = await SharedPreferences.getInstance();
       enabled = prefs.getBool(prefsEnabledKey) ?? false;
-      sensitivity =
-          (prefs.getInt(prefsSensitivityKey) ?? (enabled ? 50 : 0)).clamp(0, 100);
+      sensitivity = (prefs.getInt(prefsSensitivityKey) ?? (enabled ? 50 : 0))
+          .clamp(0, 100);
       if (!enabled && sensitivity > 0) {
         // Legacy installs stored only the bool; default mid sensitivity.
         sensitivity = 50;

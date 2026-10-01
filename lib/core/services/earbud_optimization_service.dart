@@ -102,9 +102,8 @@ class EarbudOptimizationService {
       isUsbDac: info.isUsbDac,
       sampleRateHz: info.btSampleRateHz ?? info.sampleRate,
       bitDepth: info.btBitDepth ?? info.bitDepth,
-      latencyMs: info.isBluetooth
-          ? estimateBtLatencyForCodec(info.btCodecName)
-          : 0,
+      latencyMs:
+          info.isBluetooth ? estimateBtLatencyForCodec(info.btCodecName) : 0,
     );
   }
 

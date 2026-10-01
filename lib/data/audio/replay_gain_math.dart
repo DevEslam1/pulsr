@@ -67,7 +67,8 @@ class ReplayGainMath {
     // 0.5 dB inter-sample peak headroom. The ceiling is expressed as a gain
     // cap relative to the current volume, so quiet slider positions are not
     // needlessly attenuated: unity in always means unity out.
-    final effectivePeak = (peak != null && peak.isFinite && peak > 0.0) ? peak : 1.0;
+    final effectivePeak =
+        (peak != null && peak.isFinite && peak > 0.0) ? peak : 1.0;
     final interSampleHeadroom =
         math.pow(10.0, -0.5 / 20.0).toDouble(); // ~0.944 (-0.5 dB)
     final maxGain = (volume > 0.0)
@@ -116,7 +117,8 @@ class ReplayGainMath {
         gainDb = albumGainDb ?? trackGainDb;
         break;
       case 'auto':
-        gainDb = (albumContext && albumGainDb != null) ? albumGainDb : trackGainDb;
+        gainDb =
+            (albumContext && albumGainDb != null) ? albumGainDb : trackGainDb;
         break;
       default:
         return 0.0;

@@ -21,12 +21,14 @@ void main() {
     );
   }
 
-  testWidgets('H-09: audio visualizer tick loop decays to baseline and short-circuits on pause',
+  testWidgets(
+      'H-09: audio visualizer tick loop decays to baseline and short-circuits on pause',
       (tester) async {
     await tester.pumpWidget(buildWidget(isPlaying: false));
     await tester.pumpAndSettle();
 
-    final state = tester.state<AudioVisualizerState>(find.byType(AudioVisualizer));
+    final state =
+        tester.state<AudioVisualizerState>(find.byType(AudioVisualizer));
 
     // Initially at baseline
     expect(state.isDecayedToBaseline, isTrue);

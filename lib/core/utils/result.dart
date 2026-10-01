@@ -11,7 +11,8 @@ sealed class Result<T> {
   const Result();
 
   const factory Result.success(T data) = ResultSuccess<T>;
-  const factory Result.failure(AppFailure failure, [String? message]) = ResultFailure<T>;
+  const factory Result.failure(AppFailure failure, [String? message]) =
+      ResultFailure<T>;
   const factory Result.loading() = ResultLoading<T>;
 
   bool get isSuccess => this is ResultSuccess<T>;

@@ -29,7 +29,8 @@ void main() {
       expect(DownloadQualityPickerSheet.estimateBytes(382000, 0), equals(0));
     });
 
-    testWidgets('renders all quality options and confirms selection', (tester) async {
+    testWidgets('renders all quality options and confirms selection',
+        (tester) async {
       YtmAudioQuality? confirmedQuality;
 
       await tester.pumpWidget(

@@ -88,9 +88,8 @@ class _LyricsViewState extends State<LyricsView> {
     _lyricController.setOnTapLineCallback((position) {
       HapticFeedback.selectionClick();
       if (!mounted) return;
-      final target = position +
-          _audibleOffset +
-          Duration(milliseconds: _manualOffsetMs);
+      final target =
+          position + _audibleOffset + Duration(milliseconds: _manualOffsetMs);
       final effectiveSeek = target.isNegative ? Duration.zero : target;
 
       if (widget.onLineTapped != null) {
@@ -184,11 +183,8 @@ class _LyricsViewState extends State<LyricsView> {
         try {
           pos = context.read<PlayerCubit>().state.position;
         } catch (e, st) {
-          ErrorLogger.log(
-              'PlayerCubit unavailable for manual offset position',
-              error: e,
-              stackTrace: st,
-              category: 'Lyrics');
+          ErrorLogger.log('PlayerCubit unavailable for manual offset position',
+              error: e, stackTrace: st, category: 'Lyrics');
         }
       }
       if (pos != null) _updateProgress(pos);
@@ -219,11 +215,12 @@ class _LyricsViewState extends State<LyricsView> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheet) {
           return Container(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.s20, AppSpacing.lg, AppSpacing.s28),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.lg, AppSpacing.s20, AppSpacing.lg, AppSpacing.s28),
             decoration: BoxDecoration(
               color: Theme.of(sheetContext).colorScheme.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadii.r20)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -231,7 +228,8 @@ class _LyricsViewState extends State<LyricsView> {
                 Text(
                   l10n.settingsSyncOffset,
                   style: const TextStyle(
-                      fontSize: AppFontSize.bodyLarge, fontWeight: FontWeight.w800),
+                      fontSize: AppFontSize.bodyLarge,
+                      fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -339,7 +337,8 @@ class _LyricsViewState extends State<LyricsView> {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: widget.activeColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadii.r12),
@@ -397,9 +396,8 @@ class _LyricsViewState extends State<LyricsView> {
           final persisted = await cubit.updateLyrics(lines);
           messenger?.showSnackBar(SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text(persisted
-                ? l10n.dspLyricsSaved
-                : l10n.dspLyricsSessionOnly),
+            content: Text(
+                persisted ? l10n.dspLyricsSaved : l10n.dspLyricsSessionOnly),
           ));
         },
       ),
@@ -430,14 +428,13 @@ class _LyricsViewState extends State<LyricsView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (hasSong)
-          _headerIconButton(
-              Icons.sync_rounded, context.l10n.settingsSyncOffset,
+          _headerIconButton(Icons.sync_rounded, context.l10n.settingsSyncOffset,
               () => unawaited(_showOffsetSheet())),
         if (hasSong)
           _headerIconButton(
               Icons.edit_note_rounded, context.l10n.dspEditLyrics, _openEditor),
-        _headerIconButton(
-            Icons.fullscreen_rounded, context.l10n.dspKaraokeMode, _openKaraoke),
+        _headerIconButton(Icons.fullscreen_rounded, context.l10n.dspKaraokeMode,
+            _openKaraoke),
       ],
     );
   }
@@ -446,7 +443,8 @@ class _LyricsViewState extends State<LyricsView> {
     return ListView.builder(
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: true,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
+      padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.lg, horizontal: AppSpacing.s20),
       itemCount: widget.lyrics.length,
       itemBuilder: (context, index) {
         final line = widget.lyrics[index];
@@ -583,7 +581,8 @@ class _LyricsViewState extends State<LyricsView> {
 
       return Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -598,10 +597,13 @@ class _LyricsViewState extends State<LyricsView> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              Text(context.l10n.placeLrcHint,
+              Text(
+                context.l10n.placeLrcHint,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    color: p.textSecondary, fontSize: AppFontSize.bodySmall, height: 1.4),
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.bodySmall,
+                    height: 1.4),
               ),
               const SizedBox(height: AppSpacing.md),
               OutlinedButton.icon(
@@ -619,8 +621,8 @@ class _LyricsViewState extends State<LyricsView> {
                       color: widget.activeColor.withValues(alpha: 0.4)),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadii.r10)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 ),
               ),
             ],

@@ -91,9 +91,10 @@ void main() {
         // network froze every native request for an hour across restarts.
         limiter.onRateLimited(3600);
 
-        expect(limiter.cooldownRemaining,
-            lessThan(const Duration(seconds: 302)));
-        expect(limiter.cooldownRemaining, greaterThan(const Duration(minutes: 4)));
+        expect(
+            limiter.cooldownRemaining, lessThan(const Duration(seconds: 302)));
+        expect(
+            limiter.cooldownRemaining, greaterThan(const Duration(minutes: 4)));
         async.flushTimers();
       });
     });

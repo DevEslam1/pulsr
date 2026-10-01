@@ -89,465 +89,486 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
             appBar: AppBar(
               leading: const PulsrBackButton(),
               title: Row(
-              children: [
-                Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  state.isEditing
-                      ? context.l10n.editPlaylist
-                      : context.l10n.createSmartPlaylist,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
+                children: [
+                  Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    state.isEditing
+                        ? context.l10n.editPlaylist
+                        : context.l10n.createSmartPlaylist,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: AppFontSize.title),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton.icon(
+                  onPressed: state.isSubmitting
+                      ? null
+                      : () async {
+                          final success = await cubit.savePlaylist();
+                          if (success && context.mounted) {
+                            Navigator.pop(context);
+                          }
+                        },
+                  icon: state.isSubmitting
+                      ? SizedBox(
+                          width: AppSpacing.md,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: p.accent),
+                        )
+                      : Icon(Icons.check_rounded, color: p.accent),
+                  label: Text(
+                    context.l10n.save,
+                    style:
+                        TextStyle(color: p.accent, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             ),
-            actions: [
-              TextButton.icon(
-                onPressed: state.isSubmitting
-                    ? null
-                    : () async {
-                        final success = await cubit.savePlaylist();
-                        if (success && context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                icon: state.isSubmitting
-                    ? SizedBox(width: AppSpacing.md,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: p.accent),
-                      )
-                    : Icon(Icons.check_rounded, color: p.accent),
-                label: Text(
-                  context.l10n.save,
-                  style:
-                      TextStyle(color: p.accent, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          body: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: ListView(
-                padding: EdgeInsetsDirectional.fromSTEB(context.pagePadding, AppSpacing.sm, context.pagePadding, 160),
-                children: [
-                  // Quick-start templates (preset rule sets).
-                  if (SmartCriteria.presetTemplates.isNotEmpty) ...[
-                    Text(context.l10n.suggestedForYou,
-                        style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: AppTracking.wide)),
-                    const SizedBox(height: AppSpacing.xs),
-                    SizedBox(height: AppSpacing.s40,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: SmartCriteria.presetTemplates.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-                        itemBuilder: (context, index) {
-                          final entry =
-                              SmartCriteria.presetTemplates.entries.elementAt(index);
-                          return ActionChip(
-                            avatar: Icon(Icons.auto_awesome_rounded,
-                                size: 16, color: p.accent),
-                            label: Text(entry.key),
-                            onPressed: () {
-                              cubit.applyTemplate(entry.value);
-                              _limitController.text =
-                                  entry.value.limit?.toString() ?? '';
-                              if (_nameController.text.trim().isEmpty) {
-                                _nameController.text = entry.key;
-                                cubit.updateName(entry.key);
-                              }
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-
-                  // Playlist Name Card
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: AppRadii.cardRadius,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(context.l10n.playlistName,
-                            style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: AppTracking.wide)),
-                        const SizedBox(height: AppSpacing.xs),
-                        TextField(
-                          controller: _nameController,
-                          onChanged: cubit.updateName,
-                          decoration: InputDecoration(
-                            hintText: 'e.g. 80s Rock Hits, Heavy Rotation...',
-                            filled: true,
-                            fillColor: p.surfaceContainerHigh,
-                            border: const OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(AppRadii.r12)),
-                                borderSide: BorderSide.none),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.md),
-
-                  // Match Logic Toggle
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: AppRadii.cardRadius,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(context.l10n.matchLogic,
-                            style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: AppTracking.wide)),
-                        const SizedBox(height: AppSpacing.xs),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ChoiceChip(
-                                label: Center(
-                                    child: Text(context.l10n.matchAllRules)),
-                                selected: state.criteria.matchAll,
-                                selectedColor: p.accent.withValues(alpha: 0.25),
-                                labelStyle: TextStyle(
-                                  color: state.criteria.matchAll
-                                      ? p.accent
-                                      : p.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                onSelected: (_) => cubit.toggleMatchAll(true),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Expanded(
-                              child: ChoiceChip(
-                                label: Center(
-                                    child: Text(context.l10n.matchAnyRule)),
-                                selected: !state.criteria.matchAll,
-                                selectedColor: p.accent.withValues(alpha: 0.25),
-                                labelStyle: TextStyle(
-                                  color: !state.criteria.matchAll
-                                      ? p.accent
-                                      : p.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                onSelected: (_) => cubit.toggleMatchAll(false),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.md),
-
-                  // Rules Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(context.l10n.rulesLabel,
+            body: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: ListView(
+                  padding: EdgeInsetsDirectional.fromSTEB(context.pagePadding,
+                      AppSpacing.sm, context.pagePadding, 160),
+                  children: [
+                    // Quick-start templates (preset rule sets).
+                    if (SmartCriteria.presetTemplates.isNotEmpty) ...[
+                      Text(context.l10n.suggestedForYou,
                           style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
                               letterSpacing: AppTracking.wide)),
-                      TextButton.icon(
-                        onPressed: () {
-                          cubit.addRule(const SmartRule(
-                            field: SmartRuleField.genre,
-                            operator: SmartOperator.contains,
-                            value: '',
-                          ));
-                        },
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: Text(context.l10n.addRule),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-
-                  ...List.generate(state.criteria.rules.length, (index) {
-                    final rule = state.criteria.rules[index];
-                    return _RuleCard(
-                      rule: rule,
-                      onChanged: (updated) => cubit.updateRule(index, updated),
-                      onDelete: () => cubit.removeRule(index),
-                    );
-                  }),
-
-                  const SizedBox(height: AppSpacing.md),
-
-                  // Options Card (Limit & Sorting)
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: AppRadii.cardRadius,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(context.l10n.sortingLimit,
-                            style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: AppTracking.wide)),
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(context.l10n.sortField,
-                                      style: TextStyle(
-                                          fontSize: AppFontSize.label,
-                                          color: p.textSecondary)),
-                                  const SizedBox(height: AppSpacing.xxs),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: const {
-                                      'title',
-                                      'dateAdded',
-                                      'playCount',
-                                      'lastPlayed',
-                                      'durationMs',
-                                      'year',
-                                      'rating',
-                                    }.contains(state.criteria.sortBy)
-                                        ? state.criteria.sortBy!
-                                        : 'title',
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: p.surface,
-                                      contentPadding: EdgeInsets.symmetric(
-
-                                          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                                      border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.all(
-                                              Radius.circular(AppRadii.r10)),
-                                          borderSide: BorderSide.none),
-                                    ),
-                                    items: [
-                                      DropdownMenuItem(
-                                          value: 'title', child: Text(context.l10n.titleLabel)),
-                                      DropdownMenuItem(
-                                          value: 'dateAdded',
-                                          child: Text(context.l10n.sortDateAdded)),
-                                      DropdownMenuItem(
-                                          value: 'playCount',
-                                          child: Text(context.l10n.playCountLabel)),
-                                      DropdownMenuItem(
-                                          value: 'lastPlayed',
-                                          child: Text(context.l10n.lastPlayedLabel)),
-                                      DropdownMenuItem(
-                                          value: 'durationMs',
-                                          child: Text(context.l10n.sortDuration)),
-                                      DropdownMenuItem(
-                                          value: 'year', child: Text(context.l10n.yearLabel)),
-                                      DropdownMenuItem(
-                                          value: 'rating',
-                                          child: Text(context.l10n.ruleRating)),
-                                    ],
-                                    onChanged: (val) => cubit.setSortBy(val),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(context.l10n.trackLimit,
-                                      style: TextStyle(
-                                          fontSize: AppFontSize.label,
-                                          color: p.textSecondary)),
-                                  const SizedBox(height: AppSpacing.xxs),
-                                  TextField(
-                                    controller: _limitController,
-                                    keyboardType: TextInputType.number,
-                                    onChanged: (val) {
-                                      final trimmed = val.trim();
-                                      if (trimmed.isEmpty) {
-                                        if (_limitError != null) {
-                                          setState(() => _limitError = null);
-                                        }
-                                        cubit.setLimit(null);
-                                        return;
-                                      }
-                                      final parsed = int.tryParse(trimmed);
-                                      if (parsed == null || parsed <= 0) {
-                                        setState(() => _limitError =
-                                            context.l10n.invalidNumber);
-                                        return;
-                                      }
-                                      if (_limitError != null) {
-                                        setState(() => _limitError = null);
-                                      }
-                                      cubit.setLimit(parsed);
-                                    },
-                                    decoration: InputDecoration(
-                                      hintText: context.l10n.unlimited,
-                                      errorText: _limitError,
-                                      filled: true,
-                                      fillColor: p.surface,
-                                      contentPadding: EdgeInsets.symmetric(
-
-                                          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                                      border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.all(
-                                              Radius.circular(AppRadii.r10)),
-                                          borderSide: BorderSide.none),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // Live Match Preview Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(context.l10n.matchingPreview,
-                          style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: AppTracking.wide)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                        decoration: BoxDecoration(
-                          color: p.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
-                        ),
-                        child: Text(
-                          context.l10n
-                              .previewTrackCount(state.previewSongs.length),
-                          style: TextStyle(
-                              color: p.accent,
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.label),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (state.previewTruncated)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.xxs),
-                      child: Text(
-                        context.l10n.previewTruncated(
-                            SmartPlaylistBuilderCubit.previewCap),
-                        style: TextStyle(
-                            color: p.textTertiary,
-                            fontSize: AppFontSize.caption),
-                      ),
-                    ),
-                  const SizedBox(height: AppSpacing.xs),
-
-                  if (state.previewSongs.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer.withValues(alpha: 0.5),
-                        borderRadius: AppRadii.cardRadius,
-                        border: Border.all(
-                            color: p.hairline.withValues(alpha: 0.5)),
-                      ),
-                      child: Center(
-                        child: Text(context.l10n.noRuleMatch,
-                          style:
-                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                        ),
-                      ),
-                    )
-                  else
-                    Material(
-                      color: p.surfaceContainer,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: AppRadii.cardRadius,
-                        side: BorderSide(color: p.hairline),
-                      ),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 260),
+                      const SizedBox(height: AppSpacing.xs),
+                      SizedBox(
+                        height: AppSpacing.s40,
                         child: ListView.separated(
-                          shrinkWrap: true,
-                          itemCount: state.previewSongs.length,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: SmartCriteria.presetTemplates.length,
                           separatorBuilder: (_, __) =>
-                              Divider(height: 1, color: p.hairline),
+                              const SizedBox(width: AppSpacing.xs),
                           itemBuilder: (context, index) {
-                            final song = state.previewSongs[index];
-                            return ListTile(
-                              dense: true,
-                              leading: CachedArtwork(
-                                id: song.id,
-                                remoteUrl: song.remoteArtworkUrl,
-                                type: ArtworkType.AUDIO,
-                                size: 36,
-                                borderRadius: 8,
-                              ),
-                              title: Text(song.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppFontSize.bodySmall,
-                                      color: p.textPrimary)),
-                              subtitle: Text(
-                                '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: p.textSecondary, fontSize: AppFontSize.caption),
-                              ),
+                            final entry = SmartCriteria.presetTemplates.entries
+                                .elementAt(index);
+                            return ActionChip(
+                              avatar: Icon(Icons.auto_awesome_rounded,
+                                  size: 16, color: p.accent),
+                              label: Text(entry.key),
+                              onPressed: () {
+                                cubit.applyTemplate(entry.value);
+                                _limitController.text =
+                                    entry.value.limit?.toString() ?? '';
+                                if (_nameController.text.trim().isEmpty) {
+                                  _nameController.text = entry.key;
+                                  cubit.updateName(entry.key);
+                                }
+                              },
                             );
                           },
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+
+                    // Playlist Name Card
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer,
+                        borderRadius: AppRadii.cardRadius,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.playlistName,
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: AppTracking.wide)),
+                          const SizedBox(height: AppSpacing.xs),
+                          TextField(
+                            controller: _nameController,
+                            onChanged: cubit.updateName,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. 80s Rock Hits, Heavy Rotation...',
+                              filled: true,
+                              fillColor: p.surfaceContainerHigh,
+                              border: const OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                      Radius.circular(AppRadii.r12)),
+                                  borderSide: BorderSide.none),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
-                  const SizedBox(height: AppSpacing.s40),
-                ],
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Match Logic Toggle
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer,
+                        borderRadius: AppRadii.cardRadius,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.matchLogic,
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: AppTracking.wide)),
+                          const SizedBox(height: AppSpacing.xs),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ChoiceChip(
+                                  label: Center(
+                                      child: Text(context.l10n.matchAllRules)),
+                                  selected: state.criteria.matchAll,
+                                  selectedColor:
+                                      p.accent.withValues(alpha: 0.25),
+                                  labelStyle: TextStyle(
+                                    color: state.criteria.matchAll
+                                        ? p.accent
+                                        : p.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  onSelected: (_) => cubit.toggleMatchAll(true),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: ChoiceChip(
+                                  label: Center(
+                                      child: Text(context.l10n.matchAnyRule)),
+                                  selected: !state.criteria.matchAll,
+                                  selectedColor:
+                                      p.accent.withValues(alpha: 0.25),
+                                  labelStyle: TextStyle(
+                                    color: !state.criteria.matchAll
+                                        ? p.accent
+                                        : p.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  onSelected: (_) =>
+                                      cubit.toggleMatchAll(false),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Rules Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(context.l10n.rulesLabel,
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: AppTracking.wide)),
+                        TextButton.icon(
+                          onPressed: () {
+                            cubit.addRule(const SmartRule(
+                              field: SmartRuleField.genre,
+                              operator: SmartOperator.contains,
+                              value: '',
+                            ));
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: Text(context.l10n.addRule),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+
+                    ...List.generate(state.criteria.rules.length, (index) {
+                      final rule = state.criteria.rules[index];
+                      return _RuleCard(
+                        rule: rule,
+                        onChanged: (updated) =>
+                            cubit.updateRule(index, updated),
+                        onDelete: () => cubit.removeRule(index),
+                      );
+                    }),
+
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Options Card (Limit & Sorting)
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer,
+                        borderRadius: AppRadii.cardRadius,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(context.l10n.sortingLimit,
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: AppTracking.wide)),
+                          const SizedBox(height: AppSpacing.sm),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(context.l10n.sortField,
+                                        style: TextStyle(
+                                            fontSize: AppFontSize.label,
+                                            color: p.textSecondary)),
+                                    const SizedBox(height: AppSpacing.xxs),
+                                    DropdownButtonFormField<String>(
+                                      initialValue: const {
+                                        'title',
+                                        'dateAdded',
+                                        'playCount',
+                                        'lastPlayed',
+                                        'durationMs',
+                                        'year',
+                                        'rating',
+                                      }.contains(state.criteria.sortBy)
+                                          ? state.criteria.sortBy!
+                                          : 'title',
+                                      decoration: InputDecoration(
+                                        filled: true,
+                                        fillColor: p.surface,
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.sm,
+                                            vertical: AppSpacing.xs),
+                                        border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.all(
+                                                Radius.circular(AppRadii.r10)),
+                                            borderSide: BorderSide.none),
+                                      ),
+                                      items: [
+                                        DropdownMenuItem(
+                                            value: 'title',
+                                            child:
+                                                Text(context.l10n.titleLabel)),
+                                        DropdownMenuItem(
+                                            value: 'dateAdded',
+                                            child: Text(
+                                                context.l10n.sortDateAdded)),
+                                        DropdownMenuItem(
+                                            value: 'playCount',
+                                            child: Text(
+                                                context.l10n.playCountLabel)),
+                                        DropdownMenuItem(
+                                            value: 'lastPlayed',
+                                            child: Text(
+                                                context.l10n.lastPlayedLabel)),
+                                        DropdownMenuItem(
+                                            value: 'durationMs',
+                                            child: Text(
+                                                context.l10n.sortDuration)),
+                                        DropdownMenuItem(
+                                            value: 'year',
+                                            child:
+                                                Text(context.l10n.yearLabel)),
+                                        DropdownMenuItem(
+                                            value: 'rating',
+                                            child:
+                                                Text(context.l10n.ruleRating)),
+                                      ],
+                                      onChanged: (val) => cubit.setSortBy(val),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(context.l10n.trackLimit,
+                                        style: TextStyle(
+                                            fontSize: AppFontSize.label,
+                                            color: p.textSecondary)),
+                                    const SizedBox(height: AppSpacing.xxs),
+                                    TextField(
+                                      controller: _limitController,
+                                      keyboardType: TextInputType.number,
+                                      onChanged: (val) {
+                                        final trimmed = val.trim();
+                                        if (trimmed.isEmpty) {
+                                          if (_limitError != null) {
+                                            setState(() => _limitError = null);
+                                          }
+                                          cubit.setLimit(null);
+                                          return;
+                                        }
+                                        final parsed = int.tryParse(trimmed);
+                                        if (parsed == null || parsed <= 0) {
+                                          setState(() => _limitError =
+                                              context.l10n.invalidNumber);
+                                          return;
+                                        }
+                                        if (_limitError != null) {
+                                          setState(() => _limitError = null);
+                                        }
+                                        cubit.setLimit(parsed);
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: context.l10n.unlimited,
+                                        errorText: _limitError,
+                                        filled: true,
+                                        fillColor: p.surface,
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.sm,
+                                            vertical: AppSpacing.xs),
+                                        border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.all(
+                                                Radius.circular(AppRadii.r10)),
+                                            borderSide: BorderSide.none),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.lg),
+
+                    // Live Match Preview Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(context.l10n.matchingPreview,
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: AppTracking.wide)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s10,
+                              vertical: AppSpacing.xxs),
+                          decoration: BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                          ),
+                          child: Text(
+                            context.l10n
+                                .previewTrackCount(state.previewSongs.length),
+                            style: TextStyle(
+                                color: p.accent,
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.label),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (state.previewTruncated)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                        child: Text(
+                          context.l10n.previewTruncated(
+                              SmartPlaylistBuilderCubit.previewCap),
+                          style: TextStyle(
+                              color: p.textTertiary,
+                              fontSize: AppFontSize.caption),
+                        ),
+                      ),
+                    const SizedBox(height: AppSpacing.xs),
+
+                    if (state.previewSongs.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer.withValues(alpha: 0.5),
+                          borderRadius: AppRadii.cardRadius,
+                          border: Border.all(
+                              color: p.hairline.withValues(alpha: 0.5)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            context.l10n.noRuleMatch,
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.bodySmall),
+                          ),
+                        ),
+                      )
+                    else
+                      Material(
+                        color: p.surfaceContainer,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.cardRadius,
+                          side: BorderSide(color: p.hairline),
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 260),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: state.previewSongs.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(height: 1, color: p.hairline),
+                            itemBuilder: (context, index) {
+                              final song = state.previewSongs[index];
+                              return ListTile(
+                                dense: true,
+                                leading: CachedArtwork(
+                                  id: song.id,
+                                  remoteUrl: song.remoteArtworkUrl,
+                                  type: ArtworkType.AUDIO,
+                                  size: 36,
+                                  borderRadius: 8,
+                                ),
+                                title: Text(song.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppFontSize.bodySmall,
+                                        color: p.textPrimary)),
+                                subtitle: Text(
+                                  '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: AppFontSize.caption),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: AppSpacing.s40),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      );
-    },
+        );
+      },
     );
   }
 }
@@ -615,19 +636,20 @@ class _RuleCardState extends State<_RuleCard> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: p.surfaceContainerHigh,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(AppRadii.r8)),
+                        borderRadius:
+                            BorderRadius.all(Radius.circular(AppRadii.r8)),
                         borderSide: BorderSide.none),
                   ),
-                  items: SmartRuleField.values
-                      .map((f) {
+                  items: SmartRuleField.values.map((f) {
                     return DropdownMenuItem(
                       value: f,
                       child: Text(f.label,
                           style: const TextStyle(
-                              fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w600)),
+                              fontSize: AppFontSize.bodySmall,
+                              fontWeight: FontWeight.w600)),
                     );
                   }).toList(),
                   onChanged: (f) {
@@ -647,10 +669,11 @@ class _RuleCardState extends State<_RuleCard> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: p.surfaceContainerHigh,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(AppRadii.r8)),
+                        borderRadius:
+                            BorderRadius.all(Radius.circular(AppRadii.r8)),
                         borderSide: BorderSide.none),
                   ),
                   items: SmartOperator.values.map((o) {
@@ -658,7 +681,8 @@ class _RuleCardState extends State<_RuleCard> {
                       value: o,
                       child: Text(o.label,
                           style: const TextStyle(
-                              fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w600)),
+                              fontSize: AppFontSize.bodySmall,
+                              fontWeight: FontWeight.w600)),
                     );
                   }).toList(),
                   onChanged: (o) {
@@ -669,11 +693,11 @@ class _RuleCardState extends State<_RuleCard> {
                 ),
               ),
 
-                IconButton(
-                  icon: Icon(Icons.close_rounded, size: 20, color: p.error),
-                  tooltip: context.l10n.delete,
-                  onPressed: widget.onDelete,
-                ),
+              IconButton(
+                icon: Icon(Icons.close_rounded, size: 20, color: p.error),
+                tooltip: context.l10n.delete,
+                onPressed: widget.onDelete,
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -689,15 +713,18 @@ class _RuleCardState extends State<_RuleCard> {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: p.surfaceContainerHigh,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                 border: const OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(AppRadii.r8)),
+                    borderRadius:
+                        BorderRadius.all(Radius.circular(AppRadii.r8)),
                     borderSide: BorderSide.none),
               ),
               items: [
-                DropdownMenuItem(value: 'true', child: Text(context.l10n.yesBool)),
-                DropdownMenuItem(value: 'false', child: Text(context.l10n.noBool)),
+                DropdownMenuItem(
+                    value: 'true', child: Text(context.l10n.yesBool)),
+                DropdownMenuItem(
+                    value: 'false', child: Text(context.l10n.noBool)),
               ],
               onChanged: (val) {
                 if (val != null) {
@@ -724,10 +751,11 @@ class _RuleCardState extends State<_RuleCard> {
                     _getHintForField(widget.rule.field, widget.rule.operator),
                 filled: true,
                 fillColor: p.surfaceContainerHigh,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 border: const OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(AppRadii.r8)),
+                    borderRadius:
+                        BorderRadius.all(Radius.circular(AppRadii.r8)),
                     borderSide: BorderSide.none),
               ),
             ),

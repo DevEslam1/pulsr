@@ -4,6 +4,139 @@
 #include <cmath>
 #include <thread>
 
+namespace {
+
+inline double clampFinite(double v, double lo, double hi, double fallback) {
+    if (!std::isfinite(v)) v = fallback;
+    return std::clamp(v, lo, hi);
+}
+
+inline int clampInt(int v, int lo, int hi) {
+    return std::clamp(v, lo, hi);
+}
+
+// Scrub a freshly-mutated snapshot of non-finite (NaN/Inf) and out-of-range
+// parameters. `std::clamp(NaN, lo, hi)` returns NaN, so the per-stage clamps
+// cannot be trusted; routing every mutation through this single choke point
+// guarantees the audio thread never sees a non-finite parameter (e.g. a NaN
+// limiter threshold silently disabling the safety limiter).
+void SanitizeSnapshot(DspParamSnapshot& s) {
+    s.sampleRate = clampFinite(s.sampleRate, 8000.0, 768000.0, 48000.0);
+
+    s.eq.preampDb = clampFinite(s.eq.preampDb, -60.0, 24.0, 0.0);
+    s.eq.bandCount = clampInt(s.eq.bandCount, 1, EqParamSet::MAX_BANDS);
+    for (int i = 0; i < EqParamSet::MAX_BANDS; ++i) {
+        auto& b = s.eq.bands[i];
+        b.frequency = clampFinite(b.frequency, 10.0, 40000.0, 1000.0);
+        b.gainDb = clampFinite(b.gainDb, -30.0, 30.0, 0.0);
+        b.q = clampFinite(b.q, 0.05, 100.0, 1.0);
+        const int t = static_cast<int>(b.type);
+        if (t < 0 || t > 7) b.type = FilterType::Peaking;
+    }
+
+    s.crossfeed.delayUs = clampFinite(s.crossfeed.delayUs, 0.0, 2000.0, 0.0);
+    s.crossfeed.feedDb = clampFinite(s.crossfeed.feedDb, -30.0, 0.0, 0.0);
+    s.crossfeed.fcut = clampFinite(s.crossfeed.fcut, 20.0, 20000.0, 650.0);
+    {
+        const int m = static_cast<int>(s.crossfeed.mode);
+        if (m < 0 || m > 3) s.crossfeed.mode = CrossfeedMode::Bs2bDefault;
+    }
+
+    s.limiter.lookaheadMs = clampFinite(s.limiter.lookaheadMs, 0.0, 20.0, 5.0);
+    s.limiter.thresholdDb = clampFinite(s.limiter.thresholdDb, -60.0, 0.0, -0.2);
+    s.limiter.releaseMs = clampFinite(s.limiter.releaseMs, 1.0, 1000.0, 50.0);
+
+    s.reverb.wetDry = clampFinite(s.reverb.wetDry, 0.0, 1.0, 0.2);
+    s.reverb.predelayMs = clampFinite(s.reverb.predelayMs, 0.0, 150.0, 0.0);
+    s.reverb.damping = clampFinite(s.reverb.damping, 0.0, 1.0, 0.5);
+    s.reverb.crossChannel = clampFinite(s.reverb.crossChannel, 0.0, 1.0, 0.0);
+
+    s.panner.balance = clampFinite(s.panner.balance, -1.0, 1.0, 0.0);
+
+    s.resampler.inRate = clampFinite(s.resampler.inRate, 8000.0, 768000.0, 48000.0);
+    s.resampler.outRate = clampFinite(s.resampler.outRate, 8000.0, 768000.0, 48000.0);
+    s.resampler.quality = clampInt(s.resampler.quality, 0, 3);
+
+    s.saturation.drive = clampFinite(s.saturation.drive, 0.0, 1.0, 0.0);
+    s.saturation.mix = clampFinite(s.saturation.mix, 0.0, 1.0, 0.5);
+    s.saturation.tilt = clampFinite(s.saturation.tilt, 0.0, 1.0, 0.0);
+    s.saturation.mode = clampInt(s.saturation.mode, 0, 2);
+
+    s.stereoWidth.width = clampFinite(s.stereoWidth.width, 0.0, 2.0, 1.0);
+    s.stereoWidth.lowWidth = clampFinite(s.stereoWidth.lowWidth, 0.0, 2.0, 0.0);
+    s.stereoWidth.midWidth = clampFinite(s.stereoWidth.midWidth, 0.0, 2.0, 1.0);
+    s.stereoWidth.highWidth = clampFinite(s.stereoWidth.highWidth, 0.0, 2.0, 1.5);
+    s.stereoWidth.lowCrossoverHz = clampFinite(s.stereoWidth.lowCrossoverHz, 20.0, 20000.0, 160.0);
+    s.stereoWidth.highCrossoverHz = clampFinite(s.stereoWidth.highCrossoverHz, 20.0, 20000.0, 4000.0);
+
+    s.loudness.intensity = clampFinite(s.loudness.intensity, 0.0, 1.0, 0.0);
+    s.loudness.volumeLinear = clampFinite(s.loudness.volumeLinear, 0.0, 1.0, 1.0);
+
+    s.subCrossover.cornerHz = clampFinite(s.subCrossover.cornerHz, 20.0, 500.0, 80.0);
+    s.subCrossover.slopeDbPerOct = clampFinite(s.subCrossover.slopeDbPerOct, 6.0, 48.0, 24.0);
+    s.subCrossover.subGain = clampFinite(s.subCrossover.subGain, 0.0, 2.0, 0.8);
+
+    // NOTE: bandCount may legitimately be 0 (nativeSetDynamicEqBandCount clamps
+    // to [0, MAX_BANDS]), so do not force a minimum of 1 here.
+    s.dynamicEq.bandCount = clampInt(s.dynamicEq.bandCount, 0, DynamicEqParamSet::MAX_BANDS);
+    for (int i = 0; i < DynamicEqParamSet::MAX_BANDS; ++i) {
+        auto& b = s.dynamicEq.bands[i];
+        b.frequency = clampFinite(b.frequency, 10.0, 40000.0, 1000.0);
+        b.q = clampFinite(b.q, 0.05, 100.0, 2.0);
+        b.thresholdDb = clampFinite(b.thresholdDb, -80.0, 0.0, -30.0);
+        b.ratio = clampFinite(b.ratio, 0.1, 20.0, 3.0);
+        b.attackMs = clampFinite(b.attackMs, 0.1, 200.0, 5.0);
+        b.releaseMs = clampFinite(b.releaseMs, 5.0, 2000.0, 120.0);
+        b.maxCutDb = clampFinite(b.maxCutDb, -48.0, 0.0, -12.0);
+        b.maxBoostDb = clampFinite(b.maxBoostDb, 0.0, 48.0, 12.0);
+        b.mode = clampInt(b.mode, 0, 1);
+        b.filterType = clampInt(b.filterType, 0, 2);
+    }
+
+    for (int i = 0; i < MultibandCompressorParamSet::NUM_BANDS; ++i) {
+        auto& b = s.multibandCompressor.bands[i];
+        b.thresholdDb = clampFinite(b.thresholdDb, -60.0, 0.0, -18.0);
+        b.ratio = clampFinite(b.ratio, 1.0, 20.0, 2.0);
+        b.attackMs = clampFinite(b.attackMs, 0.1, 200.0, 15.0);
+        b.releaseMs = clampFinite(b.releaseMs, 5.0, 1000.0, 100.0);
+        b.kneeDb = clampFinite(b.kneeDb, 0.0, 12.0, 3.0);
+        b.makeupGainDb = clampFinite(b.makeupGainDb, 0.0, 24.0, 0.0);
+    }
+    for (int i = 0; i < MultibandCompressorParamSet::NUM_BANDS - 1; ++i) {
+        s.multibandCompressor.crossoverFreqs[i] =
+            clampFinite(s.multibandCompressor.crossoverFreqs[i], 20.0, 20000.0, 150.0 * (i + 1));
+    }
+
+    s.dynamicBass.strength = clampFinite(s.dynamicBass.strength, 0.0, 4.0, 1.0);
+    s.dynamicBass.sideGainLow = clampFinite(s.dynamicBass.sideGainLow, 0.0, 2.0, 0.10);
+    s.dynamicBass.sideGainHigh = clampFinite(s.dynamicBass.sideGainHigh, 0.0, 2.0, 0.50);
+
+    s.replayGain.trackGainDb = clampFinite(s.replayGain.trackGainDb, -60.0, 24.0, 0.0);
+    s.replayGain.albumGainDb = clampFinite(s.replayGain.albumGainDb, -60.0, 24.0, 0.0);
+    s.replayGain.trackPeak = clampFinite(s.replayGain.trackPeak, 0.0, 10.0, 1.0);
+    s.replayGain.albumPeak = clampFinite(s.replayGain.albumPeak, 0.0, 10.0, 1.0);
+    s.replayGain.preAmpDb = clampFinite(s.replayGain.preAmpDb, -30.0, 30.0, 0.0);
+
+    s.directVolume.gainLinear = clampFinite(s.directVolume.gainLinear, 0.0, 8.0, 1.0);
+
+    s.liveProg.slider1 = clampFinite(s.liveProg.slider1, -1e6, 1e6, 0.0);
+    s.liveProg.slider2 = clampFinite(s.liveProg.slider2, -1e6, 1e6, 0.0);
+    s.liveProg.slider3 = clampFinite(s.liveProg.slider3, -1e6, 1e6, 0.0);
+    s.liveProg.slider4 = clampFinite(s.liveProg.slider4, -1e6, 1e6, 0.0);
+    s.liveProg.slider5 = clampFinite(s.liveProg.slider5, -1e6, 1e6, 0.0);
+    s.liveProg.slider6 = clampFinite(s.liveProg.slider6, -1e6, 1e6, 0.0);
+    s.liveProg.slider7 = clampFinite(s.liveProg.slider7, -1e6, 1e6, 0.0);
+    s.liveProg.slider8 = clampFinite(s.liveProg.slider8, -1e6, 1e6, 0.0);
+
+    s.headphoneSafety.doseThreshold = clampFinite(s.headphoneSafety.doseThreshold, 0.1, 100.0, 1.0);
+    s.headphoneSafety.safetyCeilingDb = clampFinite(s.headphoneSafety.safetyCeilingDb, -40.0, 0.0, -6.0);
+
+    s.bypassCompare.gainCompensationLinear =
+        clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
+}
+
+} // namespace
+
 AudioDspEngine& AudioDspEngine::instance() {
     static AudioDspEngine sInstance;
     return sInstance;
@@ -201,13 +334,12 @@ void DspEngineRegistry::recoverStageAutoDegrade(uint32_t stageBitmask) {
 }
 
 void DspEngineRegistry::setBypassCompare(bool enabled, double gainCompensationDb) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    // Route through the singleton only. `AudioDspEngine::updateParams()` on the
+    // singleton broadcasts the new snapshot to every registered engine via
+    // broadcastParams(), which locks `mutex_` itself. Taking `mutex_` here would
+    // self-deadlock on the same thread, and the explicit fan-out below would be
+    // redundant with that broadcast.
     AudioDspEngine::instance().setBypassCompare(enabled, gainCompensationDb);
-    for (auto* engine : engines_) {
-        if (engine) {
-            engine->setBypassCompare(enabled, gainCompensationDb);
-        }
-    }
 }
 
 void DspEngineRegistry::getTelemetry(double* outArray, int size) {
@@ -307,18 +439,27 @@ void DspEngineRegistry::drainRetireQueues() {
 
 void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     if (!mutator) return;
-    std::lock_guard<std::mutex> lock(publishMutex_);
-    auto current = currentParams_.load();
-    auto updated = std::make_shared<DspParamSnapshot>(*current);
-    updated->resetRequested = false; // Clear reset by default so reset() only fires once
-    mutator(*updated);
-    updated->generation = ++snapshotGeneration_;
-    auto snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
-    currentParams_.store(snap);
-    drainRetireQueue();
+    // This is the single choke point for every parameter setter, including all
+    // JNI entry points. Catch allocation failures here so a std::bad_alloc can
+    // never propagate across a JNI frame (undefined behaviour / abort).
+    try {
+        std::lock_guard<std::mutex> lock(publishMutex_);
+        auto current = currentParams_.load();
+        if (!current) return;
+        auto updated = std::make_shared<DspParamSnapshot>(*current);
+        updated->resetRequested = false; // Clear reset by default so reset() only fires once
+        mutator(*updated);
+        SanitizeSnapshot(*updated);
+        updated->generation = ++snapshotGeneration_;
+        auto snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
+        currentParams_.store(snap);
+        drainRetireQueue();
 
-    if (this == &AudioDspEngine::instance()) {
-        DspEngineRegistry::instance().broadcastParams(snap);
+        if (this == &AudioDspEngine::instance()) {
+            DspEngineRegistry::instance().broadcastParams(snap);
+        }
+    } catch (...) {
+        // Leave the previous snapshot in place on failure.
     }
 }
 
@@ -334,7 +475,14 @@ uint32_t AudioDspEngine::getActiveStages() const {
 }
 
 void AudioDspEngine::setBypassCompare(bool enabled, double gainCompensationDb) {
-    const double gainLinear = std::pow(10.0, gainCompensationDb / 20.0);
+    // Sanitize at the source: the A/B bypass path applies this gain and returns
+    // before the non-finite scrubber in processInterleaved(), so a NaN/Inf or
+    // absurd compensation would poison the output buffer.
+    double compDb = 0.0;
+    if (std::isfinite(gainCompensationDb)) {
+        compDb = std::clamp(gainCompensationDb, -60.0, 24.0);
+    }
+    const double gainLinear = std::pow(10.0, compDb / 20.0);
     updateParams([enabled, gainLinear](DspParamSnapshot& snap) {
         snap.bypassCompare.enabled = enabled;
         snap.bypassCompare.gainCompensationLinear = gainLinear;

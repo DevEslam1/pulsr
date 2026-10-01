@@ -4115,6 +4115,72 @@ abstract class AppLocalizations {
   /// **'Fitted EQ Gain'**
   String get rcFittedEqGain;
 
+  /// No description provided for @rcVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify correction'**
+  String get rcVerify;
+
+  /// No description provided for @rcVerifyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-measure with the correction active to confirm the room is flattened.'**
+  String get rcVerifyHint;
+
+  /// No description provided for @rcVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying correction - stay quiet...'**
+  String get rcVerifying;
+
+  /// No description provided for @rcVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification'**
+  String get rcVerification;
+
+  /// No description provided for @rcConverged.
+  ///
+  /// In en, this message translates to:
+  /// **'Room flattened'**
+  String get rcConverged;
+
+  /// No description provided for @rcNotConverged.
+  ///
+  /// In en, this message translates to:
+  /// **'Improvement limited'**
+  String get rcNotConverged;
+
+  /// No description provided for @rcApplyAndVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & verify'**
+  String get rcApplyAndVerify;
+
+  /// No description provided for @rcResidual.
+  ///
+  /// In en, this message translates to:
+  /// **'Residual variance'**
+  String get rcResidual;
+
+  /// No description provided for @rcImprovement.
+  ///
+  /// In en, this message translates to:
+  /// **'Improvement'**
+  String get rcImprovement;
+
+  /// No description provided for @rcTargetGatePassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Within ±0.5 dB target'**
+  String get rcTargetGatePassed;
+
+  /// No description provided for @rcTargetGateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside ±0.5 dB target'**
+  String get rcTargetGateFailed;
+
   /// No description provided for @fetchMissingArtworkTitle.
   ///
   /// In en, this message translates to:
@@ -5950,6 +6016,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reference Headphone Profiles'**
   String get refHpProfiles;
+
+  /// Viper-DDC bundled profiles are illustrative, not measured
+  ///
+  /// In en, this message translates to:
+  /// **'Demo / Placeholder Profiles'**
+  String get dspViperDdcDemoTitle;
+
+  /// Disclaimer for the bundled Viper-DDC placeholder profiles
+  ///
+  /// In en, this message translates to:
+  /// **'Bundled profiles are illustrative. Load a real .vdc file for measured correction.'**
+  String get dspViperDdcDemoNote;
 
   /// tranche7 batch
   ///
@@ -12971,6 +13049,366 @@ abstract class AppLocalizations {
   /// **'Opens the dock-style options'**
   String get onboardingGestureLongPressDesc;
 
+  /// Settings section title for headset and background controls
+  ///
+  /// In en, this message translates to:
+  /// **'Headset & background'**
+  String get headsetSectionTitle;
+
+  /// Headset setting: resume playback when the device reconnects
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-resume on reconnect'**
+  String get headsetAutoResume;
+
+  /// No description provided for @headsetResumeWithinNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume within {seconds} s when the headset reconnects.'**
+  String headsetResumeWithinNotice(int seconds);
+
+  /// Headset setting description when auto-resume is off
+  ///
+  /// In en, this message translates to:
+  /// **'Stay paused when headphones unplug.'**
+  String get headsetStayPausedDesc;
+
+  /// Slider label for the auto-resume time window
+  ///
+  /// In en, this message translates to:
+  /// **'Resume window'**
+  String get headsetResumeWindow;
+
+  /// Headset setting title for keeping playback notification
+  ///
+  /// In en, this message translates to:
+  /// **'Keep notification when paused'**
+  String get headsetKeepNotification;
+
+  /// Description when keeping notification on pause is enabled
+  ///
+  /// In en, this message translates to:
+  /// **'Controls stay in the shade after pause (restart required).'**
+  String get headsetKeepNotificationOnDesc;
+
+  /// Description when keeping notification on pause is disabled
+  ///
+  /// In en, this message translates to:
+  /// **'Notification is removed on pause to save battery.'**
+  String get headsetKeepNotificationOffDesc;
+
+  /// Headset action mapping for a single press
+  ///
+  /// In en, this message translates to:
+  /// **'Single press'**
+  String get headsetSinglePress;
+
+  /// Headset action mapping for a double press
+  ///
+  /// In en, this message translates to:
+  /// **'Double press'**
+  String get headsetDoublePress;
+
+  /// Headset action mapping for a triple press
+  ///
+  /// In en, this message translates to:
+  /// **'Triple press'**
+  String get headsetTriplePress;
+
+  /// Slider label for the multi-press detection window
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-press window'**
+  String get headsetMultiPressWindow;
+
+  /// Description for the multi-press window setting
+  ///
+  /// In en, this message translates to:
+  /// **'How long presses are grouped into double/triple.'**
+  String get headsetMultiPressWindowDesc;
+
+  /// Slider label for the headset seek step
+  ///
+  /// In en, this message translates to:
+  /// **'Seek step'**
+  String get headsetSeekStep;
+
+  /// Description for the headset seek step setting
+  ///
+  /// In en, this message translates to:
+  /// **'Used when a press is mapped to seek forward/back.'**
+  String get headsetSeekStepDesc;
+
+  /// Headset click action label: play or pause
+  ///
+  /// In en, this message translates to:
+  /// **'Play / pause'**
+  String get headsetActionPlayPause;
+
+  /// Headset click action label: next track
+  ///
+  /// In en, this message translates to:
+  /// **'Next track'**
+  String get headsetActionNextTrack;
+
+  /// Headset click action label: previous track
+  ///
+  /// In en, this message translates to:
+  /// **'Previous track'**
+  String get headsetActionPreviousTrack;
+
+  /// Headset click action label: stop
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get headsetActionStop;
+
+  /// Headset click action label: seek forward
+  ///
+  /// In en, this message translates to:
+  /// **'Seek forward'**
+  String get headsetActionSeekForward;
+
+  /// Headset click action label: seek back
+  ///
+  /// In en, this message translates to:
+  /// **'Seek back'**
+  String get headsetActionSeekBack;
+
+  /// Headset click action label: no action
+  ///
+  /// In en, this message translates to:
+  /// **'Do nothing'**
+  String get headsetActionNone;
+
+  /// Karaoke mode tooltip for practice mode
+  ///
+  /// In en, this message translates to:
+  /// **'Practice Mode (Loop Current Line)'**
+  String get karaokePracticeMode;
+
+  /// Karaoke mode tooltip for the vocal pitch meter
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal Pitch Meter (YIN Algorithm)'**
+  String get karaokePitchMeter;
+
+  /// Karaoke mode tooltip for cycling lyrics font size
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics Font Size'**
+  String get karaokeLyricsFontSize;
+
+  /// No description provided for @karaokeScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Score: {score}'**
+  String karaokeScore(int score);
+
+  /// Karaoke mode button label to tap along to the rhythm
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Rhythm'**
+  String get karaokeTapRhythm;
+
+  /// No description provided for @radioNoStationsMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No stations match \"{query}\"'**
+  String radioNoStationsMatch(String query);
+
+  /// Radio empty search result description
+  ///
+  /// In en, this message translates to:
+  /// **'Try searching by a different genre or station URL'**
+  String get radioNoStationsMatchDesc;
+
+  /// Radio station URL validation error: empty
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a URL'**
+  String get radioErrorEnterUrl;
+
+  /// Radio station URL validation error: missing scheme
+  ///
+  /// In en, this message translates to:
+  /// **'URL must start with http:// or https://'**
+  String get radioErrorUrlScheme;
+
+  /// Radio station URL validation error: malformed
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid URL format'**
+  String get radioErrorInvalidUrl;
+
+  /// Radio add station dialog genre field label
+  ///
+  /// In en, this message translates to:
+  /// **'Genre / Category (Optional)'**
+  String get radioGenreLabel;
+
+  /// Radio add station dialog genre field hint
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Chill, Classical, Jazz, Quran...'**
+  String get radioGenreHint;
+
+  /// Storage cache section: breakdown header
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Breakdown'**
+  String get storageBreakdown;
+
+  /// No description provided for @storageLegendArtwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork: {size}'**
+  String storageLegendArtwork(String size);
+
+  /// No description provided for @storageLegendStreams.
+  ///
+  /// In en, this message translates to:
+  /// **'Streams: {size}'**
+  String storageLegendStreams(String size);
+
+  /// No description provided for @storageLegendLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics: {size}'**
+  String storageLegendLyrics(String size);
+
+  /// No description provided for @storageLegendCacheDb.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache / DB: {size}'**
+  String storageLegendCacheDb(String size);
+
+  /// No description provided for @developerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer: {name}'**
+  String developerLabel(String name);
+
+  /// Title of the What's New sheet
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s New in Pulsr'**
+  String get whatsNewInPulsr;
+
+  /// What's New highlight title: bit-perfect output
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect & Hi-Res Output'**
+  String get whatsNewBitPerfectTitle;
+
+  /// What's New highlight description: bit-perfect output
+  ///
+  /// In en, this message translates to:
+  /// **'Direct USB DAC streaming, hardware volume control, and native DSD/DoP playback.'**
+  String get whatsNewBitPerfectDesc;
+
+  /// What's New highlight title: DSP suite
+  ///
+  /// In en, this message translates to:
+  /// **'Pro Studio DSP Suite'**
+  String get whatsNewProDspTitle;
+
+  /// What's New highlight description: DSP suite
+  ///
+  /// In en, this message translates to:
+  /// **'Arbitrary response parametric EQ, multiband compressor, lookahead limiter, and binaural crossfeed.'**
+  String get whatsNewProDspDesc;
+
+  /// What's New highlight title: themes
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive Player Themes'**
+  String get whatsNewThemesTitle;
+
+  /// What's New highlight description: themes
+  ///
+  /// In en, this message translates to:
+  /// **'8 handcrafted player themes with full phone landscape, tablet two-pane, and AMOLED optimization.'**
+  String get whatsNewThemesDesc;
+
+  /// What's New highlight title: accessibility
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility & Fluid Gestures'**
+  String get whatsNewAccessibilityTitle;
+
+  /// What's New highlight description: accessibility
+  ///
+  /// In en, this message translates to:
+  /// **'WCAG 2.1 AA contrast compliance, dynamic type 2.0x support, and full screen-reader semantics.'**
+  String get whatsNewAccessibilityDesc;
+
+  /// Proxy settings validation error for the host field
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid proxy host format'**
+  String get proxyInvalidHostFormat;
+
+  /// EQ essential view macro slider title: bass
+  ///
+  /// In en, this message translates to:
+  /// **'Bass & Punch'**
+  String get eqMacroBassTitle;
+
+  /// EQ essential view macro slider description: bass
+  ///
+  /// In en, this message translates to:
+  /// **'Sub-bass impact & warmth (31 Hz – 125 Hz)'**
+  String get eqMacroBassDesc;
+
+  /// EQ essential view macro slider title: mid
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal & Presence'**
+  String get eqMacroMidTitle;
+
+  /// EQ essential view macro slider description: mid
+  ///
+  /// In en, this message translates to:
+  /// **'Lead vocals & acoustic presence (500 Hz – 2 kHz)'**
+  String get eqMacroMidDesc;
+
+  /// EQ essential view macro slider title: treble
+  ///
+  /// In en, this message translates to:
+  /// **'Clarity & Air'**
+  String get eqMacroTrebleTitle;
+
+  /// EQ essential view macro slider description: treble
+  ///
+  /// In en, this message translates to:
+  /// **'Treble shimmer & spatial detail (4 kHz – 16 kHz)'**
+  String get eqMacroTrebleDesc;
+
+  /// Convolution reverb chip label when a custom IR is loaded
+  ///
+  /// In en, this message translates to:
+  /// **'Custom (Loaded)'**
+  String get eqIrCustomLoaded;
+
+  /// Convolution reverb chip label to load a WAV impulse response
+  ///
+  /// In en, this message translates to:
+  /// **'Load WAV IR (≤25MB)...'**
+  String get eqIrLoadWav;
+
+  /// Button label to audition a crossfeed preset for five seconds
+  ///
+  /// In en, this message translates to:
+  /// **'Audition (5s)'**
+  String get eqAuditionFiveSeconds;
+
+  /// Toast shown while auditioning a crossfeed preset
+  ///
+  /// In en, this message translates to:
+  /// **'Auditioning crossfeed preset (5s)...'**
+  String get eqAuditioningCrossfeed;
+
   /// No description provided for @onboardingPersonalizeTitle.
   ///
   /// In en, this message translates to:
@@ -12982,6 +13420,727 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick an accent now — you can change it anytime in Settings.'**
   String get onboardingPersonalizeDesc;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect USB Pass-Through'**
+  String get featureInfoBitPerfectTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Direct hardware streaming to USB / wired DAC'**
+  String get featureInfoBitPerfectSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).'**
+  String get featureInfoBitPerfectDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass DSP in Bit-Perfect Mode'**
+  String get featureInfoBypassDspTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Uncolored, pure bitstream to DAC'**
+  String get featureInfoBypassDspSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).'**
+  String get featureInfoBypassDspDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Follow Track Sample Rate'**
+  String get featureInfoFollowTrackSampleRateTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Reconfigure the output to each track\'s native rate'**
+  String get featureInfoFollowTrackSampleRateSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'On every track change, requests the track\'s own sample rate from the output device so no software resampling is needed. De-duplicated so tracks that share a rate do not trigger redundant native reconfiguration. Skipped on Bluetooth, where the AVRCP/codec link owns the rate. The device may still cap the rate; the negotiated format is shown in Output Path Diagnostics.'**
+  String get featureInfoFollowTrackSampleRateDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Strict Bit-Perfect (No Resample)'**
+  String get featureInfoStrictBitPerfectTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Exact source bits, no resampler — DSP stages off'**
+  String get featureInfoStrictBitPerfectSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Forces Bit-Perfect output and the DSP bypass, then follows each track\'s native sample rate so the DAC receives the exact source samples without resampling. Because it is strict, EQ, ReplayGain, Virtualizer/Dynamics and Crossfade cannot run: they would alter the bitstream. Requires a path that reports exclusive bit-perfect support (USB DAC on Android 14+); otherwise the toggle is disabled with the platform reason.'**
+  String get featureInfoStrictBitPerfectDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'10 / 32-Band Parametric EQ'**
+  String get featureInfoEqualizerTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'±15 dB per band, Q=1.414, flat by default'**
+  String get featureInfoEqualizerSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Native C++ biquad cascade (32 bands max, 8 channels). Uses single bulk JNI hop (≈1 ms) with zero-cost bypass when disabled. Interpolates AutoEQ profiles log-frequency wise. Cannot be active with Bit-Perfect bypass (would re-sample and alter bits).'**
+  String get featureInfoEqualizerDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Bass Enhancer'**
+  String get featureInfoBassBoostTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Shelving low-end gain (part of EQ engine)'**
+  String get featureInfoBassBoostSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Adds a low-shelf lift below ~150 Hz via the native EQ biquad chain. Shares the same processing stage as the graphic EQ, so it is disabled while Bit-Perfect bypass is active. Keep moderate to avoid masking detail.'**
+  String get featureInfoBassBoostDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Headphone Crossfeed'**
+  String get featureInfoCrossfeedTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'200–700 µs delay, –15 to –6 dB bleed'**
+  String get featureInfoCrossfeedSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Chu Moy / Linkwitz blend that makes headphones sound like speakers (reduces hard L/R separation). Adds ~0.05 ms latency. Disabled during Bit-Perfect.'**
+  String get featureInfoCrossfeedDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Lookahead Brickwall Limiter'**
+  String get featureInfoLimiterTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'True-peak, 0.5–20 ms lookahead'**
+  String get featureInfoLimiterSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive true-peak limiter with 4× oversample. Protects against clipping when EQ boosts. Adds ~5 ms latency. Final stage before DAC. Disabled during Bit-Perfect.'**
+  String get featureInfoLimiterDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Convolution Reverb'**
+  String get featureInfoReverbTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'8 rooms (RT60 0.35–5 s), cross-channel crosstalk, or custom IR'**
+  String get featureInfoReverbSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Partitioned convolution (512-frame blocks) against a synthesized room impulse or custom impulse response you load. Features adjustable cross-channel crosstalk for authentic binaural IRS stereo spatialization. Zero heap allocations in audio loop. Needs the native DSP path; disabled during Bit-Perfect.'**
+  String get featureInfoReverbDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo Balance & Mono Mix'**
+  String get featureInfoPannerTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'–1.0 Left … +1.0 Right, mono collapse'**
+  String get featureInfoPannerSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Constant-power panner + mono downmix (L+R / 2). Useful for hearing asymmetry. Collapses soundstage when mono ON. Disabled during Bit-Perfect.'**
+  String get featureInfoPannerDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Polyphase Sinc Resampler'**
+  String get featureInfoResamplerTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'32 phases × 32 taps (polyphase engine)'**
+  String get featureInfoResamplerSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Polyphase sinc interpolation engine. The in-stream playback path keeps the source frame count, so track→device rate conversion is performed by the platform output (AudioTrack); the polyphase engine is applied internally by the convolution reverb wet path above 48 kHz. Disabled during Bit-Perfect (direct 1:1 stream).'**
+  String get featureInfoResamplerDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Soundstage Widening (Virtualizer)'**
+  String get featureInfoVirtualizerTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Android Virtualizer stereo expansion'**
+  String get featureInfoVirtualizerSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Expands stereo field via AudioEffect Virtualizer (0–1000 mB). On devices with Hardware Spatializer, Spatializer takes precedence and Virtualizer is bypassed. Disabled during Bit-Perfect.'**
+  String get featureInfoVirtualizerDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Spatializer'**
+  String get featureInfoSpatializerTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Android Spatializer API + head tracking'**
+  String get featureInfoSpatializerSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Uses AudioManager.spatializer when available (Android 12L+). Provides true spatial audio if device supports it; otherwise emulates via Virtualizer. Mutually managed with Virtualizer.'**
+  String get featureInfoSpatializerDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Studio Dynamics & MBC'**
+  String get featureInfoDynamicsTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'3-band MBC + limiter presets'**
+  String get featureInfoDynamicsSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'DynamicsProcessing multiband compressor (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). Controls transients and loudness. Disabled during Bit-Perfect.'**
+  String get featureInfoDynamicsDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Room Correction Wizard'**
+  String get featureInfoRoomCorrectionTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Stepped-sine measurement + EQ fit'**
+  String get featureInfoRoomCorrectionSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Plays a short tone sweep through your speakers, records it with the microphone and fits a Room Correction EQ preset that flattens the measured response (clamped to the +/-15 dB EQ range with adjacent-band smoothing). Applied through the normal EQ pipeline, so it participates in Bit-Perfect bypass like any EQ preset. Not a replacement for acoustic treatment.'**
+  String get featureInfoRoomCorrectionDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'DSD (PCM Decode / DoP Output)'**
+  String get featureInfoDsdNativeTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'PCM by default — DoP only with a compatible USB DAC'**
+  String get featureInfoDsdNativeSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD, in 24-bit or zero-padded 32-bit containers (selectable for DACs that require 32-bit USB frames). DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.'**
+  String get featureInfoDsdNativeDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'MQA (Master Quality Authenticated)'**
+  String get featureInfoMqaTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Detected — core unfold only, no authenticated rendering'**
+  String get featureInfoMqaSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'MQA-encoded files are detected from their signature and labeled \"MQA\" in the quality sheet. Core unfold is handled by the in-app decoder; full authenticated/native MQA rendering is not available in this build, so MQA status is never silently reported as plain lossless and authenticated MQA output is never claimed.'**
+  String get featureInfoMqaDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Gapless Playback'**
+  String get featureInfoGaplessTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'ConcatenatingAudioSource, zero gap'**
+  String get featureInfoGaplessSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Joins consecutive tracks sample-accurate with no silence. Ideal for live albums. Mutually exclusive with Crossfade — enabling one forces the other OFF.'**
+  String get featureInfoGaplessDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade'**
+  String get featureInfoCrossfadeTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'0–12 s overlapping dual-player fade'**
+  String get featureInfoCrossfadeSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Fades out current track while fading in next via dual ExoPlayer. Requires disabling Gapless (cannot be gapless and crossfading simultaneously).'**
+  String get featureInfoCrossfadeDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'ReplayGain Normalization'**
+  String get featureInfoReplayGainTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Track / album gain tags in native pre-gain'**
+  String get featureInfoReplayGainSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-transparent native pre-gain driven by Track/Album Gain tags (20 ms smoothing, 0.5 dB inter-sample headroom, clipping-safe). The Dart mixer then carries only user volume so the gain is never applied twice; DoP and non-Android fall back to Dart math. Conflicts with Bit-Perfect bypass (any gain would alter bits). Set to Off for true exclusive.'**
+  String get featureInfoReplayGainDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'OEM Audio Warning'**
+  String get featureInfoOemTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Dolby / Dirac / SoundAlive double-processing'**
+  String get featureInfoOemSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'System-level effects (Dolby Atmos, Xiaomi Sound, Dirac) run outside the app. Running Pulsr DSP on top causes double-EQ and clipping. Use DSP Preference = Native or disable system effects for cleanest sound.'**
+  String get featureInfoOemDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Boost'**
+  String get featureInfoVolumeBoostTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'LoudnessEnhancer +10 dB'**
+  String get featureInfoVolumeBoostSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).'**
+  String get featureInfoVolumeBoostDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Harmonic Saturation / Exciter'**
+  String get featureInfoSaturationTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling'**
+  String get featureInfoSaturationSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.'**
+  String get featureInfoSaturationDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'3-Band Stereo Imager & Bass Mono'**
+  String get featureInfoStereoWidthTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Multiband width + sub-bass mono phase protection'**
+  String get featureInfoStereoWidthSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Mid/Side multiband stereo imager utilizing phase-linear Linkwitz-Riley crossovers. Features dedicated low (<160 Hz), mid (160 Hz–2.5 kHz), and high (>2.5 kHz) width controls. Sub-bass mono isolation eliminates stereo low-end phase cancellation and comb filtering. Disabled during Bit-Perfect.'**
+  String get featureInfoStereoWidthDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Loudness Contour (Fletcher–Munson)'**
+  String get featureInfoLoudnessContourTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Volume-linked bass & treble compensation'**
+  String get featureInfoLoudnessContourSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Equal-loudness approximation: as playback volume decreases, a gentle low-shelf (~100 Hz) and smaller high-shelf (~8 kHz) lift is applied, vanishing at full volume. Gain-domain but complementary to ReplayGain — ReplayGain levels tracks to a common target, while this contour adapts tone to the listening level; both can be ON together. Disabled during Bit-Perfect.'**
+  String get featureInfoLoudnessContourDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Subwoofer Crossover (Bass Redirection)'**
+  String get featureInfoSubCrossoverTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'60–150 Hz Linkwitz-Riley, Bass Mono + Anti-Pop limiting'**
+  String get featureInfoSubCrossoverSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Bass redirection for stereo rigs: a 4th-order Linkwitz-Riley low-pass mono sum is mixed into both channels. Features Bass Mono side-channel subtraction to keep sub-bass punchy and mono-centered, plus tanh anti-pop soft-limiting to eliminate clicks. Disabled during Bit-Perfect.'**
+  String get featureInfoSubCrossoverDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic EQ (Cut & Boost)'**
+  String get featureInfoDynamicEqTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-mode dynamic filters (Peaking, Low-Shelf, High-Shelf)'**
+  String get featureInfoDynamicEqSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Per-band dynamic equalization supporting both Cut (resonance taming) and Boost (transient expansion) modes. Selectable between Peaking biquad, Low-Shelf, and High-Shelf dynamic responses with smooth soft-knee detection. Disabled during Bit-Perfect.'**
+  String get featureInfoDynamicEqDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Native 4-Band Multiband Compressor'**
+  String get featureInfoMultibandCompressorTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++'**
+  String get featureInfoMultibandCompressorSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.'**
+  String get featureInfoMultibandCompressorDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic Bass (Dynamic System)'**
+  String get featureInfoDynamicBassTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Envelope-adaptive sub-bass punch & headphone virtualization'**
+  String get featureInfoDynamicBassSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.'**
+  String get featureInfoDynamicBassDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'ViPER-DDC (Digital Dynamic Correction)'**
+  String get featureInfoViperDdcTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware headphone timbre & frequency linearization'**
+  String get featureInfoViperDdcSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Loads authentic ViPER-DDC (.vdc) correction profiles. Implements high-order Second-Order Sections (SOS) Direct Form II stereo filtering with real-time sample rate adaptation (44.1 kHz / 48 kHz). Precisely neutralizes earphone-specific resonances. Disabled during Bit-Perfect.'**
+  String get featureInfoViperDdcDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Arbitrary Response EQ (GraphicEq)'**
+  String get featureInfoArbitraryEqTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'EqualizerAPO graphic response curve parser & 512-tap FIR filter'**
+  String get featureInfoArbitraryEqSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Parses standard EqualizerAPO \"GraphicEq: <freq> <gain>; ...\" curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.'**
+  String get featureInfoArbitraryEqDescription;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Live Programmable DSP (EEL Scripting)'**
+  String get featureInfoLiveProgTitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time custom audio DSP bytecode VM'**
+  String get featureInfoLiveProgSubtitle;
+
+  /// Audio feature info string
+  ///
+  /// In en, this message translates to:
+  /// **'Write custom audio DSP algorithms in Jesusonic / EEL scripting syntax right on your phone. Code compiles directly to safe, zero-latency bytecode executed per-sample inside the high-priority native audio thread. Supports @init, @sample, sliders 1..8, and comprehensive transcendental math functions. Disabled during Bit-Perfect.'**
+  String get featureInfoLiveProgDescription;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'All DSP when “Bypass DSP” is ON'**
+  String get conflictWithAllDspBypassDsp;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect bypass'**
+  String get conflictWithBitPerfect;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'EQ / ReplayGain / Effects / Crossfade'**
+  String get conflictWithEqReplayGainEffectsCrossfade;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfade (>0 s)'**
+  String get conflictWithCrossfade;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'Gapless'**
+  String get conflictWithGapless;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect bypass / Direct'**
+  String get conflictWithResampler;
+
+  /// Audio feature conflict label
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect bypass, Hardware Spatializer'**
+  String get conflictWithVirtualizer;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.'**
+  String get conflictAaudioDirect;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.'**
+  String get conflictDsdDop;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.'**
+  String get conflictDspBitPerfectBypass;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.'**
+  String get conflictBtBitPerfectUnsupported;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Requires Android 14+ for USB bit-perfect output.'**
+  String get conflictRequiresAndroid14;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.'**
+  String get conflictExclusiveRequiresUsbDac;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'This USB DAC does not advertise an exclusive mixer configuration.'**
+  String get conflictNoMixerAttributes;
+
+  /// Audio conflict reason when gapless is blocked because crossfade > 0
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: Crossfade is {crossfadeSeconds} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.'**
+  String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds);
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.'**
+  String get conflictCrossfadeNeedsGaplessOff;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.'**
+  String get conflictStrictBitPerfectActive;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.'**
+  String get conflictCrossfadeBitPerfectBypass;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot enable: no output device detected yet. Connect a USB DAC and retry.'**
+  String get conflictNoDeviceDetected;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.'**
+  String get conflictNoExclusiveMixer;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.'**
+  String get conflictAaudioDirectCrossfade;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.'**
+  String get conflictOemDoubleProcessing;
+
+  /// Audio conflict reason warning about volume boost clipping risk
+  ///
+  /// In en, this message translates to:
+  /// **'Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB > 6 dB headroom.'**
+  String conflictVolumeBoostClipping(
+      String preampDb, String boostDb, String totalDb);
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'High boost may cause distortion or hearing fatigue.'**
+  String get conflictHighBoostDistortion;
 }
 
 class _AppLocalizationsDelegate

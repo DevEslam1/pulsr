@@ -31,7 +31,10 @@ public:
     void applyParams(const LimiterParamSet& params);
     void reset();
 
-    int getLatencyFrames() const { return lookaheadSamples_; }
+    // Read from the control thread (getPipelineLatencyFrames) while the audio
+    // thread writes lookaheadSamples_ in configure(); mirror it to an atomic so
+    // the query never races the audio thread.
+    int getLatencyFrames() const { return latencyFramesAtomic_.load(std::memory_order_relaxed); }
     float getCurrentGainReductionDb() const { return gainReductionDb_.load(std::memory_order_relaxed); }
 
     void process(float* L, float* R, int frames);
@@ -53,6 +56,8 @@ private:
     LimiterParamSet pendingParams_;
 
     int lookaheadSamples_ = 240;
+    // Atomic mirror of lookaheadSamples_ for the control-thread latency query.
+    std::atomic<int> latencyFramesAtomic_{240};
     float threshold_ = 0.977237f; // pow(10, -0.2 / 20)
     float fastReleaseCoeff_ = 0.998f;
     float slowReleaseCoeff_ = 0.9995f;

@@ -45,7 +45,8 @@ class SettingsSection extends StatelessWidget {
                   Container(
                     width: 24,
                     height: 24,
-                    margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+                    margin:
+                        const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -64,9 +65,8 @@ class SettingsSection extends StatelessWidget {
                         style: TextStyle(
                           color: isProminent ? p.accent : p.textSecondary,
                           fontSize: AppFontSize.label,
-                          fontWeight: isProminent
-                              ? FontWeight.w900
-                              : FontWeight.w800,
+                          fontWeight:
+                              isProminent ? FontWeight.w900 : FontWeight.w800,
                           letterSpacing: AppTracking.overline,
                         ),
                       ),
@@ -95,9 +95,8 @@ class SettingsSection extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.card),
               side: BorderSide(
-                color: isProminent
-                    ? p.accent.withValues(alpha: 0.45)
-                    : p.hairline,
+                color:
+                    isProminent ? p.accent.withValues(alpha: 0.45) : p.hairline,
                 width: isProminent ? 1.5 : 1.0,
               ),
             ),

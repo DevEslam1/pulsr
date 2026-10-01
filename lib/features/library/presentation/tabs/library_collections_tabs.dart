@@ -1,4 +1,3 @@
-
 // ignore_for_file: unused_element_parameter
 part of '../library_screen.dart';
 
@@ -31,104 +30,111 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         child: isGrid
             ? GridView.builder(
                 key: const ValueKey('albums_grid'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
-                  Adaptive.pagePadding(context), 160),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount:
-                    PulsrAdaptiveGrid.columns(context, type: GridType.albums),
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 18,
-                childAspectRatio: 0.78,
-              ),
-              itemCount: albums.length,
-              itemBuilder: (context, index) {
-                final album = albums[index];
-                return StaggeredReveal(
-                  index: index,
-                  groupKey: '${state.sortBy}-${state.ascending}',
-                  child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadii.r18),
-                  onTap: () => context.push('/album', extra: album),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Hero(
-                          tag: 'album_${album.id}',
-                          child: CachedArtwork(
-                              id: album.id,
-                              type: ArtworkType.ALBUM,
-                              size: double.infinity,
-                              borderRadius: 18),
+                physics: const AlwaysScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: EdgeInsetsDirectional.fromSTEB(
+                    Adaptive.pagePadding(context),
+                    16,
+                    Adaptive.pagePadding(context),
+                    160),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount:
+                      PulsrAdaptiveGrid.columns(context, type: GridType.albums),
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 18,
+                  childAspectRatio: 0.78,
+                ),
+                itemCount: albums.length,
+                itemBuilder: (context, index) {
+                  final album = albums[index];
+                  return StaggeredReveal(
+                      index: index,
+                      groupKey: '${state.sortBy}-${state.ascending}',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadii.r18),
+                        onTap: () => context.push('/album', extra: album),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Hero(
+                                tag: 'album_${album.id}',
+                                child: CachedArtwork(
+                                    id: album.id,
+                                    type: ArtworkType.ALBUM,
+                                    size: double.infinity,
+                                    borderRadius: 18),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(album.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: AppFontSize.bodySmall)),
+                            const SizedBox(height: AppSpacing.s2),
+                            Text(
+                                '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label)),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(album.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.bodySmall)),
-                      const SizedBox(height: AppSpacing.s2),
-                      Text(
-                          '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: p.textSecondary, fontSize: AppFontSize.label)),
-                    ],
-                  ),
-                ));
-              },
-            )
-          : ListView.builder(
-              key: const ValueKey('albums_list'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
-              itemCount: albums.length,
-              itemBuilder: (context, index) {
-                final album = albums[index];
-                return StaggeredReveal(
-                  index: index,
-                  groupKey: '${state.sortBy}-${state.ascending}',
-                  child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
-                  child: Material(
-                    color: p.surfaceContainer,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
-                      side: BorderSide(color: p.hairline),
-                    ),
-                    child: ListTile(
-                      leading: CachedArtwork(
-                          id: album.id,
-                          type: ArtworkType.ALBUM,
-                          size: 48,
-                          borderRadius: 12),
-                      title: Text(album.title,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.body,
-                              color: p.textPrimary)),
-                      subtitle: Text(
-                          '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
-                          style:
-                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
-                      trailing: Icon(Icons.chevron_right_rounded,
-                          color: p.textTertiary),
-                      onTap: () => context.push('/album', extra: album),
-                    ),
-                  ),
-                ));
-              },
-            ),
+                      ));
+                },
+              )
+            : ListView.builder(
+                key: const ValueKey('albums_list'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: const EdgeInsets.only(
+                    bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
+                itemCount: albums.length,
+                itemBuilder: (context, index) {
+                  final album = albums[index];
+                  return StaggeredReveal(
+                      index: index,
+                      groupKey: '${state.sortBy}-${state.ascending}',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xxs),
+                        child: Material(
+                          color: p.surfaceContainer,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r16),
+                            side: BorderSide(color: p.hairline),
+                          ),
+                          child: ListTile(
+                            leading: CachedArtwork(
+                                id: album.id,
+                                type: ArtworkType.ALBUM,
+                                size: 48,
+                                borderRadius: 12),
+                            title: Text(album.title,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: AppFontSize.body,
+                                    color: p.textPrimary)),
+                            subtitle: Text(
+                                '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label)),
+                            trailing: Icon(Icons.chevron_right_rounded,
+                                color: p.textTertiary),
+                            onTap: () => context.push('/album', extra: album),
+                          ),
+                        ),
+                      ));
+                },
+              ),
       ),
     );
   }
@@ -161,99 +167,106 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         child: isGrid
             ? GridView.builder(
                 key: const ValueKey('artists_grid_view'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
-                  Adaptive.pagePadding(context), 160),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount:
-                    PulsrAdaptiveGrid.columns(context, type: GridType.artists),
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 18,
-                childAspectRatio: 0.82,
+                physics: const AlwaysScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: EdgeInsetsDirectional.fromSTEB(
+                    Adaptive.pagePadding(context),
+                    16,
+                    Adaptive.pagePadding(context),
+                    160),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: PulsrAdaptiveGrid.columns(context,
+                      type: GridType.artists),
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 18,
+                  childAspectRatio: 0.82,
+                ),
+                itemCount: artists.length,
+                itemBuilder: (context, index) {
+                  final artist = artists[index];
+                  return StaggeredReveal(
+                      index: index,
+                      groupKey: '${state.sortBy}-${state.ascending}',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppRadii.r18),
+                        onTap: () => context.push('/artist', extra: artist),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: CachedArtwork(
+                                  id: artist.id,
+                                  type: ArtworkType.ARTIST,
+                                  size: double.infinity,
+                                  borderRadius: 999,
+                                  fallbackIcon: Icons.person_rounded),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(artist.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: AppFontSize.bodySmall)),
+                            Text(Formatters.formatTrackCount(artist.songCount),
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.caption)),
+                          ],
+                        ),
+                      ));
+                },
+              )
+            : ListView.builder(
+                key: const ValueKey('artists_list_view'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                addAutomaticKeepAlives: false,
+                addRepaintBoundaries: true,
+                padding: const EdgeInsets.only(
+                    bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
+                itemCount: artists.length,
+                itemBuilder: (context, index) {
+                  final artist = artists[index];
+                  return StaggeredReveal(
+                      index: index,
+                      groupKey: '${state.sortBy}-${state.ascending}',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xxs),
+                        child: Material(
+                          color: p.surfaceContainer,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r16),
+                            side: BorderSide(color: p.hairline),
+                          ),
+                          child: ListTile(
+                            leading: CachedArtwork(
+                                id: artist.id,
+                                type: ArtworkType.ARTIST,
+                                size: 48,
+                                borderRadius: 999,
+                                fallbackIcon: Icons.person_rounded),
+                            title: Text(artist.name,
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: AppFontSize.body,
+                                    color: p.textPrimary)),
+                            subtitle: Text(
+                                Formatters.formatTrackCount(artist.songCount),
+                                style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label)),
+                            trailing: Icon(Icons.chevron_right_rounded,
+                                color: p.textTertiary),
+                            onTap: () => context.push('/artist', extra: artist),
+                          ),
+                        ),
+                      ));
+                },
               ),
-              itemCount: artists.length,
-              itemBuilder: (context, index) {
-                final artist = artists[index];
-                return StaggeredReveal(
-                  index: index,
-                  groupKey: '${state.sortBy}-${state.ascending}',
-                  child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadii.r18),
-                  onTap: () => context.push('/artist', extra: artist),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: CachedArtwork(
-                            id: artist.id,
-                            type: ArtworkType.ARTIST,
-                            size: double.infinity,
-                            borderRadius: 999,
-                            fallbackIcon: Icons.person_rounded),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(artist.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.bodySmall)),
-                      Text(Formatters.formatTrackCount(artist.songCount),
-                          style:
-                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption)),
-                    ],
-                  ),
-                ));
-              },
-            )
-          : ListView.builder(
-              key: const ValueKey('artists_list_view'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
-              itemCount: artists.length,
-              itemBuilder: (context, index) {
-                final artist = artists[index];
-                return StaggeredReveal(
-                  index: index,
-                  groupKey: '${state.sortBy}-${state.ascending}',
-                  child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
-                  child: Material(
-                    color: p.surfaceContainer,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
-                      side: BorderSide(color: p.hairline),
-                    ),
-                    child: ListTile(
-                      leading: CachedArtwork(
-                          id: artist.id,
-                          type: ArtworkType.ARTIST,
-                          size: 48,
-                          borderRadius: 999,
-                          fallbackIcon: Icons.person_rounded),
-                      title: Text(artist.name,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.body,
-                              color: p.textPrimary)),
-                      subtitle: Text(
-                          Formatters.formatTrackCount(artist.songCount),
-                          style:
-                              TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
-                      trailing: Icon(Icons.chevron_right_rounded,
-                          color: p.textTertiary),
-                      onTap: () => context.push('/artist', extra: artist),
-                    ),
-                  ),
-                ));
-              },
-            ),
       ),
     );
   }
@@ -395,8 +408,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         addAutomaticKeepAlives: false,
         addRepaintBoundaries: true,
-        padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context), 16,
-            Adaptive.pagePadding(context), 160),
+        padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+            16, Adaptive.pagePadding(context), 160),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: PulsrAdaptiveGrid.dynamicColumns(context,
               minItemWidth: 160, maxColumns: 6),
@@ -409,41 +422,6 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       ),
     );
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // Requires: provided by the composing class (same library).
   Widget _buildEmpty(

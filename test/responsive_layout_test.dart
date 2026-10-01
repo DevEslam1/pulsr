@@ -5,14 +5,15 @@ import 'package:pulsr/features/player/presentation/themes/player_theme_scaffold.
 
 void main() {
   group('Adaptive responsive metrics across screen sizes', () {
-    testWidgets('Validates scale factors across small, standard, large, and tablet screens',
+    testWidgets(
+        'Validates scale factors across small, standard, large, and tablet screens',
         (tester) async {
       const testSizes = [
-        Size(320, 568),  // Small phone (iPhone SE 1st gen)
-        Size(360, 640),  // Compact Android
-        Size(390, 844),  // Standard phone baseline
-        Size(412, 915),  // Pixel 7
-        Size(430, 932),  // iPhone 14/15 Pro Max
+        Size(320, 568), // Small phone (iPhone SE 1st gen)
+        Size(360, 640), // Compact Android
+        Size(390, 844), // Standard phone baseline
+        Size(412, 915), // Pixel 7
+        Size(430, 932), // iPhone 14/15 Pro Max
         Size(768, 1024), // Tablet portrait
         Size(1024, 768), // Tablet landscape
         Size(1440, 900), // Desktop / large window
@@ -41,7 +42,10 @@ void main() {
                 expect(context.rr(12), greaterThan(0));
 
                 // Verify page padding adapts properly
-                expect(context.pagePadding, anyOf(equals(12.0), equals(16.0), equals(24.0), equals(32.0)));
+                expect(
+                    context.pagePadding,
+                    anyOf(equals(12.0), equals(16.0), equals(24.0),
+                        equals(32.0)));
 
                 // Verify PlayerThemeMetrics calculations
                 final metrics = PlayerThemeMetrics.calculate(
@@ -82,7 +86,9 @@ void main() {
       }
     });
 
-    testWidgets('Safe artwork size handles zero and negative constraints gracefully', (tester) async {
+    testWidgets(
+        'Safe artwork size handles zero and negative constraints gracefully',
+        (tester) async {
       final safeArtZero = PlayerThemeMetrics.safeArtworkSize(
         availableWidth: 0,
         availableHeight: 0,

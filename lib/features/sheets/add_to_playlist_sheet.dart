@@ -39,7 +39,8 @@ class AddToPlaylistSheet extends StatefulWidget {
   }
 
   @visibleForTesting
-  static Set<int> get activePlaylistMutations => _AddToPlaylistSheetState._activePlaylistMutations;
+  static Set<int> get activePlaylistMutations =>
+      _AddToPlaylistSheetState._activePlaylistMutations;
 
   @override
   State<AddToPlaylistSheet> createState() => _AddToPlaylistSheetState();
@@ -90,7 +91,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
               : await _useCases.addSongsToPlaylist(
                   createdId, _allSongs.map((s) => s.id).toList());
           if (!context.mounted) return;
-          final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
+          final insertFailure =
+              insertResult.fold<String?>((f) => f.message, (_) => null);
           if (insertFailure != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(insertFailure)),
@@ -129,7 +131,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
           : await _useCases.addSongsToPlaylist(
               playlist.id, _allSongs.map((s) => s.id).toList());
       if (!context.mounted || !_isMutating) return;
-      final insertFailure = insertResult.fold<String?>((f) => f.message, (_) => null);
+      final insertFailure =
+          insertResult.fold<String?>((f) => f.message, (_) => null);
       if (insertFailure != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(insertFailure)),
@@ -190,8 +193,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
               ),
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20,
+                    AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
                 child: StreamBuilder(
                   stream: _useCases.watchPlaylists(),
                   builder: (context, snapshot) {
@@ -210,8 +213,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                       );
                     }
                     final result = snapshot.data;
-                    final hasError =
-                        snapshot.hasError || (result != null && result.isLeft());
+                    final hasError = snapshot.hasError ||
+                        (result != null && result.isLeft());
                     if (hasError) {
                       return Padding(
                         padding:
@@ -231,8 +234,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                               const SizedBox(height: AppSpacing.md),
                               TextButton.icon(
                                 onPressed: () => setState(() {}),
-                                icon: const Icon(Icons.refresh_rounded,
-                                    size: 18),
+                                icon:
+                                    const Icon(Icons.refresh_rounded, size: 18),
                                 label: Text(context.l10n.retry),
                               ),
                             ],
@@ -263,7 +266,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                               ),
                               const SizedBox(height: AppSpacing.md),
                               FilledButton.icon(
-                                onPressed: () => _showNewPlaylistDialog(context),
+                                onPressed: () =>
+                                    _showNewPlaylistDialog(context),
                                 icon: const Icon(Icons.add_rounded, size: 18),
                                 label: Text(context.l10n.createPlaylist),
                               ),
@@ -283,7 +287,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                         final playlist = playlists[index];
                         return PulsrPressable(
                           pressedScale: 0.98,
-                          onTap: () => _addToExistingPlaylist(context, playlist),
+                          onTap: () =>
+                              _addToExistingPlaylist(context, playlist),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.s14,

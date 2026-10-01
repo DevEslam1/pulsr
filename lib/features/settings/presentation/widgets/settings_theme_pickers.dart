@@ -279,7 +279,13 @@ void showThemePickerSheet(
 }
 
 class _ThemePickerSheetContent extends StatefulWidget {
-  final List<({PlayerThemeMode mode, String title, String subtitle, IconData icon})> themes;
+  final List<
+      ({
+        PlayerThemeMode mode,
+        String title,
+        String subtitle,
+        IconData icon
+      })> themes;
   final PlayerThemeMode currentMode;
   final SettingsCubit cubit;
   final Color primaryColor;
@@ -300,7 +306,8 @@ class _ThemePickerSheetContent extends StatefulWidget {
   });
 
   @override
-  State<_ThemePickerSheetContent> createState() => _ThemePickerSheetContentState();
+  State<_ThemePickerSheetContent> createState() =>
+      _ThemePickerSheetContentState();
 }
 
 class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
@@ -311,7 +318,8 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
   void initState() {
     super.initState();
     _selectedMode = widget.currentMode;
-    final initialIndex = widget.themes.indexWhere((t) => t.mode == _selectedMode);
+    final initialIndex =
+        widget.themes.indexWhere((t) => t.mode == _selectedMode);
     _pageController = PageController(
       viewportFraction: 0.82,
       initialPage: initialIndex >= 0 ? initialIndex : 0,
@@ -408,7 +416,9 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadii.r16),
                         side: BorderSide(
-                          color: isSelected ? widget.primaryColor : widget.outlineColor,
+                          color: isSelected
+                              ? widget.primaryColor
+                              : widget.outlineColor,
                           width: isSelected ? 1.5 : 1.0,
                         ),
                       ),
@@ -422,7 +432,9 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                           t.title,
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
-                            color: isSelected ? widget.primaryColor : widget.textPrimary,
+                            color: isSelected
+                                ? widget.primaryColor
+                                : widget.textPrimary,
                           ),
                         ),
                         subtitle: Text(
@@ -477,13 +489,14 @@ class _ThemeMockupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(
-          color: isSelected ? primaryColor : Colors.white10,
+          color: isSelected ? primaryColor : p.hairline,
           width: isSelected ? 2 : 1,
         ),
         boxShadow: isSelected
@@ -516,7 +529,7 @@ class _ThemeMockupCard extends StatelessWidget {
           ),
           const Spacer(),
           Center(
-            child: _buildMockupVisual(),
+            child: _buildMockupVisual(context),
           ),
           const Spacer(),
         ],
@@ -524,7 +537,8 @@ class _ThemeMockupCard extends StatelessWidget {
     );
   }
 
-  Widget _buildMockupVisual() {
+  Widget _buildMockupVisual(BuildContext context) {
+    final p = context.palette;
     switch (mode) {
       case PlayerThemeMode.vinyl:
         return Container(
@@ -532,8 +546,8 @@ class _ThemeMockupCard extends StatelessWidget {
           height: 64,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.black,
-            border: Border.all(color: Colors.grey.shade800, width: 2),
+            color: p.bg,
+            border: Border.all(color: p.hairline, width: 2),
           ),
           child: Center(
             child: Container(
@@ -547,9 +561,9 @@ class _ThemeMockupCard extends StatelessWidget {
                 child: Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white,
+                    color: p.textPrimary,
                   ),
                 ),
               ),
@@ -562,15 +576,15 @@ class _ThemeMockupCard extends StatelessWidget {
           height: 50,
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(6),
+            color: p.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(AppRadii.r6),
             border: Border.all(color: primaryColor.withValues(alpha: 0.5)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Icon(Icons.trip_origin_rounded, size: 16, color: primaryColor),
-              Container(width: 20, height: 10, color: Colors.grey.shade800),
+              Container(width: 20, height: 10, color: p.hairline),
               Icon(Icons.trip_origin_rounded, size: 16, color: primaryColor),
             ],
           ),
@@ -586,7 +600,7 @@ class _ThemeMockupCard extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
                 color: primaryColor,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(AppRadii.r2),
               ),
             );
           }),
@@ -595,11 +609,11 @@ class _ThemeMockupCard extends StatelessWidget {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(width: 60, height: 4, color: Colors.white24),
+            Container(width: 60, height: 4, color: p.hairline),
             const SizedBox(height: 4),
             Container(width: 90, height: 6, color: primaryColor),
             const SizedBox(height: 4),
-            Container(width: 70, height: 4, color: Colors.white24),
+            Container(width: 70, height: 4, color: p.hairline),
           ],
         );
       case PlayerThemeMode.circle:
@@ -619,11 +633,11 @@ class _ThemeMockupCard extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadii.r8),
             border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
           ),
-          child: const Center(
-            child: Icon(Icons.layers_rounded, color: Colors.white70, size: 22),
+          child: Center(
+            child: Icon(Icons.layers_rounded, color: p.textSecondary, size: 22),
           ),
         );
       case PlayerThemeMode.minimal:
@@ -648,7 +662,7 @@ class _ThemeMockupCard extends StatelessWidget {
           height: 50,
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(AppRadii.r6),
             border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
           ),
           child: Icon(Icons.play_arrow_rounded, color: primaryColor, size: 28),
@@ -656,7 +670,6 @@ class _ThemeMockupCard extends StatelessWidget {
     }
   }
 }
-
 
 void showLanguagePickerSheet(
   BuildContext context,

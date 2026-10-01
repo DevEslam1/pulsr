@@ -18,6 +18,7 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
 class MockAudioPlayer extends Mock implements AudioPlayer {}
+
 class MockYtmUrlCache extends Mock implements YtmUrlCache {}
 
 void main() {
@@ -25,18 +26,22 @@ void main() {
 
   group('Playback Engine Wiring Verification Suite', () {
     // 1. AdaptiveBufferEngine throughput & bucket transition
-    test('1. AdaptiveBufferEngine transitions buckets and supports force/release', () async {
+    test(
+        '1. AdaptiveBufferEngine transitions buckets and supports force/release',
+        () async {
       final engine = AdaptiveBufferEngine();
       expect(engine.currentBucket, equals(BufferBucket.standard));
 
       // Local file always maps to minimal
-      expect(engine.bucketFor(isWifi: true, isLocal: true), equals(BufferBucket.minimal));
+      expect(engine.bucketFor(isWifi: true, isLocal: true),
+          equals(BufferBucket.minimal));
 
       // Sampling slow throughput (< 2 Mbps)
       // 100,000 bytes in 1000ms = 0.8 Mbps
       engine.sampleThroughput(100000, const Duration(milliseconds: 1000));
       expect(engine.averageNetworkSpeedMbps, lessThan(2.0));
-      expect(engine.bucketFor(isWifi: false, isLocal: false), equals(BufferBucket.generous));
+      expect(engine.bucketFor(isWifi: false, isLocal: false),
+          equals(BufferBucket.generous));
 
       // Test force bucket
       final events = <BufferBucket>[];
@@ -54,7 +59,9 @@ void main() {
     });
 
     // 2. TripleBufferPipeline PlayerClaim contention protection
-    test('2. TripleBufferPipeline PlayerClaim prevents concurrent player claims', () async {
+    test(
+        '2. TripleBufferPipeline PlayerClaim prevents concurrent player claims',
+        () async {
       final playerA = MockAudioPlayer();
       final playerB = MockAudioPlayer();
       final prefetchPlayer = MockAudioPlayer();
@@ -63,8 +70,10 @@ void main() {
         getActivePlayer: () => playerA,
         getInactivePlayer: () => playerB,
         prefetchPlayer: prefetchPlayer,
-        resolveAudioSource: (song, tag) async => AudioSource.uri(Uri.parse('https://example.com')),
-        songToMediaItem: (song, [fastArtUri]) => MediaItem(id: '1', title: 'Song'),
+        resolveAudioSource: (song, tag) async =>
+            AudioSource.uri(Uri.parse('https://example.com')),
+        songToMediaItem: (song, [fastArtUri]) =>
+            MediaItem(id: '1', title: 'Song'),
       );
 
       expect(pipeline.inactiveClaim, equals(PlayerClaim.none));
@@ -92,9 +101,11 @@ void main() {
     });
 
     // 3. Preload scheduling & resolution deduplication
-    test('3. StreamPreResolver skips resolution if already prefetching', () async {
+    test('3. StreamPreResolver skips resolution if already prefetching',
+        () async {
       final mockCache = MockYtmUrlCache();
-      when(() => mockCache.contains(any(), quality: any(named: 'quality'))).thenReturn(false);
+      when(() => mockCache.contains(any(), quality: any(named: 'quality')))
+          .thenReturn(false);
 
       int resolveCallCount = 0;
       final resolver = StreamPreResolver(
@@ -158,7 +169,9 @@ void main() {
     });
 
     // 4. DSP Latency Compensation
-    test('4. OptimizedDspPipeline compensates playback position for measured latency', () {
+    test(
+        '4. OptimizedDspPipeline compensates playback position for measured latency',
+        () {
       final dsp = OptimizedDspPipeline();
       const rawPos = Duration(seconds: 10);
 
@@ -169,12 +182,17 @@ void main() {
       dsp.updateNativeLatency(frames: 480, sampleRate: 48000.0);
       final compensated = dsp.getCompensatedPosition(rawPos);
 
-      expect(compensated, equals(const Duration(seconds: 10) - const Duration(milliseconds: 10)));
+      expect(
+          compensated,
+          equals(
+              const Duration(seconds: 10) - const Duration(milliseconds: 10)));
       expect(dsp.calculateTotalEstimatedLatencyMs(), equals(10.0));
     });
 
     // 5. BatteryAwarePlayback & DSP degradation (all 9 stages)
-    test('5. EqualizerManager degradeToEssentials disables all 9 DSP stages and restores them', () async {
+    test(
+        '5. EqualizerManager degradeToEssentials disables all 9 DSP stages and restores them',
+        () async {
       final eq = EqualizerManager();
 
       eq.isReverbEnabled = true;
@@ -215,7 +233,8 @@ void main() {
     });
 
     // 6. AudioMemoryManager Preload Budget
-    test('6. AudioMemoryManager enforces 32MB budget and canPreload limits', () {
+    test('6. AudioMemoryManager enforces 32MB budget and canPreload limits',
+        () {
       final memory = AudioMemoryManager();
 
       expect(memory.canPreload(isBatteryConstrained: false), isTrue);
@@ -231,13 +250,16 @@ void main() {
     });
 
     // 7. DSD safety guard
-    test('7. FormatAwareDecoder throws PlayerException(9001) for DSF/DFF files', () async {
+    test('7. FormatAwareDecoder throws PlayerException(9001) for DSF/DFF files',
+        () async {
       final decoder = FormatAwareDecoder(
-        resolveYtmStream: (song, tag) async => AudioSource.uri(Uri.parse('https://example.com')),
+        resolveYtmStream: (song, tag) async =>
+            AudioSource.uri(Uri.parse('https://example.com')),
         decodeDsdToPcm: (song, tag) async {
           final ext = song.path.split('.').last.toLowerCase();
           if (ext == 'dsf' || ext == 'dff') {
-            throw PlayerException(9001, 'DSD decode-to-PCM pipeline not yet wired', null);
+            throw PlayerException(
+                9001, 'DSD decode-to-PCM pipeline not yet wired', null);
           }
           return AudioSource.uri(Uri.parse(song.path));
         },
@@ -259,13 +281,17 @@ void main() {
       );
 
       expect(
-        () => decoder.decodeForFormat(dsfSong, MediaItem(id: '1', title: 'Hi-Res Track')),
-        throwsA(isA<PlayerException>().having((e) => e.code, 'code', equals(9001))),
+        () => decoder.decodeForFormat(
+            dsfSong, MediaItem(id: '1', title: 'Hi-Res Track')),
+        throwsA(
+            isA<PlayerException>().having((e) => e.code, 'code', equals(9001))),
       );
     });
 
     // 8. ReplayGainMath calculation parity
-    test('8. ReplayGainMath calculates correct gain and applies inter-sample headroom', () {
+    test(
+        '8. ReplayGainMath calculates correct gain and applies inter-sample headroom',
+        () {
       final volumeTrack = ReplayGainMath.apply(
         mode: 'track',
         volume: 1.0,
@@ -286,7 +312,9 @@ void main() {
     });
 
     // 9. SmartPreloadScheduler 70% progress threshold guard & configurable preloadCount
-    test('9. SmartPreloadScheduler schedules preloads at 70% threshold and respects preloadCount', () {
+    test(
+        '9. SmartPreloadScheduler schedules preloads at 70% threshold and respects preloadCount',
+        () {
       final preloaded = <int>[];
       final scheduler = SmartPreloadScheduler(
         onPreloadRequested: (song, {required priority}) async {
@@ -337,7 +365,9 @@ void main() {
     });
 
     // 10. EqualizerManager.syncNativeLatency updates OptimizedDspPipeline
-    test('10. EqualizerManager.syncNativeLatency updates attached OptimizedDspPipeline', () async {
+    test(
+        '10. EqualizerManager.syncNativeLatency updates attached OptimizedDspPipeline',
+        () async {
       final eq = EqualizerManager();
       final dsp = OptimizedDspPipeline();
       eq.attachDspPipeline(dsp);
@@ -351,7 +381,9 @@ void main() {
     });
 
     // 11. AudioMemoryManager onTrackCompleted and evict
-    test('11. AudioMemoryManager evict removes entry and onTrackCompleted accepts String and int', () {
+    test(
+        '11. AudioMemoryManager evict removes entry and onTrackCompleted accepts String and int',
+        () {
       bool evictedOldest = false;
       final memory = AudioMemoryManager(
         onEvictOldestCacheRequested: () {
@@ -378,7 +410,9 @@ void main() {
     });
 
     // 12. AudioMemoryManager calculateHeadSize with variable bitrates
-    test('12. AudioMemoryManager calculateHeadSize accurately calculates head bytes by bitrate', () {
+    test(
+        '12. AudioMemoryManager calculateHeadSize accurately calculates head bytes by bitrate',
+        () {
       // 10 seconds of 256 kbps: (256 * 1000 / 8) * 10 = 320,000 bytes
       final size256 = AudioMemoryManager.calculateHeadSize(bitrateKbps: 256);
       expect(size256, equals(320000));
@@ -393,7 +427,9 @@ void main() {
     });
 
     // 13. AdaptiveBufferEngine evaluateBucket
-    test('13. AdaptiveBufferEngine evaluateBucket updates currentBucket based on network and locality', () {
+    test(
+        '13. AdaptiveBufferEngine evaluateBucket updates currentBucket based on network and locality',
+        () {
       final engine = AdaptiveBufferEngine();
       expect(engine.currentBucket, equals(BufferBucket.standard));
 
@@ -408,7 +444,9 @@ void main() {
     });
 
     // 14. AudioPlayer setAudioLoadConfiguration updates configuration dynamically
-    test('14. AudioPlayer setAudioLoadConfiguration updates load control configuration', () async {
+    test(
+        '14. AudioPlayer setAudioLoadConfiguration updates load control configuration',
+        () async {
       final player = AudioPlayer();
       expect(player.audioLoadConfiguration, isNull);
 

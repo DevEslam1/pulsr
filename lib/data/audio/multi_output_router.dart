@@ -2,7 +2,12 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 
-enum MultiOutputMode { systemDefault, speakerAndBluetooth, speakerOnly, bluetoothOnly }
+enum MultiOutputMode {
+  systemDefault,
+  speakerAndBluetooth,
+  speakerOnly,
+  bluetoothOnly
+}
 
 /// Best-effort simultaneous routing. Android has no public API for true
 /// concurrent A2DP + speaker; we attempt the vendor route via the audio
@@ -28,7 +33,8 @@ class MultiOutputRouter {
       return true;
     }
     try {
-      final result = await _channel.invokeMethod<String>('setMultiOutputRoute', {
+      final result =
+          await _channel.invokeMethod<String>('setMultiOutputRoute', {
         'mode': next.name,
       }).timeout(const Duration(seconds: 3));
       lastRouteSupported = result != 'unsupported';

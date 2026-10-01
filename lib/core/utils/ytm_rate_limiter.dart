@@ -156,29 +156,32 @@ class YtmRateLimiter {
   /// Acquires a permit before making a native YTM request.
   /// If [fastFail] is true and an active backoff window is longer than 30s,
   /// throws a [TimeoutException] immediately instead of blocking the async mutex for minutes.
-  Future<void> acquirePermit({bool fastFail = false}) => _nativeMutex.run(() async {
-    while (true) {
-      final now = clock.now();
-      if (now.isBefore(_backoffUntil)) {
-        final waitDuration = _backoffUntil.difference(now);
-        if (fastFail && waitDuration > const Duration(seconds: 30)) {
-          throw TimeoutException('Rate limiter in long backoff (${waitDuration.inSeconds}s remaining)');
+  Future<void> acquirePermit({bool fastFail = false}) =>
+      _nativeMutex.run(() async {
+        while (true) {
+          final now = clock.now();
+          if (now.isBefore(_backoffUntil)) {
+            final waitDuration = _backoffUntil.difference(now);
+            if (fastFail && waitDuration > const Duration(seconds: 30)) {
+              throw TimeoutException(
+                  'Rate limiter in long backoff (${waitDuration.inSeconds}s remaining)');
+            }
+            await Future<void>.delayed(waitDuration);
+          }
+
+          _refill();
+          if (_tokens >= 1.0) {
+            _tokens -= 1.0;
+            _persist();
+            return;
+          }
+
+          // Wait for the next token to become available
+          final waitMs =
+              ((1.0 - _tokens) / _refillRate * 1000).ceil().clamp(10, 5000);
+          await Future<void>.delayed(Duration(milliseconds: waitMs));
         }
-        await Future<void>.delayed(waitDuration);
-      }
-
-      _refill();
-      if (_tokens >= 1.0) {
-        _tokens -= 1.0;
-        _persist();
-        return;
-      }
-
-      // Wait for the next token to become available
-      final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil().clamp(10, 5000);
-      await Future<void>.delayed(Duration(milliseconds: waitMs));
-    }
-  });
+      });
 
   /// Called when a 429 rate-limit response is received from native YouTube.
   /// [_adaptiveMultiplier] actually scales the backoff (previously it was

@@ -56,7 +56,9 @@ class SleepTimerManager {
   }) {
     startSleepTimer(
       duration,
-      getActivePlayer: playerGetter ?? _lastPlayerGetter ?? () => throw StateError('No player available'),
+      getActivePlayer: playerGetter ??
+          _lastPlayerGetter ??
+          () => throw StateError('No player available'),
       onTimerExpired: onExpired ?? _onTimerExpiredCallback ?? () async {},
     );
   }
@@ -91,8 +93,8 @@ class SleepTimerManager {
       if (allKnown.isNotEmpty) {
         final totalAll =
             allKnown.fold<Duration>(Duration.zero, (prev, d) => prev + d);
-        averageDuration = Duration(
-            milliseconds: totalAll.inMilliseconds ~/ allKnown.length);
+        averageDuration =
+            Duration(milliseconds: totalAll.inMilliseconds ~/ allKnown.length);
       }
     }
 
@@ -446,8 +448,7 @@ class SleepTimerManager {
       final prefs = await SharedPreferences.getInstance();
       final targetMs = prefs.getInt(PrefsKeys.sleepTimerTarget);
       if (targetMs == null) return false;
-      final remainingMs =
-          targetMs - DateTime.now().millisecondsSinceEpoch;
+      final remainingMs = targetMs - DateTime.now().millisecondsSinceEpoch;
       if (remainingMs <= 0) {
         await prefs.remove(PrefsKeys.sleepTimerTarget);
         return false;

@@ -113,9 +113,11 @@ class _YtmAccountDisconnectDialogState
             foregroundColor: Colors.white,
           ),
           child: _busy
-              ? const SizedBox(width: AppSpacing.md,
+              ? const SizedBox(
+                  width: AppSpacing.md,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
               : Text(context.l10n.disconnect),
         ),

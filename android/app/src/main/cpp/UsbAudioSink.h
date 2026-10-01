@@ -74,12 +74,16 @@ private:
     void workerLoop();
     bool submitAll();
     void releaseResources();
+    void drainUrbCompletions();
 
     std::atomic<bool> active_{false};
     std::atomic<bool> running_{false};
     std::atomic<int> lastError_{0};
     std::atomic<uint64_t> underrunCount_{0};
     std::atomic<uint64_t> overrunCount_{0};
+    // In-flight audio-thread producers. releaseResources() sets active_=false
+    // then waits for this to drain before freeing/reassigning the ring buffer.
+    std::atomic<int> activeWriters_{0};
 
     int fd_ = -1;
     int endpoint_ = 0;

@@ -73,8 +73,10 @@ void main() {
         f1: 200.0,
         f2: 1000.0,
       );
-      expect(manager.multibandCompressorF0, lessThan(manager.multibandCompressorF1));
-      expect(manager.multibandCompressorF1, lessThan(manager.multibandCompressorF2));
+      expect(manager.multibandCompressorF0,
+          lessThan(manager.multibandCompressorF1));
+      expect(manager.multibandCompressorF1,
+          lessThan(manager.multibandCompressorF2));
       manager.dispose();
     });
 

@@ -20,7 +20,8 @@ class PlaybackBookmark {
 
   /// Consider finished when within [finishWindow] of the end.
   bool isFinished({Duration finishWindow = const Duration(seconds: 30)}) =>
-      durationMs > 0 && (durationMs - positionMs) <= finishWindow.inMilliseconds;
+      durationMs > 0 &&
+      (durationMs - positionMs) <= finishWindow.inMilliseconds;
 
   Map<String, dynamic> toMap() => {
         'pos': positionMs,
@@ -63,15 +64,15 @@ class PlaybackBookmarkStore {
   }) {
     final threshold = customMinDurationMs ?? minDurationMs;
     if (durationMs >= threshold) return true;
-    final haystack =
-        '${genre ?? ''} ${album ?? ''}'.toLowerCase();
-    final genres = customGenres ?? [
-      'podcast',
-      'audiobook',
-      'audio book',
-      'talk',
-      'lecture',
-    ];
+    final haystack = '${genre ?? ''} ${album ?? ''}'.toLowerCase();
+    final genres = customGenres ??
+        [
+          'podcast',
+          'audiobook',
+          'audio book',
+          'talk',
+          'lecture',
+        ];
     for (final g in genres) {
       if (haystack.contains(g.toLowerCase())) return true;
     }

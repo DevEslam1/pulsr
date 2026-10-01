@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
+
 void main() {
   group('EqPreset 10-band migration', () {
     test('centerFrequencies are the 10 ISO octave centers', () {
@@ -62,12 +63,21 @@ void main() {
         gains: const [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         bassBoost: 0.3,
         customFrequencies: const [
-          31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
+          31,
+          62,
+          125,
+          250,
+          500,
+          1000,
+          2000,
+          4000,
+          8000,
+          16000,
         ],
         qFactors: const [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       );
-      final decoded =
-          EqPreset.fromJson(jsonDecode(jsonEncode(preset.toJson())) as Map<String, dynamic>);
+      final decoded = EqPreset.fromJson(
+          jsonDecode(jsonEncode(preset.toJson())) as Map<String, dynamic>);
       expect(decoded.name, 'My Custom');
       expect(decoded.gains, preset.gains);
       expect(decoded.bassBoost, 0.3);

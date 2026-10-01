@@ -61,7 +61,8 @@ class SongRatingStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_ratings.length > maxEntries) {
-        final keysToRemove = _ratings.keys.take(_ratings.length - maxEntries).toList();
+        final keysToRemove =
+            _ratings.keys.take(_ratings.length - maxEntries).toList();
         for (final k in keysToRemove) {
           _ratings.remove(k);
         }

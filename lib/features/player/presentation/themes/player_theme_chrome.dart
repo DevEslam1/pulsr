@@ -86,7 +86,7 @@ class PlayerDockIconStyle {
     badgeHPadding: 3.5,
     badgeRadius: 6,
     badgeShadow: false,
-    badgeFontSize: 8,
+    badgeFontSize: AppFontSize.nano,
   );
 
   static const PlayerDockIconStyle classic = PlayerDockIconStyle(
@@ -100,7 +100,7 @@ class PlayerDockIconStyle {
     badgeHPadding: 4,
     badgeRadius: 8,
     badgeShadow: true,
-    badgeFontSize: 8.5,
+    badgeFontSize: AppFontSize.micro,
   );
 }
 
@@ -128,8 +128,9 @@ class PlayerSwitcherItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final semanticsLabel =
-        (badgeCount != null && badgeCount! > 0) ? '$label ($badgeCount)' : label;
+    final semanticsLabel = (badgeCount != null && badgeCount! > 0)
+        ? '$label ($badgeCount)'
+        : label;
     return Semantics(
       button: true,
       label: semanticsLabel,
@@ -172,8 +173,10 @@ class PlayerSwitcherItem extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: isTablet ? AppFontSize.bodySmall : AppFontSize.label,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                      fontSize:
+                          isTablet ? AppFontSize.bodySmall : AppFontSize.label,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
                       color: isSelected ? p.textPrimary : p.textSecondary,
                       letterSpacing: AppTracking.label,
                     ),
@@ -182,8 +185,8 @@ class PlayerSwitcherItem extends StatelessWidget {
                 if (badgeCount != null && badgeCount! > 0) ...[
                   const SizedBox(width: AppSpacing.xxs),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4.5, vertical: AppSpacing.s2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4.5, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? activeColor
@@ -250,7 +253,8 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
               duration: context.motionMs(280),
               transitionBuilder: (child, anim) {
                 final isHeart = (child.key as ValueKey<bool>?)?.value == true;
-                final curve = isHeart ? Curves.easeOutBack : Curves.easeOutCubic;
+                final curve =
+                    isHeart ? Curves.easeOutBack : Curves.easeOutCubic;
                 return ScaleTransition(
                   scale: CurvedAnimation(
                     parent: anim,
@@ -442,12 +446,13 @@ class PlayerViewSwitcher extends StatelessWidget {
     final surfaceBase = p.isDark ? Colors.white : Colors.black;
     // Custom Theme Studio shape controls apply when the user picked the custom
     // colour source, so preset themes keep their hand-tuned geometry.
-    final custom = context.select<SettingsCubit, ({double radius, bool glow, bool active})>(
-        (c) => (
-              radius: c.state.customThemeRadius,
-              glow: c.state.customThemeGlow,
-              active: c.state.themeColorSource == ThemeColorSource.custom,
-            ));
+    final custom = context
+        .select<SettingsCubit, ({double radius, bool glow, bool active})>(
+            (c) => (
+                  radius: c.state.customThemeRadius,
+                  glow: c.state.customThemeGlow,
+                  active: c.state.themeColorSource == ThemeColorSource.custom,
+                ));
     final barRadius = custom.active ? custom.radius : 24.0;
     final showGlow = custom.active && custom.glow;
 
@@ -470,76 +475,76 @@ class PlayerViewSwitcher extends StatelessWidget {
                       ? surfaceBase
                       : surfaceBase.withValues(alpha: surfaceFillAlpha),
                   borderRadius: BorderRadius.circular(barRadius),
-                border: Border.all(
-                  color: surfaceBase.withValues(alpha: borderAlpha),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  if (showGlow)
+                  border: Border.all(
+                    color: surfaceBase.withValues(alpha: borderAlpha),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    if (showGlow)
+                      BoxShadow(
+                        color: activeColor.withValues(alpha: 0.30),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      ),
                     BoxShadow(
-                      color: activeColor.withValues(alpha: 0.30),
-                      blurRadius: 20,
-                      spreadRadius: 1,
+                      color: Colors.black.withValues(alpha: 0.20),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: PlayerSwitcherItem(
-                      label: l10n.trackNumber,
-                      icon: trackIcon,
-                      isSelected: isTrack,
-                      activeColor: activeColor,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (!isTrack) {
-                          HapticFeedback.selectionClick();
-                          if (isLyrics) cubit.toggleLyricsVisibility();
-                          if (isQueue) cubit.toggleQueueVisibility();
-                        }
-                      },
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: PlayerSwitcherItem(
+                        label: l10n.trackNumber,
+                        icon: trackIcon,
+                        isSelected: isTrack,
+                        activeColor: activeColor,
+                        isTablet: isTablet,
+                        onTap: () {
+                          if (!isTrack) {
+                            HapticFeedback.selectionClick();
+                            if (isLyrics) cubit.toggleLyricsVisibility();
+                            if (isQueue) cubit.toggleQueueVisibility();
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: PlayerSwitcherItem(
-                      label: l10n.lyrics,
-                      icon: Icons.lyrics_rounded,
-                      isSelected: isLyrics,
-                      activeColor: activeColor,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (!isLyrics) {
-                          HapticFeedback.selectionClick();
-                          cubit.toggleLyricsVisibility();
-                        }
-                      },
+                    Expanded(
+                      child: PlayerSwitcherItem(
+                        label: l10n.lyrics,
+                        icon: Icons.lyrics_rounded,
+                        isSelected: isLyrics,
+                        activeColor: activeColor,
+                        isTablet: isTablet,
+                        onTap: () {
+                          if (!isLyrics) {
+                            HapticFeedback.selectionClick();
+                            cubit.toggleLyricsVisibility();
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: PlayerSwitcherItem(
-                      label: l10n.queue,
-                      icon: Icons.queue_music_rounded,
-                      isSelected: isQueue,
-                      badgeCount: state.queue.length,
-                      activeColor: activeColor,
-                      isTablet: isTablet,
-                      onTap: () {
-                        if (!isQueue) {
-                          HapticFeedback.selectionClick();
-                          cubit.toggleQueueVisibility();
-                        }
-                      },
+                    Expanded(
+                      child: PlayerSwitcherItem(
+                        label: l10n.queue,
+                        icon: Icons.queue_music_rounded,
+                        isSelected: isQueue,
+                        badgeCount: state.queue.length,
+                        activeColor: activeColor,
+                        isTablet: isTablet,
+                        onTap: () {
+                          if (!isQueue) {
+                            HapticFeedback.selectionClick();
+                            cubit.toggleQueueVisibility();
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
+                  ],
+                ),
+              );
 
               if (GpuBudget.isGpuSaverActive) {
                 return pillContainer;
@@ -581,9 +586,17 @@ class PlayerBottomActionDock extends StatelessWidget {
     final song = props.state.currentSong;
     final p = context.palette;
     final l10n = context.l10n;
-    final outputDevice = settingsState?.currentOutputDevice ??
-        context.select<SettingsCubit, AudioOutputInfo?>(
+    // SettingsCubit is optional for standalone theme previews; fall back to the
+    // injected state instead of throwing when it is not provided.
+    AudioOutputInfo? outputDevice = settingsState?.currentOutputDevice;
+    if (outputDevice == null) {
+      try {
+        outputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
             (c) => c.state.currentOutputDevice);
+      } catch (_) {
+        outputDevice = null;
+      }
+    }
     final isUsb = outputDevice?.isUsbDac == true;
     final isCast = CastService().sessionStatus.connected;
     final isEqActive = props.state.isEqEnabled;
@@ -600,12 +613,22 @@ class PlayerBottomActionDock extends StatelessWidget {
     final hasTimer = props.state.sleepTimerRemaining != null ||
         remainingTracks != null ||
         isEndQ;
-    final custom = context.select<SettingsCubit, ({double radius, bool glow, bool active})>(
-        (c) => (
-              radius: c.state.customThemeRadius,
-              glow: c.state.customThemeGlow,
-              active: c.state.themeColorSource == ThemeColorSource.custom,
-            ));
+    ({double radius, bool glow, bool active}) custom = (
+      radius: 24.0,
+      glow: false,
+      active: false,
+    );
+    try {
+      custom = context
+          .select<SettingsCubit, ({double radius, bool glow, bool active})>(
+              (c) => (
+                    radius: c.state.customThemeRadius,
+                    glow: c.state.customThemeGlow,
+                    active: c.state.themeColorSource == ThemeColorSource.custom,
+                  ));
+    } catch (_) {
+      // SettingsCubit not provided (standalone preview) — keep defaults.
+    }
     final barRadius = custom.active ? custom.radius : 24.0;
     final showGlow = custom.active && custom.glow;
 
@@ -640,152 +663,151 @@ class PlayerBottomActionDock extends StatelessWidget {
                       : (p.isDark ? Colors.white : Colors.black)
                           .withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(barRadius),
-                border: Border.all(
-                  color: (p.isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.12),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  if (showGlow)
+                  border: Border.all(
+                    color: (p.isDark ? Colors.white : Colors.black)
+                        .withValues(alpha: 0.12),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    if (showGlow)
+                      BoxShadow(
+                        color: props.activeColor.withValues(alpha: 0.28),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      ),
                     BoxShadow(
-                      color: props.activeColor.withValues(alpha: 0.28),
-                      blurRadius: 20,
-                      spreadRadius: 1,
+                      color: Colors.black.withValues(alpha: 0.20),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // 1. Equalizer & DSP
-                  Expanded(
-                    child: PlayerDockIconButton(
-                      icon: Icons.tune_rounded,
-                      tooltip: l10n.equalizer,
-                      isActive: isEqActive,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      style: dockIconStyle,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        EqualizerSheet.show(context);
-                      },
-                    ),
-                  ),
-
-                  // 2. Audio Output & DAC
-                  Expanded(
-                    child: PlayerDockIconButton(
-                      icon: outputIcon,
-                      tooltip:
-                          isCast ? l10n.googleCast : l10n.audioOutputAndDac,
-                      badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
-                      isActive: isCast || isUsb,
-                      activeColor: isCast
-                          ? AppColors.accentCyan
-                          : AppColors.dacGold,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      style: dockIconStyle,
-                      onTap: () {
-                        if (song != null) {
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // 1. Equalizer & DSP
+                    Expanded(
+                      child: PlayerDockIconButton(
+                        icon: Icons.tune_rounded,
+                        tooltip: l10n.equalizer,
+                        isActive: isEqActive,
+                        activeColor: props.activeColor,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                        style: dockIconStyle,
+                        onTap: () {
                           HapticFeedback.lightImpact();
-                          AudioQualitySheet.show(
-                              context, song, props.activeColor);
-                        }
-                      },
+                          EqualizerSheet.show(context);
+                        },
+                      ),
                     ),
-                  ),
 
-                  // 3. Playback Speed
-                  Expanded(
-                    child: PlayerDockIconButton(
-                      icon: Icons.speed_rounded,
-                      tooltip: l10n.playbackSpeed,
-                      badgeText: speed != 1.0
-                          ? '${speed.toStringAsFixed(1)}x'
-                          : null,
-                      isActive: speed != 1.0,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      style: dockIconStyle,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        SpeedPickerSheet.show(context);
-                      },
+                    // 2. Audio Output & DAC
+                    Expanded(
+                      child: PlayerDockIconButton(
+                        icon: outputIcon,
+                        tooltip:
+                            isCast ? l10n.googleCast : l10n.audioOutputAndDac,
+                        badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
+                        isActive: isCast || isUsb,
+                        activeColor:
+                            isCast ? AppColors.accentCyan : AppColors.dacGold,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                        style: dockIconStyle,
+                        onTap: () {
+                          if (song != null) {
+                            HapticFeedback.lightImpact();
+                            AudioQualitySheet.show(
+                                context, song, props.activeColor);
+                          }
+                        },
+                      ),
                     ),
-                  ),
 
-                  // 4. Sleep Timer
-                  Expanded(
-                    child: PlayerDockIconButton(
-                      icon: Icons.timer_outlined,
-                      tooltip: isEndQ
-                          ? l10n.sleepTimerEndOfQueue
-                          : (remainingTracks != null
-                              ? l10n.sleepTimerTracksRemaining(remainingTracks)
-                              : (props.state.sleepTimerRemaining != null
-                                  ? l10n.sleepTimerMinutesRemaining(
-                                      props.state.sleepTimerRemaining!
-                                          .inMinutes)
-                                  : l10n.sleepTimer)),
-                      badgeText: hasTimer
-                          ? (remainingTracks != null
-                              ? '$remainingTracks tr'
-                              : (isEndQ
-                                  ? 'End'
-                                  : (props.state.sleepTimerRemaining != null
-                                      ? '${props.state.sleepTimerRemaining!.inMinutes}m'
-                                      : '')))
-                          : null,
-                      isActive: hasTimer,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      style: dockIconStyle,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        SleepTimerSheet.show(context);
-                      },
-                    ),
-                  ),
-
-                  // 5. Quran Mode
-                  Expanded(
-                    child: QuranModeDockButton(
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                    ),
-                  ),
-
-                  // 6. Add to Playlist
-                  Expanded(
-                    child: PlayerDockIconButton(
-                      icon: Icons.playlist_add_rounded,
-                      tooltip: l10n.addToPlaylist,
-                      isActive: false,
-                      activeColor: props.activeColor,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      style: dockIconStyle,
-                      onTap: () {
-                        if (song != null) {
+                    // 3. Playback Speed
+                    Expanded(
+                      child: PlayerDockIconButton(
+                        icon: Icons.speed_rounded,
+                        tooltip: l10n.playbackSpeed,
+                        badgeText: speed != 1.0
+                            ? '${speed.toStringAsFixed(1)}x'
+                            : null,
+                        isActive: speed != 1.0,
+                        activeColor: props.activeColor,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                        style: dockIconStyle,
+                        onTap: () {
                           HapticFeedback.lightImpact();
-                          AddToPlaylistSheet.show(context, song: song);
-                        }
-                      },
+                          SpeedPickerSheet.show(context);
+                        },
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
+
+                    // 4. Sleep Timer
+                    Expanded(
+                      child: PlayerDockIconButton(
+                        icon: Icons.timer_outlined,
+                        tooltip: isEndQ
+                            ? l10n.sleepTimerEndOfQueue
+                            : (remainingTracks != null
+                                ? l10n
+                                    .sleepTimerTracksRemaining(remainingTracks)
+                                : (props.state.sleepTimerRemaining != null
+                                    ? l10n.sleepTimerMinutesRemaining(props
+                                        .state.sleepTimerRemaining!.inMinutes)
+                                    : l10n.sleepTimer)),
+                        badgeText: hasTimer
+                            ? (remainingTracks != null
+                                ? '$remainingTracks tr'
+                                : (isEndQ
+                                    ? 'End'
+                                    : (props.state.sleepTimerRemaining != null
+                                        ? '${props.state.sleepTimerRemaining!.inMinutes}m'
+                                        : '')))
+                            : null,
+                        isActive: hasTimer,
+                        activeColor: props.activeColor,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                        style: dockIconStyle,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          SleepTimerSheet.show(context);
+                        },
+                      ),
+                    ),
+
+                    // 5. Quran Mode
+                    Expanded(
+                      child: QuranModeDockButton(
+                        activeColor: props.activeColor,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                      ),
+                    ),
+
+                    // 6. Add to Playlist
+                    Expanded(
+                      child: PlayerDockIconButton(
+                        icon: Icons.playlist_add_rounded,
+                        tooltip: l10n.addToPlaylist,
+                        isActive: false,
+                        activeColor: props.activeColor,
+                        inactiveColor: p.textSecondary,
+                        isTablet: isTablet,
+                        style: dockIconStyle,
+                        onTap: () {
+                          if (song != null) {
+                            HapticFeedback.lightImpact();
+                            AddToPlaylistSheet.show(context, song: song);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
 
               if (GpuBudget.isGpuSaverActive) {
                 return dockContainer;

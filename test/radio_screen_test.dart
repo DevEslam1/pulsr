@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -11,7 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
-Widget _buildTestApp({required Widget child, required MockPlayerCubit playerCubit}) {
+Widget _buildTestApp(
+    {required Widget child, required MockPlayerCubit playerCubit}) {
   return MaterialApp(
     theme: AuraTheme.darkTheme,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -35,7 +36,8 @@ void main() {
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
   });
 
-  testWidgets('RadioScreen renders empty state and Add Station button', (tester) async {
+  testWidgets('RadioScreen renders empty state and Add Station button',
+      (tester) async {
     await tester.pumpWidget(_buildTestApp(
       child: const RadioScreen(),
       playerCubit: mockPlayerCubit,
@@ -47,7 +49,9 @@ void main() {
     expect(find.text('Add Station'), findsWidgets);
   });
 
-  testWidgets('Add Station dialog opens and closes without controller disposal errors', (tester) async {
+  testWidgets(
+      'Add Station dialog opens and closes without controller disposal errors',
+      (tester) async {
     await tester.pumpWidget(_buildTestApp(
       child: const RadioScreen(),
       playerCubit: mockPlayerCubit,
@@ -70,7 +74,8 @@ void main() {
     expect(find.text('Station name'), findsNothing);
   });
 
-  testWidgets('Adding a valid station updates the list without error', (tester) async {
+  testWidgets('Adding a valid station updates the list without error',
+      (tester) async {
     await tester.pumpWidget(_buildTestApp(
       child: const RadioScreen(),
       playerCubit: mockPlayerCubit,
@@ -82,8 +87,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Enter details
-    await tester.enterText(find.widgetWithText(TextField, 'Station name'), 'Chill Beats');
-    await tester.enterText(find.widgetWithText(TextField, 'Stream URL'), 'https://stream.example.com/live.mp3');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Station name'), 'Chill Beats');
+    await tester.enterText(find.widgetWithText(TextField, 'Stream URL'),
+        'https://stream.example.com/live.mp3');
     await tester.pump();
 
     // Tap Add

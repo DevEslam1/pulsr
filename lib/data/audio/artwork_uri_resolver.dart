@@ -217,9 +217,10 @@ class ArtworkUriResolver {
 
   static Future<Uri?> resolveArtworkUri(SongsTableData song) async {
     // Remote tracks have no MediaStore id, so querying would be a wasted IPC.
-    final remoteUrl = (song.remoteArtworkUrl != null && song.remoteArtworkUrl!.isNotEmpty)
-        ? song.remoteArtworkUrl
-        : song.artworkUri;
+    final remoteUrl =
+        (song.remoteArtworkUrl != null && song.remoteArtworkUrl!.isNotEmpty)
+            ? song.remoteArtworkUrl
+            : song.artworkUri;
     if (remoteUrl != null && remoteUrl.isNotEmpty) {
       final parsed = Uri.tryParse(remoteUrl);
       if (parsed != null &&

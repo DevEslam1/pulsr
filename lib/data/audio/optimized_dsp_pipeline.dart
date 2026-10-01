@@ -191,7 +191,9 @@ class OptimizedDspPipeline {
     if (isSaturationEnabled != null) saturationEnabled = isSaturationEnabled;
     if (isLiveProgEnabled != null) liveProgEnabled = isLiveProgEnabled;
     if (isStereoWidthEnabled != null) stereoWidthEnabled = isStereoWidthEnabled;
-    if (isSubCrossoverEnabled != null) subCrossoverEnabled = isSubCrossoverEnabled;
+    if (isSubCrossoverEnabled != null) {
+      subCrossoverEnabled = isSubCrossoverEnabled;
+    }
     if (isDynamicBassEnabled != null) dynamicBassEnabled = isDynamicBassEnabled;
     if (isLoudnessContourEnabled != null) {
       loudnessContourEnabled = isLoudnessContourEnabled;

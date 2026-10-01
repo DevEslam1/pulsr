@@ -34,7 +34,8 @@ void main() {
     ytmService.dispose();
   });
 
-  group('Engine 3 Resolution Strategy & Resilience Matrix (on-device only)', () {
+  group('Engine 3 Resolution Strategy & Resilience Matrix (on-device only)',
+      () {
     test('INT-1: App resolves the stream via the native extractor', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(

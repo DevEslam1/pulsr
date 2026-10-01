@@ -29,8 +29,9 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         songId: s.id, remoteId: s.remoteId, path: s.path);
   }
 
-  int get currentTrackDelayMs =>
-      _currentTrackKey == null ? 0 : trackDelayManager.getDelayMs(_currentTrackKey!);
+  int get currentTrackDelayMs => _currentTrackKey == null
+      ? 0
+      : trackDelayManager.getDelayMs(_currentTrackKey!);
 
   Duration get delayCompensatedPosition {
     final key = _currentTrackKey;
@@ -67,7 +68,8 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     final ceiling = prefs.getString('setting_streaming_quality') ?? 'high';
-    if (qualityRank(adaptiveQualityManager.currentQuality) > qualityRank(ceiling)) {
+    if (qualityRank(adaptiveQualityManager.currentQuality) >
+        qualityRank(ceiling)) {
       adaptiveQualityManager.setQuality(ceiling);
     }
     final next = await adaptiveQualityManager.reportUnderrun();
@@ -78,7 +80,8 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     final ceiling = prefs.getString('setting_streaming_quality') ?? 'high';
-    if (qualityRank(adaptiveQualityManager.currentQuality) > qualityRank(ceiling)) {
+    if (qualityRank(adaptiveQualityManager.currentQuality) >
+        qualityRank(ceiling)) {
       adaptiveQualityManager.setQuality(ceiling);
     }
     final next = await adaptiveQualityManager.reportHealthy();
@@ -94,11 +97,13 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
     if (_gaplessMode && _gaplessLoaded) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     final previousQuality = prefs.getString('adaptive_runtime_quality') ??
-        prefs.getString('setting_streaming_quality') ?? 'high';
+        prefs.getString('setting_streaming_quality') ??
+        'high';
     try {
       await prefs.setString('adaptive_runtime_quality', newQuality);
       if (!_errorSubject.isClosed) {
-        _errorSubject.add('Quality adjusted to ${newQuality.toUpperCase()} for smooth playback');
+        _errorSubject.add(
+            'Quality adjusted to ${newQuality.toUpperCase()} for smooth playback');
       }
       final song = currentSong;
       if (song != null &&
@@ -189,8 +194,8 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         await _equalizerManager.applyEffectsState(effects);
       } else {
         // Legacy v1 snapshot — only the graphic-EQ curve was captured.
-        await _equalizerManager.applyPreset(
-            EqPreset(name: snap.presetName, gains: snap.gains));
+        await _equalizerManager
+            .applyPreset(EqPreset(name: snap.presetName, gains: snap.gains));
       }
       return true;
     } catch (_) {
@@ -231,185 +236,52 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   }
 
   Future<void> persistBookmarks() => bookmarkStore.persist();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  // Requires: provided by the composing class (same library).
   SharedPreferences? get _cachedPrefs;
 
-  // Requires: provided by the composing class (same library).
   CrossfadeManager get _crossfadeManager;
 
-  // Requires: provided by the composing class (same library).
   EqualizerManager get _equalizerManager;
 
-  // Requires: provided by the composing class (same library).
   int get _playGeneration;
   set _playGeneration(int value);
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _playerA;
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _playerB;
 
-  // Requires: provided by the composing class (same library).
-  Future<({String url, String? userAgent, String? cookies, String quality})> _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
+  Future<({String url, String? userAgent, String? cookies, String quality})>
+      _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
 
-  // Requires: provided by the composing class (same library).
   dynamic get _streamCache;
 
-  // Requires: provided by the composing class (same library).
   StreamResolutionPipeline get _streamResolutionPipeline;
 
-  // Requires: provided by the composing class (same library).
   AbLoopManager get abLoopManager;
 
-  // Requires: provided by the composing class (same library).
   AdaptiveQualityManager get adaptiveQualityManager;
 
-  // Requires: provided by the composing class (same library).
   PlaybackBookmarkStore get bookmarkStore;
 
-  // Requires: provided by the composing class (same library).
   SongsTableData? get currentSong;
 
-  // Requires: provided by the composing class (same library).
   dynamic get dspSnapshotStore;
 
-  // Requires: provided by the composing class (same library).
   DuckingController get duckingController;
 
-  // Requires: provided by the composing class (same library).
   bool get hedgedResolutionEnabled;
   set hedgedResolutionEnabled(bool value);
 
-  // Requires: provided by the composing class (same library).
   MultiOutputRouter get multiOutputRouter;
 
-  // Requires: provided by the composing class (same library).
   SilenceSkipController get silenceSkipController;
 
-  // Requires: provided by the composing class (same library).
   TrackDelayManager get trackDelayManager;
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessMode;
   bool get _gaplessLoaded;
   StreamController<String> get _errorSubject;

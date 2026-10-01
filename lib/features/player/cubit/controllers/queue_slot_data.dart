@@ -1,7 +1,8 @@
 // lib/features/player/cubit/controllers/queue_slot_data.dart
 import '../../../../data/db/app_database.dart';
 
-/// In-memory representation of a saved playback queue slot (slots 1–9).
+/// In-memory representation of a saved playback queue slot (slots 0–2, i.e.
+/// three saved queues).
 class QueueSlotData {
   /// Ordered list of song database identifiers in the slot.
   final List<int> songIds;
@@ -31,15 +32,22 @@ class QueueSlotData {
 /// Computes the new active track index after a queue item reorder from [oldIndex] to [newIndex].
 int calculateReorderedIndex(int oldIndex, int newIndex, int currentIndex) {
   if (currentIndex == oldIndex) return newIndex;
-  if (oldIndex < currentIndex && newIndex >= currentIndex) return currentIndex - 1;
-  if (oldIndex > currentIndex && newIndex <= currentIndex) return currentIndex + 1;
+  if (oldIndex < currentIndex && newIndex >= currentIndex) {
+    return currentIndex - 1;
+  }
+  if (oldIndex > currentIndex && newIndex <= currentIndex) {
+    return currentIndex + 1;
+  }
   return currentIndex;
 }
 
 /// Computes the new active track index after removing an item at [removedIndex].
-int calculateRemovedIndex(int removedIndex, int currentIndex, int newQueueLength) {
+int calculateRemovedIndex(
+    int removedIndex, int currentIndex, int newQueueLength) {
   if (newQueueLength == 0) return 0;
   if (removedIndex < currentIndex) return currentIndex - 1;
-  if (removedIndex == currentIndex) return currentIndex.clamp(0, newQueueLength - 1);
+  if (removedIndex == currentIndex) {
+    return currentIndex.clamp(0, newQueueLength - 1);
+  }
   return currentIndex;
 }

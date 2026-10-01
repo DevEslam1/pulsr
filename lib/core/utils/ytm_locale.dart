@@ -34,6 +34,5 @@ class YtmLocale {
     return '$url${sep}gl=${gl()}&hl=${hl()}';
   }
 
-  static String homeUrl() =>
-      withLocaleParams('https://music.youtube.com/');
+  static String homeUrl() => withLocaleParams('https://music.youtube.com/');
 }

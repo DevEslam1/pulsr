@@ -99,8 +99,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
                 item.positionMs > 0 ? item.positionMs : song.lastPositionMs;
             try {
               final crashSnapshot = await PositionCrashGuard.readSnapshot();
-              if (crashSnapshot != null && crashSnapshot.songId == item.songId) {
-                final preferCrash = await PositionCrashGuard.shouldPreferCrashGuard(savedPositionMs);
+              if (crashSnapshot != null &&
+                  crashSnapshot.songId == item.songId) {
+                final preferCrash =
+                    await PositionCrashGuard.shouldPreferCrashGuard(
+                        savedPositionMs);
                 if (preferCrash || crashSnapshot.positionMs > savedPositionMs) {
                   savedPositionMs = crashSnapshot.positionMs;
                 }
@@ -204,145 +207,40 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         _preCrossfadeVolume = initialActiveVolume;
         try {
           final nextSong = _songs[nextIndex];
-        final songId = nextSong.id;
-        final fastArtUri = nextSong.artworkUri != null
-            ? Uri.tryParse(nextSong.artworkUri!)
-            : (nextSong.remoteArtworkUrl != null
-                ? Uri.tryParse(nextSong.remoteArtworkUrl!)
-                : ArtworkUriResolver.getCachedArtworkUri(songId));
-        if (!_songs.any((s) => s.id == songId)) return;
-        final item = PulsrAudioHandler._songToMediaItem(nextSong, fastArtUri);
+          final songId = nextSong.id;
+          final fastArtUri = nextSong.artworkUri != null
+              ? Uri.tryParse(nextSong.artworkUri!)
+              : (nextSong.remoteArtworkUrl != null
+                  ? Uri.tryParse(nextSong.remoteArtworkUrl!)
+                  : ArtworkUriResolver.getCachedArtworkUri(songId));
+          if (!_songs.any((s) => s.id == songId)) return;
+          final item = PulsrAudioHandler._songToMediaItem(nextSong, fastArtUri);
 
-        ArtworkUriResolver.resolveArtworkUri(nextSong).then((artUri) {
-          if (artUri != null &&
-              artUri != fastArtUri &&
-              _crossfadeManager.currentFadeId == currentFadeId &&
-              _currentIndex == nextIndex) {
-            mediaItem.add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
+          ArtworkUriResolver.resolveArtworkUri(nextSong).then((artUri) {
+            if (artUri != null &&
+                artUri != fastArtUri &&
+                _crossfadeManager.currentFadeId == currentFadeId &&
+                _currentIndex == nextIndex) {
+              mediaItem
+                  .add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
+            }
+          }).catchError((_) {});
+
+          final canReusePreload =
+              _tripleBufferPipeline.preloadedSongId == songId &&
+                  _canStartCrossfade(_inactivePlayer);
+
+          final AudioSource source;
+          if (canReusePreload &&
+              _tripleBufferPipeline.preloadedSource != null) {
+            source = _tripleBufferPipeline.preloadedSource!;
+          } else {
+            source = await _resolveAudioSource(nextSong, item);
           }
-        }).catchError((_) {});
-
-        final canReusePreload =
-            _tripleBufferPipeline.preloadedSongId == songId &&
-            _canStartCrossfade(_inactivePlayer);
-
-        final AudioSource source;
-        if (canReusePreload && _tripleBufferPipeline.preloadedSource != null) {
-          source = _tripleBufferPipeline.preloadedSource!;
-        } else {
-          source = await _resolveAudioSource(nextSong, item);
-        }
-        if (!_songs.any((s) => s.id == songId)) return;
-        // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
-        // fade meanwhile, loading the source now would push phantom audio into a
-        // player that cancel() already stopped — bail on the stale fade.
-        if (_crossfadeManager.currentFadeId != currentFadeId) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        // Synchronize speed on inactive player before loading & playback
-        await _inactivePlayer.setSpeed(_activePlayer.speed);
-        await _inactivePlayer.setPitch(_pitch);
-        if (!canReusePreload) {
-          await _inactivePlayer.setAudioSource(source, preload: true);
-        }
-        _tripleBufferPipeline.clearPreload();
-        if (!_songs.any((s) => s.id == songId)) return;
-
-        if (_crossfadeManager.currentFadeId != currentFadeId) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        await _inactivePlayer.setVolume(0.0);
-        // Wait for the inactive player to be ACTUALLY playing at volume 0
-        // before starting the gain ramp. play() resolves when the command is
-        // sent, not when ExoPlayer has decoded its first frame — on slow
-        // decoders or buffered streams the ramp can advance to ~0.3 before
-        // any audio is emitted, causing a pop/click burst at the crossfade
-        // start. We poll processingState until it leaves 'loading' (≤1000ms)
-        // and then give the mixer one extra period to settle at zero gain.
-        try {
-          await _inactivePlayer.play().timeout(const Duration(milliseconds: 1000));
-        } catch (_) {
-          // FIX-#6: The fallback play() must also have a timeout — without one,
-          // a hung native decoder deadlocks the crossfade engine indefinitely.
-          try {
-            await _inactivePlayer.play().timeout(const Duration(milliseconds: 3000));
-          } on TimeoutException {
-            ErrorLogger.log(
-                'Inactive player hung on play(); aborting crossfade',
-                category: 'AudioHandler');
-            rethrow; // let crossfade error handler clean up
-          } catch (_) {}
-        }
-
-        // FIX-B02: Abort if crossfade ID changed during play() await
-        if (_crossfadeManager.currentFadeId != currentFadeId) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        // Poll until the decoder has produced its first audio frame
-        // (processingState == ready/buffering with playing==true), or until
-        // 1000ms have elapsed as a safety cap.
-        const maxSettleMs = 1000;
-        var settleWaited = 0;
-        while (settleWaited < maxSettleMs) {
-          final ps = _inactivePlayer.processingState;
-          if (ps == ProcessingState.ready || ps == ProcessingState.buffering) {
-            break;
-          }
-          await Future.delayed(const Duration(milliseconds: 20));
-          settleWaited += 20;
-        }
-
-        // FIX-B02: Abort if crossfade ID changed during settle loop
-        if (_crossfadeManager.currentFadeId != currentFadeId) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        final ps = _inactivePlayer.processingState;
-        if (ps != ProcessingState.ready && ps != ProcessingState.buffering) {
-          ErrorLogger.log(
-              'Inactive player not ready for crossfade (state: $ps); aborting crossfade',
-              category: 'AudioHandler');
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        // Readiness gate: require enough buffered audio to cover the fade
-        // start before opening the gain ramp; otherwise delay briefly or
-        // fall back to a hard transition to avoid a truncated fade.
-        if (!_canStartCrossfade(_inactivePlayer)) {
-          await Future.delayed(const Duration(milliseconds: 250));
+          if (!_songs.any((s) => s.id == songId)) return;
+          // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
+          // fade meanwhile, loading the source now would push phantom audio into a
+          // player that cancel() already stopped — bail on the stale fade.
           if (_crossfadeManager.currentFadeId != currentFadeId) {
             try {
               await _inactivePlayer.stop();
@@ -352,9 +250,94 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
             } catch (_) {}
             return;
           }
-          if (!_canStartCrossfade(_inactivePlayer)) {
+
+          // Synchronize speed on inactive player before loading & playback
+          await _inactivePlayer.setSpeed(_activePlayer.speed);
+          await _inactivePlayer.setPitch(_pitch);
+          if (!canReusePreload) {
+            await _inactivePlayer.setAudioSource(source, preload: true);
+          }
+          _tripleBufferPipeline.clearPreload();
+          if (!_songs.any((s) => s.id == songId)) return;
+
+          if (_crossfadeManager.currentFadeId != currentFadeId) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await _activePlayer.setVolume(initialActiveVolume);
+            } catch (_) {}
+            return;
+          }
+
+          await _inactivePlayer.setVolume(0.0);
+          // Wait for the inactive player to be ACTUALLY playing at volume 0
+          // before starting the gain ramp. play() resolves when the command is
+          // sent, not when ExoPlayer has decoded its first frame — on slow
+          // decoders or buffered streams the ramp can advance to ~0.3 before
+          // any audio is emitted, causing a pop/click burst at the crossfade
+          // start. We poll processingState until it leaves 'loading' (≤1000ms)
+          // and then give the mixer one extra period to settle at zero gain.
+          try {
+            await _inactivePlayer
+                .play()
+                .timeout(const Duration(milliseconds: 1000));
+          } catch (_) {
+            // FIX-#6: The fallback play() must also have a timeout — without one,
+            // a hung native decoder deadlocks the crossfade engine indefinitely.
+            try {
+              await _inactivePlayer
+                  .play()
+                  .timeout(const Duration(milliseconds: 3000));
+            } on TimeoutException {
+              ErrorLogger.log(
+                  'Inactive player hung on play(); aborting crossfade',
+                  category: 'AudioHandler');
+              rethrow; // let crossfade error handler clean up
+            } catch (_) {}
+          }
+
+          // FIX-B02: Abort if crossfade ID changed during play() await
+          if (_crossfadeManager.currentFadeId != currentFadeId) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await _activePlayer.setVolume(initialActiveVolume);
+            } catch (_) {}
+            return;
+          }
+
+          // Poll until the decoder has produced its first audio frame
+          // (processingState == ready/buffering with playing==true), or until
+          // 1000ms have elapsed as a safety cap.
+          const maxSettleMs = 1000;
+          var settleWaited = 0;
+          while (settleWaited < maxSettleMs) {
+            final ps = _inactivePlayer.processingState;
+            if (ps == ProcessingState.ready ||
+                ps == ProcessingState.buffering) {
+              break;
+            }
+            await Future.delayed(const Duration(milliseconds: 20));
+            settleWaited += 20;
+          }
+
+          // FIX-B02: Abort if crossfade ID changed during settle loop
+          if (_crossfadeManager.currentFadeId != currentFadeId) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await _activePlayer.setVolume(initialActiveVolume);
+            } catch (_) {}
+            return;
+          }
+
+          final ps = _inactivePlayer.processingState;
+          if (ps != ProcessingState.ready && ps != ProcessingState.buffering) {
             ErrorLogger.log(
-                'Inactive player under-buffered for crossfade; falling back to direct transition',
+                'Inactive player not ready for crossfade (state: $ps); aborting crossfade',
                 category: 'AudioHandler');
             try {
               await _inactivePlayer.stop();
@@ -362,166 +345,196 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
             try {
               await _activePlayer.setVolume(initialActiveVolume);
             } catch (_) {}
-            await playSongAt(nextIndex);
             return;
           }
-        }
 
-        // One extra mixer period so the audio sink has settled at zero before
-        // the gain ramp opens — eliminates the brief full-volume transient.
-        await Future.delayed(const Duration(milliseconds: 20));
-
-        if (_crossfadeManager.currentFadeId != currentFadeId) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        final active = _activePlayer;
-        final inactive = _inactivePlayer;
-
-        // BPM-synced crossfade: when enabled and the incoming track has a
-        // known BPM, align the fade to the nearest 2/4/8/16/32 beats.
-        final fadeDuration = _crossfadeManager.effectiveFadeDuration(
-          trackId: nextSong.id.toString(),
-        );
-
-        final targetNextVolume = _calculateReplayGainVolume(nextSong);
-        final isRepeatOne = _activePlayer.loopMode == LoopMode.one;
-
-        // Pre-buffer track N+2 into _prefetchPlayer during crossfade window
-        // (gated on depth>=2 so minimal-bucket / critical-battery skips it).
-        final nextNextIndex = _getNextIndex(offset: 2, peek: true);
-        if (_preloadCountForCurrentBucket >= 2 &&
-            nextNextIndex != null &&
-            nextNextIndex >= 0 &&
-            nextNextIndex < _songs.length) {
-          unawaited(_tripleBufferPipeline.prefetchAhead(_songs[nextNextIndex]));
-        }
-
-        await _crossfadeManager.crossfadeVolumes(
-          active: active,
-          inactive: inactive,
-          fromActiveVol: initialActiveVolume,
-          toInactiveVol: targetNextVolume,
-          duration: fadeDuration,
-          fadeId: currentFadeId,
-          isRepeatOne: isRepeatOne,
-        );
-
-        if (_crossfadeManager.currentFadeId != currentFadeId) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await active.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        final resolvedIndex = _songs.indexWhere((s) => s.id == songId);
-        if (resolvedIndex == -1) {
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
-          try {
-            await active.setVolume(initialActiveVolume);
-          } catch (_) {}
-          return;
-        }
-
-        _isPlayerAActive = !_isPlayerAActive;
-        _generationCounter++;
-        _currentIndex = resolvedIndex;
-        _savedQueueIndex = resolvedIndex;
-
-        final currentSessionId =
-            _isPlayerAActive ? _playerASessionId : _playerBSessionId;
-        _audioSessionIdRouter.handleSessionId(
-            currentSessionId ?? _activePlayer.androidAudioSessionId);
-        final initialArtUri =
-            ArtworkUriResolver.getCachedArtworkUri(songId) ?? fastArtUri;
-        mediaItem.add(PulsrAudioHandler._songToMediaItem(nextSong, initialArtUri));
-        ArtworkUriResolver.resolveArtworkUri(nextSong).then((artUri) {
-          if (artUri != null &&
-              artUri != initialArtUri &&
-              _crossfadeManager.currentFadeId == currentFadeId &&
-              currentSong?.id == songId) {
-            mediaItem.add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
-          }
-        }).catchError((_) {});
-        _notifyTrackChanged(nextSong);
-        _planNextStreamResolution();
-        _repository.recordPlayHistory(nextSong.id);
-        _broadcastState(_activePlayer.playbackEvent);
-
-        // Clear the native gain curve BEFORE stop() while the player is still
-        // active on the platform channel, then allow the pipeline to drain before stop.
-        // Re-read outgoing player reference in case of mid-delay skip or swap (M-05).
-        final outgoing = _inactivePlayer;
-        try {
-          await outgoing.dspClearGainCurve();
-        } catch (_) {}
-        await Future.delayed(const Duration(milliseconds: 80));
-        final outgoingAfterDelay = _inactivePlayer;
-        try {
-          await outgoingAfterDelay.stop();
-        } catch (_) {}
-        await outgoingAfterDelay.setVolume(_volume);
-        // FIX-#5: During crossfade the outgoing player is manually stopped, so
-        // ProcessingState.completed never fires.  Notify the sleep timer here
-        // so track-count-based timers decrement correctly.
-        notifySleepTrackCompleted();
-      } catch (e, st) {
-        ErrorLogger.log('Error during crossfade playback',
-            error: e, stackTrace: st, category: 'AudioHandler');
-        try {
-          await _inactivePlayer.stop();
-        } catch (_) {}
-        if (_crossfadeManager.currentFadeId == currentFadeId) {
-          await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-              restoreVolume: _volume);
-          if (nextIndex >= 0 && nextIndex < _songs.length) {
-            try {
-              await playSongAt(nextIndex);
-            } catch (fallbackError, fallbackSt) {
-              ErrorLogger.log('Crossfade fallback also failed',
-                  error: fallbackError,
-                  stackTrace: fallbackSt,
+          // Readiness gate: require enough buffered audio to cover the fade
+          // start before opening the gain ramp; otherwise delay briefly or
+          // fall back to a hard transition to avoid a truncated fade.
+          if (!_canStartCrossfade(_inactivePlayer)) {
+            await Future.delayed(const Duration(milliseconds: 250));
+            if (_crossfadeManager.currentFadeId != currentFadeId) {
+              try {
+                await _inactivePlayer.stop();
+              } catch (_) {}
+              try {
+                await _activePlayer.setVolume(initialActiveVolume);
+              } catch (_) {}
+              return;
+            }
+            if (!_canStartCrossfade(_inactivePlayer)) {
+              ErrorLogger.log(
+                  'Inactive player under-buffered for crossfade; falling back to direct transition',
                   category: 'AudioHandler');
-              _errorSubject.add('Playback failed. Please try again.');
-              await _failCurrentPlayback(fatal: true);
+              try {
+                await _inactivePlayer.stop();
+              } catch (_) {}
+              try {
+                await _activePlayer.setVolume(initialActiveVolume);
+              } catch (_) {}
+              await playSongAt(nextIndex);
+              return;
             }
           }
-        }
-      } finally {
-        if (_crossfadeManager.currentFadeId == currentFadeId) {
-          _crossfadeManager.finishCrossfade();
-        } else {
-          // Stale fade (a skip/stop superseded it): drop any native gain
-          // curves armed meanwhile so neither player keeps a fade multiplier
-          // applied after the volumes are restored here. Clear both players:
-          // depending on whether the post-fade swap ran, the outgoing player
-          // may be either one.
+
+          // One extra mixer period so the audio sink has settled at zero before
+          // the gain ramp opens — eliminates the brief full-volume transient.
+          await Future.delayed(const Duration(milliseconds: 20));
+
+          if (_crossfadeManager.currentFadeId != currentFadeId) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await _activePlayer.setVolume(initialActiveVolume);
+            } catch (_) {}
+            return;
+          }
+
+          final active = _activePlayer;
+          final inactive = _inactivePlayer;
+
+          // BPM-synced crossfade: when enabled and the incoming track has a
+          // known BPM, align the fade to the nearest 2/4/8/16/32 beats.
+          final fadeDuration = _crossfadeManager.effectiveFadeDuration(
+            trackId: nextSong.id.toString(),
+          );
+
+          final targetNextVolume = _calculateReplayGainVolume(nextSong);
+          final isRepeatOne = _activePlayer.loopMode == LoopMode.one;
+
+          // Pre-buffer track N+2 into _prefetchPlayer during crossfade window
+          // (gated on depth>=2 so minimal-bucket / critical-battery skips it).
+          final nextNextIndex = _getNextIndex(offset: 2, peek: true);
+          if (_preloadCountForCurrentBucket >= 2 &&
+              nextNextIndex != null &&
+              nextNextIndex >= 0 &&
+              nextNextIndex < _songs.length) {
+            unawaited(
+                _tripleBufferPipeline.prefetchAhead(_songs[nextNextIndex]));
+          }
+
+          await _crossfadeManager.crossfadeVolumes(
+            active: active,
+            inactive: inactive,
+            fromActiveVol: initialActiveVolume,
+            toInactiveVol: targetNextVolume,
+            duration: fadeDuration,
+            fadeId: currentFadeId,
+            isRepeatOne: isRepeatOne,
+          );
+
+          if (_crossfadeManager.currentFadeId != currentFadeId) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await active.setVolume(initialActiveVolume);
+            } catch (_) {}
+            return;
+          }
+
+          final resolvedIndex = _songs.indexWhere((s) => s.id == songId);
+          if (resolvedIndex == -1) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await active.setVolume(initialActiveVolume);
+            } catch (_) {}
+            return;
+          }
+
+          _isPlayerAActive = !_isPlayerAActive;
+          _generationCounter++;
+          _currentIndex = resolvedIndex;
+          _savedQueueIndex = resolvedIndex;
+
+          final currentSessionId =
+              _isPlayerAActive ? _playerASessionId : _playerBSessionId;
+          _audioSessionIdRouter.handleSessionId(
+              currentSessionId ?? _activePlayer.androidAudioSessionId);
+          final initialArtUri =
+              ArtworkUriResolver.getCachedArtworkUri(songId) ?? fastArtUri;
+          mediaItem
+              .add(PulsrAudioHandler._songToMediaItem(nextSong, initialArtUri));
+          ArtworkUriResolver.resolveArtworkUri(nextSong).then((artUri) {
+            if (artUri != null &&
+                artUri != initialArtUri &&
+                _crossfadeManager.currentFadeId == currentFadeId &&
+                currentSong?.id == songId) {
+              mediaItem
+                  .add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
+            }
+          }).catchError((_) {});
+          _notifyTrackChanged(nextSong);
+          _planNextStreamResolution();
+          _repository.recordPlayHistory(nextSong.id);
+          _broadcastState(_activePlayer.playbackEvent);
+
+          // Clear the native gain curve BEFORE stop() while the player is still
+          // active on the platform channel, then allow the pipeline to drain before stop.
+          // Re-read outgoing player reference in case of mid-delay skip or swap (M-05).
+          final outgoing = _inactivePlayer;
           try {
-            await _inactivePlayer.dspClearGainCurve();
+            await outgoing.dspClearGainCurve();
           } catch (_) {}
+          await Future.delayed(const Duration(milliseconds: 80));
+          final outgoingAfterDelay = _inactivePlayer;
           try {
-            await _activePlayer.dspClearGainCurve();
+            await outgoingAfterDelay.stop();
           } catch (_) {}
+          await outgoingAfterDelay.setVolume(_volume);
+          // FIX-#5: During crossfade the outgoing player is manually stopped, so
+          // ProcessingState.completed never fires.  Notify the sleep timer here
+          // so track-count-based timers decrement correctly.
+          notifySleepTrackCompleted();
+        } catch (e, st) {
+          ErrorLogger.log('Error during crossfade playback',
+              error: e, stackTrace: st, category: 'AudioHandler');
           try {
             await _inactivePlayer.stop();
           } catch (_) {}
-          try {
-            await _activePlayer.setVolume(initialActiveVolume);
-          } catch (_) {}
+          if (_crossfadeManager.currentFadeId == currentFadeId) {
+            await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+                restoreVolume: _volume);
+            if (nextIndex >= 0 && nextIndex < _songs.length) {
+              try {
+                await playSongAt(nextIndex);
+              } catch (fallbackError, fallbackSt) {
+                ErrorLogger.log('Crossfade fallback also failed',
+                    error: fallbackError,
+                    stackTrace: fallbackSt,
+                    category: 'AudioHandler');
+                _errorSubject.add('Playback failed. Please try again.');
+                await _failCurrentPlayback(fatal: true);
+              }
+            }
+          }
+        } finally {
+          if (_crossfadeManager.currentFadeId == currentFadeId) {
+            _crossfadeManager.finishCrossfade();
+          } else {
+            // Stale fade (a skip/stop superseded it): drop any native gain
+            // curves armed meanwhile so neither player keeps a fade multiplier
+            // applied after the volumes are restored here. Clear both players:
+            // depending on whether the post-fade swap ran, the outgoing player
+            // may be either one.
+            try {
+              await _inactivePlayer.dspClearGainCurve();
+            } catch (_) {}
+            try {
+              await _activePlayer.dspClearGainCurve();
+            } catch (_) {}
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await _activePlayer.setVolume(initialActiveVolume);
+            } catch (_) {}
+          }
         }
-      }
-    });
+      });
     } finally {
       _tripleBufferPipeline.releaseInactive(PlayerClaim.crossfade);
     }
@@ -603,12 +616,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       ],
     ];
     final processingState = const {
-      ProcessingState.idle: AudioProcessingState.idle,
-      ProcessingState.loading: AudioProcessingState.loading,
-      ProcessingState.buffering: AudioProcessingState.buffering,
-      ProcessingState.ready: AudioProcessingState.ready,
-      ProcessingState.completed: AudioProcessingState.completed,
-    }[_activePlayer.processingState] ?? AudioProcessingState.ready;
+          ProcessingState.idle: AudioProcessingState.idle,
+          ProcessingState.loading: AudioProcessingState.loading,
+          ProcessingState.buffering: AudioProcessingState.buffering,
+          ProcessingState.ready: AudioProcessingState.ready,
+          ProcessingState.completed: AudioProcessingState.completed,
+        }[_activePlayer.processingState] ??
+        AudioProcessingState.ready;
 
     playbackState.add(
       playbackState.value.copyWith(
@@ -733,7 +747,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   // --- QUEUE & PLAYBACK COMMANDS ---
   Future<void> loadQueue(List<SongsTableData> songs,
-      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true}) async {
+      {int initialIndex = 0,
+      Duration? initialPosition,
+      bool autoPlay = true}) async {
     if (songs.isEmpty) {
       _songs = [];
       _currentIndex = 0;
@@ -892,7 +908,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     _publishQueueWithArtwork();
 
     if (_gaplessMode) {
-      await _loadGaplessQueue(initialPosition: initialPosition, preload: autoPlay);
+      await _loadGaplessQueue(
+          initialPosition: initialPosition, preload: autoPlay);
     } else {
       if (autoPlay) {
         await playSongAt(_currentIndex, initialPosition: initialPosition);
@@ -905,12 +922,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   void _publishQueueWithArtwork({int windowSize = 5}) {
     final songsSnapshot = List<SongsTableData>.from(_songs);
     final currentIdx = _currentIndex;
-    final mediaItems = songsSnapshot.map(PulsrAudioHandler._songToMediaItem).toList();
+    final mediaItems =
+        songsSnapshot.map(PulsrAudioHandler._songToMediaItem).toList();
     queue.add(mediaItems);
 
     unawaited(() async {
       if (songsSnapshot.isEmpty) return;
-      final start = (currentIdx - windowSize).clamp(0, songsSnapshot.length - 1);
+      final start =
+          (currentIdx - windowSize).clamp(0, songsSnapshot.length - 1);
       final end = (currentIdx + windowSize).clamp(0, songsSnapshot.length - 1);
       bool anyResolved = false;
       for (int i = start; i <= end; i++) {
@@ -937,6 +956,27 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
             : null;
         mediaItem.add(PulsrAudioHandler._songToMediaItem(newSong, fastArtUri));
       }
+    }
+  }
+
+  /// Mirrors an in-app favorite change into the handler's queue and pushes a
+  /// fresh metadata/control update so the media notification's favorite icon
+  /// and the in-app queue stay in lockstep (no DB/notification divergence).
+  void updateFavorite(int songId, bool isFavorite) {
+    final idx = _songs.indexWhere((s) => s.id == songId);
+    if (idx == -1) return;
+    final song = _songs[idx];
+    if (song.isFavorite == isFavorite) return;
+    _songs[idx] = song.copyWith(isFavorite: isFavorite);
+    _publishQueueWithArtwork();
+    if (_currentIndex == idx) {
+      final fastArtUri =
+          song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+      mediaItem
+          .add(PulsrAudioHandler._songToMediaItem(_songs[idx], fastArtUri));
+      // Rebuild controls so the notification heart reflects the new state now
+      // instead of on the next unrelated playback-state broadcast.
+      _broadcastState(_activePlayer.playbackEvent);
     }
   }
 
@@ -999,12 +1039,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     final sources = _buildAudioSources(songsSnapshot);
     if (targetIndex >= 0 && targetIndex < sources.length) {
       final firstSong = songsSnapshot[targetIndex];
-      if (firstSong.source != SongSource.youtube && !PulsrAudioHandler._isStreamUrl(firstSong.path)) {
+      if (firstSong.source != SongSource.youtube &&
+          !PulsrAudioHandler._isStreamUrl(firstSong.path)) {
         try {
-          final measuredTrim = GaplessTrimHandler.readHeaderGaplessTrimSync(firstSong.path);
+          final measuredTrim =
+              GaplessTrimHandler.readHeaderGaplessTrimSync(firstSong.path);
           if (measuredTrim != null && measuredTrim.preSkip.inMilliseconds > 2) {
             final currentSrc = sources[targetIndex];
-            if (currentSrc is UriAudioSource && currentSrc is! ClippingAudioSource) {
+            if (currentSrc is UriAudioSource &&
+                currentSrc is! ClippingAudioSource) {
               sources[targetIndex] = ClippingAudioSource(
                 start: measuredTrim.preSkip,
                 child: currentSrc,
@@ -1154,7 +1197,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       // error" is a known-permanent cause — skip to the next track rather than
       // calling _failCurrentPlayback(fatal: true) which just pauses and leaves
       // the user stuck with no audio and no way to continue.
-      final targetSource = sources.length > targetIndex ? sources[targetIndex] : null;
+      final targetSource =
+          sources.length > targetIndex ? sources[targetIndex] : null;
       final sourcePermanentFailure = targetSource is YtmResolvingSource
           ? targetSource.permanentFailure
           : null;
@@ -1183,7 +1227,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
           info.recoveryAction != YtmRecoveryAction.skipToNextTrack;
       await _failCurrentPlayback(fatal: isFatal);
     }
-
   }
 
   /// Reacts to a native gapless advance (currentIndexStream): keeps the queue
@@ -1240,7 +1283,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
             'Circuit breaker tripped: rapid gapless track changes detected. Halting playback.',
             category: 'AudioHandler',
           );
-          _errorSubject.add('Playback stopped: multiple tracks failed to load.');
+          _errorSubject
+              .add('Playback stopped: multiple tracks failed to load.');
           await _activePlayer.pause();
           _broadcastState(_activePlayer.playbackEvent);
           return;
@@ -1407,7 +1451,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         if (song.source == SongSource.youtube && song.remoteId != null) {
           debugPrint(
               '[AudioHandler] Playback error on ${song.title}: $playErr. Retrying with fresh stream URL...');
-          _streamCache.removeWhere((key, _) => key.startsWith('${song.remoteId}:'));
+          _streamCache
+              .removeWhere((key, _) => key.startsWith('${song.remoteId}:'));
           source = await _resolveAudioSource(song, item);
           if (await _isGenerationCancelled(generation)) return;
           final retryLazy = source is YtmResolvingSource;
@@ -1528,498 +1573,139 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  // Requires: provided by the composing class (same library).
   AudioSessionIdRouter get _audioSessionIdRouter;
 
-  // Requires: provided by the composing class (same library).
   List<AudioSource> _buildAudioSources(List<SongsTableData> songs);
 
-  // Requires: provided by the composing class (same library).
   double _calculateReplayGainVolume(SongsTableData? song);
 
-  // Requires: provided by the composing class (same library).
   int get _consecutiveFailures;
   set _consecutiveFailures(int value);
 
-  // Requires: provided by the composing class (same library).
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag);
 
-  // Requires: provided by the composing class (same library).
   CrossfadeManager get _crossfadeManager;
 
-  // Requires: provided by the composing class (same library).
   int get _currentIndex;
   set _currentIndex(int value);
 
-  // Requires: provided by the composing class (same library).
   StreamController<String> get _errorSubject;
 
-  // Requires: provided by the composing class (same library).
   Future<void> _evaluateBufferBucket(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   Future<void> _fadeOutForSwitch(AudioPlayer player);
 
-  // Requires: provided by the composing class (same library).
   Stopwatch get _gaplessStopwatch;
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessLoaded;
   set _gaplessLoaded(bool value);
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessMode;
 
-  // Requires: provided by the composing class (same library).
   int? get _gaplessTargetIndex;
   set _gaplessTargetIndex(int? value);
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessTargetReached;
   set _gaplessTargetReached(bool value);
 
-  // Requires: provided by the composing class (same library).
   int get _generationCounter;
   set _generationCounter(int value);
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _inactivePlayer;
 
-  // Requires: provided by the composing class (same library).
   bool get _isManualSkip;
   set _isManualSkip(bool value);
 
-  // Requires: provided by the composing class (same library).
   bool get _isPlayerAActive;
   set _isPlayerAActive(bool value);
 
-  // Requires: provided by the composing class (same library).
   DateTime? get _lastGaplessChangeTime;
   set _lastGaplessChangeTime(DateTime? value);
 
-  // Requires: provided by the composing class (same library).
   PlaybackLatencyTracker? get _latencyTracker;
 
-  // Requires: provided by the composing class (same library).
   void notifySleepTrackCompleted();
 
-  // Requires: provided by the composing class (same library).
   void _notifyTrackChanged(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   double get _pitch;
 
-  // Requires: provided by the composing class (same library).
   int get _playGeneration;
   set _playGeneration(int value);
 
-  // Requires: provided by the composing class (same library).
   int? get _playerASessionId;
 
-  // Requires: provided by the composing class (same library).
   int? get _playerBSessionId;
 
-  // Requires: provided by the composing class (same library).
   StreamController<Duration> get _positionSubject;
 
-  // Requires: provided by the composing class (same library).
   void _prefetchNextTracks();
 
-  // Requires: provided by the composing class (same library).
   void _prefetchStream(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   int get _preloadCountForCurrentBucket;
 
-  // Requires: provided by the composing class (same library).
   int get _rapidGaplessChangeCount;
   set _rapidGaplessChangeCount(int value);
 
-  // Requires: provided by the composing class (same library).
   IMusicRepository get _repository;
 
-  // Requires: provided by the composing class (same library).
-  Future<AudioSource> _resolveAudioSource( SongsTableData song, MediaItem tag);
+  Future<AudioSource> _resolveAudioSource(SongsTableData song, MediaItem tag);
 
-  // Requires: provided by the composing class (same library).
   void _saveCurrentPosition();
 
-  // Requires: provided by the composing class (same library).
   PlaybackQueueStateMachine get _queueStateMachine;
 
-  // Requires: provided by the composing class (same library).
   List<int> get _shuffleHistory;
 
-  // Requires: provided by the composing class (same library).
   List<SongsTableData> get _songs;
   set _songs(List<SongsTableData> value);
 
-  // Requires: provided by the composing class (same library).
   dynamic get _streamCache;
 
-  // Requires: provided by the composing class (same library).
   StreamPreResolver get _streamPreResolver;
 
-  // Requires: provided by the composing class (same library).
   TripleBufferPipeline get _tripleBufferPipeline;
 
-  // Requires: provided by the composing class (same library).
   bool get _userPlaybackInitiated;
   set _userPlaybackInitiated(bool value);
 
-  // Requires: provided by the composing class (same library).
   double get _volume;
 
-  // Requires: provided by the composing class (same library).
   Future<void> _warmStreamCache(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   void cancelPrefetches();
 
-  // Requires: provided by the composing class (same library).
   Duration get compensatedPosition;
 
-  // Requires: provided by the composing class (same library).
   SongsTableData? get currentSong;
 
-  // Requires: provided by the composing class (same library).
   Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);
 
-  // Requires: provided by the composing class (same library).
   double? get _preCrossfadeVolume;
   set _preCrossfadeVolume(double? value);
 
-  // Requires: provided by the composing class (same library).
   bool get _queueDirty;
   set _queueDirty(bool value);
 
-  // Requires: provided by the composing class (same library).
   int get _lastGaplessIndex;
   set _lastGaplessIndex(int value);
 
-  // Requires: provided by the composing class (same library).
   int get _savedQueueIndex;
   set _savedQueueIndex(int value);
 
-  // Requires: provided by the composing class (same library).
   int get _gaplessLoadGeneration;
   set _gaplessLoadGeneration(int value);
 
-  // Requires: provided by the composing class (same library).
   SleepTimerManager get _sleepTimerManager;
 
-  // Requires: provided by the composing class (same library).
   void _fadeInAfterSwitch(AudioPlayer player, double targetVolume);
 
-  // Requires: provided by the composing class (same library).
   void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation);
 }

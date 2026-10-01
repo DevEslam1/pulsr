@@ -296,7 +296,9 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   Future<void> removeQueueItemAt(int index) async {}
   @override
   Future<void> loadQueue(List<SongsTableData> songs,
-      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true}) async {}
+      {int initialIndex = 0,
+      Duration? initialPosition,
+      bool autoPlay = true}) async {}
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
   @override
@@ -331,7 +333,8 @@ void main() {
     // under full-suite load and flakes the suite (no relation to app logic).
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-            const MethodChannel('dev.fluttercommunity.plus/connectivity_status'),
+            const MethodChannel(
+                'dev.fluttercommunity.plus/connectivity_status'),
             (call) async => null);
 
     SharedPreferences.setMockInitialValues({});
@@ -391,8 +394,7 @@ void main() {
     final mockDownloadRepo = MockDownloadRepo();
     when(() => mockDownloadRepo.observeDownloads())
         .thenAnswer((_) => const Stream.empty());
-    when(() => mockDownloadRepo.getAllDownloads())
-        .thenAnswer((_) async => []);
+    when(() => mockDownloadRepo.getAllDownloads()).thenAnswer((_) async => []);
     when(() => mockDownloadRepo.getStorageStats())
         .thenAnswer((_) async => const Right(StorageStats()));
 
@@ -402,7 +404,8 @@ void main() {
     final retryDownloadUseCase = RetryDownloadUseCase(mockDownloadRepo);
     final deleteDownloadUseCase = DeleteDownloadUseCase(mockDownloadRepo);
     final observeDownloadsUseCase = ObserveDownloadsUseCase(mockDownloadRepo);
-    final getDownloadStorageStatsUseCase = GetDownloadStorageStatsUseCase(mockDownloadRepo);
+    final getDownloadStorageStatsUseCase =
+        GetDownloadStorageStatsUseCase(mockDownloadRepo);
 
     getIt.registerSingleton<IDownloadRepository>(mockDownloadRepo);
     getIt.registerSingleton<QueueDownloadUseCase>(queueDownloadUseCase);
@@ -411,7 +414,8 @@ void main() {
     getIt.registerSingleton<RetryDownloadUseCase>(retryDownloadUseCase);
     getIt.registerSingleton<DeleteDownloadUseCase>(deleteDownloadUseCase);
     getIt.registerSingleton<ObserveDownloadsUseCase>(observeDownloadsUseCase);
-    getIt.registerSingleton<GetDownloadStorageStatsUseCase>(getDownloadStorageStatsUseCase);
+    getIt.registerSingleton<GetDownloadStorageStatsUseCase>(
+        getDownloadStorageStatsUseCase);
     getIt.registerSingleton<DownloadsCubit>(DownloadsCubit(
       queueDownloadUseCase,
       pauseDownloadUseCase,

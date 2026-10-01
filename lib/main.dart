@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'core/errors/error_message_resolver.dart';
 import 'core/utils/l10n_extensions.dart';
+import 'core/utils/l10n_holder.dart';
 import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -98,8 +99,7 @@ Future<void> main() async {
       builder: (context) => Material(
         child: Center(
           child: Text(
-            AppLocalizations.of(context)?.somethingWentWrong ??
-                'Error',
+            AppLocalizations.of(context)?.somethingWentWrong ?? 'Error',
             style: const TextStyle(color: Colors.white70),
           ),
         ),
@@ -200,8 +200,7 @@ Future<void> main() async {
               ErrorLogger.log('YtmAccountService init failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
             }),
-          if (onlineAllowed &&
-              getIt.isRegistered<YtmClientVersionResolver>())
+          if (onlineAllowed && getIt.isRegistered<YtmClientVersionResolver>())
             getIt<YtmClientVersionResolver>()
                 .init()
                 .timeout(const Duration(seconds: 8))
@@ -801,6 +800,9 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                           theme: lightTheme,
                           darkTheme: darkTheme,
                           builder: (context, child) {
+                            // Expose the active localizations to non-widget code
+                            // (cubits/services) via L10nHolder.
+                            L10nHolder.current = AppLocalizations.of(context);
                             // Honour both the in-app toggle and the OS
                             // "Reduce motion" / "Remove animations" setting.
                             // Overriding `disableAnimations` here makes every
@@ -865,8 +867,7 @@ class _AppOrientationSystemUiObserver extends StatefulWidget {
 }
 
 class _AppOrientationSystemUiObserverState
-    extends State<_AppOrientationSystemUiObserver>
-    with WidgetsBindingObserver {
+    extends State<_AppOrientationSystemUiObserver> with WidgetsBindingObserver {
   Orientation? _lastOrientation;
 
   @override

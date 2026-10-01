@@ -56,7 +56,8 @@ void main() {
         path: '/storage/music/track.mp3',
       );
 
-      await decoder.decodeForFormat(song, MediaItem(id: '1', title: 'Plain MP3'));
+      await decoder.decodeForFormat(
+          song, MediaItem(id: '1', title: 'Plain MP3'));
       expect(AudioQualityInfo.dsdDopActive, isFalse,
           reason: 'a non-DSD track must not inherit the previous DoP state');
     });
@@ -76,10 +77,26 @@ void main() {
         await b2.writeAsBytes(List<int>.filled(2048, 9));
 
         final songs = [
-          _song(id: 1, title: 'Alpha', artist: 'A', path: a1.path, fileSize: 2048),
-          _song(id: 2, title: 'Beta', artist: 'B', path: a2.path, fileSize: 2048),
-          _song(id: 3, title: 'Gamma', artist: 'C', path: b1.path, fileSize: 2048),
-          _song(id: 4, title: 'Delta', artist: 'D', path: b2.path, fileSize: 2048),
+          _song(
+              id: 1,
+              title: 'Alpha',
+              artist: 'A',
+              path: a1.path,
+              fileSize: 2048),
+          _song(
+              id: 2, title: 'Beta', artist: 'B', path: a2.path, fileSize: 2048),
+          _song(
+              id: 3,
+              title: 'Gamma',
+              artist: 'C',
+              path: b1.path,
+              fileSize: 2048),
+          _song(
+              id: 4,
+              title: 'Delta',
+              artist: 'D',
+              path: b2.path,
+              fileSize: 2048),
         ];
 
         final groups = await DuplicateFinderService().findDuplicates(songs);

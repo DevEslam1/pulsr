@@ -20,7 +20,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('UX & Notification Controls Audit Remediation Tests', () {
-    test('B-06: PlaybackVolumeController respects DVC mode without double-attenuating', () async {
+    test(
+        'B-06: PlaybackVolumeController respects DVC mode without double-attenuating',
+        () async {
       final fakePlayer = _FakeAudioPlayer();
       final controller = PlaybackVolumeController(
         getActivePlayer: () => fakePlayer,
@@ -45,20 +47,43 @@ void main() {
       expect(dvcVol, closeTo(0.5, 0.001));
     });
 
-    test('B-13: MediaScannerService.isSystemIgnoredPath uses segment matching', () {
+    test('B-13: MediaScannerService.isSystemIgnoredPath uses segment matching',
+        () {
       // Legitimate user folders that contain 'Recordings' as substring or part of title
-      expect(MediaScannerService.isSystemIgnoredPath('/storage/emulated/0/Music/My Recordings/track.mp3'), isFalse);
-      expect(MediaScannerService.isSystemIgnoredPath('/sdcard/Music/Recordings Studio/song.flac'), isFalse);
-      expect(MediaScannerService.isSystemIgnoredPath('/storage/emulated/0/Music/Alarms and Themes/chime.wav'), isFalse);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              '/storage/emulated/0/Music/My Recordings/track.mp3'),
+          isFalse);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              '/sdcard/Music/Recordings Studio/song.flac'),
+          isFalse);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              '/storage/emulated/0/Music/Alarms and Themes/chime.wav'),
+          isFalse);
 
       // Actual system ignored folders
-      expect(MediaScannerService.isSystemIgnoredPath('/storage/emulated/0/Recordings/voice_memo.m4a'), isTrue);
-      expect(MediaScannerService.isSystemIgnoredPath('/storage/emulated/0/Android/media/com.whatsapp/voice.opus'), isTrue);
-      expect(MediaScannerService.isSystemIgnoredPath('/storage/emulated/0/.cache/temp.mp3'), isTrue);
-      expect(MediaScannerService.isSystemIgnoredPath('C:\\Users\\User\\Music\\.thumbnails\\cover.jpg'), isTrue);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              '/storage/emulated/0/Recordings/voice_memo.m4a'),
+          isTrue);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              '/storage/emulated/0/Android/media/com.whatsapp/voice.opus'),
+          isTrue);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              '/storage/emulated/0/.cache/temp.mp3'),
+          isTrue);
+      expect(
+          MediaScannerService.isSystemIgnoredPath(
+              'C:\\Users\\User\\Music\\.thumbnails\\cover.jpg'),
+          isTrue);
     });
 
-    test('B-17: AudioMemoryManager.computeAdaptiveBudget adapts to core count', () {
+    test('B-17: AudioMemoryManager.computeAdaptiveBudget adapts to core count',
+        () {
       final budget = AudioMemoryManager.computeAdaptiveBudget();
       expect(budget, greaterThanOrEqualTo(16 * 1024 * 1024));
       expect(budget, lessThanOrEqualTo(32 * 1024 * 1024));
@@ -73,7 +98,9 @@ void main() {
       }
     });
 
-    test('B-28: CrossfadeManager.auditionCurveProgress emits smooth curve steps', () async {
+    test(
+        'B-28: CrossfadeManager.auditionCurveProgress emits smooth curve steps',
+        () async {
       final manager = CrossfadeManager()..curve = CrossfadeCurve.equalPower;
       final stream = manager.auditionCurveProgress(
         duration: const Duration(milliseconds: 50),
@@ -84,8 +111,8 @@ void main() {
       expect(points.length, greaterThanOrEqualTo(5));
       expect(points.first.$1, closeTo(1.0, 0.05)); // oldGain
       expect(points.first.$2, closeTo(0.0, 0.05)); // newGain
-      expect(points.last.$1, closeTo(0.0, 0.05));  // oldGain
-      expect(points.last.$2, closeTo(1.0, 0.05));  // newGain
+      expect(points.last.$1, closeTo(0.0, 0.05)); // oldGain
+      expect(points.last.$2, closeTo(1.0, 0.05)); // newGain
     });
   });
 }

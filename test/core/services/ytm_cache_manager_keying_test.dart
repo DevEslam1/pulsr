@@ -15,8 +15,8 @@ void main() {
           equals('$hash.m4a'));
       expect(YtmCacheManager.cacheFileName(hash, 'HIGH', 'webm'),
           equals('$hash.webm'));
-      expect(YtmCacheManager.cacheFileName(hash, '', 'm4a'),
-          equals('$hash.m4a'));
+      expect(
+          YtmCacheManager.cacheFileName(hash, '', 'm4a'), equals('$hash.m4a'));
     });
 
     test('other qualities get their own slot', () {
@@ -24,10 +24,8 @@ void main() {
           equals('$hash.low.m4a'));
       expect(YtmCacheManager.cacheFileName(hash, 'medium', 'webm'),
           equals('$hash.medium.webm'));
-      expect(
-          YtmCacheManager.cacheFileName(hash, 'low', 'm4a'),
-          isNot(equals(
-              YtmCacheManager.cacheFileName(hash, 'high', 'm4a'))));
+      expect(YtmCacheManager.cacheFileName(hash, 'low', 'm4a'),
+          isNot(equals(YtmCacheManager.cacheFileName(hash, 'high', 'm4a'))));
     });
 
     test('the cleanup sweep covers every quality and container', () {
@@ -38,8 +36,8 @@ void main() {
           expect(names, contains('$hash.$q.$ext'));
         }
       }
-      expect(names,
-          contains(YtmCacheManager.cacheFileName(hash, 'low', 'webm')));
+      expect(
+          names, contains(YtmCacheManager.cacheFileName(hash, 'low', 'webm')));
     });
   });
 }

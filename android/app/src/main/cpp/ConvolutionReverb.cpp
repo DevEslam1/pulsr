@@ -1163,33 +1163,17 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
                 fftWorkR_[PARTITION_SIZE + k] = FftUtil::Complex(inputBlockR_[k], 0.0f);
             }
 
-            const auto mode = threadingMode_.load(std::memory_order_relaxed);
-            const bool useMt = (mode == ReverbThreadingMode::MultiThread || (mode == ReverbThreadingMode::Auto && numPartitions >= 4)) &&
-                               workerRunning_.load(std::memory_order_relaxed);
+            // Realtime safety: never block the audio callback on a worker thread
+            // or condition variable (priority inversion / dropouts under load).
+            // Both channels are convolved inline on the calling thread. The
+            // threading mode is retained for API compatibility only.
+            processLeftChannelPartition(numPartitions);
+            processRightChannelPartition(numPartitions);
 
-            if (useMt) {
-                workerNumPartitions_.store(numPartitions, std::memory_order_relaxed);
-                {
-                    std::lock_guard<std::mutex> lock(workerMutex_);
-                    workerJobDone_.store(false, std::memory_order_relaxed);
-                    workerJobReady_.store(true, std::memory_order_release);
-                    workerCv_.notify_one();
-                }
-
-                processLeftChannelPartition(numPartitions);
-
-                std::unique_lock<std::mutex> doneLock(workerDoneMutex_);
-                workerCvDone_.wait(doneLock, [this] {
-                    return workerJobDone_.load(std::memory_order_acquire);
-                });
-            } else {
-                processLeftChannelPartition(numPartitions);
-                processRightChannelPartition(numPartitions);
-            }
-
-            // Overlap-save block advance: current block becomes previous block
-            prevBlockL_ = inputBlockL_;
-            prevBlockR_ = inputBlockR_;
+            // Overlap-save block advance: current block becomes previous block.
+            // Element-wise copy into preallocated storage (no reallocation).
+            std::copy(inputBlockL_.begin(), inputBlockL_.end(), prevBlockL_.begin());
+            std::copy(inputBlockR_.begin(), inputBlockR_.end(), prevBlockR_.begin());
 
             historyHead_ = (historyHead_ + 1) % numPartitions;
             inputBlockPos_ = 0;

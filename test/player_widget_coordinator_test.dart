@@ -74,7 +74,9 @@ void main() {
       );
     }
 
-    test('invalidates cache when songs are reordered within the next-titles window', () {
+    test(
+        'invalidates cache when songs are reordered within the next-titles window',
+        () {
       final coordinator = PlayerWidgetCoordinator(mockWidgetService);
       final songA = makeSong(1, 'Song A', 'Artist A');
       final songB = makeSong(2, 'Song B', 'Artist B');
@@ -103,7 +105,9 @@ void main() {
       expect(titlesReordered, ['Song C · Artist C', 'Song B · Artist B']);
     });
 
-    test('invalidates cache when duplicate IDs are reordered or track content differs', () {
+    test(
+        'invalidates cache when duplicate IDs are reordered or track content differs',
+        () {
       final coordinator = PlayerWidgetCoordinator(mockWidgetService);
       final song1 = makeSong(-1, 'Track 1', 'Artist');
       final song2 = makeSong(-1, 'Track 2', 'Artist');

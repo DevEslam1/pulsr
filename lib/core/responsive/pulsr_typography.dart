@@ -7,7 +7,8 @@ export 'responsive_typography.dart';
 
 /// Unified responsive text styles scaling cleanly across device classes and respecting text scaler limits.
 class PulsrTextStyles {
-  static TextStyle display(BuildContext context, {Color? color, FontWeight? fontWeight}) {
+  static TextStyle display(BuildContext context,
+      {Color? color, FontWeight? fontWeight}) {
     final typo = context.responsiveTypography;
     return TextStyle(
       fontSize: typo.display,
@@ -17,7 +18,8 @@ class PulsrTextStyles {
     );
   }
 
-  static TextStyle headline(BuildContext context, {Color? color, FontWeight? fontWeight}) {
+  static TextStyle headline(BuildContext context,
+      {Color? color, FontWeight? fontWeight}) {
     final typo = context.responsiveTypography;
     return TextStyle(
       fontSize: typo.headline,
@@ -27,7 +29,8 @@ class PulsrTextStyles {
     );
   }
 
-  static TextStyle title(BuildContext context, {Color? color, FontWeight? fontWeight}) {
+  static TextStyle title(BuildContext context,
+      {Color? color, FontWeight? fontWeight}) {
     final typo = context.responsiveTypography;
     return TextStyle(
       fontSize: typo.title,
@@ -37,7 +40,8 @@ class PulsrTextStyles {
     );
   }
 
-  static TextStyle body(BuildContext context, {Color? color, FontWeight? fontWeight}) {
+  static TextStyle body(BuildContext context,
+      {Color? color, FontWeight? fontWeight}) {
     final typo = context.responsiveTypography;
     return TextStyle(
       fontSize: typo.body,
@@ -46,7 +50,8 @@ class PulsrTextStyles {
     );
   }
 
-  static TextStyle label(BuildContext context, {Color? color, FontWeight? fontWeight}) {
+  static TextStyle label(BuildContext context,
+      {Color? color, FontWeight? fontWeight}) {
     final typo = context.responsiveTypography;
     return TextStyle(
       fontSize: typo.label,
@@ -55,7 +60,8 @@ class PulsrTextStyles {
     );
   }
 
-  static TextStyle caption(BuildContext context, {Color? color, FontWeight? fontWeight}) {
+  static TextStyle caption(BuildContext context,
+      {Color? color, FontWeight? fontWeight}) {
     final typo = context.responsiveTypography;
     return TextStyle(
       fontSize: typo.caption,

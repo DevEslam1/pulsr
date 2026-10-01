@@ -95,7 +95,6 @@ class AudioQualityInfo {
 
     // YouTube Music online streaming track (not yet downloaded)
     if ((song.source == SongSource.youtube ||
-            song.source == 'youtube' ||
             path.startsWith('ytmusic://')) &&
         song.isDownloaded != true) {
       final defaultKbps = streamingQuality == YtmAudioQuality.low
@@ -136,7 +135,7 @@ class AudioQualityInfo {
                 : 'Data Saver Stream',
         shortBadgeLabel: '$format • ${kbps}k',
         description: 'Online YouTube Music audio stream ($kbps kbps $format)',
-        badgeColor: const Color(0xFFE11D48),
+        badgeColor: AppColors.qualityBadgeRose,
         icon: Icons.wifi_tethering_rounded,
       );
     }
@@ -190,8 +189,7 @@ class AudioQualityInfo {
     // the badge never silently presents MQA material as plain lossless.
     final bool isMqa = (realCodec != null && realCodec.contains('mqa')) ||
         MqaDecoderHelper.isConfirmedMqaPath(song.path) ||
-        RegExp(r'(?:^|[\s_\-\.\/])mqa(?:$|[\s_\-\.\/])',
-                caseSensitive: false)
+        RegExp(r'(?:^|[\s_\-\.\/])mqa(?:$|[\s_\-\.\/])', caseSensitive: false)
             .hasMatch(path);
 
     final bool hasRealHiRes = (realBitDepth != null && realBitDepth >= 24) ||
@@ -286,11 +284,13 @@ class AudioQualityInfo {
           : '$formatLabel • LOSSLESS';
       description =
           'CD Quality 16-bit / 44.1 kHz • Exact bit-perfect reproduction';
-      badgeColor = const Color(0xFF00F2FF); // Electric Cyan
+      badgeColor = AppColors.qualityBadgeCyan; // Electric Cyan
       icon = Icons.diamond_rounded;
       sampleRate = resolvedSampleRate;
       bitDepth = resolvedBitDepth;
-    } else if (realCodec != null ? (codecIs('aac') || codecIs('mp4a')) : (ext == 'aac' || ext == 'm4a')) {
+    } else if (realCodec != null
+        ? (codecIs('aac') || codecIs('mp4a'))
+        : (ext == 'aac' || ext == 'm4a')) {
       formatLabel = 'AAC';
       codecName = 'Advanced Audio Coding (AAC-LC)';
       final kbps = calculatedBitrate ?? 128;
@@ -303,18 +303,30 @@ class AudioQualityInfo {
       shortBadgeLabel =
           calculatedBitrate != null ? 'AAC • ${calculatedBitrate}k' : 'AAC HQ';
       description = 'High Efficiency perceptual audio compression';
-      badgeColor = const Color(0xFF38BDF8);
+      badgeColor = AppColors.qualityBadgeSky;
       icon = Icons.high_quality_rounded;
-      sampleRate = resolvedSampleRate.isNotEmpty && resolvedSampleRate != '44.1 kHz'
-          ? resolvedSampleRate
-          : '44.1 kHz';
+      sampleRate =
+          resolvedSampleRate.isNotEmpty && resolvedSampleRate != '44.1 kHz'
+              ? resolvedSampleRate
+              : '44.1 kHz';
       bitDepth = resolvedBitDepth;
     } else if (realCodec != null
-        ? (codecIs('opus') || codecIs('ogg') || codecIs('vorbis') || codecIs('webm'))
-        : (ext == 'ogg' || ext == 'opus' || ext == 'oga' || ext == 'webm' || path.contains('.webm') || path.contains('.opus'))) {
+        ? (codecIs('opus') ||
+            codecIs('ogg') ||
+            codecIs('vorbis') ||
+            codecIs('webm'))
+        : (ext == 'ogg' ||
+            ext == 'opus' ||
+            ext == 'oga' ||
+            ext == 'webm' ||
+            path.contains('.webm') ||
+            path.contains('.opus'))) {
       final isOpus = realCodec != null
           ? (codecIs('opus') || codecIs('webm'))
-          : (ext == 'opus' || ext == 'webm' || path.contains('.webm') || path.contains('.opus'));
+          : (ext == 'opus' ||
+              ext == 'webm' ||
+              path.contains('.webm') ||
+              path.contains('.opus'));
       formatLabel = isOpus ? 'OPUS' : 'OGG';
       codecName = isOpus ? 'Opus Interactive Audio' : 'Ogg Vorbis Audio';
       final kbps = calculatedBitrate ?? (isOpus ? 160 : 192);
@@ -323,16 +335,18 @@ class AudioQualityInfo {
           : kbps >= 96
               ? AudioQualityTier.standardQuality
               : AudioQualityTier.compact;
-      tierLabel = '$formatLabel ${tier == AudioQualityTier.highQuality ? "HQ" : "Standard"} Audio';
+      tierLabel =
+          '$formatLabel ${tier == AudioQualityTier.highQuality ? "HQ" : "Standard"} Audio';
       shortBadgeLabel = '$formatLabel • ${kbps}k';
       description = isOpus
           ? 'Modern high-performance Opus audio stream ($kbps kbps)'
           : 'Ogg Vorbis variable bitrate audio';
-      badgeColor = const Color(0xFF818CF8);
+      badgeColor = AppColors.qualityBadgeIndigo;
       icon = Icons.graphic_eq_rounded;
-      sampleRate = resolvedSampleRate.isNotEmpty && resolvedSampleRate != '44.1 kHz'
-          ? resolvedSampleRate
-          : '48.0 kHz';
+      sampleRate =
+          resolvedSampleRate.isNotEmpty && resolvedSampleRate != '44.1 kHz'
+              ? resolvedSampleRate
+              : '48.0 kHz';
       bitDepth = resolvedBitDepth;
     } else if (AudioFormats.requiresNativeDecoder(ext)) {
       formatLabel = ext.toUpperCase();
@@ -349,8 +363,13 @@ class AudioQualityInfo {
       bitDepth = 'Unavailable';
     } else {
       // Default to MP3 / general audio
-      final isRealMp3 = realCodec != null ? (codecIs('mp3') || codecIs('mpeg') || codecIs('mp2')) : ext == 'mp3';
-      formatLabel = isRealMp3 ? 'MP3' : (realCodec?.toUpperCase() ?? (ext.isNotEmpty ? ext.toUpperCase() : 'MP3'));
+      final isRealMp3 = realCodec != null
+          ? (codecIs('mp3') || codecIs('mpeg') || codecIs('mp2'))
+          : ext == 'mp3';
+      formatLabel = isRealMp3
+          ? 'MP3'
+          : (realCodec?.toUpperCase() ??
+              (ext.isNotEmpty ? ext.toUpperCase() : 'MP3'));
       codecName = isRealMp3 ? 'MPEG-1 Audio Layer III' : '$formatLabel Audio';
       final kbps = calculatedBitrate ?? 320;
       if (kbps >= 256) {
@@ -358,14 +377,14 @@ class AudioQualityInfo {
         tierLabel = 'High Quality $formatLabel';
         shortBadgeLabel = '$formatLabel • ${kbps}k';
         description = 'Full-frequency $kbps kbps $formatLabel playback';
-        badgeColor = const Color(0xFF60A5FA);
+        badgeColor = AppColors.qualityBadgeBlue;
         icon = Icons.high_quality_rounded;
       } else if (kbps >= 160) {
         tier = AudioQualityTier.standardQuality;
         tierLabel = 'Standard Quality $formatLabel';
         shortBadgeLabel = '$formatLabel • ${kbps}k';
         description = 'Standard compression audio stream';
-        badgeColor = const Color(0xFF94A3B8);
+        badgeColor = AppColors.qualityBadgeSlate;
         icon = Icons.graphic_eq_rounded;
       } else {
         tier = AudioQualityTier.compact;
@@ -394,7 +413,7 @@ class AudioQualityInfo {
               'authenticated/native MQA rendering is not available in this '
               'build, so no authenticated MQA output is claimed.'
           : description,
-      badgeColor: isMqa ? const Color(0xFFF59E0B) : badgeColor,
+      badgeColor: isMqa ? AppColors.qualityBadgeAmber : badgeColor,
       icon: isMqa ? Icons.verified_rounded : icon,
     );
   }

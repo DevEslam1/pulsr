@@ -11,15 +11,19 @@ void main() {
       expect(dspSheetRebuildGate(state, state), isFalse);
     });
 
-    test('ignores gains-only changes in eqPreset to avoid full sheet rebuild during slider drag', () {
+    test(
+        'ignores gains-only changes in eqPreset to avoid full sheet rebuild during slider drag',
+        () {
       final stateA = PlayerState(
         dsp: const DspSlice(
-          eqPreset: EqPreset(name: 'Custom', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+          eqPreset:
+              EqPreset(name: 'Custom', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         ),
       );
       final stateB = PlayerState(
         dsp: const DspSlice(
-          eqPreset: EqPreset(name: 'Custom', gains: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+          eqPreset:
+              EqPreset(name: 'Custom', gains: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         ),
       );
       expect(dspSheetRebuildGate(stateA, stateB), isFalse);
@@ -28,12 +32,14 @@ void main() {
     test('triggers rebuild when eqPreset preset name changes', () {
       final stateA = PlayerState(
         dsp: const DspSlice(
-          eqPreset: EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+          eqPreset:
+              EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         ),
       );
       final stateB = PlayerState(
         dsp: const DspSlice(
-          eqPreset: EqPreset(name: 'Rock', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+          eqPreset:
+              EqPreset(name: 'Rock', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         ),
       );
       expect(dspSheetRebuildGate(stateA, stateB), isTrue);
@@ -70,11 +76,16 @@ void main() {
         ),
       );
 
-      final withLow = base.copyWith(dsp: base.dsp.copyWith(stereoWidthLow: 1.5));
-      final withMid = base.copyWith(dsp: base.dsp.copyWith(stereoWidthMid: 1.2));
-      final withHigh = base.copyWith(dsp: base.dsp.copyWith(stereoWidthHigh: 0.8));
-      final withLowCross = base.copyWith(dsp: base.dsp.copyWith(stereoWidthLowCrossoverHz: 200.0));
-      final withHighCross = base.copyWith(dsp: base.dsp.copyWith(stereoWidthHighCrossoverHz: 3000.0));
+      final withLow =
+          base.copyWith(dsp: base.dsp.copyWith(stereoWidthLow: 1.5));
+      final withMid =
+          base.copyWith(dsp: base.dsp.copyWith(stereoWidthMid: 1.2));
+      final withHigh =
+          base.copyWith(dsp: base.dsp.copyWith(stereoWidthHigh: 0.8));
+      final withLowCross = base.copyWith(
+          dsp: base.dsp.copyWith(stereoWidthLowCrossoverHz: 200.0));
+      final withHighCross = base.copyWith(
+          dsp: base.dsp.copyWith(stereoWidthHighCrossoverHz: 3000.0));
 
       expect(dspSheetRebuildGate(base, withLow), isTrue);
       expect(dspSheetRebuildGate(base, withMid), isTrue);
@@ -125,7 +136,8 @@ void main() {
 
     test('triggers rebuild when errorMessage changes', () {
       const stateA = PlayerState(playback: PlaybackSlice(errorMessage: null));
-      const stateB = PlayerState(playback: PlaybackSlice(errorMessage: 'DSP error'));
+      const stateB =
+          PlayerState(playback: PlaybackSlice(errorMessage: 'DSP error'));
       expect(dspSheetRebuildGate(stateA, stateB), isTrue);
     });
   });

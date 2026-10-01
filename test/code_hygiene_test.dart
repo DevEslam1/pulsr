@@ -94,17 +94,23 @@ void main() {
           reason: 'Controllers must remain focused and <= 400 lines');
     });
 
-    test('domain boundary interfaces provide comprehensive contract documentation', () {
+    test(
+        'domain boundary interfaces provide comprehensive contract documentation',
+        () {
       final boundaryFile = File('lib/domain/boundaries.dart');
       expect(boundaryFile.existsSync(), isTrue);
       final content = boundaryFile.readAsStringSync();
       expect(content.contains('/// Boundary contract:'), isTrue);
-      expect(content.contains('abstract class IPlayerSettingsBoundary'), isTrue);
+      expect(
+          content.contains('abstract class IPlayerSettingsBoundary'), isTrue);
       expect(content.contains('abstract class IPlayerLibraryBoundary'), isTrue);
-      expect(content.contains('abstract class IDownloadPlayerBoundary'), isTrue);
+      expect(
+          content.contains('abstract class IDownloadPlayerBoundary'), isTrue);
     });
 
-    test('calculateReorderedIndex shifts active pointer correctly across permutations', () {
+    test(
+        'calculateReorderedIndex shifts active pointer correctly across permutations',
+        () {
       // 1. Moving current index itself
       expect(calculateReorderedIndex(2, 5, 2), equals(5));
 
@@ -119,7 +125,9 @@ void main() {
       expect(calculateReorderedIndex(0, 1, 4), equals(4));
     });
 
-    test('calculateRemovedIndex adjusts active pointer accurately for all positions', () {
+    test(
+        'calculateRemovedIndex adjusts active pointer accurately for all positions',
+        () {
       // 1. Empty queue returns 0
       expect(calculateRemovedIndex(0, 0, 0), equals(0));
 
@@ -134,7 +142,9 @@ void main() {
       expect(calculateRemovedIndex(0, 0, 3), equals(0));
     });
 
-    test('QueueSlotData correctly hydrates matching entities and drops unresolvable IDs', () {
+    test(
+        'QueueSlotData correctly hydrates matching entities and drops unresolvable IDs',
+        () {
       const slot = QueueSlotData(
         songIds: [101, 102, 103],
         currentIndex: 1,

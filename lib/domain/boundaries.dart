@@ -71,5 +71,6 @@ class SongReconciledEvent {
   /// Reconciled local song record in the database.
   final SongsTableData localSong;
 
-  const SongReconciledEvent({required this.originalId, required this.localSong});
+  const SongReconciledEvent(
+      {required this.originalId, required this.localSong});
 }

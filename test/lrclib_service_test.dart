@@ -82,7 +82,8 @@ void main() {
         searchResponse = MockHttpClientResponse();
         searchHeaders = MockHttpHeaders();
         when(() => searchRequest.headers).thenReturn(searchHeaders);
-        when(() => searchRequest.close()).thenAnswer((_) async => searchResponse);
+        when(() => searchRequest.close())
+            .thenAnswer((_) async => searchResponse);
       });
 
       void routeByEndpoint({

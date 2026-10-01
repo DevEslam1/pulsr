@@ -158,7 +158,8 @@ void main() {
       );
     });
 
-    test('merges overlapping and adjacent skip segments into unified intervals', () async {
+    test('merges overlapping and adjacent skip segments into unified intervals',
+        () async {
       final mockClient = MockClient((request) async {
         final responseJson = jsonEncode([
           {

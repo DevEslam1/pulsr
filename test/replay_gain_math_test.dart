@@ -19,10 +19,7 @@ void main() {
 
     test('preamp without RG is applied when tags are missing', () {
       final out = ReplayGainMath.apply(
-          mode: 'track',
-          volume: 1.0,
-          trackGainDb: null,
-          preampWithoutRg: -3.0);
+          mode: 'track', volume: 1.0, trackGainDb: null, preampWithoutRg: -3.0);
       expect(out, closeTo(0.7079, 0.001));
     });
 
@@ -34,8 +31,7 @@ void main() {
       expect(out, 1.0);
     });
 
-    test('album mode falls back to track gain when album tags are missing',
-        () {
+    test('album mode falls back to track gain when album tags are missing', () {
       final out = ReplayGainMath.apply(
         mode: 'album',
         volume: 1.0,

@@ -126,7 +126,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   Center(
                     child: Text(
                       Formatters.formatTrackCount(artist.songCount),
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                      style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.bodySmall),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -139,7 +141,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Container(
                           margin: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                              horizontal: AppSpacing.s20,
+                              vertical: AppSpacing.xs),
                           height: 56,
                           decoration: BoxDecoration(
                             color: p.surfaceContainer.withValues(alpha: 0.4),
@@ -157,7 +160,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       if (snapshot.hasError) {
                         return Container(
                           margin: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                              horizontal: AppSpacing.s20,
+                              vertical: AppSpacing.xs),
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: p.surfaceContainer.withValues(alpha: 0.4),
@@ -184,7 +188,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                         final bio = snapshot.data!.bio!;
                         return Container(
                           margin: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                              horizontal: AppSpacing.s20,
+                              vertical: AppSpacing.xs),
                           padding: const EdgeInsets.all(AppSpacing.s14),
                           decoration: BoxDecoration(
                             color: p.surfaceContainer.withValues(alpha: 0.6),
@@ -199,7 +204,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                   Icon(Icons.info_outline_rounded,
                                       size: 16, color: p.accent),
                                   const SizedBox(width: AppSpacing.s6),
-                                  Text(context.l10n.aboutArtist,
+                                  Text(
+                                    context.l10n.aboutArtist,
                                     style: TextStyle(
                                       fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w700,
@@ -232,9 +238,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   StreamBuilder<Result<List<AlbumsTableData>>>(
                     stream: _useCase.watchArtistAlbums(artist.id).distinct(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          !snapshot.hasData) {
                         return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
                           child: const SkeletonList(itemCount: 2),
                         );
                       }
@@ -270,13 +278,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                 final album = albums[index];
                                 return Container(
                                   width: 120,
-                                  margin: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
+                                  margin: const EdgeInsetsDirectional.only(
+                                      end: AppSpacing.s14),
                                   child: InkWell(
-                                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r16),
                                     onTap: () =>
                                         context.push('/album', extra: album),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         CachedArtwork(
                                             id: album.id,
@@ -290,7 +301,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                                             style: TextStyle(
                                                 color: p.textPrimary,
                                                 fontWeight: FontWeight.w700,
-                                                fontSize: AppFontSize.bodySmall)),
+                                                fontSize:
+                                                    AppFontSize.bodySmall)),
                                         const SizedBox(height: AppSpacing.s2),
                                         Text(
                                             Formatters.formatTrackCount(
@@ -315,9 +327,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   StreamBuilder<Result<List<SongsTableData>>>(
                     stream: _useCase.watchArtistSongs(artist.id).distinct(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          !snapshot.hasData) {
                         return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
                           child: const SkeletonList(itemCount: 4),
                         );
                       }
@@ -348,7 +362,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               onTap: () => context
                                   .read<PlayerCubit>()
                                   .playSong(songs[i], queue: songs),
-                              onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
+                              onMorePressed: () =>
+                                  SongInfoSheet.show(context, song: songs[i]),
                             ),
                         ],
                       );
@@ -376,14 +391,16 @@ class _ErrorSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(title: title),
           const SizedBox(height: AppSpacing.xs),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s14),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.s14),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -396,7 +413,9 @@ class _ErrorSection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     message,
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall),
                   ),
                 ),
                 TextButton(

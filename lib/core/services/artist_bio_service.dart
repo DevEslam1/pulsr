@@ -26,7 +26,8 @@ class ArtistInfo {
 @singleton
 class ArtistBioService {
   final http.Client _client;
-  final LinkedHashMap<String, ArtistInfo> _cache = LinkedHashMap<String, ArtistInfo>();
+  final LinkedHashMap<String, ArtistInfo> _cache =
+      LinkedHashMap<String, ArtistInfo>();
   static const int _maxCacheSize = 150;
 
   ArtistBioService([http.Client? client]) : _client = client ?? http.Client();
@@ -65,13 +66,19 @@ class ArtistBioService {
       final wikiUri = Uri.parse(
           'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(cleanName)}');
 
-      final deezerFuture = _client.get(deezerUri).timeout(const Duration(seconds: 8)).catchError((e, st) {
+      final deezerFuture = _client
+          .get(deezerUri)
+          .timeout(const Duration(seconds: 8))
+          .catchError((e, st) {
         ErrorLogger.log('Deezer artist lookup failed for $cleanName',
             error: e, stackTrace: st, category: 'ArtistBio');
         return http.Response('', 500);
       });
 
-      final wikiFuture = _client.get(wikiUri).timeout(const Duration(seconds: 6)).catchError((e, st) {
+      final wikiFuture = _client
+          .get(wikiUri)
+          .timeout(const Duration(seconds: 6))
+          .catchError((e, st) {
         ErrorLogger.log('Wikipedia bio lookup failed for $cleanName',
             error: e, stackTrace: st, category: 'ArtistBio');
         return http.Response('', 500);

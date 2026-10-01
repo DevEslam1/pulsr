@@ -43,7 +43,8 @@ void main() {
         expect(report.toString(), contains('healthy: true'));
       });
 
-      test('DatabaseOptimizationReport tracks reclaimed bytes and duration', () {
+      test('DatabaseOptimizationReport tracks reclaimed bytes and duration',
+          () {
         const optReport = DatabaseOptimizationReport(
           pagesBefore: 100,
           pagesAfter: 75,
@@ -115,7 +116,8 @@ void main() {
         expect(report.warnings, isEmpty);
       });
 
-      test('DspChainValidator captures excessive latency and distortion issues', () {
+      test('DspChainValidator captures excessive latency and distortion issues',
+          () {
         final validator = DspChainValidator();
         final report = validator.validate(
           chainInputRms: 0.5,
@@ -148,7 +150,14 @@ void main() {
     group('4. Waveform Generator Peak Extraction & Styles', () {
       test('WaveformGenerator normalizes peaks properly in 0.0..1.0 range', () {
         final rawSamples = Float32List.fromList([
-          0.1, -0.5, 0.8, -0.95, 0.2, 0.0, -0.3, 0.6,
+          0.1,
+          -0.5,
+          0.8,
+          -0.95,
+          0.2,
+          0.0,
+          -0.3,
+          0.6,
         ]);
 
         final peaks = WaveformGenerator.extractPeaksFromPcmSync(
@@ -165,12 +174,18 @@ void main() {
         expect(peaks.reduce(math.max), closeTo(1.0, 0.001));
       });
 
-      test('WaveformVisualizerStyle enum supports all 4 distinct rendering styles', () {
+      test(
+          'WaveformVisualizerStyle enum supports all 4 distinct rendering styles',
+          () {
         expect(WaveformVisualizerStyle.values.length, equals(4));
-        expect(WaveformVisualizerStyle.values, contains(WaveformVisualizerStyle.mirroredBars));
-        expect(WaveformVisualizerStyle.values, contains(WaveformVisualizerStyle.roundedTopBars));
-        expect(WaveformVisualizerStyle.values, contains(WaveformVisualizerStyle.continuousEnvelope));
-        expect(WaveformVisualizerStyle.values, contains(WaveformVisualizerStyle.neonGlowLine));
+        expect(WaveformVisualizerStyle.values,
+            contains(WaveformVisualizerStyle.mirroredBars));
+        expect(WaveformVisualizerStyle.values,
+            contains(WaveformVisualizerStyle.roundedTopBars));
+        expect(WaveformVisualizerStyle.values,
+            contains(WaveformVisualizerStyle.continuousEnvelope));
+        expect(WaveformVisualizerStyle.values,
+            contains(WaveformVisualizerStyle.neonGlowLine));
       });
     });
 
@@ -185,7 +200,8 @@ void main() {
           buffer[i] = math.sin(2.0 * math.pi * targetFreq * i / sampleRate);
         }
 
-        final detector = YinPitchDetector(sampleRate: sampleRate, threshold: 0.15);
+        final detector =
+            YinPitchDetector(sampleRate: sampleRate, threshold: 0.15);
         final detected = detector.getPitch(buffer);
 
         expect(detected, isNotNull);

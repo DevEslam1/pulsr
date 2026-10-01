@@ -230,7 +230,9 @@ void ViperDdc::updateActiveSections() {
 
 void ViperDdc::applyParams(const ViperDdcParamSet& params) {
     enabled_ = params.enabled;
-    profileName_ = params.profileName;
+    // NOTE: do NOT copy params.profileName here. This runs on the audio thread
+    // and std::string assignment can heap-allocate. The name is display-only and
+    // is retained on the control thread; the DSP path never needs it.
     // Preferred path: sections were parsed off the audio thread by the JNI
     // setter. Only copy them in (pre-reserved storage -> no allocation).
     if (params.sections441 || params.sections480) {

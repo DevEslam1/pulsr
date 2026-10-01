@@ -54,7 +54,8 @@ void main() {
         trackDuration: const Duration(minutes: 10),
       );
       expect(buf.inSeconds, lessThanOrEqualTo(50));
-      expect(buf.inSeconds, greaterThanOrEqualTo(AdaptiveBufferEngine.minBufferMs ~/ 1000));
+      expect(buf.inSeconds,
+          greaterThanOrEqualTo(AdaptiveBufferEngine.minBufferMs ~/ 1000));
 
       // Short track (30s) produces smaller buffer than default 240s
       final shortBuf = engine.calculateOptimalBuffer(

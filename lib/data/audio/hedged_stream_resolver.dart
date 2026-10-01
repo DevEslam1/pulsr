@@ -66,6 +66,5 @@ class HedgedStreamResolver {
     Duration hedgeDelay = const Duration(milliseconds: 250),
     Duration? timeout,
   }) =>
-      race([resolver, resolver],
-          hedgeDelay: hedgeDelay, timeout: timeout);
+      race([resolver, resolver], hedgeDelay: hedgeDelay, timeout: timeout);
 }

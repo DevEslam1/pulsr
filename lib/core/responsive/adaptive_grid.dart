@@ -48,7 +48,8 @@ class PulsrAdaptiveGrid {
           case PulsrBreakpoint.expanded:
             return isLandscape ? 5 : 4;
           case PulsrBreakpoint.large:
-            final calculated = (width / (customMinItemWidth ?? minCardWidth)).floor();
+            final calculated =
+                (width / (customMinItemWidth ?? minCardWidth)).floor();
             return calculated.clamp(6, 8);
         }
 
@@ -74,7 +75,8 @@ class PulsrAdaptiveGrid {
     double? maxColumns,
   }) {
     final vp = PulsrViewport.of(context);
-    final availableWidth = math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2);
+    final availableWidth =
+        math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2);
     int cols = (availableWidth / (minItemWidth + spacing)).floor();
     if (maxColumns != null) cols = cols.clamp(1, maxColumns.toInt());
     return cols.clamp(1, 12);
@@ -139,7 +141,8 @@ class PulsrContentConstraint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveMaxWidth = maxWidth ?? PulsrViewport.of(context).contentMaxWidth;
+    final effectiveMaxWidth =
+        maxWidth ?? PulsrViewport.of(context).contentMaxWidth;
     return Align(
       alignment: alignment,
       child: ConstrainedBox(

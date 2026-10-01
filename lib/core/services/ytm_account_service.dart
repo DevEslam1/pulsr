@@ -88,6 +88,7 @@ enum SessionValidationResult {
 @singleton
 class YtmAccountService {
   String? _cachedLikedSongsBrowseId;
+
   /// Session cookies are full Google auth credentials — stored in
   /// Keystore/Keychain-backed secure storage, never as plaintext prefs. (BUG-023)
   static const String _cookieSecureKey = 'ytm_session_cookies_secure';
@@ -104,6 +105,7 @@ class YtmAccountService {
   static void setSecureStorageForTesting(FlutterSecureStorage storage) {
     _secureStorage = storage;
   }
+
   static const String _accountNamePrefKey = 'ytm_account_name';
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
   static const String _dataSyncIdPrefKey = 'ytm_data_sync_id';
@@ -162,7 +164,8 @@ class YtmAccountService {
 
   void _markSabrDemoted(String client) {
     _sabrDemotedUntil[client] = DateTime.now().add(const Duration(minutes: 10));
-    debugPrint('[YTM_ACCOUNT] Client $client marked SABR demoted for 10 minutes');
+    debugPrint(
+        '[YTM_ACCOUNT] Client $client marked SABR demoted for 10 minutes');
   }
 
   bool _isSabrDemoted(String client) {
@@ -202,6 +205,7 @@ class YtmAccountService {
   String? get cookies => _cookies;
   String? get accountName => _accountName;
   String? get accountAvatar => _accountAvatar;
+
   /// Raw datasyncId of the authenticated account — null until the first authenticated
   /// Innertube response is harvested. Used externally to gate account-bound poToken minting.
   String? get dataSyncId => _dataSyncId;
@@ -543,7 +547,8 @@ class YtmAccountService {
       // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
       // an unexpected shape), do an explicit lightweight bootstrap fetch.
       if (_dataSyncId == null || _dataSyncId!.isEmpty) {
-        debugPrint('[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
+        debugPrint(
+            '[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
         await _bootstrapDataSyncId();
       }
       if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
@@ -577,8 +582,8 @@ class YtmAccountService {
       try {
         await _warmSession();
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     }());
   }
 
@@ -718,8 +723,8 @@ class YtmAccountService {
         try {
           _harvestSessionState(json);
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
         // Set-Cookie is now ingested for every 2xx in _postWithRetry, so this
         // path no longer needs its own copy.
         debugPrint('[YTM_ACCOUNT] Session warmed successfully');
@@ -1087,8 +1092,7 @@ class YtmAccountService {
             'BOT_CHALLENGE', 'Bot challenge circuit breaker open');
       }
       if (!breaker.shouldAllow(YtmBlockSignal.ipBlocked)) {
-        throw const YtmException(
-            'IP_BLOCKED', 'IP block circuit breaker open');
+        throw const YtmException('IP_BLOCKED', 'IP block circuit breaker open');
       }
     }
 
@@ -1106,8 +1110,8 @@ class YtmAccountService {
       } on YtmException {
         rethrow;
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     }
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
@@ -1179,8 +1183,8 @@ class YtmAccountService {
               try {
                 _ingestSetCookies(setCookie);
               } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+                // Best-effort: failure intentionally ignored on this non-critical path.
+              }
             }
           }
         }
@@ -1317,8 +1321,7 @@ class YtmAccountService {
               ' (top-level keys: ${json.keys.take(8).join(', ')})');
 
           if (tracks.isEmpty) {
-            debugPrint(
-                '[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
+            debugPrint('[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
                 '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
             // YouTube Music frequently delivers the liked-songs list only via
             // continuation — the initial browse response is a header shell.
@@ -1451,8 +1454,7 @@ class YtmAccountService {
           if (tracks.isNotEmpty) {
             return tracks.take(maxTracks).toList();
           } else {
-            debugPrint(
-                '[YTM_ACCOUNT] Next endpoint $pId parsed nothing '
+            debugPrint('[YTM_ACCOUNT] Next endpoint $pId parsed nothing '
                 '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
           }
         }
@@ -1760,8 +1762,7 @@ class YtmAccountService {
                 ? playlistTitle
                 : 'Playlist ($cleanRawId)',
             author: playlistAuthor,
-            artworkUrl:
-                playlistArtwork ?? uniqueTracks.firstOrNull?.artworkUrl,
+            artworkUrl: playlistArtwork ?? uniqueTracks.firstOrNull?.artworkUrl,
             tracks: uniqueTracks,
           );
         }
@@ -1836,9 +1837,9 @@ class YtmAccountService {
         }
       }
 
-      final thumbRenderer =
-          header['thumbnail']?['croppedSquareThumbnailRenderer'] ??
-              header['thumbnail']?['musicThumbnailRenderer'];
+      final thumbRenderer = header['thumbnail']
+              ?['croppedSquareThumbnailRenderer'] ??
+          header['thumbnail']?['musicThumbnailRenderer'];
       final thumbs = (thumbRenderer?['thumbnail']?['thumbnails'] ??
           header['thumbnail']?['thumbnails']) as List<dynamic>?;
       if (thumbs != null && thumbs.isNotEmpty && artwork == null) {
@@ -2023,8 +2024,7 @@ class YtmAccountService {
           if (node.containsKey('musicTimedLyricsRenderer')) {
             final timedShelf =
                 node['musicTimedLyricsRenderer'] as Map<String, dynamic>;
-            final dataList =
-                timedShelf['timedLyricsData'] as List<dynamic>?;
+            final dataList = timedShelf['timedLyricsData'] as List<dynamic>?;
             if (dataList != null && dataList.isNotEmpty) {
               for (final item in dataList) {
                 if (item is Map<String, dynamic>) {
@@ -2032,7 +2032,8 @@ class YtmAccountService {
                   final lyricLine = item['lyricLine'];
                   if (lyricLine is String) {
                     text = lyricLine;
-                  } else if (lyricLine is Map && lyricLine.containsKey('runs')) {
+                  } else if (lyricLine is Map &&
+                      lyricLine.containsKey('runs')) {
                     final runs = lyricLine['runs'] as List<dynamic>;
                     text = runs.map((r) => r['text'] as String? ?? '').join();
                   }
@@ -2148,8 +2149,8 @@ class YtmAccountService {
             .ensurePoTokenReady()
             .timeout(const Duration(seconds: 2));
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     }();
     await sessionWarm;
     await tokenReady;
@@ -2163,7 +2164,8 @@ class YtmAccountService {
     // "confirm you're not a bot".
     String? accountPoToken;
     String? accountVisitorData;
-    bool hadAccountPoToken = false; // true only when account-bound token minted successfully
+    bool hadAccountPoToken =
+        false; // true only when account-bound token minted successfully
     // Whether this pass may carry the session (cookies + SAPISIDHASH). Only an
     // account-bound poToken earns that; otherwise the pass runs as a clean guest.
     var useSessionAuth = isAuthenticated;
@@ -2183,8 +2185,8 @@ class YtmAccountService {
         guestPoToken = poState?['streamingPoToken'] as String?;
         guestVisitorData = poState?['visitorData'] as String?;
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     }();
 
     Future<Map<String, dynamic>?>? accountMint;
@@ -2239,7 +2241,8 @@ class YtmAccountService {
       // cookies. Both the token and the visitorData must be the guest ones,
       // so drop what the account attempt left behind.
       if (!hadAccountPoToken) {
-        debugPrint('[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
+        debugPrint(
+            '[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
             'running Tier-1 as a guest pass (no session cookies).');
         useSessionAuth = false;
         accountPoToken = null;
@@ -2415,7 +2418,6 @@ class YtmAccountService {
           },
         });
 
-
         final response = await _postWithRetry(
           Uri.parse(
               '$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey'),
@@ -2583,7 +2585,8 @@ class YtmAccountService {
     // Dart tier to be skipped and the native hedged race to run.
     final cipher = (format['signatureCipher'] ?? format['cipher']) as String?;
     if (cipher != null && cipher.isNotEmpty) {
-      debugPrint('[YTM_ACCOUNT] Skipping ciphered format (itag ${format['itag']}) — needs native decipher');
+      debugPrint(
+          '[YTM_ACCOUNT] Skipping ciphered format (itag ${format['itag']}) — needs native decipher');
       return null;
     }
     return null;
@@ -2660,7 +2663,8 @@ class YtmAccountService {
   }
 
   /// Searches for a map containing [key] in the InnerTube JSON tree.
-  Map<String, dynamic>? _findShelfNode(dynamic node, String key, [int depth = 0]) {
+  Map<String, dynamic>? _findShelfNode(dynamic node, String key,
+      [int depth = 0]) {
     if (depth > 25 || node == null) return null;
     if (node is Map<String, dynamic>) {
       if (node.containsKey(key) && node[key] is Map<String, dynamic>) {
@@ -2715,7 +2719,8 @@ class YtmAccountService {
           }
           final contEndpoint = c['continuationEndpoint'];
           if (contEndpoint is Map<String, dynamic>) {
-            final token = contEndpoint['continuationCommand']?['token'] as String?;
+            final token =
+                contEndpoint['continuationCommand']?['token'] as String?;
             if (token != null && token.isNotEmpty) return token;
           }
           final contCmd = c['continuationCommand'];
@@ -2789,10 +2794,12 @@ class YtmAccountService {
   /// This is the raw content-binding for the account poToken (kept verbatim, incl. trailing `||`).
   String? _extractDataSyncId(Map<String, dynamic> json) {
     final rc = json['responseContext'];
-    final mainApp = rc is Map<String, dynamic> ? rc['mainAppWebResponseContext'] : null;
-    final id = (mainApp is Map<String, dynamic> ? mainApp['datasyncId'] : null) ??
-        (rc is Map<String, dynamic> ? rc['datasyncId'] : null) ??
-        json['datasyncId'];
+    final mainApp =
+        rc is Map<String, dynamic> ? rc['mainAppWebResponseContext'] : null;
+    final id =
+        (mainApp is Map<String, dynamic> ? mainApp['datasyncId'] : null) ??
+            (rc is Map<String, dynamic> ? rc['datasyncId'] : null) ??
+            json['datasyncId'];
     if (id is String && id.isNotEmpty) return id;
     return null;
   }

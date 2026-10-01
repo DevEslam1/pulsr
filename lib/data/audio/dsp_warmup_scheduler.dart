@@ -20,7 +20,8 @@ class DspWarmupScheduler {
     Duration warmupDuration = const Duration(milliseconds: 100),
   }) async {
     try {
-      await _channel.sendWarmupBuffer(durationMs: warmupDuration.inMilliseconds);
+      await _channel.sendWarmupBuffer(
+          durationMs: warmupDuration.inMilliseconds);
     } catch (e, st) {
       ErrorLogger.log('DspWarmupScheduler silent buffer preload error',
           error: e, stackTrace: st, category: 'DspWarmupScheduler');
@@ -29,7 +30,8 @@ class DspWarmupScheduler {
   }
 
   /// Fire-and-forget or awaited standalone warmup execution.
-  Future<void> warmup({Duration duration = const Duration(milliseconds: 100)}) async {
+  Future<void> warmup(
+      {Duration duration = const Duration(milliseconds: 100)}) async {
     try {
       await _channel.sendWarmupBuffer(durationMs: duration.inMilliseconds);
     } catch (e, st) {

@@ -86,7 +86,8 @@ void main() {
 
     test('handles an empty profile list and empty device name', () {
       expect(
-        HeadphoneDeviceMatcher.match(deviceName: 'WH-1000XM5', profiles: const []),
+        HeadphoneDeviceMatcher.match(
+            deviceName: 'WH-1000XM5', profiles: const []),
         isNull,
       );
       expect(

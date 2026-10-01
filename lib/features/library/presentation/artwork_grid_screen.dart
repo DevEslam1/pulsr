@@ -152,7 +152,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                       if (details.scale > 1.2 && _columnCount > minCols) {
                         setState(() => _columnCount =
                             (_columnCount - 0.05).clamp(minCols, maxCols));
-                      } else if (details.scale < 0.8 && _columnCount < maxCols) {
+                      } else if (details.scale < 0.8 &&
+                          _columnCount < maxCols) {
                         setState(() => _columnCount =
                             (_columnCount + 0.05).clamp(minCols, maxCols));
                       }
@@ -177,60 +178,62 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                           button: true,
                           label: '${album.title}, ${album.artist}',
                           child: InkWell(
-                      onTap: () =>
-                          context.push('/album', extra: album),
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: p.surfaceCard,
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: CachedArtwork(
-                                id: album.id,
-                                type: ArtworkType.ALBUM,
-                                size: 250,
-                                borderRadius: 14,
-                                fallbackIcon: Icons.album_rounded,
+                            onTap: () => context.push('/album', extra: album),
+                            borderRadius: BorderRadius.circular(AppRadii.r14),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: p.surfaceCard,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r14),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(AppSpacing.s6),
+                              clipBehavior: Clip.antiAlias,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    album.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w600,
-                                      color: p.textPrimary,
+                                  Expanded(
+                                    child: CachedArtwork(
+                                      id: album.id,
+                                      type: ArtworkType.ALBUM,
+                                      size: 250,
+                                      borderRadius: 14,
+                                      fallbackIcon: Icons.album_rounded,
                                     ),
                                   ),
-                                  Text(
-                                    album.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.tiny,
-                                      color: p.textSecondary,
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.all(AppSpacing.s6),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          album.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.label,
+                                            fontWeight: FontWeight.w600,
+                                            color: p.textPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          album.artist,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.tiny,
+                                            color: p.textSecondary,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),

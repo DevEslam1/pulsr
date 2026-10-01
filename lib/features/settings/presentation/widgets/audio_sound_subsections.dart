@@ -50,7 +50,8 @@ class _OutputSection extends StatelessWidget {
         settingsCardDivider(p),
         // Audiophile & Hi-Res Output Card & Controls
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s6),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s6),
           child: Material(
             color: p.surfaceContainer.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -113,17 +114,21 @@ class _OutputSection extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (state.currentOutputDevice?.isBitPerfectActive == true)
+                        if (state.currentOutputDevice?.isBitPerfectActive ==
+                            true)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                                horizontal: AppSpacing.s6,
+                                vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: AppColors.dacGold.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(AppRadii.r6),
                               border: Border.all(
-                                  color: AppColors.dacGold.withValues(alpha: 0.6)),
+                                  color:
+                                      AppColors.dacGold.withValues(alpha: 0.6)),
                             ),
-                            child: Text(context.l10n.bitPerfectLabel,
+                            child: Text(
+                              context.l10n.bitPerfectLabel,
                               style: TextStyle(
                                 color: p.warning,
                                 fontWeight: FontWeight.w900,
@@ -133,13 +138,15 @@ class _OutputSection extends StatelessWidget {
                             ),
                           ),
                         const SizedBox(width: AppSpacing.s6),
-                        Icon(Icons.tune_rounded, size: 16, color: p.textSecondary),
+                        Icon(Icons.tune_rounded,
+                            size: 16, color: p.textSecondary),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
                       context.l10n.settingsOutputDeviceConfigHint(
-                          (state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000,
+                          (state.currentOutputDevice?.sampleRate ?? 44100) ~/
+                              1000,
                           state.currentOutputDevice?.bitDepth ?? 16),
                       style: TextStyle(
                         color: p.textSecondary,
@@ -156,7 +163,8 @@ class _OutputSection extends StatelessWidget {
         Builder(builder: (ctx) {
           final bpBlock = !isAndroid
               ? unsupported
-              : AudioConflicts.bitPerfectBlockedReason(state.currentOutputDevice);
+              : AudioConflicts.bitPerfectBlockedReason(
+                  state.currentOutputDevice);
           return Column(
             children: [
               if (bpBlock != null && isAndroid)
@@ -182,7 +190,9 @@ class _OutputSection extends StatelessWidget {
           Icons.tune_rounded,
           context.l10n.settingsBypassDspBitPerfect,
           context.l10n.settingsBypassDspBitPerfectDesc,
-          value: isAndroid && state.bitPerfectOutput && state.bypassDspOnBitPerfect,
+          value: isAndroid &&
+              state.bitPerfectOutput &&
+              state.bypassDspOnBitPerfect,
           featureInfo: AudioFeatureRegistry.bypassDsp,
           disabledReason: !isAndroid
               ? unsupported
@@ -211,7 +221,8 @@ class _OutputSection extends StatelessWidget {
         Builder(builder: (ctx) {
           final strictBlock = !isAndroid
               ? unsupported
-              : AudioConflicts.strictBitPerfectBlockedReason(state.currentOutputDevice);
+              : AudioConflicts.strictBitPerfectBlockedReason(
+                  state.currentOutputDevice);
           return Column(
             children: [
               SettingsSwitchTile(
@@ -241,7 +252,8 @@ class _OutputSection extends StatelessWidget {
         }),
         settingsCardDivider(p),
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -266,8 +278,10 @@ class _OutputSection extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
-                    tooltip: context.l10n.settingsAboutTitle(context.l10n.dsdOutputModeTitle),
+                    icon: Icon(Icons.info_outline_rounded,
+                        size: 18, color: p.textTertiary),
+                    tooltip: context.l10n
+                        .settingsAboutTitle(context.l10n.dsdOutputModeTitle),
                     visualDensity: VisualDensity.compact,
                     onPressed: () => showAudioFeatureInfoDialog(
                       context,
@@ -288,7 +302,8 @@ class _OutputSection extends StatelessWidget {
                     : state.dsdDopSupported
                         ? context.l10n.dsdOutputModeSubtitle
                         : context.l10n.dsdDopRequiresUsbDac,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               const SizedBox(height: AppSpacing.xs),
               SizedBox(
@@ -349,7 +364,8 @@ class _OutputSection extends StatelessWidget {
           context.l10n.settingsPerTrackFormatDesc,
           value: isAndroid && state.outputFormatNegotiationEnabled,
           disabledReason: isAndroid ? null : unsupported,
-          onChanged: !isAndroid ? (v) {} : cubit.setOutputFormatNegotiationEnabled,
+          onChanged:
+              !isAndroid ? (v) {} : cubit.setOutputFormatNegotiationEnabled,
         ),
         settingsCardDivider(p),
         SettingsSwitchTile(
@@ -414,7 +430,8 @@ class _DspSection extends StatelessWidget {
           child: InkWell(
             onTap: isAndroid ? () => RoomCorrectionSheet.show(context) : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.s10),
               child: Row(
                 children: [
                   Icon(
@@ -433,14 +450,17 @@ class _DspSection extends StatelessWidget {
                               child: Text(
                                 context.l10n.rcTitle,
                                 style: TextStyle(
-                                  color: isAndroid ? p.textPrimary : p.textTertiary,
+                                  color: isAndroid
+                                      ? p.textPrimary
+                                      : p.textTertiary,
                                   fontWeight: FontWeight.w700,
                                   fontSize: AppFontSize.body,
                                 ),
                               ),
                             ),
                             IconButton(
-                              icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
+                              icon: Icon(Icons.info_outline_rounded,
+                                  size: 18, color: p.textTertiary),
                               tooltip: context.l10n.learnMore,
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
@@ -464,7 +484,8 @@ class _DspSection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.s6),
-                  Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+                  Icon(Icons.chevron_right_rounded,
+                      color: p.textTertiary, size: 20),
                 ],
               ),
             ),
@@ -476,7 +497,8 @@ class _DspSection extends StatelessWidget {
           child: InkWell(
             onTap: isAndroid ? () => DspInspectorSheet.show(context) : null,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.s10),
               child: Row(
                 children: [
                   Icon(
@@ -489,7 +511,8 @@ class _DspSection extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(context.l10n.dspInspectorDebug,
+                        Text(
+                          context.l10n.dspInspectorDebug,
                           style: TextStyle(
                             color: isAndroid ? p.textPrimary : p.textTertiary,
                             fontWeight: FontWeight.w700,
@@ -498,7 +521,9 @@ class _DspSection extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.s2),
                         Text(
-                          isAndroid ? context.l10n.settingsDspInspectorDesc : unsupported,
+                          isAndroid
+                              ? context.l10n.settingsDspInspectorDesc
+                              : unsupported,
                           style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.label,
@@ -508,7 +533,8 @@ class _DspSection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.s6),
-                  Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+                  Icon(Icons.chevron_right_rounded,
+                      color: p.textTertiary, size: 20),
                 ],
               ),
             ),
@@ -516,7 +542,8 @@ class _DspSection extends StatelessWidget {
         ),
         settingsCardDivider(p),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -541,10 +568,13 @@ class _DspSection extends StatelessWidget {
                 !isAndroid
                     ? unsupported
                     : switch (state.systemEffectsStatus) {
-                        'bypassed' => context.l10n.systemEffectsSubtitleBypassed,
+                        'bypassed' =>
+                          context.l10n.systemEffectsSubtitleBypassed,
                         'active' => context.l10n.systemEffectsSubtitleActive,
-                        'unsupportedDevice' => context.l10n.systemEffectsSubtitleUnsupported,
-                        _ => context.l10n.settingsStatusLabel(state.systemEffectsStatus),
+                        'unsupportedDevice' =>
+                          context.l10n.systemEffectsSubtitleUnsupported,
+                        _ => context.l10n
+                            .settingsStatusLabel(state.systemEffectsStatus),
                       },
                 style: TextStyle(
                   color: state.systemEffectsStatus == 'bypassed'
@@ -567,15 +597,24 @@ class _DspSection extends StatelessWidget {
                   segments: [
                     ButtonSegment(
                       value: 'auto',
-                      label: Text(context.l10n.systemEffectsAuto, style: const TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.systemEffectsAuto,
+                          style: const TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700)),
                     ),
                     ButtonSegment(
                       value: 'tryDisable',
-                      label: Text(context.l10n.systemEffectsTryDisable, style: const TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.systemEffectsTryDisable,
+                          style: const TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700)),
                     ),
                     ButtonSegment(
                       value: 'leaveOn',
-                      label: Text(context.l10n.systemEffectsLeaveOn, style: const TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                      label: Text(context.l10n.systemEffectsLeaveOn,
+                          style: const TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700)),
                     ),
                   ],
                   selected: {state.systemEffectsPolicy},
@@ -600,15 +639,18 @@ class _DspSection extends StatelessWidget {
           builder: (context, playerState) {
             final l10n = context.l10n;
             final playerCubit = context.read<PlayerCubit>();
-            final isLoudnessContourEnabled = playerState.isLoudnessContourEnabled;
-            final loudnessContourIntensity = playerState.loudnessContourIntensity;
+            final isLoudnessContourEnabled =
+                playerState.isLoudnessContourEnabled;
+            final loudnessContourIntensity =
+                playerState.loudnessContourIntensity;
             final lcBlocked = AudioConflicts.dspBlockedByBitPerfect(
               bitPerfectOutput: state.bitPerfectOutput,
               bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
               device: state.currentOutputDevice,
             );
             return Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -642,7 +684,8 @@ class _DspSection extends StatelessWidget {
                                   tooltip: context.l10n.learnMore,
                                   visualDensity: VisualDensity.compact,
                                   onPressed: () => showAudioFeatureInfoDialog(
-                                      context, AudioFeatureRegistry.loudnessContour,
+                                      context,
+                                      AudioFeatureRegistry.loudnessContour,
                                       conflictReason: lcBlocked),
                                 ),
                               ],
@@ -650,7 +693,9 @@ class _DspSection extends StatelessWidget {
                             Text(
                               lcBlocked ?? l10n.dspLoudnessSubtitle,
                               style: TextStyle(
-                                color: lcBlocked != null ? p.error : p.textSecondary,
+                                color: lcBlocked != null
+                                    ? p.error
+                                    : p.textSecondary,
                                 fontSize: AppFontSize.label,
                                 fontWeight: lcBlocked != null
                                     ? FontWeight.w600
@@ -688,7 +733,8 @@ class _DspSection extends StatelessWidget {
                     const SizedBox(height: AppSpacing.s6),
                     Text(
                       l10n.dspLoudnessReplayGainNote,
-                      style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny),
+                      style: TextStyle(
+                          color: p.textTertiary, fontSize: AppFontSize.tiny),
                     ),
                   ],
                 ],
@@ -704,7 +750,8 @@ class _DspSection extends StatelessWidget {
 /// B-25 Sub-widget 3: ReplayGain and gain/volume control (DVC, resampler).
 class _GainSection extends StatelessWidget {
   final SettingsState state;
-  final Future<void> Function(BuildContext, SettingsCubit) onResolveReplayGainConflict;
+  final Future<void> Function(BuildContext, SettingsCubit)
+      onResolveReplayGainConflict;
 
   const _GainSection({
     required this.state,
@@ -729,7 +776,8 @@ class _GainSection extends StatelessWidget {
             device: state.currentOutputDevice,
           );
           return Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -746,7 +794,8 @@ class _GainSection extends StatelessWidget {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(context.l10n.replayGainTitle,
+                                child: Text(
+                                  context.l10n.replayGainTitle,
                                   style: TextStyle(
                                     color: rgBlocked != null
                                         ? p.textTertiary
@@ -770,7 +819,8 @@ class _GainSection extends StatelessWidget {
                           Text(
                             rgBlocked ?? context.l10n.settingsReplayGainDesc,
                             style: TextStyle(
-                              color: rgBlocked != null ? p.error : p.textSecondary,
+                              color:
+                                  rgBlocked != null ? p.error : p.textSecondary,
                               fontSize: AppFontSize.label,
                               fontWeight: rgBlocked != null
                                   ? FontWeight.w600
@@ -787,8 +837,10 @@ class _GainSection extends StatelessWidget {
                     padding: const EdgeInsets.only(top: AppSpacing.xs),
                     child: SettingsConflictCard(
                       reason: rgBlocked,
-                      resolveLabel: context.l10n.settingsDisableBitPerfectBypass,
-                      onResolve: () => onResolveReplayGainConflict(context, cubit),
+                      resolveLabel:
+                          context.l10n.settingsDisableBitPerfectBypass,
+                      onResolve: () =>
+                          onResolveReplayGainConflict(context, cubit),
                     ),
                   ),
                 const SizedBox(height: AppSpacing.sm),
@@ -806,22 +858,30 @@ class _GainSection extends StatelessWidget {
                       ButtonSegment(
                         value: ReplayGainMode.off,
                         label: Text(context.l10n.rgOff,
-                            style: TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                            style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.track,
                         label: Text(context.l10n.rgTrack,
-                            style: TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                            style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.album,
                         label: Text(context.l10n.rgAlbum,
-                            style: TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                            style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700)),
                       ),
                       ButtonSegment(
                         value: ReplayGainMode.auto,
                         label: Text(context.l10n.rgAuto,
-                            style: TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                            style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700)),
                       ),
                     ],
                     selected: {state.replayGainMode},
@@ -949,13 +1009,15 @@ class _DiagnosticSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.bluetooth_audio_rounded, size: 20, color: p.accent),
+                  Icon(Icons.bluetooth_audio_rounded,
+                      size: 20, color: p.accent),
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
@@ -972,9 +1034,11 @@ class _DiagnosticSection extends StatelessWidget {
               const SizedBox(height: AppSpacing.xxs),
               Text(
                 isAndroid
-                    ? context.l10n.bluetoothLatencySubtitle(state.bluetoothLatencyOffsetMs)
+                    ? context.l10n.bluetoothLatencySubtitle(
+                        state.bluetoothLatencyOffsetMs)
                     : unsupported,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               const SizedBox(height: AppSpacing.s6),
               SettingSliderRow(

@@ -130,13 +130,15 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
     return Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
-        constraints:
-            BoxConstraints(maxWidth: Adaptive.sheetConstraints(context).maxWidth),
+        constraints: BoxConstraints(
+            maxWidth: Adaptive.sheetConstraints(context).maxWidth),
         child: Container(
-          padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, bottomInset + 24),
+          padding: EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, bottomInset + 24),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
             border: Border.all(color: p.hairline),
           ),
           child: SingleChildScrollView(
@@ -171,16 +173,19 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(context.l10n.signInGoogleTv,
+                          Text(
+                            context.l10n.signInGoogleTv,
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: AppFontSize.title,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(context.l10n.noCaptchaDesc,
+                          Text(
+                            context.l10n.noCaptchaDesc,
                             style: TextStyle(
-                                color: p.textSecondary, fontSize: AppFontSize.label),
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label),
                           ),
                         ],
                       ),
@@ -217,7 +222,8 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(text,
-                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body)),
+                style: TextStyle(
+                    color: p.textPrimary, fontSize: AppFontSize.body)),
           ),
         ],
       ),
@@ -239,8 +245,8 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r12)),
           ),
         ),
       ],
@@ -258,14 +264,18 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(context.l10n.oauthStep1,
-          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+        Text(
+          context.l10n.oauthStep1,
+          style: TextStyle(
+              color: p.textSecondary, fontSize: AppFontSize.bodySmall),
         ),
         const SizedBox(height: AppSpacing.xs),
         _copyRow(p, code.verificationUrl, context.l10n.browseAddress),
         const SizedBox(height: AppSpacing.s18),
-        Text(context.l10n.oauthStep2,
-          style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+        Text(
+          context.l10n.oauthStep2,
+          style: TextStyle(
+              color: p.textSecondary, fontSize: AppFontSize.bodySmall),
         ),
         const SizedBox(height: AppSpacing.xs),
         Container(
@@ -297,21 +307,24 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             foregroundColor: p.textPrimary,
             side: BorderSide(color: p.hairline),
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.r12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r12)),
           ),
         ),
         const SizedBox(height: AppSpacing.s14),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(width: AppSpacing.s14,
+            const SizedBox(
+              width: AppSpacing.s14,
               height: 14,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             const SizedBox(width: AppSpacing.s10),
-            Text(context.l10n.waitingApproval,
-              style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
+            Text(
+              context.l10n.waitingApproval,
+              style:
+                  TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
             ),
           ],
         ),
@@ -321,7 +334,8 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
 
   Widget _copyRow(PulsrPalette p, String value, String label) {
     return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.xxs, AppSpacing.xxs, AppSpacing.xxs),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.s14, AppSpacing.xxs, AppSpacing.xxs, AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surface,
         borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -333,7 +347,9 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             child: SelectableText(
               value,
               style: TextStyle(
-                  color: p.textPrimary, fontSize: AppFontSize.bodySmall, height: 1.3),
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.bodySmall,
+                  height: 1.3),
             ),
           ),
           IconButton(

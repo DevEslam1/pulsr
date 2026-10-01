@@ -267,9 +267,10 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       }
     } on PlatformException catch (e) {
       if (isClosed) return;
-      final msg = e.code == 'photo_access_denied' || e.code == 'camera_access_denied'
-          ? 'Permission denied to access gallery'
-          : 'Failed to pick artwork image: ${e.message ?? e.code}';
+      final msg =
+          e.code == 'photo_access_denied' || e.code == 'camera_access_denied'
+              ? 'Permission denied to access gallery'
+              : 'Failed to pick artwork image: ${e.message ?? e.code}';
       emit(state.copyWith(errorMessage: msg));
     } catch (e) {
       if (isClosed) return;
@@ -732,7 +733,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 }
 
 // FIX-M08 / H-10: Distinct outcomes for native bridge responses
-enum _TagWriteOutcome { verified, accepted, rejected, failed, unverified, unavailable }
+enum _TagWriteOutcome {
+  verified,
+  accepted,
+  rejected,
+  failed,
+  unverified,
+  unavailable
+}
 
 _TagWriteOutcome _checkTagWriteOutcome(dynamic result) {
   // H-10: A null response means the platform channel never answered (bridge

@@ -141,7 +141,6 @@ class _DuplicateFinderSheetState extends State<DuplicateFinderSheet> {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-
             if (_isScanning)
               const Center(
                 child: Padding(
@@ -188,114 +187,113 @@ class _DuplicateFinderSheetState extends State<DuplicateFinderSheet> {
                         child: Padding(
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            group.tracks.first.title,
-                            style: TextStyle(
-                              fontSize: AppFontSize.body,
-                              fontWeight: FontWeight.w700,
-                              color: p.textPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            group.tracks.first.artist,
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              color: p.textSecondary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const Divider(height: AppSpacing.md),
-                          ...group.tracks.map((track) {
-                            final isMarked =
-                                _selectedIdsToDelete.contains(track.id);
-                            final ext = track.path.contains('.')
-                                ? track.path.split('.').last.toUpperCase()
-                                : 'AUDIO';
-                            final bitrateStr = track.bitrateKbps != null
-                                ? '${track.bitrateKbps} kbps'
-                                : '';
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                group.tracks.first.title,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.body,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                group.tracks.first.artist,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.label,
+                                  color: p.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Divider(height: AppSpacing.md),
+                              ...group.tracks.map((track) {
+                                final isMarked =
+                                    _selectedIdsToDelete.contains(track.id);
+                                final ext = track.path.contains('.')
+                                    ? track.path.split('.').last.toUpperCase()
+                                    : 'AUDIO';
+                                final bitrateStr = track.bitrateKbps != null
+                                    ? '${track.bitrateKbps} kbps'
+                                    : '';
 
-                            return CheckboxListTile(
-                              value: isMarked,
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.xs,
-                                        vertical: AppSpacing.xxs),
-                                    decoration: BoxDecoration(
-                                      color: ext == 'FLAC'
-                                          ? p.accent.withValues(alpha: 0.15)
-                                          : p.hairline,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r4),
-                                    ),
-                                    child: Text(
-                                      ext,
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.tiny,
-                                        fontWeight: FontWeight.w800,
-                                        color: ext == 'FLAC'
-                                            ? p.accent
-                                            : p.textSecondary,
+                                return CheckboxListTile(
+                                  value: isMarked,
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.xs,
+                                            vertical: AppSpacing.xxs),
+                                        decoration: BoxDecoration(
+                                          color: ext == 'FLAC'
+                                              ? p.accent.withValues(alpha: 0.15)
+                                              : p.hairline,
+                                          borderRadius: BorderRadius.circular(
+                                              AppRadii.r4),
+                                        ),
+                                        child: Text(
+                                          ext,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.tiny,
+                                            fontWeight: FontWeight.w800,
+                                            color: ext == 'FLAC'
+                                                ? p.accent
+                                                : p.textSecondary,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Text(
+                                        bitrateStr,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.caption,
+                                          color: p.textSecondary,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        Formatters.formatDuration(Duration(
+                                            milliseconds: track.durationMs)),
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.caption,
+                                          color: p.textTertiary,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Text(
-                                    bitrateStr,
+                                  subtitle: Text(
+                                    track.path,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: AppFontSize.caption,
-                                      color: p.textSecondary,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    Formatters.formatDuration(Duration(
-                                        milliseconds: track.durationMs)),
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.caption,
+                                      fontSize: AppFontSize.tiny,
                                       color: p.textTertiary,
                                     ),
                                   ),
-                                ],
-                              ),
-                              subtitle: Text(
-                                track.path,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.tiny,
-                                  color: p.textTertiary,
-                                ),
-                              ),
-                              onChanged: (val) {
-                                setState(() {
-                                  if (val == true) {
-                                    _selectedIdsToDelete.add(track.id);
-                                  } else {
-                                    _selectedIdsToDelete.remove(track.id);
-                                  }
-                                });
-                              },
-                            );
-                          }),
-                        ],
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        _selectedIdsToDelete.add(track.id);
+                                      } else {
+                                        _selectedIdsToDelete.remove(track.id);
+                                      }
+                                    });
+                                  },
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
+                    );
+                  },
                 ),
               ),
-
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
@@ -306,7 +304,8 @@ class _DuplicateFinderSheetState extends State<DuplicateFinderSheet> {
                 const Spacer(),
                 FilledButton.icon(
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                  label: Text('Remove Selected (${_selectedIdsToDelete.length})'),
+                  label:
+                      Text('Remove Selected (${_selectedIdsToDelete.length})'),
                   style: FilledButton.styleFrom(
                     backgroundColor: p.favorite,
                   ),

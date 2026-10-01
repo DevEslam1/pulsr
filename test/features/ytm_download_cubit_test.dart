@@ -36,7 +36,8 @@ void main() {
   late SongsTableData testSong;
 
   setUp(() {
-    mockService = MockYtDownloadService();    mockPlayerCubit = MockPlayerCubit();
+    mockService = MockYtDownloadService();
+    mockPlayerCubit = MockPlayerCubit();
     mockDownloads = MockDownloadsCubit();
     controller = StreamController<DownloadsState>.broadcast();
     when(() => mockDownloads.stream).thenAnswer((_) => controller.stream);
@@ -66,8 +67,8 @@ void main() {
     await controller.close();
   });
 
-  YtmDownloadCubit build() =>
-      YtmDownloadCubit(mockService, mockPlayerCubit, downloadsCubit: mockDownloads);
+  YtmDownloadCubit build() => YtmDownloadCubit(mockService, mockPlayerCubit,
+      downloadsCubit: mockDownloads);
 
   DownloadTask taskWith(DownloadStatus status, {int? localSongId}) =>
       DownloadTask(
@@ -118,7 +119,9 @@ void main() {
     // Completion swaps the stale remote row for the local one exactly once.
     verify(() => mockPlayerCubit.swapReconciledSong(-101, 501)).called(1);
 
-    expect(states.any((s) => s.itemFor('testVid1').status == YtDownloadStatus.running),
+    expect(
+        states.any(
+            (s) => s.itemFor('testVid1').status == YtDownloadStatus.running),
         isTrue);
     await sub.cancel();
     await cubit.close();

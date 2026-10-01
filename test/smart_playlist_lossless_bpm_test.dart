@@ -47,9 +47,17 @@ void main() {
       await insertSong(
           id: 1, title: 'FlacTrack', path: '/m/a.flac', codec: 'FLAC');
       await insertSong(
-          id: 2, title: 'HiResMp3', path: '/m/b.mp3', codec: 'MP3', bitDepth: 24);
+          id: 2,
+          title: 'HiResMp3',
+          path: '/m/b.mp3',
+          codec: 'MP3',
+          bitDepth: 24);
       await insertSong(
-          id: 3, title: 'PlainMp3', path: '/m/c.mp3', codec: 'MP3', bitDepth: 16);
+          id: 3,
+          title: 'PlainMp3',
+          path: '/m/c.mp3',
+          codec: 'MP3',
+          bitDepth: 16);
 
       final result = await engine.evaluateCriteria(const SmartCriteria(
         rules: [
@@ -66,12 +74,15 @@ void main() {
       expect(titles, isNot(contains('PlainMp3')));
     });
 
-    test('isLossless=false matches lossy tracks, not lossless ones',
-        () async {
+    test('isLossless=false matches lossy tracks, not lossless ones', () async {
       await insertSong(
           id: 1, title: 'FlacTrack', path: '/m/a.flac', codec: 'FLAC');
       await insertSong(
-          id: 2, title: 'PlainMp3', path: '/m/c.mp3', codec: 'MP3', bitDepth: 16);
+          id: 2,
+          title: 'PlainMp3',
+          path: '/m/c.mp3',
+          codec: 'MP3',
+          bitDepth: 16);
 
       for (final falsy in ['false', '0', 'no']) {
         final result = await engine.evaluateCriteria(SmartCriteria(

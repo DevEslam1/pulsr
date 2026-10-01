@@ -102,8 +102,7 @@ class _QueuedThemeRequest {
 class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   static const int _maxCacheSize = 50;
-  final LinkedHashMap<String, _CachedPalette> _cachedPalettes =
-      LinkedHashMap();
+  final LinkedHashMap<String, _CachedPalette> _cachedPalettes = LinkedHashMap();
   Timer? _debounceTimer;
   int _currentRequestToken = 0;
   // FIX-C01: Guard against overlapping extractions
@@ -236,7 +235,8 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
           imageProvider,
           size: const Size(64, 64),
           maximumColorCount: 16,
-        ).timeout(const Duration(seconds: 5), onTimeout: () => throw TimeoutException('Palette timeout'));
+        ).timeout(const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('Palette timeout'));
 
         if (token != _currentRequestToken || isClosed) return;
 
@@ -290,18 +290,25 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
       }
     } catch (e, st) {
       // FIX-H01: If re-extraction fails, emit expired palette as fallback instead of leaving state stale
-      if (expiredFallback != null && !isClosed && token == _currentRequestToken) {
+      if (expiredFallback != null &&
+          !isClosed &&
+          token == _currentRequestToken) {
         _lastEmittedPalette = expiredFallback;
         safeEmit(expiredFallback.applyTo(state));
         return;
       }
-      if (_lastEmittedPalette != null && !isClosed && token == _currentRequestToken) {
+      if (_lastEmittedPalette != null &&
+          !isClosed &&
+          token == _currentRequestToken) {
         safeEmit(_lastEmittedPalette!.applyTo(state));
         return;
       }
       // Do not reset to default on single artwork 404/timeout — keep existing palette
-      if (e is TimeoutException || e.toString().contains('404') || e.toString().contains('Failed host lookup')) {
-        ErrorLogger.log('Palette fetch transient failure for $cacheKey (keeping existing): $e',
+      if (e is TimeoutException ||
+          e.toString().contains('404') ||
+          e.toString().contains('Failed host lookup')) {
+        ErrorLogger.log(
+            'Palette fetch transient failure for $cacheKey (keeping existing): $e',
             category: 'DynamicTheme');
         return;
       }

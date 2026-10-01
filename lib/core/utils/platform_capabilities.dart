@@ -32,15 +32,22 @@ class AudioCapabilities {
   factory AudioCapabilities.fromMap(Map<String, dynamic> map) {
     return AudioCapabilities(
       hasEqualizer: map['hasEqualizer'] == true || map['hasEqualizer'] == 1,
-      hasAudioEffects: map['hasAudioEffects'] == true || map['hasAudioEffects'] == 1,
+      hasAudioEffects:
+          map['hasAudioEffects'] == true || map['hasAudioEffects'] == 1,
       hasTagEditor: map['hasTagEditor'] == true || map['hasTagEditor'] == 1,
-      hasRingtoneManager: map['hasRingtoneManager'] == true || map['hasRingtoneManager'] == 1,
+      hasRingtoneManager:
+          map['hasRingtoneManager'] == true || map['hasRingtoneManager'] == 1,
       hasAppWidget: map['hasAppWidget'] == true || map['hasAppWidget'] == 1,
-      hasHardwareVisualizer: map['hasHardwareVisualizer'] == true || map['hasHardwareVisualizer'] == 1,
-      isVolumeBoostSupported: map['isVolumeBoostSupported'] == true || map['isVolumeBoostSupported'] == 1,
-      isBassBoostSupported: map['isBassBoostSupported'] == true || map['isBassBoostSupported'] == 1,
-      isDynamicsSupported: map['isDynamicsSupported'] == true || map['isDynamicsSupported'] == 1,
-      isVirtualizerSupported: map['isVirtualizerSupported'] == true || map['isVirtualizerSupported'] == 1,
+      hasHardwareVisualizer: map['hasHardwareVisualizer'] == true ||
+          map['hasHardwareVisualizer'] == 1,
+      isVolumeBoostSupported: map['isVolumeBoostSupported'] == true ||
+          map['isVolumeBoostSupported'] == 1,
+      isBassBoostSupported: map['isBassBoostSupported'] == true ||
+          map['isBassBoostSupported'] == 1,
+      isDynamicsSupported:
+          map['isDynamicsSupported'] == true || map['isDynamicsSupported'] == 1,
+      isVirtualizerSupported: map['isVirtualizerSupported'] == true ||
+          map['isVirtualizerSupported'] == 1,
     );
   }
 
@@ -75,16 +82,12 @@ class PlatformCapabilities {
     } catch (_) {}
   }
 
-  static bool get hasEqualizer =>
-      _nativeCache?.hasEqualizer ?? isAndroid;
-  static bool get hasAudioEffects =>
-      _nativeCache?.hasAudioEffects ?? isAndroid;
-  static bool get hasTagEditor =>
-      _nativeCache?.hasTagEditor ?? isAndroid;
+  static bool get hasEqualizer => _nativeCache?.hasEqualizer ?? isAndroid;
+  static bool get hasAudioEffects => _nativeCache?.hasAudioEffects ?? isAndroid;
+  static bool get hasTagEditor => _nativeCache?.hasTagEditor ?? isAndroid;
   static bool get hasRingtoneManager =>
       _nativeCache?.hasRingtoneManager ?? isAndroid;
-  static bool get hasAppWidget =>
-      _nativeCache?.hasAppWidget ?? isAndroid;
+  static bool get hasAppWidget => _nativeCache?.hasAppWidget ?? isAndroid;
   static bool get hasHardwareVisualizer =>
       _nativeCache?.hasHardwareVisualizer ?? isAndroid;
 

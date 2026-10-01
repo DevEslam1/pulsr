@@ -4,7 +4,7 @@
 // gates on freezed states.
 //
 // WHY THIS EXISTS: freezed 3.2 `copyWith` does not preserve list reference
-// identity â€” even a no-argument `state.copyWith()` returns a state whose
+// identity — even a no-argument `state.copyWith()` returns a state whose
 // `@Default([])` list fields are NEW instances (verified by
 // test/tmp_gate_probe_test.dart). Therefore `!identical(a.list, b.list)` is
 // always true after any copyWith, which silently defeats every identity-based

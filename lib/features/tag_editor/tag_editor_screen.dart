@@ -189,8 +189,7 @@ class _TagEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
             return IconButton(
               tooltip: context.l10n.undo,
               icon: const Icon(Icons.undo_rounded),
-              onPressed:
-                  canUndo && !isSaving ? () => cubit.undo() : null,
+              onPressed: canUndo && !isSaving ? () => cubit.undo() : null,
             );
           },
         ),
@@ -335,41 +334,38 @@ class _AutoFetchButton extends StatelessWidget {
       final message = resolved > 0
           ? 'Online metadata filled for $resolved track${resolved == 1 ? '' : 's'} (shared fields only)'
           : context.l10n.noOnlineMetadata;
-      messenger
-        ?.clearSnackBars();
+      messenger?.clearSnackBars();
       messenger?.showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: resolved > 0 ? p.accent : null,
-          ),
-        );
+        SnackBar(
+          content: Text(message),
+          backgroundColor: resolved > 0 ? p.accent : null,
+        ),
+      );
       return;
     }
 
     final matches = await cubit.searchOnlineMatches();
     if (!context.mounted) return;
     if (matches.isEmpty) {
-      messenger
-        ?.clearSnackBars();
-      messenger?.showSnackBar(SnackBar(content: Text(context.l10n.noOnlineMetadata)));
+      messenger?.clearSnackBars();
+      messenger?.showSnackBar(
+          SnackBar(content: Text(context.l10n.noOnlineMetadata)));
       return;
     }
 
     if (matches.length == 1) {
       final ok = await cubit.applyMetadataResult(matches.first);
       if (ok && context.mounted) {
-        messenger
-          ?.clearSnackBars();
+        messenger?.clearSnackBars();
         messenger?.showSnackBar(SnackBar(
-            content: Text(context.l10n.onlineMetadataApplied),
-            backgroundColor: p.accent,
-          ));
+          content: Text(context.l10n.onlineMetadataApplied),
+          backgroundColor: p.accent,
+        ));
       }
       return;
     }
 
-    final selected =
-        await PulsrSheetHelper.showPulsrSheet<OnlineTrackMetadata>(
+    final selected = await PulsrSheetHelper.showPulsrSheet<OnlineTrackMetadata>(
       context: context,
       builder: (ctx) => _MetadataMatchSheet(matches: matches),
     );
@@ -377,12 +373,11 @@ class _AutoFetchButton extends StatelessWidget {
     if (selected != null && context.mounted) {
       final ok = await cubit.applyMetadataResult(selected);
       if (ok && context.mounted) {
-        messenger
-          ?.clearSnackBars();
+        messenger?.clearSnackBars();
         messenger?.showSnackBar(SnackBar(
-            content: Text(context.l10n.onlineMetadataApplied),
-            backgroundColor: p.accent,
-          ));
+          content: Text(context.l10n.onlineMetadataApplied),
+          backgroundColor: p.accent,
+        ));
       }
     }
   }
@@ -464,24 +459,25 @@ class _MetadataMatchSheet extends StatelessWidget {
                             fit: BoxFit.cover,
                             cacheWidth: 88,
                             cacheHeight: 88,
-                            loadingBuilder: (context, child, progress) => progress == null
-                                ? child
-                                : Container(
-                                    width: 44,
-                                    height: 44,
-                                    color: p.surfaceContainer,
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: p.accent),
+                            loadingBuilder: (context, child, progress) =>
+                                progress == null
+                                    ? child
+                                    : Container(
+                                        width: 44,
+                                        height: 44,
+                                        color: p.surfaceContainer,
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: p.accent),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                            errorBuilder: (_, __, ___) => Icon(
-                                Icons.music_note_rounded,
-                                color: p.accent),
+                            errorBuilder: (_, __, ___) =>
+                                Icon(Icons.music_note_rounded, color: p.accent),
                           ),
                         )
                       : Icon(Icons.music_note_rounded, color: p.accent),

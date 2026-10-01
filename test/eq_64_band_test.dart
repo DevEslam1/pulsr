@@ -79,8 +79,8 @@ void main() {
       expect(out.length, 3);
       expect(out[0], closeTo(0.0, 1e-9));
       expect(out[2], closeTo(1.0, 1e-9));
-      final t = (math.log(40.0) - math.log(32.0)) /
-          (math.log(64.0) - math.log(32.0));
+      final t =
+          (math.log(40.0) - math.log(32.0)) / (math.log(64.0) - math.log(32.0));
       expect(out[1], closeTo(t, 1e-9));
     });
 

@@ -18,7 +18,8 @@ void main() {
   setUp(() {
     mockSettingsCubit = MockSettingsCubit();
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
   });
 
   Widget buildWidget() {
@@ -37,11 +38,14 @@ void main() {
     );
   }
 
-  testWidgets('M-20: _initPlayer error prevents _start from running and disables start button', (tester) async {
+  testWidgets(
+      'M-20: _initPlayer error prevents _start from running and disables start button',
+      (tester) async {
     await tester.pumpWidget(buildWidget());
     await tester.pumpAndSettle();
 
-    final state = tester.state<BtLatencyTapSheetState>(find.byType(BtLatencyTapSheet));
+    final state =
+        tester.state<BtLatencyTapSheetState>(find.byType(BtLatencyTapSheet));
 
     // Simulate initPlayer error
     state.setInitErrorForTesting(true);

@@ -142,8 +142,7 @@ void main() {
       ];
     }
 
-    test('endpoints are exact for every curve: f=0 -> (1,0), f=1 -> (0,1)',
-        () {
+    test('endpoints are exact for every curve: f=0 -> (1,0), f=1 -> (0,1)', () {
       for (final curve in curves) {
         final pairs = pairsFor(curve);
         expect(pairs.first.$1, closeTo(1.0, 1e-9),
@@ -157,16 +156,15 @@ void main() {
       }
     });
 
-    test('repeat-one always returns the linear pair (1-f, f) regardless of '
+    test(
+        'repeat-one always returns the linear pair (1-f, f) regardless of '
         'the selected curve', () {
       for (final curve in curves) {
         final mgr = CrossfadeManager()..curve = curve;
         for (int i = 0; i <= 10; i++) {
           final f = i / 10;
-          final (oldGain, newGain) =
-              mgr.evaluateGainPair(f, isRepeatOne: true);
-          expect(oldGain, closeTo(1.0 - f, 1e-9),
-              reason: '${curve.name} f=$f');
+          final (oldGain, newGain) = mgr.evaluateGainPair(f, isRepeatOne: true);
+          expect(oldGain, closeTo(1.0 - f, 1e-9), reason: '${curve.name} f=$f');
           expect(newGain, closeTo(f, 1e-9), reason: '${curve.name} f=$f');
         }
       }
@@ -246,7 +244,8 @@ void main() {
       }
     });
 
-    test('sum-safe scaling reduces the equal-power midpoint peak from '
+    test(
+        'sum-safe scaling reduces the equal-power midpoint peak from '
         'sqrt(2) to the ceiling', () {
       final mgr = CrossfadeManager()..curve = CrossfadeCurve.equalPower;
       final raw = mgr.evaluateGainPair(0.5);
@@ -280,7 +279,8 @@ void main() {
   });
 
   group('fadeVolume curve correctness', () {
-    test('equal-power fade-out follows the complementary cos shape, not '
+    test(
+        'equal-power fade-out follows the complementary cos shape, not '
         'the mirrored 1-sin shape', () {
       fakeAsync((async) {
         final volumes = <double>[];
@@ -340,7 +340,8 @@ void main() {
   });
 
   group('crossfadeVolumes (dual-player)', () {
-    test('stepped fallback keeps summed player volumes <= 1.0 and lands on '
+    test(
+        'stepped fallback keeps summed player volumes <= 1.0 and lands on '
         'exact endpoints', () async {
       final activeVolumes = <double>[];
       final inactiveVolumes = <double>[];
@@ -365,7 +366,9 @@ void main() {
       expect(activeVolumes, isNotEmpty);
       // Anti-clip invariant: both players at full-scale peaks can never sum
       // above 1.0 at any tick (per-tick gains sampled by the timers).
-      for (int i = 0; i < math.min(activeVolumes.length, inactiveVolumes.length); i++) {
+      for (int i = 0;
+          i < math.min(activeVolumes.length, inactiveVolumes.length);
+          i++) {
         expect(activeVolumes[i] + inactiveVolumes[i],
             lessThanOrEqualTo(1.0 + 1e-9),
             reason: 'summed tick $i exceeds full scale');
@@ -375,7 +378,8 @@ void main() {
       expect(inactiveVolumes.last, closeTo(1.0, 1e-9));
     });
 
-    test('native outgoing ramp is armed per-sample while the incoming player '
+    test(
+        'native outgoing ramp is armed per-sample while the incoming player '
         'is stepped (no full-volume buffer leak)', () async {
       final curvesArmed = <MockAudioPlayer, List<double>>{};
       when(() => mockPlayerA.dspSetGainCurve(any(),
@@ -426,15 +430,16 @@ void main() {
       expect(incomingVolumes.first, lessThan(0.4));
       expect(incomingVolumes.last, closeTo(0.8, 1e-9));
       for (var i = 1; i < incomingVolumes.length; i++) {
-        expect(incomingVolumes[i], greaterThanOrEqualTo(incomingVolumes[i - 1]));
+        expect(
+            incomingVolumes[i], greaterThanOrEqualTo(incomingVolumes[i - 1]));
       }
       expect(incomingVolumes.every((v) => v <= 0.8 + 1e-9), isTrue);
 
       // Outgoing keeps its base volume during the armed ramp; only the final
       // exact endpoint write (0.0) is sent.
       verify(() => mockPlayerA.setVolume(0.0)).called(1);
-      verifyNever(() => mockPlayerA.setVolume(
-          any(that: inInclusiveRange(0.001, 0.999))));
+      verifyNever(() =>
+          mockPlayerA.setVolume(any(that: inInclusiveRange(0.001, 0.999))));
     });
 
     test('cancel clears native curves before restoring volumes', () async {

@@ -38,15 +38,24 @@ class PlayerMetadataController {
         _isClosed = isClosed,
         _isSameTrack = isSameTrack;
 
-  Future<void> loadLyrics(SongsTableData song, {bool isOfflineOnly = false}) async {
+  Future<void> loadLyrics(SongsTableData song,
+      {bool isOfflineOnly = false}) async {
     final gen = _lyricsManager.bumpGeneration();
     if (_isClosed() || !_isSameTrack(_getState().currentSong, song)) return;
 
     final cached = _lyricsManager.getCachedLyrics(song);
     if (cached != null) {
-      if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) return;
+      if (_isClosed() ||
+          gen != _lyricsManager.generation ||
+          !_isSameTrack(_getState().currentSong, song)) {
+        return;
+      }
       final s = _getState();
-      if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(s.currentSong, song)) return;
+      if (_isClosed() ||
+          gen != _lyricsManager.generation ||
+          !_isSameTrack(s.currentSong, song)) {
+        return;
+      }
       _emit(s.copyWith(
         lyricsSlice: s.lyricsSlice.copyWith(
           lyrics: cached.lines,
@@ -58,9 +67,17 @@ class PlayerMetadataController {
     }
 
     if (_lyricsManager.hasFreshNegativeCache(song)) {
-      if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) return;
+      if (_isClosed() ||
+          gen != _lyricsManager.generation ||
+          !_isSameTrack(_getState().currentSong, song)) {
+        return;
+      }
       final s = _getState();
-      if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(s.currentSong, song)) return;
+      if (_isClosed() ||
+          gen != _lyricsManager.generation ||
+          !_isSameTrack(s.currentSong, song)) {
+        return;
+      }
       _emit(s.copyWith(
         lyricsSlice: s.lyricsSlice.copyWith(
           lyrics: const [],
@@ -82,12 +99,16 @@ class PlayerMetadataController {
         )
         .timeout(PlayerConstants.lyricsTimeout, onTimeout: () => null);
 
-    if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) {
+    if (_isClosed() ||
+        gen != _lyricsManager.generation ||
+        !_isSameTrack(_getState().currentSong, song)) {
       return;
     }
 
     final s = _getState();
-    if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(s.currentSong, song)) {
+    if (_isClosed() ||
+        gen != _lyricsManager.generation ||
+        !_isSameTrack(s.currentSong, song)) {
       return;
     }
     _emit(s.copyWith(
@@ -99,7 +120,8 @@ class PlayerMetadataController {
     ));
   }
 
-  Future<void> loadSponsorBlock(SongsTableData song, {bool isOfflineOnly = false}) async {
+  Future<void> loadSponsorBlock(SongsTableData song,
+      {bool isOfflineOnly = false}) async {
     try {
       await _sponsorBlockManager
           .loadSegmentsForSong(
@@ -108,7 +130,8 @@ class PlayerMetadataController {
             isStale: () =>
                 _isClosed() || !_isSameTrack(_getState().currentSong, song),
           )
-          .timeout(const Duration(seconds: 10), onTimeout: () => const <SponsorBlockSegment>[]);
+          .timeout(const Duration(seconds: 10),
+              onTimeout: () => const <SponsorBlockSegment>[]);
     } catch (e, st) {
       ErrorLogger.log('Failed to load SponsorBlock for ${song.id}',
           error: e, stackTrace: st, category: 'PlayerMetadataController');
@@ -127,7 +150,8 @@ class PlayerMetadataController {
       final state = _getState();
       if (state.cueChapters.isEmpty && state.currentCueIndex == 0) return;
       _emit(state.copyWith(
-        queueSlice: state.queueSlice.copyWith(cueChapters: const [], currentCueIndex: 0),
+        queueSlice: state.queueSlice
+            .copyWith(cueChapters: const [], currentCueIndex: 0),
       ));
       return;
     }
@@ -172,15 +196,18 @@ class PlayerMetadataController {
     }
   }
 
-  Future<void> enrichTrackParallel(SongsTableData song, {bool isOfflineOnly = false}) async {
+  Future<void> enrichTrackParallel(SongsTableData song,
+      {bool isOfflineOnly = false}) async {
     final failures = <String>[];
     await Future.wait([
-      loadLyrics(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
+      loadLyrics(song, isOfflineOnly: isOfflineOnly)
+          .catchError((Object e, StackTrace st) {
         failures.add('lyrics');
         ErrorLogger.log('Parallel lyrics failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),
-      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
+      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly)
+          .catchError((Object e, StackTrace st) {
         failures.add('sponsorBlock');
         ErrorLogger.log('Parallel sponsorBlock failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');

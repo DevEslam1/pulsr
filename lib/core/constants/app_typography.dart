@@ -22,6 +22,8 @@
 /// | display | 28 | hero headings |
 /// | displayLarge | 32 | numeric hero values |
 abstract class AppFontSize {
+  /// 8 — ultra-dense micro glyphs (badge counters, telemetry tick labels).
+  static const double nano = 8;
   static const double micro = 9;
   static const double tiny = 10;
   static const double caption = 11;

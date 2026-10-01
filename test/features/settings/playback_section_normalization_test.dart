@@ -14,6 +14,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
@@ -30,7 +31,8 @@ void main() {
     mockPlayerCubit = MockPlayerCubit();
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
     when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
   });
@@ -56,7 +58,9 @@ void main() {
     );
   }
 
-  testWidgets('M-18: _buildNormal in PlaybackSection includes _AudioNormalizationSettingTile', (tester) async {
+  testWidgets(
+      'M-18: _buildNormal in PlaybackSection includes _AudioNormalizationSettingTile',
+      (tester) async {
     // Normal mode (isProfessional == false)
     const normalState = SettingsState(experienceMode: ExperienceMode.normal);
 
@@ -65,7 +69,8 @@ void main() {
 
     // Verify Audio Normalization tile is rendered in _buildNormal
     final titleFinder = find.text('Audio normalization');
-    final subtitleFinder = find.text('Even out loudness for tracks without ReplayGain tags');
+    final subtitleFinder =
+        find.text('Even out loudness for tracks without ReplayGain tags');
 
     expect(titleFinder, findsOneWidget);
     expect(subtitleFinder, findsOneWidget);
@@ -84,7 +89,8 @@ void main() {
     expect(prefs.getBool(PrefsKeys.audioNormalizationEnabled), isTrue);
   });
 
-  testWidgets('M-18: _buildProfessional also contains audio normalization tile', (tester) async {
+  testWidgets('M-18: _buildProfessional also contains audio normalization tile',
+      (tester) async {
     // Professional mode (isProfessional == true)
     const proState = SettingsState(experienceMode: ExperienceMode.professional);
 

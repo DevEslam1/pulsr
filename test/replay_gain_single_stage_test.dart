@@ -84,7 +84,11 @@ void main() {
     });
 
     test('non-finite tags and volumes never produce NaN output', () {
-      for (final gain in [double.nan, double.infinity, double.negativeInfinity]) {
+      for (final gain in [
+        double.nan,
+        double.infinity,
+        double.negativeInfinity
+      ]) {
         final out = ReplayGainMath.apply(
           mode: 'track',
           volume: 0.7,

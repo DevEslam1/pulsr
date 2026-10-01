@@ -47,10 +47,12 @@ class MilkdropPresetStore {
         allowedExtensions: const ['milk'],
       );
       if (file == null) return null;
-      final ioFile = SafeFilePath.validate(file.path, allowedExtensions: const ['milk']);
+      final ioFile =
+          SafeFilePath.validate(file.path, allowedExtensions: const ['milk']);
       if (ioFile == null) return null;
       final content = await ioFile.readAsString();
-      final cleanName = file.name.replaceAll(RegExp(r'\.milk$', caseSensitive: false), '');
+      final cleanName =
+          file.name.replaceAll(RegExp(r'\.milk$', caseSensitive: false), '');
       final preset = MilkdropPreset.fromMilk(
         content,
         fallbackName: cleanName.isNotEmpty ? cleanName : 'Imported Preset',
@@ -58,7 +60,8 @@ class MilkdropPresetStore {
       await save(preset, content);
       return preset;
     } catch (e, st) {
-      ErrorLogger.log('MilkdropPresetStore importFromFile failed', error: e, stackTrace: st, category: 'MilkdropPresetStore');
+      ErrorLogger.log('MilkdropPresetStore importFromFile failed',
+          error: e, stackTrace: st, category: 'MilkdropPresetStore');
       return null;
     }
   }

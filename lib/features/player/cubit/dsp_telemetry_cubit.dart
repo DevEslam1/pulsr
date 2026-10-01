@@ -15,6 +15,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   int _listenerCount = 0;
   int _consecutiveFailures = 0;
   bool _didLogFailure = false;
+  bool _fetchInFlight = false;
 
   /// B3: after this many consecutive failed polls the timer is parked so a
   /// broken channel (non-Android, engine not ready, test fakes) cannot fire an
@@ -32,7 +33,8 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   bool get isRetryTimerActive => _retryTimer != null && _retryTimer!.isActive;
 
   @visibleForTesting
-  bool get isPollingTimerActive => _pollingTimer != null && _pollingTimer!.isActive;
+  bool get isPollingTimerActive =>
+      _pollingTimer != null && _pollingTimer!.isActive;
 
   @visibleForTesting
   int get consecutiveFailures => _consecutiveFailures;
@@ -97,6 +99,11 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   }
 
   Future<void> _fetchTelemetry() async {
+    // Skip this tick while a previous fetch is still in flight: the 200ms timer
+    // can fire before the 250ms channel timeout, and overlapping polls could
+    // emit telemetry out of order.
+    if (_fetchInFlight) return;
+    _fetchInFlight = true;
     try {
       final telemetry = await _channel.getTelemetry();
       if (isClosed) return;
@@ -127,6 +134,8 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
         _stopTimer();
         _scheduleRetry();
       }
+    } finally {
+      _fetchInFlight = false;
     }
   }
 

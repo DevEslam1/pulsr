@@ -19,7 +19,8 @@ void main() {
     expect(find.text('Search Lyrics'), findsOneWidget);
   });
 
-  testWidgets('LyricsView renders CircularProgressIndicator when isLoading is true',
+  testWidgets(
+      'LyricsView renders CircularProgressIndicator when isLoading is true',
       (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
@@ -95,9 +96,13 @@ void main() {
       (tester) async {
     final plainLines = [
       LyricsLine(
-          timestamp: Duration.zero, text: 'Plain A', source: LyricsSource.lrclib),
+          timestamp: Duration.zero,
+          text: 'Plain A',
+          source: LyricsSource.lrclib),
       LyricsLine(
-          timestamp: Duration.zero, text: 'Plain B', source: LyricsSource.lrclib),
+          timestamp: Duration.zero,
+          text: 'Plain B',
+          source: LyricsSource.lrclib),
     ];
 
     await tester.pumpWidget(

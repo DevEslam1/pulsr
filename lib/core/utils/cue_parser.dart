@@ -218,8 +218,8 @@ class CueParser {
         offset += 4;
         if (offset + length > bytes.length) break;
 
-        final commentStr =
-            utf8.decode(bytes.sublist(offset, offset + length), allowMalformed: true);
+        final commentStr = utf8.decode(bytes.sublist(offset, offset + length),
+            allowMalformed: true);
         offset += length;
 
         final eqIdx = commentStr.indexOf('=');
@@ -276,7 +276,8 @@ class CueParser {
           final mStr = minutes.toString().padLeft(2, '0');
           final sStr = seconds.toString().padLeft(2, '0');
           final fStr = frames.toString().padLeft(2, '0');
-          sb.writeln('    INDEX ${pointNum.toString().padLeft(2, '0')} $mStr:$sStr:$fStr');
+          sb.writeln(
+              '    INDEX ${pointNum.toString().padLeft(2, '0')} $mStr:$sStr:$fStr');
         }
       }
       return sb.isNotEmpty ? sb.toString() : null;
@@ -301,7 +302,8 @@ class CueParser {
       while ((await raf.position()) + 8 <= fileLength) {
         final chunkHeader = await raf.read(8);
         if (chunkHeader.length < 8) break;
-        final chunkId = ascii.decode(chunkHeader.sublist(0, 4), allowInvalid: true);
+        final chunkId =
+            ascii.decode(chunkHeader.sublist(0, 4), allowInvalid: true);
         final chunkSize = chunkHeader[4] |
             (chunkHeader[5] << 8) |
             (chunkHeader[6] << 16) |
@@ -344,7 +346,8 @@ class CueParser {
   static String? _parseWavCueChunk(List<int> bytes, int sampleRate) {
     try {
       if (bytes.length < 4) return null;
-      final numPoints = bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+      final numPoints =
+          bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
       if (numPoints <= 0) return null;
       var offset = 4;
       final sb = StringBuffer();

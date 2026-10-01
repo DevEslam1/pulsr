@@ -55,7 +55,8 @@ void main() {
       expect(evictionCalls, equals(2));
     });
 
-    test('registerPreload rejects oversized entry exceeding total budget (B2)', () {
+    test('registerPreload rejects oversized entry exceeding total budget (B2)',
+        () {
       manager.registerPreload('normal_1', 4 * 1024 * 1024);
       expect(manager.currentPreloadBytes, equals(4 * 1024 * 1024));
 
@@ -65,7 +66,8 @@ void main() {
 
       // Must be rejected; existing state preserved and currentPreloadBytes does not overshoot
       expect(manager.currentPreloadBytes, equals(4 * 1024 * 1024));
-      expect(manager.currentPreloadBytes, lessThanOrEqualTo(AudioMemoryManager.maxPreloadBudgetBytes));
+      expect(manager.currentPreloadBytes,
+          lessThanOrEqualTo(AudioMemoryManager.maxPreloadBudgetBytes));
       expect(manager.preloadedHeadCount, equals(1));
     });
   });

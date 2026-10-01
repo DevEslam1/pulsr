@@ -28,7 +28,8 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
-    testWidgets('renders Catmull-Rom curve with FFT spectrum overlay', (tester) async {
+    testWidgets('renders Catmull-Rom curve with FFT spectrum overlay',
+        (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -52,7 +53,8 @@ void main() {
       expect(find.byType(EqCurveVisualizer), findsOneWidget);
     });
 
-    testWidgets('invokes onGainChanged and onBandSelected on drag gesture', (tester) async {
+    testWidgets('invokes onGainChanged and onBandSelected on drag gesture',
+        (tester) async {
       int? selectedBand;
       double? updatedGain;
 

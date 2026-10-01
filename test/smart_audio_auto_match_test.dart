@@ -84,7 +84,8 @@ void main() {
     fakeHiRes.emitDevice(btDevice('WH-1000XM5'));
     await pumpEventQueue();
 
-    expect(cubit.state.selectedHeadphoneProfile?.id, 'sony_wh1000xm5');
+    expect(cubit.state.selectedHeadphoneProfile?.id,
+        'autoeq_oratory1990_over_ear_sony_wh_1000xm5');
   });
 
   test('Auto mode remembers the match for the device key', () async {
@@ -96,7 +97,7 @@ void main() {
 
     final key = DeviceProfileService.deviceKeyFromInfo(btDevice('WH-1000XM5'));
     final link = await SmartAudioService().linkForDeviceKey(key);
-    expect(link?.profileId, 'sony_wh1000xm5');
+    expect(link?.profileId, 'autoeq_oratory1990_over_ear_sony_wh_1000xm5');
   });
 
   test('Manual mode does not auto-apply any profile', () async {

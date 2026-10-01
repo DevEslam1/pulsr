@@ -4,7 +4,8 @@ import 'package:pulsr/core/responsive/layout_delegate.dart';
 
 void main() {
   group('PulsrLayoutDelegate', () {
-    testWidgets('Standard Phone Portrait (390 x 844) uses bottomNav', (tester) async {
+    testWidgets('Standard Phone Portrait (390 x 844) uses bottomNav',
+        (tester) async {
       late PulsrLayoutDelegate delegate;
 
       await tester.pumpWidget(
@@ -25,7 +26,9 @@ void main() {
       expect(delegate.playerBarHeight, 148.0);
     });
 
-    testWidgets('Landscape Phone (720 x 360) uses bottomNavWide with 56dp player bar', (tester) async {
+    testWidgets(
+        'Landscape Phone (720 x 360) uses bottomNavWide with 56dp player bar',
+        (tester) async {
       late PulsrLayoutDelegate delegate;
 
       await tester.pumpWidget(
@@ -46,7 +49,9 @@ void main() {
       expect(delegate.playerBarHeight, 56.0);
     });
 
-    testWidgets('Tablet Portrait (768 x 1024) uses sideRailCollapsed with 64dp rail', (tester) async {
+    testWidgets(
+        'Tablet Portrait (768 x 1024) uses sideRailCollapsed with 64dp rail',
+        (tester) async {
       late PulsrLayoutDelegate delegate;
 
       await tester.pumpWidget(
@@ -68,7 +73,9 @@ void main() {
       expect(delegate.playerBarHeight, 90.0);
     });
 
-    testWidgets('Tablet Landscape (1024 x 768) uses sideRailExpanded with side inspector', (tester) async {
+    testWidgets(
+        'Tablet Landscape (1024 x 768) uses sideRailExpanded with side inspector',
+        (tester) async {
       late PulsrLayoutDelegate delegate;
 
       await tester.pumpWidget(
@@ -90,7 +97,8 @@ void main() {
       expect(delegate.playerBarHeight, 90.0);
     });
 
-    testWidgets('Large Desktop (1440 x 900) uses sideRailFull with 260dp rail', (tester) async {
+    testWidgets('Large Desktop (1440 x 900) uses sideRailFull with 260dp rail',
+        (tester) async {
       late PulsrLayoutDelegate delegate;
 
       await tester.pumpWidget(

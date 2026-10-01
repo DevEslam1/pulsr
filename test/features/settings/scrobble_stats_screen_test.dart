@@ -4,7 +4,8 @@ import 'package:pulsr/features/settings/presentation/scrobble_stats_screen.dart'
 
 void main() {
   group('M-26: ScrobbleBarChartPainter single-element and edge cases', () {
-    testWidgets('paints single-element data without error and centers bar', (tester) async {
+    testWidgets('paints single-element data without error and centers bar',
+        (tester) async {
       final painter = ScrobbleBarChartPainter(
         data: const [42],
         labels: const ['Today'],
@@ -58,7 +59,8 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
 
-    testWidgets('handles constrained/small canvas sizes without crashing', (tester) async {
+    testWidgets('handles constrained/small canvas sizes without crashing',
+        (tester) async {
       final painter = ScrobbleBarChartPainter(
         data: const [10],
         labels: const ['M'],

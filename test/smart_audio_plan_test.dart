@@ -46,7 +46,8 @@ void main() {
       expect(plan.preferBitPerfect, isFalse);
     });
 
-    test('hi-res wired with bit-perfect support and no correction -> bit-perfect',
+    test(
+        'hi-res wired with bit-perfect support and no correction -> bit-perfect',
         () {
       final plan = resolveSmartAudioPlan(
         mode: SmartAudioMode.auto,

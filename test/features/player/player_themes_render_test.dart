@@ -35,7 +35,8 @@ void main() {
       bgColor: const Color(0xFF1C1B1F),
     );
 
-    test('All 8 PlayerThemeModes resolve to concrete theme widget instances', () {
+    test('All 8 PlayerThemeModes resolve to concrete theme widget instances',
+        () {
       expect(
         ThemeRegistry.build(PlayerThemeMode.classic, dummyProps),
         isA<ClassicPlayerTheme>(),
@@ -76,7 +77,8 @@ void main() {
         (props) => const SizedBox(key: ValueKey('custom_classic')),
       );
 
-      final overridden = ThemeRegistry.build(PlayerThemeMode.classic, dummyProps);
+      final overridden =
+          ThemeRegistry.build(PlayerThemeMode.classic, dummyProps);
       expect(overridden, isA<SizedBox>());
 
       ThemeRegistry.reset();

@@ -54,16 +54,21 @@ void main() {
       );
     });
 
-    test('resyncForTrack invokes native JNI without resetting active effect snapshot', () async {
+    test(
+        'resyncForTrack invokes native JNI without resetting active effect snapshot',
+        () async {
       await channel.resyncForTrack(96000.0, channels: 2);
 
-      expect(methodCalls.any((call) => call.method == 'resyncForTrack'), isTrue);
-      final resyncCall = methodCalls.firstWhere((call) => call.method == 'resyncForTrack');
+      expect(
+          methodCalls.any((call) => call.method == 'resyncForTrack'), isTrue);
+      final resyncCall =
+          methodCalls.firstWhere((call) => call.method == 'resyncForTrack');
       expect(resyncCall.arguments['sampleRate'], 96000.0);
       expect(resyncCall.arguments['channels'], 2);
     });
 
-    test('telemetry stream reports smooth continuity across track boundaries', () async {
+    test('telemetry stream reports smooth continuity across track boundaries',
+        () async {
       final telemetry = await channel.getTelemetry();
 
       expect(telemetry.isThrottling, isFalse);
@@ -72,14 +77,17 @@ void main() {
       expect(telemetry.safetyAttenuationActive, isFalse);
     });
 
-    test('reverb and crossfeed parameters remain unchanged across sequential track resyncs', () async {
+    test(
+        'reverb and crossfeed parameters remain unchanged across sequential track resyncs',
+        () async {
       // Simulate rapid gapless track changes across multiple sample rates
       final rates = [44100.0, 48000.0, 96000.0, 192000.0, 44100.0];
       for (final sr in rates) {
         await channel.resyncForTrack(sr, channels: 2);
       }
 
-      final resyncCalls = methodCalls.where((c) => c.method == 'resyncForTrack').toList();
+      final resyncCalls =
+          methodCalls.where((c) => c.method == 'resyncForTrack').toList();
       expect(resyncCalls.length, 5);
       expect(resyncCalls[2].arguments['sampleRate'], 96000.0);
       expect(resyncCalls[3].arguments['sampleRate'], 192000.0);

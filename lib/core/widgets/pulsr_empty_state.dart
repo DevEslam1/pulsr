@@ -44,8 +44,7 @@ class PulsrEmptyState extends StatelessWidget {
     final p = context.palette;
     final effectiveIconColor = iconColor ?? p.accent;
 
-    final shouldAnimate =
-        context.motionEnabled &&
+    final shouldAnimate = context.motionEnabled &&
         !WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
     return LayoutBuilder(
@@ -78,7 +77,9 @@ class PulsrEmptyState extends StatelessWidget {
                               color: effectiveIconColor.withValues(alpha: 0.10),
                             ),
                           )
-                              .animate(onPlay: (controller) => controller.repeat(reverse: true))
+                              .animate(
+                                  onPlay: (controller) =>
+                                      controller.repeat(reverse: true))
                               .scaleXY(
                                   begin: 0.88,
                                   end: 1.16,
@@ -92,7 +93,9 @@ class PulsrEmptyState extends StatelessWidget {
                               color: effectiveIconColor.withValues(alpha: 0.05),
                             ),
                           )
-                              .animate(onPlay: (controller) => controller.repeat(reverse: true))
+                              .animate(
+                                  onPlay: (controller) =>
+                                      controller.repeat(reverse: true))
                               .scaleXY(
                                   begin: 0.80,
                                   end: 1.24,
@@ -129,7 +132,8 @@ class PulsrEmptyState extends StatelessWidget {
                             ],
                           ),
                           child: Center(
-                            child: Icon(icon, size: 40, color: effectiveIconColor),
+                            child:
+                                Icon(icon, size: 40, color: effectiveIconColor),
                           ),
                         ),
                       ],
@@ -154,7 +158,8 @@ class PulsrEmptyState extends StatelessWidget {
                       height: 1.4,
                     ),
                   ),
-                  if (primaryActionLabel != null && onPrimaryAction != null) ...[
+                  if (primaryActionLabel != null &&
+                      onPrimaryAction != null) ...[
                     const SizedBox(height: AppSpacing.lg),
                     FilledButton.icon(
                       onPressed: isPrimaryLoading ? null : onPrimaryAction,
@@ -170,12 +175,12 @@ class PulsrEmptyState extends StatelessWidget {
                         ),
                       ),
                       icon: isPrimaryLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 16,
                               height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: p.onAccent,
                               ),
                             )
                           : (primaryActionIcon != null
@@ -196,8 +201,7 @@ class PulsrEmptyState extends StatelessWidget {
                       label: Text(
                         secondaryActionLabel!,
                         style: TextStyle(
-                            color: p.textTertiary,
-                            fontSize: AppFontSize.label),
+                            color: p.textTertiary, fontSize: AppFontSize.label),
                       ),
                     ),
                   ],

@@ -9,7 +9,6 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
-
 void showMiniPlayerSwipePickerSheet(
   BuildContext context,
   SettingsCubit cubit, {
@@ -41,7 +40,9 @@ void showMiniPlayerSwipePickerSheet(
     (
       action: MiniPlayerSwipeAction.volume,
       title: context.l10n.settingsSwipeAdjustVolume,
-      subtitle: isLeft ? context.l10n.settingsLowerVolume : context.l10n.settingsRaiseVolume,
+      subtitle: isLeft
+          ? context.l10n.settingsLowerVolume
+          : context.l10n.settingsRaiseVolume,
       icon: isLeft ? Icons.volume_down_rounded : Icons.volume_up_rounded,
     ),
     (
@@ -61,18 +62,21 @@ void showMiniPlayerSwipePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   isLeft
                       ? context.l10n.settingsSwipeLeftAction
                       : context.l10n.settingsSwipeRightAction,
-                  style: const TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                      fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -99,9 +103,12 @@ void showMiniPlayerSwipePickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: textSecondary)),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         if (isLeft) {
@@ -167,15 +174,19 @@ void showNowPlayingDoubleTapPickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(context.l10n.npDoubleTap,
-                  style: TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Text(
+                  context.l10n.npDoubleTap,
+                  style: TextStyle(
+                      fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -202,9 +213,12 @@ void showNowPlayingDoubleTapPickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: textSecondary)),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         cubit.setNowPlayingDoubleTap(opt.action);
@@ -260,15 +274,19 @@ void showNowPlayingArtworkSwipePickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                child: Text(context.l10n.npArtworkSwipe,
-                  style: TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                child: Text(
+                  context.l10n.npArtworkSwipe,
+                  style: TextStyle(
+                      fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -295,9 +313,12 @@ void showNowPlayingArtworkSwipePickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: textSecondary)),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         cubit.setNowPlayingArtworkSwipe(opt.action);
@@ -366,18 +387,21 @@ void showQualityPickerSheet(
         ),
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s20, horizontal: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
                   isStreaming
                       ? context.l10n.streamingQuality
                       : context.l10n.downloadQuality,
-                  style: const TextStyle(fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                      fontSize: AppFontSize.title, fontWeight: FontWeight.w900),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -404,9 +428,12 @@ void showQualityPickerSheet(
                               fontWeight: FontWeight.w700,
                               color: isSelected ? primaryColor : textPrimary)),
                       subtitle: Text(opt.subtitle,
-                          style: TextStyle(fontSize: AppFontSize.label, color: textSecondary)),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              color: textSecondary)),
                       trailing: isSelected
-                          ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                          ? Icon(Icons.check_circle_rounded,
+                              color: primaryColor)
                           : null,
                       onTap: () {
                         if (isStreaming) {
@@ -427,4 +454,3 @@ void showQualityPickerSheet(
     ),
   );
 }
-

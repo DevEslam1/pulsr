@@ -83,7 +83,8 @@ void main() {
         SearchAlgorithmUtils.maxResultCount + 25,
         (i) => _song(id: i + 1, title: 'Song $i', artist: 'Artist'),
       );
-      final results = SearchAlgorithmUtils.filterWithFuzzy(big, 'song', 'Songs');
+      final results =
+          SearchAlgorithmUtils.filterWithFuzzy(big, 'song', 'Songs');
       expect(results.length, SearchAlgorithmUtils.maxResultCount);
     });
   });
@@ -94,18 +95,24 @@ void main() {
       _song(id: 1, title: 'Lossless Track', artist: 'A', codec: 'FLAC'),
       _song(id: 2, title: 'Lossy Track', artist: 'A', codec: 'MP3'),
       _song(id: 3, title: 'Alac Track', artist: 'A', codec: 'ALAC'),
-      _song(id: 4, title: 'Unknown Track', artist: 'A', codec: null,
+      _song(
+          id: 4,
+          title: 'Unknown Track',
+          artist: 'A',
+          codec: null,
           path: '/music/4.flac'),
     ];
 
     test('FLAC keeps only flac codecs', () {
-      final results = SearchAlgorithmUtils.filterWithFuzzy(songs, 'track', 'FLAC');
+      final results =
+          SearchAlgorithmUtils.filterWithFuzzy(songs, 'track', 'FLAC');
       expect(results.map((s) => s.id), containsAll([1, 4]));
       expect(results.map((s) => s.id), isNot(contains(2)));
     });
 
     test('MP3 keeps only mp3 codecs', () {
-      final results = SearchAlgorithmUtils.filterWithFuzzy(songs, 'track', 'MP3');
+      final results =
+          SearchAlgorithmUtils.filterWithFuzzy(songs, 'track', 'MP3');
       expect(results.map((s) => s.id), [2]);
     });
 
@@ -124,7 +131,11 @@ void main() {
 
     test('falls back to file extension when codec is null', () {
       final mp3 = [
-        _song(id: 9, title: 'Ext', artist: 'A', codec: null,
+        _song(
+            id: 9,
+            title: 'Ext',
+            artist: 'A',
+            codec: null,
             path: '/music/9.MP3'),
       ];
       final results = SearchAlgorithmUtils.filterWithFuzzy(mp3, 'ext', 'MP3');

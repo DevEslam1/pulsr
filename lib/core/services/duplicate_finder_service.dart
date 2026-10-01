@@ -17,7 +17,8 @@ class DuplicateGroup {
   });
 }
 
-Future<List<DuplicateGroup>> _findDuplicatesWorker(List<SongsTableData> allSongs) async {
+Future<List<DuplicateGroup>> _findDuplicatesWorker(
+    List<SongsTableData> allSongs) async {
   return DuplicateFinderService.findDuplicatesInternal(allSongs);
 }
 
@@ -27,14 +28,16 @@ class DuplicateFinderService {
   /// Pass 1: Identical normalized title + artist metadata.
   /// Pass 2: Duration + size pre-filtering verified via fast audio content checksums.
   /// Offloads execution to a background isolate via [compute] for larger collections.
-  Future<List<DuplicateGroup>> findDuplicates(List<SongsTableData> allSongs) async {
+  Future<List<DuplicateGroup>> findDuplicates(
+      List<SongsTableData> allSongs) async {
     if (allSongs.length < 20) {
       return findDuplicatesInternal(allSongs);
     }
     return compute(_findDuplicatesWorker, allSongs);
   }
 
-  static Future<List<DuplicateGroup>> findDuplicatesInternal(List<SongsTableData> allSongs) async {
+  static Future<List<DuplicateGroup>> findDuplicatesInternal(
+      List<SongsTableData> allSongs) async {
     final Map<String, List<SongsTableData>> byTitleArtist = {};
     final Map<String, List<SongsTableData>> byDurationSize = {};
 
@@ -73,9 +76,8 @@ class DuplicateFinderService {
     // Pass 2: Duration + Size matches verified with audio file content checksum.
     for (final entry in byDurationSize.entries) {
       if (entry.value.length > 1) {
-        final remaining = entry.value
-            .where((s) => !capturedSongIds.contains(s.id))
-            .toList();
+        final remaining =
+            entry.value.where((s) => !capturedSongIds.contains(s.id)).toList();
         if (remaining.length > 1) {
           final clusters = await _verifyWithChecksum(remaining);
           for (final cluster in clusters) {

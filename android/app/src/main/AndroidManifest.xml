@@ -142,6 +142,15 @@
                 <data android:mimeType="text/*" />
                 <data android:mimeType="audio/*" />
             </intent-filter>
+            <!-- Multi-file share (e.g. selecting several tracks in a file manager
+                 and "Share → Pulsr"). MainActivity.handleAudioIntent already
+                 handles ACTION_SEND_MULTIPLE via EXTRA_STREAM; this filter makes
+                 the app eligible to receive it. -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
         </activity>
         
         <service android:name="com.ryanheise.audioservice.AudioService"

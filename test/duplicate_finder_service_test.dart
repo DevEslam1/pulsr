@@ -64,12 +64,18 @@ void main() {
       expect(duplicates.first.reason, contains('Identical Title & Artist'));
     });
 
-    test('Pass 2 disambiguates keys for multiple checksum clusters in same bucket', () {
+    test(
+        'Pass 2 disambiguates keys for multiple checksum clusters in same bucket',
+        () {
       final group = DuplicateGroup(
         key: '180-500-1',
         songs: [
           _testSong(id: 1, title: 'Track A', artist: 'Art', path: '/a.mp3'),
-          _testSong(id: 2, title: 'Track A (Copy)', artist: 'Art', path: '/a_copy.mp3'),
+          _testSong(
+              id: 2,
+              title: 'Track A (Copy)',
+              artist: 'Art',
+              path: '/a_copy.mp3'),
         ],
         reason: 'Identical Audio Content (Checksum Verified)',
       );

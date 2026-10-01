@@ -46,7 +46,8 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> signInWithGoogle() async {
-    safeEmit(state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
+    safeEmit(
+        state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
     try {
       final user = await _authService.signInWithGoogle();
       if (isClosed) return;
@@ -71,7 +72,8 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> signInWithEmail(String email, String password) async {
-    safeEmit(state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
+    safeEmit(
+        state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
     try {
       final user = await _authService.signInWithEmail(email, password);
       if (isClosed) return;
@@ -99,7 +101,8 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> signUpWithEmail(String email, String password) async {
-    safeEmit(state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
+    safeEmit(
+        state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
     try {
       final user = await _authService.signUpWithEmail(email, password);
       if (isClosed) return;
@@ -226,7 +229,8 @@ class AuthCubit extends PulsrCubit<AuthState> {
   Future<void> syncNow() async {
     if (state.user == null || _syncing) return;
     // FIX-C11: Monotonic clock prevents system wall-clock jumps from disrupting sync deduplication
-    if (_syncStopwatch.isRunning && _syncStopwatch.elapsed < _syncDedupeWindow) {
+    if (_syncStopwatch.isRunning &&
+        _syncStopwatch.elapsed < _syncDedupeWindow) {
       return;
     }
     _syncStopwatch

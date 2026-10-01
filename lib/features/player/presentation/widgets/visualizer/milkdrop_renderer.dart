@@ -223,10 +223,3 @@ class MilkdropCanvasPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant MilkdropCanvasPainter oldDelegate) => true;
 }
-
-// Deprecated typedefs to maintain backwards compatibility
-@Deprecated('Use MilkdropGpuPainter instead')
-typedef MilkdropGpuPainterAlias = MilkdropGpuPainter;
-
-@Deprecated('Use MilkdropCanvasPainter instead')
-typedef MilkdropPainterAlias = MilkdropCanvasPainter;

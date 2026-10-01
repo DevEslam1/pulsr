@@ -52,9 +52,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
   void _apply(BuildContext context) {
     final text = _textController.text.trim();
     if (text.isNotEmpty) {
-      context
-          .read<PlayerCubit>()
-          .setArbitraryEqEnabled(true, eqString: text, linearPhase: _linearPhase);
+      context.read<PlayerCubit>().setArbitraryEqEnabled(true,
+          eqString: text, linearPhase: _linearPhase);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.appliedGraphicEq)),
       );
@@ -73,10 +72,12 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
         final cubit = context.read<PlayerCubit>();
 
         return Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -100,7 +101,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       children: [
                         Icon(Icons.graphic_eq_rounded, color: p.primary),
                         const SizedBox(width: AppSpacing.s10),
-                        Text(context.l10n.arbitraryResponseEq,
+                        Text(
+                          context.l10n.arbitraryResponseEq,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: AppFontSize.title,
@@ -121,13 +123,15 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                   ],
                 ),
                 Text(
-                  AudioFeatureRegistry.arbitraryEq.subtitle,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                  AudioFeatureRegistry.arbitraryEq
+                      .localized(context.l10n)
+                      .subtitle,
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Container(
                   padding: const EdgeInsets.symmetric(
-
                       horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
@@ -140,7 +144,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(context.l10n.linearPhaseFir,
+                            Text(
+                              context.l10n.linearPhaseFir,
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontSize: AppFontSize.bodySmall,
@@ -153,7 +158,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                                   ? context.l10n.linearPhaseOnDesc
                                   : context.l10n.linearPhaseOffDesc,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: AppFontSize.caption),
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption),
                             ),
                           ],
                         ),
@@ -189,14 +195,16 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(context.l10n.graphicEqSpec,
+                          Text(
+                            context.l10n.graphicEqSpec,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Text(context.l10n.fir512,
+                          Text(
+                            context.l10n.fir512,
                             style: TextStyle(
                               color: p.primary,
                               fontSize: AppFontSize.caption,
@@ -249,7 +257,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               foregroundColor: p.textSecondary,
                               side: BorderSide(color: p.hairline),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r10),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r10),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -263,7 +272,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               backgroundColor: p.accent,
                               foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r10),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r10),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -275,7 +285,8 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                 ),
                 const SizedBox(height: AppSpacing.s20),
 
-                Text(context.l10n.presetAcousticTargets,
+                Text(
+                  context.l10n.presetAcousticTargets,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: AppFontSize.body,
@@ -292,14 +303,13 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                           _textController.text = entry.value;
                         });
                         cubit.setArbitraryEqEnabled(true,
-                            eqString: entry.value,
-                            linearPhase: _linearPhase);
+                            eqString: entry.value, linearPhase: _linearPhase);
                       },
                       borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+                            horizontal: AppSpacing.s14,
+                            vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
                           borderRadius: BorderRadius.circular(AppRadii.r14),

@@ -78,8 +78,9 @@ class _SearchScreenState extends State<SearchScreen> {
   /// "Tried to listen to a value exposed with provider, from outside of the
   /// widget tree" and would abort the search before it starts.
   bool _isOnlineAvailable(BuildContext context, {bool listen = true}) {
-    final settings =
-        listen ? context.watch<SettingsCubit?>() : context.read<SettingsCubit?>();
+    final settings = listen
+        ? context.watch<SettingsCubit?>()
+        : context.read<SettingsCubit?>();
     final offlineOnly = settings?.state.offlineOnlyMode ?? false;
     return AppConfig.ytmEnabled && !offlineOnly;
   }
@@ -141,7 +142,8 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void _onQueryChanged(BuildContext context, String value, {bool immediate = false}) {
+  void _onQueryChanged(BuildContext context, String value,
+      {bool immediate = false}) {
     // Event handler: read (never watch) providers here.
     final showOnline = _isOnlineAvailable(context, listen: false);
     final effTab = _effectiveTab(context, listen: false);
@@ -233,8 +235,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
-        BlocProvider<YtmDownloadCubit>.value(
-            value: getIt<YtmDownloadCubit>()),
+        BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
       ],
       child: scaffold,
     );
@@ -400,19 +401,25 @@ class _SearchScreenState extends State<SearchScreen> {
                               _searchController.text.trim().isNotEmpty
                           ? _buildSuggestionsList(context, p)
                           : _searchController.text.trim().isEmpty
-                              ? _buildEmptySearchBody(context, state, p, showOnline, effTab)
+                              ? _buildEmptySearchBody(
+                                  context, state, p, showOnline, effTab)
                               : (showOnline && effTab == 0)
                                   ? _UnifiedSearchResults(
                                       query: _searchController.text.trim(),
-                                      onSelectTag: (tag) => _applySearch(context, tag),
-                                      onOpenArtist: (name) => _openDerivedArtist(context, name),
-                                      onOpenAlbum: (name) => _openDerivedAlbum(context, name),
+                                      onSelectTag: (tag) =>
+                                          _applySearch(context, tag),
+                                      onOpenArtist: (name) =>
+                                          _openDerivedArtist(context, name),
+                                      onOpenAlbum: (name) =>
+                                          _openDerivedAlbum(context, name),
                                     )
                                   : (showOnline && effTab == 2)
                                       ? _OnlineResults(
-                                          onSelectTag: (tag) => _applySearch(context, tag),
+                                          onSelectTag: (tag) =>
+                                              _applySearch(context, tag),
                                         )
-                                      : _buildLocalBody(context, state, playerCubit, p),
+                                      : _buildLocalBody(
+                                          context, state, playerCubit, p),
                     ),
                   ],
                 );
@@ -448,7 +455,8 @@ class _SearchScreenState extends State<SearchScreen> {
             _buildRecentSectionHeader(
               context: context,
               icon: Icons.library_music_rounded,
-              title: '${context.l10n.recentSearches} • ${context.l10n.localMusic}',
+              title:
+                  '${context.l10n.recentSearches} • ${context.l10n.localMusic}',
               onClear: () {
                 HapticFeedback.lightImpact();
                 context.read<SearchCubit>().clearHistory();
@@ -461,7 +469,8 @@ class _SearchScreenState extends State<SearchScreen> {
               runSpacing: AppSpacing.xxs,
               children: state.history.take(5).map((term) {
                 return InputChip(
-                  avatar: Icon(Icons.history_rounded, size: 14, color: p.textTertiary),
+                  avatar: Icon(Icons.history_rounded,
+                      size: 14, color: p.textTertiary),
                   label: Text(term),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
@@ -472,7 +481,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
                   ),
-                  onDeleted: () => context.read<SearchCubit>().removeHistoryQuery(term),
+                  onDeleted: () =>
+                      context.read<SearchCubit>().removeHistoryQuery(term),
                   onPressed: () => _applySearch(context, term),
                 );
               }).toList(),
@@ -481,7 +491,9 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
 
           // 2. Online Recent Searches (up to 5 items)
-          if (showOnline && (effTab == 0 || effTab == 2) && ytmCubit != null) ...[
+          if (showOnline &&
+              (effTab == 0 || effTab == 2) &&
+              ytmCubit != null) ...[
             ValueListenableBuilder<List<String>>(
               valueListenable: ytmCubit.historyNotifier,
               builder: (context, onlineHistory, _) {
@@ -492,7 +504,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     _buildRecentSectionHeader(
                       context: context,
                       icon: Icons.public_rounded,
-                      title: '${context.l10n.recentSearches} • ${context.l10n.onlineStream}',
+                      title:
+                          '${context.l10n.recentSearches} • ${context.l10n.onlineStream}',
                       onClear: () {
                         HapticFeedback.lightImpact();
                         ytmCubit.clearHistory();
@@ -505,7 +518,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       runSpacing: AppSpacing.xxs,
                       children: onlineHistory.take(5).map((term) {
                         return InputChip(
-                          avatar: Icon(Icons.public_rounded, size: 14, color: p.accent),
+                          avatar: Icon(Icons.public_rounded,
+                              size: 14, color: p.accent),
                           label: Text(term),
                           backgroundColor: p.surfaceContainer,
                           side: BorderSide(color: p.hairline),
@@ -554,7 +568,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         InputChip(
                           avatar: Icon(Icons.bookmark_outline_rounded,
                               size: 14, color: p.accent),
-                          label: Text(SearchCubit.decodeSavedSearch(entry).query),
+                          label:
+                              Text(SearchCubit.decodeSavedSearch(entry).query),
                           backgroundColor: p.surfaceContainer,
                           side: BorderSide(color: p.hairline),
                           deleteIcon: const Icon(Icons.close_rounded, size: 14),
@@ -568,10 +583,14 @@ class _SearchScreenState extends State<SearchScreen> {
                               .read<SearchCubit>()
                               .removeSavedSearch(entry),
                           onPressed: () {
-                            final decoded = SearchCubit.decodeSavedSearch(entry);
+                            final decoded =
+                                SearchCubit.decodeSavedSearch(entry);
                             _searchController.text = decoded.query;
-                            context.read<SearchCubit>().setFilter(decoded.filter);
-                            _onQueryChanged(context, decoded.query, immediate: true);
+                            context
+                                .read<SearchCubit>()
+                                .setFilter(decoded.filter);
+                            _onQueryChanged(context, decoded.query,
+                                immediate: true);
                           },
                         ),
                     ],
@@ -584,7 +603,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
           // 4. Quick Discovery / Popular Tags
           Text(
-            (effTab == 2 ? context.l10n.popularSearches : context.l10n.quickDiscovery).toUpperCase(),
+            (effTab == 2
+                    ? context.l10n.popularSearches
+                    : context.l10n.quickDiscovery)
+                .toUpperCase(),
             style: TextStyle(
               fontSize: AppFontSize.tiny,
               fontWeight: FontWeight.w800,
@@ -816,9 +838,9 @@ class _SearchScreenState extends State<SearchScreen> {
             style:
                 TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
         subtitle: Text(context.l10n.artist,
-            style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
-        trailing:
-            Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+            style:
+                TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
+        trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
         onTap: () => _openDerivedArtist(context, name),
       );
     }
@@ -831,8 +853,7 @@ class _SearchScreenState extends State<SearchScreen> {
       title: Text(album,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style:
-              TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
+          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
       subtitle: Text(context.l10n.album,
           style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label)),
       trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
@@ -844,8 +865,7 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final lib = context.read<LibraryCubit>().state.artists;
       final match = lib.cast<dynamic>().firstWhere(
-          (a) =>
-              (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
+          (a) => (a?.name as String?)?.toLowerCase() == name.toLowerCase(),
           orElse: () => null);
       if (match != null) {
         context.push('/artist', extra: match);
@@ -859,8 +879,7 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       final lib = context.read<LibraryCubit>().state.albums;
       final match = lib.cast<dynamic>().firstWhere(
-          (a) =>
-              (a?.title as String?)?.toLowerCase() == name.toLowerCase(),
+          (a) => (a?.title as String?)?.toLowerCase() == name.toLowerCase(),
           orElse: () => null);
       if (match != null) {
         context.push('/album', extra: match);
@@ -897,7 +916,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
-    final isOffline = context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+    final isOffline =
+        context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
 
     return BlocBuilder<SearchCubit, SearchState>(
       builder: (context, localState) {
@@ -906,7 +926,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
             final localDone = !localState.isLoading;
             final onlineDone = isOffline || !ytmState.isLoading;
             final localEmpty = localState.results.isEmpty;
-            final onlineEmpty = isOffline || (ytmState.results.isEmpty && ytmState.hasSearched);
+            final onlineEmpty =
+                isOffline || (ytmState.results.isEmpty && ytmState.hasSearched);
 
             if (localDone &&
                 onlineDone &&
@@ -928,11 +949,15 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
             }
 
             final localResults = localState.results;
-            final localToDisplay = _expandLocal ? localResults : localResults.take(5).toList();
+            final localToDisplay =
+                _expandLocal ? localResults : localResults.take(5).toList();
 
             final onlineTracks = ytmState.results;
-            final onlineSongs = [for (final track in onlineTracks) track.toSongData()];
-            final onlineToDisplay = _expandOnline ? onlineSongs : onlineSongs.take(10).toList();
+            final onlineSongs = [
+              for (final track in onlineTracks) track.toSongData()
+            ];
+            final onlineToDisplay =
+                _expandOnline ? onlineSongs : onlineSongs.take(10).toList();
 
             return RefreshIndicator(
               color: p.accent,
@@ -944,7 +969,8 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                 }
               },
               child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics()),
                 padding: const EdgeInsets.only(
                   bottom: AppSpacing.scrollBottom,
                   top: AppSpacing.xxs,
@@ -987,15 +1013,19 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                       SongTile(
                         song: song,
                         subtitleOverride: '${song.artist} • ${song.album}',
-                        onTap: () => playerCubit.playSong(song, queue: localResults),
-                        onMorePressed: () => SongInfoSheet.show(context, song: song),
+                        onTap: () =>
+                            playerCubit.playSong(song, queue: localResults),
+                        onMorePressed: () =>
+                            SongInfoSheet.show(context, song: song),
                       ),
                     if (localResults.length > 5)
                       Center(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xs),
                           child: TextButton.icon(
-                            onPressed: () => setState(() => _expandLocal = !_expandLocal),
+                            onPressed: () =>
+                                setState(() => _expandLocal = !_expandLocal),
                             icon: Icon(
                               _expandLocal
                                   ? Icons.keyboard_arrow_up_rounded
@@ -1068,17 +1098,21 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     for (var i = 0; i < onlineToDisplay.length; i++)
                       SongTile(
                         song: onlineToDisplay[i],
-                        subtitleOverride:
-                            (i < onlineTracks.length) ? onlineTracks[i].artist : null,
-                        onTap: () => playerCubit.playSong(onlineToDisplay[i], queue: onlineSongs),
+                        subtitleOverride: (i < onlineTracks.length)
+                            ? onlineTracks[i].artist
+                            : null,
+                        onTap: () => playerCubit.playSong(onlineToDisplay[i],
+                            queue: onlineSongs),
                         trailing: YtmDownloadButton(song: onlineToDisplay[i]),
                       ),
                     if (onlineSongs.length > 10)
                       Center(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xs),
                           child: TextButton.icon(
-                            onPressed: () => setState(() => _expandOnline = !_expandOnline),
+                            onPressed: () =>
+                                setState(() => _expandOnline = !_expandOnline),
                             icon: Icon(
                               _expandOnline
                                   ? Icons.keyboard_arrow_up_rounded
@@ -1148,7 +1182,8 @@ Widget _buildSectionHeader({
           )
         else
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: BorderRadius.circular(AppRadii.r12),
@@ -1325,7 +1360,8 @@ class _OnlineResults extends StatelessWidget {
         }
 
         if (state.isLoading) {
-          return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
+          return const SkeletonList(
+              padding: EdgeInsets.only(top: AppSpacing.xs));
         }
 
         if (state.errorMessage != null) {
@@ -1351,26 +1387,32 @@ class _OnlineResults extends StatelessWidget {
 
           return Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.travel_explore_rounded,
                       size: 48, color: p.textTertiary),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(context.l10n.searchYtm,
+                  Text(
+                    context.l10n.searchYtm,
                     style: TextStyle(
                         fontSize: AppFontSize.title,
                         fontWeight: FontWeight.w800,
                         color: p.textPrimary),
                   ),
                   const SizedBox(height: AppSpacing.s6),
-                  Text(context.l10n.ytmSearchDesc,
+                  Text(
+                    context.l10n.ytmSearchDesc,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  Text(context.l10n.popularSearches,
+                  Text(
+                    context.l10n.popularSearches,
                     style: TextStyle(
                         fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,

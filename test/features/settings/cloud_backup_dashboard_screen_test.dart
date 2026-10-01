@@ -14,13 +14,18 @@ void main() {
 
   setUp(() {
     mockSyncService = MockCloudSyncService();
-    when(() => mockSyncService.isFavoritesSyncEnabled).thenAnswer((_) async => true);
-    when(() => mockSyncService.isPlaylistsSyncEnabled).thenAnswer((_) async => true);
+    when(() => mockSyncService.isFavoritesSyncEnabled)
+        .thenAnswer((_) async => true);
+    when(() => mockSyncService.isPlaylistsSyncEnabled)
+        .thenAnswer((_) async => true);
     when(() => mockSyncService.lastSyncTime).thenReturn(null);
   });
 
-  testWidgets('[H-21] _performSync surfaces specific exception message to user on sync failure', (tester) async {
-    when(() => mockSyncService.syncAll()).thenThrow(Exception('Authentication token expired'));
+  testWidgets(
+      '[H-21] _performSync surfaces specific exception message to user on sync failure',
+      (tester) async {
+    when(() => mockSyncService.syncAll())
+        .thenThrow(Exception('Authentication token expired'));
 
     await tester.pumpWidget(
       MaterialApp(
@@ -42,7 +47,9 @@ void main() {
     expect(find.textContaining('Authentication token expired'), findsOneWidget);
   });
 
-  testWidgets('[M-27] screen disables sync button and scope switches when syncService is null', (tester) async {
+  testWidgets(
+      '[M-27] screen disables sync button and scope switches when syncService is null',
+      (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -63,9 +70,13 @@ void main() {
     }
   });
 
-  testWidgets('[M-27] toggling sync scopes calls service methods when syncService is present', (tester) async {
-    when(() => mockSyncService.setFavoritesSyncEnabled(any())).thenAnswer((_) async {});
-    when(() => mockSyncService.setPlaylistsSyncEnabled(any())).thenAnswer((_) async {});
+  testWidgets(
+      '[M-27] toggling sync scopes calls service methods when syncService is present',
+      (tester) async {
+    when(() => mockSyncService.setFavoritesSyncEnabled(any()))
+        .thenAnswer((_) async {});
+    when(() => mockSyncService.setPlaylistsSyncEnabled(any()))
+        .thenAnswer((_) async {});
 
     await tester.pumpWidget(
       MaterialApp(

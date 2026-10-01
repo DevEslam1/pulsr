@@ -100,8 +100,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (now - _lastSeekMs < 60) {
       _pendingSeekPosition = position;
       _seekDebounceTimer?.cancel();
-      _seekDebounceTimer =
-          Timer(const Duration(milliseconds: 60), () {
+      _seekDebounceTimer = Timer(const Duration(milliseconds: 60), () {
         final pending = _pendingSeekPosition;
         _pendingSeekPosition = null;
         if (pending != null) {
@@ -351,9 +350,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // The crossfade engine draws its own random order from _getNextIndex, so no
     // native reshuffle is needed there.
     playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
+    // Rebuild custom controls so the notification's shuffle icon flips now
+    // rather than on the next unrelated playback-state broadcast.
+    _broadcastState(_activePlayer.playbackEvent);
     final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.playbackShuffle,
-        shuffleMode == AudioServiceShuffleMode.all);
+    await prefs.setBool(
+        PrefsKeys.playbackShuffle, shuffleMode == AudioServiceShuffleMode.all);
   }
 
   @override
@@ -372,6 +374,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     ]);
 
     playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
+    // See setShuffleMode: refresh the notification's repeat icon immediately.
+    _broadcastState(_activePlayer.playbackEvent);
     final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
     final persistMode = switch (repeatMode) {
       AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => 'all',
@@ -476,11 +480,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (begin) await seekRelative(const Duration(seconds: 10));
   }
 
-  double get minPlaybackSpeed =>
-      _advancedSpeedEnabled ? PulsrAudioHandler._minAdvancedPlaybackSpeed : PulsrAudioHandler._minPlaybackSpeed;
+  double get minPlaybackSpeed => _advancedSpeedEnabled
+      ? PulsrAudioHandler._minAdvancedPlaybackSpeed
+      : PulsrAudioHandler._minPlaybackSpeed;
 
-  double get maxPlaybackSpeed =>
-      _advancedSpeedEnabled ? PulsrAudioHandler._maxAdvancedPlaybackSpeed : PulsrAudioHandler._maxPlaybackSpeed;
+  double get maxPlaybackSpeed => _advancedSpeedEnabled
+      ? PulsrAudioHandler._maxAdvancedPlaybackSpeed
+      : PulsrAudioHandler._maxPlaybackSpeed;
 
   /// Enables the extended 0.1–8.0 speed range for power users.
   /// When disabled the stable 0.25–4.0 range is enforced.
@@ -580,11 +586,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
   }
 
-
   @override
   Future<void> addQueueItem(MediaItem mediaItem) async {
     if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
+      ErrorLogger.log(
+          'Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
           category: 'AudioHandler');
       return;
     }
@@ -622,7 +628,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
 
     if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
+      ErrorLogger.log(
+          'Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
           category: 'AudioHandler');
       return;
     }
@@ -654,7 +661,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
 
     if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
+      ErrorLogger.log(
+          'Queue size limit reached (${PulsrAudioHandler.maxQueueSize})',
           category: 'AudioHandler');
       return;
     }
@@ -723,7 +731,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           final fastArtUri = nextSong.artworkUri != null
               ? Uri.tryParse(nextSong.artworkUri!)
               : null;
-          mediaItem.add(PulsrAudioHandler._songToMediaItem(nextSong, fastArtUri));
+          mediaItem
+              .add(PulsrAudioHandler._songToMediaItem(nextSong, fastArtUri));
         }
       } else {
         if (index < _currentIndex) _currentIndex--;
@@ -801,432 +810,121 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _saveCurrentPosition();
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  // Requires: provided by the composing class (same library).
   bool get _advancedSpeedEnabled;
   set _advancedSpeedEnabled(bool value);
 
-  // Requires: provided by the composing class (same library).
   void _broadcastState(PlaybackEvent event);
 
-  // Requires: provided by the composing class (same library).
   AudioSource _buildGaplessChild(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   SharedPreferences? get _cachedPrefs;
   set _cachedPrefs(SharedPreferences? value);
 
-  // Requires: provided by the composing class (same library).
   CrossfadeManager get _crossfadeManager;
 
-  // Requires: provided by the composing class (same library).
   int get _currentIndex;
   set _currentIndex(int value);
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessLoaded;
   set _gaplessLoaded(bool value);
 
-  // Requires: provided by the composing class (same library).
   bool get _gaplessMode;
 
-  // Requires: provided by the composing class (same library).
   int? _getNextIndex({int offset = 1, bool peek = false});
 
-  // Requires: provided by the composing class (same library).
   int? getPreviousIndex({bool forcePrevious = false});
 
-  // Requires: provided by the composing class (same library).
   int get _headsetClickCount;
   set _headsetClickCount(int value);
 
-  // Requires: provided by the composing class (same library).
   Timer? get _headsetClickTimer;
   set _headsetClickTimer(Timer? value);
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _inactivePlayer;
 
-  // Requires: provided by the composing class (same library).
   InterruptionStateMachine get _interruption;
 
-  // Requires: provided by the composing class (same library).
   PlaybackQueueStateMachine get _queueStateMachine;
 
-  // Requires: provided by the composing class (same library).
   set _isManualSkip(bool value);
 
-  // Requires: provided by the composing class (same library).
   DateTime? get _lastPreviousTapTime;
   set _lastPreviousTapTime(DateTime? value);
 
-  // Requires: provided by the composing class (same library).
   int get _lastSeekMs;
   set _lastSeekMs(int value);
 
-  // Requires: provided by the composing class (same library).
-  Future<void> _loadGaplessQueue({Duration? initialPosition, bool preload = true});
+  Future<void> _loadGaplessQueue(
+      {Duration? initialPosition, bool preload = true});
 
-  // Requires: provided by the composing class (same library).
   Future<void> _loadSongPaused(int index, {Duration? initialPosition});
 
-  // Requires: provided by the composing class (same library).
   Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);
 
-  // Requires: provided by the composing class (same library).
   Duration? get _pendingSeekPosition;
   set _pendingSeekPosition(Duration? value);
 
-  // Requires: provided by the composing class (same library).
   double get _pitch;
   set _pitch(double value);
 
-  // Requires: provided by the composing class (same library).
   int get _playGeneration;
   set _playGeneration(int value);
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _playerA;
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _playerB;
 
-  // Requires: provided by the composing class (same library).
   StreamController<Duration> get _positionSubject;
 
-  // Requires: provided by the composing class (same library).
   double? get _preCrossfadeVolume;
 
-  // Requires: provided by the composing class (same library).
   IMusicRepository get _repository;
 
-  // Requires: provided by the composing class (same library).
   void _saveCurrentPosition();
 
-  // Requires: provided by the composing class (same library).
   Future<void> saveCurrentPositionImmediate();
 
-  // Requires: provided by the composing class (same library).
   void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation);
 
-  // Requires: provided by the composing class (same library).
   Timer? get _seekDebounceTimer;
   set _seekDebounceTimer(Timer? value);
 
-  // Requires: provided by the composing class (same library).
   List<SongsTableData> get _songs;
   set _songs(List<SongsTableData> value);
 
-  // Requires: provided by the composing class (same library).
   StreamPreResolver get _streamPreResolver;
-
-
-
-  // Requires: provided by the composing class (same library).
   double get _volume;
 
-  // Requires: provided by the composing class (same library).
   void cancelPrefetches();
 
-  // Requires: provided by the composing class (same library).
   SongsTableData? get currentSong;
 
-  // Requires: provided by the composing class (same library).
-  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
+  Future<void> loadQueue(List<SongsTableData> songs,
+      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
 
-  // Requires: provided by the composing class (same library).
   Future<void> playSongAt(int index, {Duration? initialPosition});
 
-  // Requires: provided by the composing class (same library).
   bool get _userPlaybackInitiated;
   set _userPlaybackInitiated(bool value);
 
-  // Requires: provided by the composing class (same library).
   int get _rapidGaplessChangeCount;
   set _rapidGaplessChangeCount(int value);
 
-  // Requires: provided by the composing class (same library).
   DateTime? get _lastGaplessChangeTime;
   set _lastGaplessChangeTime(DateTime? value);
 
-  // Requires: provided by the composing class (same library).
   bool get _queueDirty;
   set _queueDirty(bool value);
 
-  // Requires: provided by the composing class (same library).
   int get _lastGaplessIndex;
   set _lastGaplessIndex(int value);
 
-  // Requires: provided by the composing class (same library).
   HeadsetControlConfig? get cachedHeadsetConfig;
   set cachedHeadsetConfig(HeadsetControlConfig? value);
 }

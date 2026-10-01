@@ -7,7 +7,8 @@ import 'package:pulsr/core/responsive/responsive_sheet.dart';
 
 void main() {
   group('Responsive Tokens & Typography', () {
-    testWidgets('ResponsiveValues resolves correctly based on context', (tester) async {
+    testWidgets('ResponsiveValues resolves correctly based on context',
+        (tester) async {
       late double valueCompact;
       late double valueMedium;
       late double valueExpanded;
@@ -65,7 +66,8 @@ void main() {
       expect(valueExpanded, 30.0);
     });
 
-    testWidgets('PulsrTextScaleScope clamps text scaler between 0.85 and 1.5', (tester) async {
+    testWidgets('PulsrTextScaleScope clamps text scaler between 0.85 and 1.5',
+        (tester) async {
       late double scaledSizeLow;
       late double scaledSizeHigh;
 
@@ -104,7 +106,8 @@ void main() {
       expect(scaledSizeHigh, 150.0);
     });
 
-    testWidgets('PulsrResponsiveMotion scales duration and distance', (tester) async {
+    testWidgets('PulsrResponsiveMotion scales duration and distance',
+        (tester) async {
       late Duration durationCompact;
       late Duration durationLarge;
 
@@ -136,7 +139,8 @@ void main() {
       expect(durationLarge.inMilliseconds, greaterThanOrEqualTo(230));
     });
 
-    testWidgets('PulsrResponsiveSheetContainer renders dialog mode correctly', (tester) async {
+    testWidgets('PulsrResponsiveSheetContainer renders dialog mode correctly',
+        (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(

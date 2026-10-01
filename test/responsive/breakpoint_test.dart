@@ -33,7 +33,8 @@ void main() {
       expect(PulsrBreakpoint.compact >= PulsrBreakpoint.medium, isFalse);
     });
 
-    testWidgets('Context extension detects breakpoints accurately', (tester) async {
+    testWidgets('Context extension detects breakpoints accurately',
+        (tester) async {
       late PulsrBreakpoint capturedBreakpoint;
       late bool capturedIsCompact;
       late bool capturedIsMedium;

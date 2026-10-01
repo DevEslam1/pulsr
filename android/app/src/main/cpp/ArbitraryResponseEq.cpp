@@ -231,7 +231,9 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     // and no heap allocation.
     if (params.parsedNodes) {
         if (params.parsedNodes != preparedNodesRef_ || std::abs(firSynthesizedRate_ - sampleRate_) >= 0.5) {
-            loadedString_ = params.graphicEqString;
+            // Do not copy params.graphicEqString here: this is the audio thread
+            // and std::string assignment can allocate. The string is only needed
+            // by the (control-thread) parse fallback below.
             applyPreparedNodes(params.parsedNodes, params.linearPhase);
         }
         return;

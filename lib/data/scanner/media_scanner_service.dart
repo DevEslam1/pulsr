@@ -91,7 +91,8 @@ class MediaScannerService {
   /// True when a resume-triggered delta scan is worthwhile (default: 15 min
   /// since last successful scan). Used by app-resume hooks to avoid a full
   /// MediaStore query on every foreground.
-  bool shouldRescanOnResume({Duration threshold = const Duration(minutes: 15)}) {
+  bool shouldRescanOnResume(
+      {Duration threshold = const Duration(minutes: 15)}) {
     final last = _lastScanAt;
     if (last == null) return true;
     return DateTime.now().difference(last) >= threshold;
@@ -99,7 +100,8 @@ class MediaScannerService {
 
   void markScanComplete({int? epochSec}) {
     _lastScanAt = DateTime.now();
-    _lastScanEpochSec = epochSec ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    _lastScanEpochSec =
+        epochSec ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
   }
 
   MediaScannerService(this._repository);
@@ -116,7 +118,10 @@ class MediaScannerService {
     if (Platform.isAndroid) {
       final audio = await Permission.audio.status;
       final storage = await Permission.storage.status;
-      return audio.isGranted || audio.isLimited || storage.isGranted || storage.isLimited;
+      return audio.isGranted ||
+          audio.isLimited ||
+          storage.isGranted ||
+          storage.isLimited;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.status;
       return status.isGranted || status.isLimited;
@@ -280,7 +285,8 @@ class MediaScannerService {
     bool autoHideSystemMedia = true,
     bool incremental = false,
   }) async {
-    _emitProgress(0.0, currentFile: 'Initializing scanner...', isIncremental: incremental);
+    _emitProgress(0.0,
+        currentFile: 'Initializing scanner...', isIncremental: incremental);
     try {
       final hasPermission = await checkPermission();
       if (!hasPermission) {
@@ -288,7 +294,9 @@ class MediaScannerService {
         if (!granted) return 0;
       }
 
-      _emitProgress(0.1, currentFile: 'Checking library exclusions...', isIncremental: incremental);
+      _emitProgress(0.1,
+          currentFile: 'Checking library exclusions...',
+          isIncremental: incremental);
       final excludedRes = await _repository.getExcludedFolderPaths();
       final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
 
@@ -341,7 +349,9 @@ class MediaScannerService {
         final genres = await _audioQuery.queryGenres();
         for (final g in genres) {
           final genreName = g.genre.trim();
-          if (genreName.isEmpty || genreName.toLowerCase() == '<unknown>') continue;
+          if (genreName.isEmpty || genreName.toLowerCase() == '<unknown>') {
+            continue;
+          }
           try {
             final audios = await _audioQuery.queryAudiosFrom(
               AudiosFromType.GENRE_ID,
@@ -364,10 +374,13 @@ class MediaScannerService {
       // Stream progress preview with sample filenames
       for (int i = 0; i < songsToProcess.length; i += 30) {
         final song = songsToProcess[i];
-        final frac = 0.25 + (i / (songsToProcess.isEmpty ? 1 : songsToProcess.length)) * 0.45;
+        final frac = 0.25 +
+            (i / (songsToProcess.isEmpty ? 1 : songsToProcess.length)) * 0.45;
         _emitProgress(
           frac,
-          currentFile: song.displayNameWOExt.isNotEmpty ? song.displayNameWOExt : song.title,
+          currentFile: song.displayNameWOExt.isNotEmpty
+              ? song.displayNameWOExt
+              : song.title,
           scannedCount: i,
           totalCount: songsToProcess.length,
           isIncremental: incremental,
@@ -376,7 +389,9 @@ class MediaScannerService {
 
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
-        rawSongs: songsToProcess.map((s) => Map<String, dynamic>.from(s.getMap)).toList(),
+        rawSongs: songsToProcess
+            .map((s) => Map<String, dynamic>.from(s.getMap))
+            .toList(),
         songGenres: songGenres,
         excludedFolders: excludedFolders,
         minDurationMs: minDurationMs,
@@ -388,7 +403,8 @@ class MediaScannerService {
       final parseResult =
           await compute(_parseScannedMediaInIsolate, parseInput);
       _emitProgress(0.75,
-          currentFile: 'Syncing catalog (${parseResult.songs.length} tracks)...',
+          currentFile:
+              'Syncing catalog (${parseResult.songs.length} tracks)...',
           scannedCount: parseResult.songs.length,
           totalCount: songsToProcess.length,
           isIncremental: incremental);
@@ -675,8 +691,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final sep = input.pathSeparator;
     if (input.excludedFolders.any((folder) {
       final normFolder = folder.toLowerCase();
-      final prefix =
-          normFolder.endsWith(sep) ? normFolder : '$normFolder$sep';
+      final prefix = normFolder.endsWith(sep) ? normFolder : '$normFolder$sep';
       return normPath.startsWith(prefix) || normPath == normFolder;
     })) {
       continue;

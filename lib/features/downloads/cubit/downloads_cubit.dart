@@ -88,7 +88,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     safeEmit(state.copyWith(isLoading: true));
     try {
       // FIX-I02: Reconcile on boot from cubit init rather than repository constructor
-      await (_downloadRepository?.reconcileOnBoot() ?? _observeDownloadsUseCase.reconcileOnBoot());
+      await (_downloadRepository?.reconcileOnBoot() ??
+          _observeDownloadsUseCase.reconcileOnBoot());
       // Subscribe BEFORE hydrating: getAll() reads the repository's live task
       // map (which is updated before every stream event is emitted), so the
       // snapshot includes everything emitted up to call time, and events
@@ -150,8 +151,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       onDone: () {
         // The repository's broadcast controller only closes on app teardown;
         // there is nothing to resubscribe to after that.
-        ErrorLogger.log('Downloads stream closed',
-            category: 'DownloadsCubit');
+        ErrorLogger.log('Downloads stream closed', category: 'DownloadsCubit');
       },
     );
   }
@@ -176,8 +176,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
     final shouldDrop = await _deleteMutex.protect(() async {
       final now = _nowMs;
-      _deletedAtMsByVideoId
-          .removeWhere((_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
+      _deletedAtMsByVideoId.removeWhere(
+          (_, deletedAt) => now - deletedAt >= _deletedIgnoreWindowMs);
       if (_deletedAtMsByVideoId.containsKey(task.videoId)) return true;
 
       final currentTasks = state.tasks;
@@ -226,7 +226,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           if (_lastEmitTimeByVideoId.length > _maxThrottleEntries) {
             final entries = _lastEmitTimeByVideoId.entries.toList()
               ..sort((a, b) => a.value.compareTo(b.value));
-            final toRemove = entries.take(_lastEmitTimeByVideoId.length - _maxThrottleEntries);
+            final toRemove = entries
+                .take(_lastEmitTimeByVideoId.length - _maxThrottleEntries);
             for (final e in toRemove) {
               _lastEmitTimeByVideoId.remove(e.key);
             }
@@ -252,7 +253,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   // FIX-A14: 300ms debounce on storage stats refresh to prevent disk thrashing
   void _scheduleDebouncedStorageStats() {
     _storageStatsDebounceTimer?.cancel();
-    _storageStatsDebounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
+    _storageStatsDebounceTimer =
+        autoTimer(Timer(const Duration(milliseconds: 300), () {
       if (!isClosed) {
         refreshStorageStats();
       }
@@ -332,8 +334,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       if (result.isRight()) queued++;
     }
     if (!isClosed && failedIds.isNotEmpty && queued == 0) {
-      safeEmit(state.copyWith(
-          errorMessage: 'Could not retry failed downloads'));
+      safeEmit(
+          state.copyWith(errorMessage: 'Could not retry failed downloads'));
     }
     return queued;
   }

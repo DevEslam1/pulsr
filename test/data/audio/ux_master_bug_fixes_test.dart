@@ -24,12 +24,16 @@ void main() {
   });
 
   group('UX & Master Fix Catalog Tests', () {
-    test('B-01 / B-02 / B-17: Adaptive quality policy steps down on underruns and respects ceiling', () {
-      final policy = AdaptiveQualityPolicy(underrunThreshold: 2, healthyThreshold: 2);
+    test(
+        'B-01 / B-02 / B-17: Adaptive quality policy steps down on underruns and respects ceiling',
+        () {
+      final policy =
+          AdaptiveQualityPolicy(underrunThreshold: 2, healthyThreshold: 2);
 
       // Starting at high quality
       expect(policy.onBufferUnderrun('high'), isNull); // 1st underrun
-      final step1 = policy.onBufferUnderrun('high'); // 2nd underrun triggers step-down
+      final step1 =
+          policy.onBufferUnderrun('high'); // 2nd underrun triggers step-down
       expect(step1, equals('medium'));
 
       // Downgrade from medium to low
@@ -47,7 +51,8 @@ void main() {
       expect(stepUp1, equals('medium'));
     });
 
-    test('B-03: AudioQualityInfo.dsdDopActive forces bit-perfect DoP state', () {
+    test('B-03: AudioQualityInfo.dsdDopActive forces bit-perfect DoP state',
+        () {
       AudioQualityInfo.dsdDopActive = true;
       expect(AudioQualityInfo.dsdDopActive, isTrue);
 
@@ -55,7 +60,9 @@ void main() {
       expect(AudioQualityInfo.dsdDopActive, isFalse);
     });
 
-    test('B-06: SleepTimerManager pauses countdown ticker while playback is paused', () {
+    test(
+        'B-06: SleepTimerManager pauses countdown ticker while playback is paused',
+        () {
       fakeAsync((async) {
         final mockPlayer = MockAudioPlayer();
         when(() => mockPlayer.volume).thenReturn(1.0);
@@ -86,7 +93,9 @@ void main() {
       });
     });
 
-    test('B-14: SleepTimerManager calculates accurate total duration for N tracks', () async {
+    test(
+        'B-14: SleepTimerManager calculates accurate total duration for N tracks',
+        () async {
       final mockPlayer = MockAudioPlayer();
       when(() => mockPlayer.volume).thenReturn(1.0);
       when(() => mockPlayer.playing).thenReturn(true);
@@ -112,20 +121,26 @@ void main() {
       expect(targetMs, isNotNull);
 
       // Expected duration is 180 + 240 + 120 = 540 seconds (9 minutes)
-      final expectedMinTarget = DateTime.now().millisecondsSinceEpoch + 530 * 1000;
-      final expectedMaxTarget = DateTime.now().millisecondsSinceEpoch + 550 * 1000;
+      final expectedMinTarget =
+          DateTime.now().millisecondsSinceEpoch + 530 * 1000;
+      final expectedMaxTarget =
+          DateTime.now().millisecondsSinceEpoch + 550 * 1000;
       expect(targetMs!, greaterThanOrEqualTo(expectedMinTarget));
       expect(targetMs, lessThanOrEqualTo(expectedMaxTarget));
 
       manager.dispose();
     });
 
-    test('B-07: ArtworkUriResolver synchronous cache methods return null for uncached items', () {
+    test(
+        'B-07: ArtworkUriResolver synchronous cache methods return null for uncached items',
+        () {
       expect(ArtworkUriResolver.getCachedArtworkUri(9999), isNull);
       expect(ArtworkUriResolver.getCachedAlbumArtUri(9999), isNull);
     });
 
-    test('B-08: PlaybackBookmarkStore identifies podcasts and long tracks for +/-10s rewind/fastForward', () {
+    test(
+        'B-08: PlaybackBookmarkStore identifies podcasts and long tracks for +/-10s rewind/fastForward',
+        () {
       // Track > 20 minutes (1,200,000 ms) qualifies for bookmarking / podcast controls
       expect(
         PlaybackBookmarkStore.shouldBookmark(
@@ -165,7 +180,9 @@ void main() {
       );
     });
 
-    test('B-15: EqualizerManager loadCustomImpulseResponse safely fails on non-Android', () async {
+    test(
+        'B-15: EqualizerManager loadCustomImpulseResponse safely fails on non-Android',
+        () async {
       final eq = EqualizerManager();
       if (!Platform.isAndroid) {
         final result = await eq.loadCustomImpulseResponse([0.1, 0.2, 0.3]);
@@ -174,7 +191,9 @@ void main() {
       eq.dispose();
     });
 
-    test('B-22: AbLoopManager handles points A and B and responds to song changes', () {
+    test(
+        'B-22: AbLoopManager handles points A and B and responds to song changes',
+        () {
       final ab = AbLoopManager();
       ab.setA(const Duration(seconds: 10), songId: 42);
       expect(ab.pointA, equals(const Duration(seconds: 10)));
@@ -185,7 +204,8 @@ void main() {
       expect(ab.isEnabled, isTrue);
 
       // Target wrap works when within scope
-      expect(ab.wrapTarget(const Duration(seconds: 25), songId: 42), equals(const Duration(seconds: 10)));
+      expect(ab.wrapTarget(const Duration(seconds: 25), songId: 42),
+          equals(const Duration(seconds: 10)));
       // Outside scope songId returns null
       expect(ab.wrapTarget(const Duration(seconds: 25), songId: 99), isNull);
 
@@ -194,7 +214,9 @@ void main() {
       expect(ab.pointB, isNull);
     });
 
-    test('B-24: PrefsRepository type-safe getter returns null on type mismatch without throwing', () async {
+    test(
+        'B-24: PrefsRepository type-safe getter returns null on type mismatch without throwing',
+        () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('test_string_key', 'hello');
       await prefs.setInt('test_int_key', 42);
@@ -216,7 +238,9 @@ void main() {
       expect(repo.get<String>('dynamic_key'), equals('text_value'));
     });
 
-    test('B-26: Scanner dateAdded normalization preserves milliseconds and scales seconds', () {
+    test(
+        'B-26: Scanner dateAdded normalization preserves milliseconds and scales seconds',
+        () {
       const secondsTimestamp = 1600000000; // < 10^10
       const msTimestamp = 1600000000000; // > 10^10
 
@@ -229,7 +253,9 @@ void main() {
       expect(normalize(msTimestamp), equals(1600000000000));
     });
 
-    test('N-2: AbLoopManager preserves previously persisted loops when persist() is called before load completes', () async {
+    test(
+        'N-2: AbLoopManager preserves previously persisted loops when persist() is called before load completes',
+        () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         AbLoopManager.prefsKey,

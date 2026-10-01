@@ -11,11 +11,15 @@ void main() {
     final rnd = Random(42);
 
     String generateRandomString(int length) {
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 \t\r\n[]()<>-:;,."\'\\/!@#\$%^&*';
-      return List.generate(length, (_) => chars[rnd.nextInt(chars.length)]).join();
+      const chars =
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 \t\r\n[]()<>-:;,."\'\\/!@#\$%^&*';
+      return List.generate(length, (_) => chars[rnd.nextInt(chars.length)])
+          .join();
     }
 
-    test('CueParser.parse fuzz test: 10,000 iterations without unhandled exceptions', () {
+    test(
+        'CueParser.parse fuzz test: 10,000 iterations without unhandled exceptions',
+        () {
       final cuePatterns = [
         'FILE "test.mp3" MP3\nTRACK 01 AUDIO\nTITLE "Test"\nINDEX 01 00:00:00',
         'TRACK %d AUDIO\nINDEX 01 %d:%d:%d',
@@ -38,7 +42,8 @@ void main() {
               .replaceAll('%s', generateRandomString(10));
         } else if (mode == 2) {
           // Massive lines or blank lines
-          input = '${'\n' * rnd.nextInt(50)}FILE "a" MP3\n${generateRandomString(500)}';
+          input =
+              '${'\n' * rnd.nextInt(50)}FILE "a" MP3\n${generateRandomString(500)}';
         } else {
           // Truncated tokens
           input = 'FILE TRACK TITLE INDEX'.substring(0, rnd.nextInt(22));
@@ -48,7 +53,9 @@ void main() {
       }
     });
 
-    test('LrcParser.parse fuzz test: 10,000 iterations without unhandled exceptions', () {
+    test(
+        'LrcParser.parse fuzz test: 10,000 iterations without unhandled exceptions',
+        () {
       final lrcSnippets = [
         '[01:23.45]Normal lyric',
         '[offset: %d]\n[%d:%d.%d]Fuzzed lyric',
@@ -67,21 +74,24 @@ void main() {
           input = generateRandomString(rnd.nextInt(250));
         } else if (mode == 1) {
           final snippet = lrcSnippets[rnd.nextInt(lrcSnippets.length)];
-          input = snippet
-              .replaceAll('%d', '${rnd.nextInt(500) - 100}');
+          input = snippet.replaceAll('%d', '${rnd.nextInt(500) - 100}');
         } else if (mode == 2) {
           // Nested brackets and tags
-          input = '[[[${rnd.nextInt(100)}:${rnd.nextInt(60)}]]]<${generateRandomString(20)}>';
+          input =
+              '[[[${rnd.nextInt(100)}:${rnd.nextInt(60)}]]]<${generateRandomString(20)}>';
         } else {
           // Mixed UTF-8 and control characters
-          input = '\uFEFF[offset:${rnd.nextInt(10000) - 5000}]\n${generateRandomString(100)}';
+          input =
+              '\uFEFF[offset:${rnd.nextInt(10000) - 5000}]\n${generateRandomString(100)}';
         }
 
         expect(() => LrcParser.parse(input), returnsNormally);
       }
     });
 
-    test('QueueSlotCodec.decodeSlot fuzz test: 2,000 malformed dictionaries safely handled', () {
+    test(
+        'QueueSlotCodec.decodeSlot fuzz test: 2,000 malformed dictionaries safely handled',
+        () {
       for (int i = 0; i < 2000; i++) {
         final malformedMap = <String, dynamic>{
           'songIds': (i % 3 == 0)
@@ -102,7 +112,8 @@ void main() {
                 ],
         };
 
-        expect(() => QueueSlotCodec.decodeSlot(malformedMap, 500), returnsNormally);
+        expect(() => QueueSlotCodec.decodeSlot(malformedMap, 500),
+            returnsNormally);
       }
     });
   });

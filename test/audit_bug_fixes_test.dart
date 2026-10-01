@@ -17,9 +17,11 @@ import 'mocks/fake_audio_player_backend.dart';
 
 class _FakeSmartPlaylistEngine extends Fake implements ISmartPlaylistEngine {
   @override
-  Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) => const Stream.empty();
+  Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) =>
+      const Stream.empty();
   @override
-  Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async => [];
+  Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async =>
+      [];
   @override
   List<SmartRule> validateRules(SmartCriteria criteria) => const [];
 }
@@ -38,7 +40,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Audit Bug Fixes Tests', () {
-    test('MediaItem extras preserves remoteId, source, isDownloaded, and remoteArtworkUrl', () {
+    test(
+        'MediaItem extras preserves remoteId, source, isDownloaded, and remoteArtworkUrl',
+        () {
       const original = SongsTableData(
         id: 42,
         title: 'Song Title',
@@ -107,7 +111,9 @@ void main() {
           equals('https://img.youtube.com/vi/xyz/hqdefault.jpg'));
     });
 
-    test('PlayerState.differsFromBeyondPosition detects sleep timer second-level changes', () {
+    test(
+        'PlayerState.differsFromBeyondPosition detects sleep timer second-level changes',
+        () {
       const state1 = PlayerState(
         playback: PlaybackSlice(sleepTimerRemaining: Duration(seconds: 59)),
       );
@@ -118,7 +124,8 @@ void main() {
       expect(state1.differsFromBeyondPosition(state2), isTrue);
     });
 
-    test('listContentDiffers detects queue item changes with same queue length', () {
+    test('listContentDiffers detects queue item changes with same queue length',
+        () {
       const songA = SongsTableData(
         id: 1,
         title: 'Original Title',
@@ -151,7 +158,8 @@ void main() {
       expect(listContentDiffers([songA], [songB]), isTrue);
     });
 
-    test('Repeat mode persistence normalizes group and all to all, one to one', () {
+    test('Repeat mode persistence normalizes group and all to all, one to one',
+        () {
       String normalizeRepeatMode(AudioServiceRepeatMode mode) {
         return switch (mode) {
           AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => 'all',
@@ -166,7 +174,8 @@ void main() {
       expect(normalizeRepeatMode(AudioServiceRepeatMode.none), equals('none'));
     });
 
-    test('End-of-track sleep timer calculates remaining duration accurately', () {
+    test('End-of-track sleep timer calculates remaining duration accurately',
+        () {
       const totalDuration = Duration(minutes: 3, seconds: 45);
       const position = Duration(minutes: 1, seconds: 15);
       final remaining = totalDuration > position
@@ -211,7 +220,9 @@ void main() {
       expect(clampIndex(0, queue.length, 0), equals(0));
     });
 
-    test('Unknown song duration fallback yields Duration.zero for different track', () {
+    test(
+        'Unknown song duration fallback yields Duration.zero for different track',
+        () {
       const stateDuration = Duration(minutes: 3);
       Duration resolveDuration({
         required int durationMs,
@@ -248,7 +259,8 @@ void main() {
       const state = PlayerState(
         playback: PlaybackSlice(sleepTimerRemaining: Duration(minutes: 15)),
       );
-      final updated = state.copyWith(playback: state.playback.copyWith(sleepTimerRemaining: null));
+      final updated = state.copyWith(
+          playback: state.playback.copyWith(sleepTimerRemaining: null));
       expect(updated.sleepTimerRemaining, isNull);
     });
 
@@ -264,7 +276,9 @@ void main() {
       expect(shouldSkipPrefetch(4), isTrue);
     });
 
-    test('Distinct remote songs receive unique negative IDs and never collide on -1', () {
+    test(
+        'Distinct remote songs receive unique negative IDs and never collide on -1',
+        () {
       int generateUniqueNegativeId(String remoteId) {
         return -(remoteId.hashCode.abs() % 1000000000 + 1);
       }
@@ -286,7 +300,9 @@ void main() {
       expect(idA, isNot(equals(idC)));
     });
 
-    test('FakeAudioPlayerBackend supports playlist navigation, looping, and clock advancement', () async {
+    test(
+        'FakeAudioPlayerBackend supports playlist navigation, looping, and clock advancement',
+        () async {
       final backend = FakeAudioPlayerBackend();
       expect(backend.currentIndex, isNull);
       expect(backend.duration, isNull);
@@ -322,7 +338,9 @@ void main() {
       await backend.dispose();
     });
 
-    test('DownloadsState precomputes and caches taskList sorted descending by createdAt', () {
+    test(
+        'DownloadsState precomputes and caches taskList sorted descending by createdAt',
+        () {
       final t1 = DownloadTask(
         id: 'v1',
         videoId: 'v1',
@@ -342,7 +360,8 @@ void main() {
         createdAt: DateTime.fromMillisecondsSinceEpoch(2000),
       );
 
-      final state = const DownloadsState().copyWith(tasks: {'v1': t1, 'v2': t2});
+      final state =
+          const DownloadsState().copyWith(tasks: {'v1': t1, 'v2': t2});
       final listA = state.taskList;
       final listB = state.taskList;
 
@@ -357,17 +376,20 @@ void main() {
       expect(identical(updatedLoading.taskList, listA), isTrue);
     });
 
-    test('DspTelemetryCubit accepts and configures custom polling intervals', () {
+    test('DspTelemetryCubit accepts and configures custom polling intervals',
+        () {
       final defaultCubit = DspTelemetryCubit();
       expect(defaultCubit.pollingInterval, const Duration(milliseconds: 200));
       defaultCubit.close();
 
-      final customCubit = DspTelemetryCubit(pollingInterval: const Duration(milliseconds: 100));
+      final customCubit =
+          DspTelemetryCubit(pollingInterval: const Duration(milliseconds: 100));
       expect(customCubit.pollingInterval, const Duration(milliseconds: 100));
       customCubit.close();
     });
 
-    test('SmartPlaylistBuilderCubit validates empty name and empty rules', () async {
+    test('SmartPlaylistBuilderCubit validates empty name and empty rules',
+        () async {
       final engine = _FakeSmartPlaylistEngine();
       final useCases = _FakePlaylistUseCases();
       final cubit = SmartPlaylistBuilderCubit(engine, useCases);
@@ -397,11 +419,13 @@ void main() {
       expect(cubit.state.errorMessage, 'Please enter a value for rule #1');
 
       // With valid name and rule
-      cubit.updateRule(0, const SmartRule(
-        field: SmartRuleField.title,
-        operator: SmartOperator.contains,
-        value: 'Rock',
-      ));
+      cubit.updateRule(
+          0,
+          const SmartRule(
+            field: SmartRuleField.title,
+            operator: SmartOperator.contains,
+            value: 'Rock',
+          ));
       saved = await cubit.savePlaylist();
       expect(saved, isTrue);
 
@@ -409,4 +433,3 @@ void main() {
     });
   });
 }
-

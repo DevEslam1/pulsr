@@ -14,7 +14,8 @@ void main() {
       expect(YtmAccountService.normalizeCookieHeader(jar), jar);
     });
 
-    test('strips a DevTools copy: newlines, the header name and attributes', () {
+    test('strips a DevTools copy: newlines, the header name and attributes',
+        () {
       // What "copy as cURL"/"copy value" actually puts on the clipboard.
       const pasted = '''
 Cookie: SAPISID=abc; Path=/; Secure; HttpOnly
@@ -83,7 +84,8 @@ __Secure-3PSID=def; Domain=.youtube.com; Expires=Wed, 21 Oct 2026 07:28:00 GMT
   });
 
   group('buildAuthorizationHeader', () {
-    test('prefers SAPISID, then 3P, then 1P, and is scheme-tagged for each', () {
+    test('prefers SAPISID, then 3P, then 1P, and is scheme-tagged for each',
+        () {
       expect(
           YtmAccountService.buildAuthorizationHeader(
               'SAPISID=a; __Secure-3PAPISID=b; __Secure-1PAPISID=c'),
@@ -92,15 +94,13 @@ __Secure-3PSID=def; Domain=.youtube.com; Expires=Wed, 21 Oct 2026 07:28:00 GMT
           YtmAccountService.buildAuthorizationHeader(
               '__Secure-3PAPISID=b; __Secure-1PAPISID=c'),
           startsWith('SAPISID3PHASH '));
-      expect(
-          YtmAccountService.buildAuthorizationHeader('__Secure-1PAPISID=c'),
+      expect(YtmAccountService.buildAuthorizationHeader('__Secure-1PAPISID=c'),
           startsWith('SAPISID1PHASH '));
       expect(YtmAccountService.buildAuthorizationHeader('CONSENT=1'), isNull);
     });
 
     test('is a timestamp_sha1 pair over the current second', () {
-      final header =
-          YtmAccountService.buildAuthorizationHeader('SAPISID=abc')!;
+      final header = YtmAccountService.buildAuthorizationHeader('SAPISID=abc')!;
       final payload = header.split(' ').last;
       final parts = payload.split('_');
       expect(parts, hasLength(2));
@@ -148,8 +148,8 @@ __Secure-3PSID=def; Domain=.youtube.com; Expires=Wed, 21 Oct 2026 07:28:00 GMT
     });
 
     test('an empty header is a no-op', () {
-      expect(YtmAccountService.mergeSetCookieInto('SAPISID=a', ''),
-          'SAPISID=a');
+      expect(
+          YtmAccountService.mergeSetCookieInto('SAPISID=a', ''), 'SAPISID=a');
     });
   });
 }

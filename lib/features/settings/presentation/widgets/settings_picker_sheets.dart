@@ -13,8 +13,6 @@ import 'package:pulsr/core/constants/app_typography.dart';
 export 'settings_theme_pickers.dart';
 export 'settings_playback_pickers.dart';
 
-
-
 void showYtmWebOptionsSheet(BuildContext context) {
   final p = context.palette;
   PulsrSheetHelper.showPulsrSheet(
@@ -23,112 +21,114 @@ void showYtmWebOptionsSheet(BuildContext context) {
       return SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.lg),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: p.accentContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                    ),
+                    child:
+                        Icon(Icons.language_rounded, color: p.accent, size: 22),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.xs),
-                          decoration: BoxDecoration(
-                            color: p.accentContainer,
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                        Text(
+                          ctx.l10n.youtubeMusicWeb,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.bodyLarge,
                           ),
-                          child: Icon(Icons.language_rounded,
-                              color: p.accent, size: 22),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                ctx.l10n.youtubeMusicWeb,
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: AppFontSize.bodyLarge,
-                                ),
-                              ),
-                              Text(
-                                ctx.l10n.selectPageToOpen,
-                                style: TextStyle(
-                                    color: p.textSecondary, fontSize: AppFontSize.label),
-                              ),
-                            ],
-                          ),
+                        Text(
+                          ctx.l10n.selectPageToOpen,
+                          style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.label),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.home_rounded,
-                      title: ctx.l10n.homePage,
-                      subtitle: ctx.l10n.homePageSubtitle,
-                      url: YtmLocale.homeUrl(),
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.video_library_rounded,
-                      title: ctx.l10n.youtubeWeb,
-                      subtitle: ctx.l10n.youtubeWebSubtitle,
-                      url: 'https://www.youtube.com',
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.explore_rounded,
-                      title: ctx.l10n.exploreAndCharts,
-                      subtitle: ctx.l10n.exploreAndChartsSubtitle,
-                      url: YtmLocale.withLocaleParams(
-                          'https://music.youtube.com/explore'),
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.library_music_rounded,
-                      title: ctx.l10n.yourLibrary,
-                      subtitle: ctx.l10n.yourLibrarySubtitle,
-                      url: YtmLocale.withLocaleParams(
-                          'https://music.youtube.com/library'),
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.favorite_rounded,
-                      title: ctx.l10n.likedMusic,
-                      subtitle: ctx.l10n.likedMusicSubtitle,
-                      url: YtmLocale.withLocaleParams(
-                          'https://music.youtube.com/playlist?list=LM'),
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.fiber_new_rounded,
-                      title: ctx.l10n.newReleases,
-                      subtitle: ctx.l10n.newReleasesSubtitle,
-                      url: YtmLocale.withLocaleParams(
-                          'https://music.youtube.com/new_releases'),
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.history_rounded,
-                      title: ctx.l10n.listeningHistory,
-                      subtitle: ctx.l10n.listeningHistorySubtitle,
-                      url: YtmLocale.withLocaleParams(
-                          'https://music.youtube.com/history'),
-                      p: p,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            );
-          },
+              const SizedBox(height: AppSpacing.md),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.home_rounded,
+                title: ctx.l10n.homePage,
+                subtitle: ctx.l10n.homePageSubtitle,
+                url: YtmLocale.homeUrl(),
+                p: p,
+              ),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.video_library_rounded,
+                title: ctx.l10n.youtubeWeb,
+                subtitle: ctx.l10n.youtubeWebSubtitle,
+                url: 'https://www.youtube.com',
+                p: p,
+              ),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.explore_rounded,
+                title: ctx.l10n.exploreAndCharts,
+                subtitle: ctx.l10n.exploreAndChartsSubtitle,
+                url: YtmLocale.withLocaleParams(
+                    'https://music.youtube.com/explore'),
+                p: p,
+              ),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.library_music_rounded,
+                title: ctx.l10n.yourLibrary,
+                subtitle: ctx.l10n.yourLibrarySubtitle,
+                url: YtmLocale.withLocaleParams(
+                    'https://music.youtube.com/library'),
+                p: p,
+              ),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.favorite_rounded,
+                title: ctx.l10n.likedMusic,
+                subtitle: ctx.l10n.likedMusicSubtitle,
+                url: YtmLocale.withLocaleParams(
+                    'https://music.youtube.com/playlist?list=LM'),
+                p: p,
+              ),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.fiber_new_rounded,
+                title: ctx.l10n.newReleases,
+                subtitle: ctx.l10n.newReleasesSubtitle,
+                url: YtmLocale.withLocaleParams(
+                    'https://music.youtube.com/new_releases'),
+                p: p,
+              ),
+              _ytmWebOptionTile(
+                ctx,
+                icon: Icons.history_rounded,
+                title: ctx.l10n.listeningHistory,
+                subtitle: ctx.l10n.listeningHistorySubtitle,
+                url: YtmLocale.withLocaleParams(
+                    'https://music.youtube.com/history'),
+                p: p,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -143,7 +143,8 @@ Widget _ytmWebOptionTile(
   return Material(
     color: Colors.transparent,
     child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs, vertical: AppSpacing.s2),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxs, vertical: AppSpacing.s2),
       leading: Container(
         width: AppSpacing.s40,
         height: AppSpacing.s40,
@@ -157,7 +158,9 @@ Widget _ytmWebOptionTile(
       title: Text(
         title,
         style: TextStyle(
-            color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
+            color: p.textPrimary,
+            fontWeight: FontWeight.w600,
+            fontSize: AppFontSize.body),
       ),
       subtitle: Text(
         subtitle,
@@ -188,7 +191,8 @@ void showPrivacyGuaranteeSheet(BuildContext context) {
           maxHeight: MediaQuery.of(ctx).size.height * 0.8,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.lg),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,7 +291,8 @@ void showAboutSheet(BuildContext context) {
     context: context,
     builder: (ctx) => SafeArea(
       child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -312,7 +317,8 @@ void showAboutSheet(BuildContext context) {
             const SizedBox(height: AppSpacing.xxs),
             Text(
               '${context.l10n.version} ${AppConfig.appVersion}',
-              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+              style: TextStyle(
+                  color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
             const SizedBox(height: AppSpacing.xs),
             Row(
@@ -322,7 +328,7 @@ void showAboutSheet(BuildContext context) {
                 const SizedBox(width: AppSpacing.xs),
                 // FIX-L8: Extract developer name constant to AppConfig.developerName
                 Text(
-                  'Developer: ${AppConfig.developerName}',
+                  context.l10n.developerLabel(AppConfig.developerName),
                   style: TextStyle(
                     color: p.accent,
                     fontWeight: FontWeight.w600,
@@ -332,7 +338,8 @@ void showAboutSheet(BuildContext context) {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(context.l10n.aboutBlurb,
+            Text(
+              context.l10n.aboutBlurb,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: p.textSecondary,
@@ -349,7 +356,7 @@ void showAboutSheet(BuildContext context) {
                       Navigator.pop(ctx);
                       showWhatsNewSheet(context);
                     },
-                    child: const Text("What's New"),
+                    child: Text(context.l10n.whatsNew),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -374,26 +381,26 @@ void showAboutSheet(BuildContext context) {
 
 void showWhatsNewSheet(BuildContext context) {
   final p = context.palette;
-  final highlights = const [
+  final highlights = [
     (
       Icons.speed_rounded,
-      'Bit-Perfect & Hi-Res Output',
-      'Direct USB DAC streaming, hardware volume control, and native DSD/DoP playback.'
+      context.l10n.whatsNewBitPerfectTitle,
+      context.l10n.whatsNewBitPerfectDesc
     ),
     (
       Icons.tune_rounded,
-      'Pro Studio DSP Suite',
-      'Arbitrary response parametric EQ, multiband compressor, lookahead limiter, and binaural crossfeed.'
+      context.l10n.whatsNewProDspTitle,
+      context.l10n.whatsNewProDspDesc
     ),
     (
       Icons.palette_rounded,
-      'Adaptive Player Themes',
-      '8 handcrafted player themes with full phone landscape, tablet two-pane, and AMOLED optimization.'
+      context.l10n.whatsNewThemesTitle,
+      context.l10n.whatsNewThemesDesc
     ),
     (
       Icons.accessibility_new_rounded,
-      'Accessibility & Fluid Gestures',
-      'WCAG 2.1 AA contrast compliance, dynamic type 2.0x support, and full screen-reader semantics.'
+      context.l10n.whatsNewAccessibilityTitle,
+      context.l10n.whatsNewAccessibilityDesc
     ),
   ];
 
@@ -414,7 +421,8 @@ void showWhatsNewSheet(BuildContext context) {
                     color: p.accentContainer,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.new_releases_rounded, color: p.accent, size: 24),
+                  child: Icon(Icons.new_releases_rounded,
+                      color: p.accent, size: 24),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -422,7 +430,7 @@ void showWhatsNewSheet(BuildContext context) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "What's New in Pulsr",
+                        context.l10n.whatsNewInPulsr,
                         style: TextStyle(
                           color: p.textPrimary,
                           fontWeight: FontWeight.w800,
@@ -430,7 +438,7 @@ void showWhatsNewSheet(BuildContext context) {
                         ),
                       ),
                       Text(
-                        'Version ${AppConfig.appVersion}',
+                        '${context.l10n.version} ${AppConfig.appVersion}',
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: AppFontSize.caption,
@@ -503,4 +511,3 @@ void showWhatsNewSheet(BuildContext context) {
     ),
   );
 }
-

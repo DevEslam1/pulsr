@@ -36,7 +36,8 @@ class DecodedSlot {
 class QueueSlotCodec {
   static const int currentSchemaVersion = 1;
   static const int maxSlotIndex = 2;
-  static const int maxDocumentKeys = (maxSlotIndex + 1) + 2; // slots + activeSlot + schemaVersion
+  static const int maxDocumentKeys =
+      (maxSlotIndex + 1) + 2; // slots + activeSlot + schemaVersion
   // FIX-L06: 7 days to support audiobooks and long podcasts
   static const int maxPositionMs = 7 * 24 * 3600 * 1000;
   static const double minSpeed = 0.1;
@@ -117,7 +118,8 @@ class QueueSlotCodec {
       version = -1;
     }
     if (version < 0 || version > currentSchemaVersion) {
-      throw ArgumentError('Incompatible or invalid schema version: $rawVersion');
+      throw ArgumentError(
+          'Incompatible or invalid schema version: $rawVersion');
     }
     if (version == 0) {
       doc['schemaVersion'] = currentSchemaVersion;
@@ -221,8 +223,7 @@ class QueueSlotCodec {
     ];
   }
 
-  static int clampCurrentIndex(int raw, int length) =>
-      raw.clamp(0, length - 1);
+  static int clampCurrentIndex(int raw, int length) => raw.clamp(0, length - 1);
   static Duration clampPosition(int ms) =>
       Duration(milliseconds: ms.clamp(0, maxPositionMs));
   static double clampSpeed(double v) =>

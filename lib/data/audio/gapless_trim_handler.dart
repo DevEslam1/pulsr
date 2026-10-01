@@ -8,7 +8,8 @@ import 'dart:math' as math;
 class GaplessTrim {
   final Duration preSkip;
   final Duration postTrim;
-  const GaplessTrim({this.preSkip = Duration.zero, this.postTrim = Duration.zero});
+  const GaplessTrim(
+      {this.preSkip = Duration.zero, this.postTrim = Duration.zero});
 
   bool get isEmpty => preSkip == Duration.zero && postTrim == Duration.zero;
   Duration get total => preSkip + postTrim;
@@ -34,8 +35,10 @@ class GaplessTrimHandler {
 
   /// MP3 (LAME): 576-sample encoder delay (@44.1kHz ~13.06ms).
   static const Duration mp3EncoderDelay = Duration(microseconds: 13061);
+
   /// MP3 (LAME): 529-sample encoder padding (@44.1kHz ~11.99ms).
   static const Duration mp3EncoderPadding = Duration(microseconds: 11995);
+
   /// AAC/iTunes gapless priming: 2048-sample encoder delay + 64 lead-in
   /// (@44.1kHz ~47.9ms).
   static const Duration aacEncoderDelay = Duration(microseconds: 47873);
@@ -43,7 +46,8 @@ class GaplessTrimHandler {
   static final Map<String, GaplessTrim> _headerTrimCache = {};
 
   /// Reads actual header-derived gapless metadata (LAME Xing header or M4A iTunSMPB).
-  static Future<GaplessTrim?> readHeaderGaplessTrim(String filePath, {int sampleRate = 44100}) async {
+  static Future<GaplessTrim?> readHeaderGaplessTrim(String filePath,
+      {int sampleRate = 44100}) async {
     if (_headerTrimCache.containsKey(filePath)) {
       return _headerTrimCache[filePath];
     }
@@ -54,7 +58,9 @@ class GaplessTrimHandler {
       GaplessTrim? trim;
       if (lower.endsWith('.mp3')) {
         trim = await _readMp3LameGapless(file, sampleRate);
-      } else if (lower.endsWith('.m4a') || lower.endsWith('.mp4') || lower.endsWith('.aac')) {
+      } else if (lower.endsWith('.m4a') ||
+          lower.endsWith('.mp4') ||
+          lower.endsWith('.aac')) {
         trim = await _readM4aItunSmpb(file, sampleRate);
       }
       if (trim != null) {
@@ -65,7 +71,8 @@ class GaplessTrimHandler {
     return null;
   }
 
-  static Future<GaplessTrim?> _readMp3LameGapless(File file, int sampleRate) async {
+  static Future<GaplessTrim?> _readMp3LameGapless(
+      File file, int sampleRate) async {
     RandomAccessFile? raf;
     try {
       raf = await file.open(mode: FileMode.read);
@@ -75,10 +82,19 @@ class GaplessTrimHandler {
 
       // Scan for 'Xing' or 'Info'
       for (int i = 0; i <= len - 32; i++) {
-        final isXing = bytes[i] == 0x58 && bytes[i + 1] == 0x69 && bytes[i + 2] == 0x6E && bytes[i + 3] == 0x67;
-        final isInfo = bytes[i] == 0x49 && bytes[i + 1] == 0x6E && bytes[i + 2] == 0x66 && bytes[i + 3] == 0x6F;
+        final isXing = bytes[i] == 0x58 &&
+            bytes[i + 1] == 0x69 &&
+            bytes[i + 2] == 0x6E &&
+            bytes[i + 3] == 0x67;
+        final isInfo = bytes[i] == 0x49 &&
+            bytes[i + 1] == 0x6E &&
+            bytes[i + 2] == 0x66 &&
+            bytes[i + 3] == 0x6F;
         if (isXing || isInfo) {
-          final flags = (bytes[i + 4] << 24) | (bytes[i + 5] << 16) | (bytes[i + 6] << 8) | bytes[i + 7];
+          final flags = (bytes[i + 4] << 24) |
+              (bytes[i + 5] << 16) |
+              (bytes[i + 6] << 8) |
+              bytes[i + 7];
           var offset = 8;
           if ((flags & 0x01) != 0) offset += 4; // frames
           if ((flags & 0x02) != 0) offset += 4; // bytes
@@ -99,8 +115,10 @@ class GaplessTrimHandler {
               final delaySamples = (b0 << 4) | (b1 >> 4);
               final paddingSamples = ((b1 & 0x0F) << 8) | b2;
               if (delaySamples > 0 || paddingSamples > 0) {
-                final preSkipUs = ((delaySamples * 1000000) / sampleRate).round();
-                final postTrimUs = ((paddingSamples * 1000000) / sampleRate).round();
+                final preSkipUs =
+                    ((delaySamples * 1000000) / sampleRate).round();
+                final postTrimUs =
+                    ((paddingSamples * 1000000) / sampleRate).round();
                 return GaplessTrim(
                   preSkip: Duration(microseconds: preSkipUs),
                   postTrim: Duration(microseconds: postTrimUs),
@@ -118,7 +136,8 @@ class GaplessTrimHandler {
     return null;
   }
 
-  static Future<GaplessTrim?> _readM4aItunSmpb(File file, int sampleRate) async {
+  static Future<GaplessTrim?> _readM4aItunSmpb(
+      File file, int sampleRate) async {
     RandomAccessFile? raf;
     try {
       raf = await file.open(mode: FileMode.read);
@@ -127,13 +146,15 @@ class GaplessTrimHandler {
       final idx = text.indexOf('iTunSMPB');
       if (idx != -1) {
         final window = text.substring(idx, math.min(text.length, idx + 256));
-        final match = RegExp(r'00000000\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)').firstMatch(window);
+        final match = RegExp(r'00000000\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)')
+            .firstMatch(window);
         if (match != null) {
           final delaySamples = int.tryParse(match.group(1)!, radix: 16) ?? 0;
           final paddingSamples = int.tryParse(match.group(2)!, radix: 16) ?? 0;
           if (delaySamples > 0 || paddingSamples > 0) {
             final preSkipUs = ((delaySamples * 1000000) / sampleRate).round();
-            final postTrimUs = ((paddingSamples * 1000000) / sampleRate).round();
+            final postTrimUs =
+                ((paddingSamples * 1000000) / sampleRate).round();
             return GaplessTrim(
               preSkip: Duration(microseconds: preSkipUs),
               postTrim: Duration(microseconds: postTrimUs),
@@ -150,7 +171,8 @@ class GaplessTrimHandler {
   }
 
   /// Synchronously inspects local audio file header for LAME Xing / M4A iTunSMPB atoms.
-  static GaplessTrim? readHeaderGaplessTrimSync(String filePath, {int sampleRate = 44100}) {
+  static GaplessTrim? readHeaderGaplessTrimSync(String filePath,
+      {int sampleRate = 44100}) {
     if (_headerTrimCache.containsKey(filePath)) {
       return _headerTrimCache[filePath];
     }
@@ -165,10 +187,19 @@ class GaplessTrimHandler {
           final len = bytes.length;
           if (len >= 64) {
             for (int i = 0; i <= len - 32; i++) {
-              final isXing = bytes[i] == 0x58 && bytes[i + 1] == 0x69 && bytes[i + 2] == 0x6E && bytes[i + 3] == 0x67;
-              final isInfo = bytes[i] == 0x49 && bytes[i + 1] == 0x6E && bytes[i + 2] == 0x66 && bytes[i + 3] == 0x6F;
+              final isXing = bytes[i] == 0x58 &&
+                  bytes[i + 1] == 0x69 &&
+                  bytes[i + 2] == 0x6E &&
+                  bytes[i + 3] == 0x67;
+              final isInfo = bytes[i] == 0x49 &&
+                  bytes[i + 1] == 0x6E &&
+                  bytes[i + 2] == 0x66 &&
+                  bytes[i + 3] == 0x6F;
               if (isXing || isInfo) {
-                final flags = (bytes[i + 4] << 24) | (bytes[i + 5] << 16) | (bytes[i + 6] << 8) | bytes[i + 7];
+                final flags = (bytes[i + 4] << 24) |
+                    (bytes[i + 5] << 16) |
+                    (bytes[i + 6] << 8) |
+                    bytes[i + 7];
                 var offset = 8;
                 if ((flags & 0x01) != 0) offset += 4;
                 if ((flags & 0x02) != 0) offset += 4;
@@ -187,8 +218,10 @@ class GaplessTrimHandler {
                     final delaySamples = (b0 << 4) | (b1 >> 4);
                     final paddingSamples = ((b1 & 0x0F) << 8) | b2;
                     if (delaySamples > 0 || paddingSamples > 0) {
-                      final preSkipUs = ((delaySamples * 1000000) / sampleRate).round();
-                      final postTrimUs = ((paddingSamples * 1000000) / sampleRate).round();
+                      final preSkipUs =
+                          ((delaySamples * 1000000) / sampleRate).round();
+                      final postTrimUs =
+                          ((paddingSamples * 1000000) / sampleRate).round();
                       final trim = GaplessTrim(
                         preSkip: Duration(microseconds: preSkipUs),
                         postTrim: Duration(microseconds: postTrimUs),
@@ -204,21 +237,29 @@ class GaplessTrimHandler {
         } finally {
           raf.closeSync();
         }
-      } else if (lower.endsWith('.m4a') || lower.endsWith('.mp4') || lower.endsWith('.aac')) {
+      } else if (lower.endsWith('.m4a') ||
+          lower.endsWith('.mp4') ||
+          lower.endsWith('.aac')) {
         final raf = file.openSync(mode: FileMode.read);
         try {
           final bytes = raf.readSync(65536);
           final text = latin1.decode(bytes);
           final idx = text.indexOf('iTunSMPB');
           if (idx != -1) {
-            final window = text.substring(idx, math.min(text.length, idx + 256));
-            final match = RegExp(r'00000000\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)').firstMatch(window);
+            final window =
+                text.substring(idx, math.min(text.length, idx + 256));
+            final match = RegExp(r'00000000\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)')
+                .firstMatch(window);
             if (match != null) {
-              final delaySamples = int.tryParse(match.group(1)!, radix: 16) ?? 0;
-              final paddingSamples = int.tryParse(match.group(2)!, radix: 16) ?? 0;
+              final delaySamples =
+                  int.tryParse(match.group(1)!, radix: 16) ?? 0;
+              final paddingSamples =
+                  int.tryParse(match.group(2)!, radix: 16) ?? 0;
               if (delaySamples > 0 || paddingSamples > 0) {
-                final preSkipUs = ((delaySamples * 1000000) / sampleRate).round();
-                final postTrimUs = ((paddingSamples * 1000000) / sampleRate).round();
+                final preSkipUs =
+                    ((delaySamples * 1000000) / sampleRate).round();
+                final postTrimUs =
+                    ((paddingSamples * 1000000) / sampleRate).round();
                 final trim = GaplessTrim(
                   preSkip: Duration(microseconds: preSkipUs),
                   postTrim: Duration(microseconds: postTrimUs),
@@ -247,8 +288,10 @@ class GaplessTrimHandler {
   }) {
     if (preSkipOverrideMs != null || postTrimOverrideMs != null) {
       return GaplessTrim(
-        preSkip: Duration(milliseconds: (preSkipOverrideMs ?? 0).clamp(0, 5000)),
-        postTrim: Duration(milliseconds: (postTrimOverrideMs ?? 0).clamp(0, 5000)),
+        preSkip:
+            Duration(milliseconds: (preSkipOverrideMs ?? 0).clamp(0, 5000)),
+        postTrim:
+            Duration(milliseconds: (postTrimOverrideMs ?? 0).clamp(0, 5000)),
       );
     }
     final headerTrim = readHeaderGaplessTrimSync(path);
@@ -259,7 +302,8 @@ class GaplessTrimHandler {
     final c = (codec ?? '').toLowerCase();
     final isOpus = c.contains('opus') ||
         lower.endsWith('.opus') ||
-        (lower.endsWith('.ogg') && (c.isEmpty || c.contains('opus') || lower.contains('opus')));
+        (lower.endsWith('.ogg') &&
+            (c.isEmpty || c.contains('opus') || lower.contains('opus')));
     final isOgg = lower.endsWith('.ogg') || lower.endsWith('.oga');
     final isVorbis = c.contains('vorbis') || (isOgg && !isOpus);
     if (isOpus) {
@@ -267,8 +311,7 @@ class GaplessTrimHandler {
     }
     if (isVorbis) {
       // Vorbis codec delay: ~2 short blocks (~512 samples @44.1k ≈ 11.6ms).
-      return const GaplessTrim(
-          preSkip: Duration(microseconds: 11600));
+      return const GaplessTrim(preSkip: Duration(microseconds: 11600));
     }
     final isMp3 = c.contains('mp3') || lower.endsWith('.mp3');
     if (isMp3) {

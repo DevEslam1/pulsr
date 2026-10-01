@@ -50,13 +50,58 @@ class HeadphoneDeviceMatcher {
   /// Transport / generic words that carry no model identity and must not count
   /// toward a match.
   static const Set<String> _genericTokens = {
-    'bluetooth', 'wireless', 'headphone', 'headphones', 'headset', 'earbud',
-    'earbuds', 'earphone', 'earphones', 'audio', 'stereo', 'hands', 'free',
-    'handsfree', 'tws', 'in', 'on', 'over', 'ear', 'buds', 'bud', 'le',
-    'leaudio', 'a2dp', 'aac', 'sbc', 'ldac', 'aptx', 'device', 'output',
-    'dac', 'usb', 'hifi', 'hires', 'hi', 'res', 'the', 'for', 'and', 'by',
-    'with', 'phone', 'mobile', 'default', 'built', 'builtin', 'speaker',
-    'mono', 'sound', 'card', 'target', 'curve',
+    'bluetooth',
+    'wireless',
+    'headphone',
+    'headphones',
+    'headset',
+    'earbud',
+    'earbuds',
+    'earphone',
+    'earphones',
+    'audio',
+    'stereo',
+    'hands',
+    'free',
+    'handsfree',
+    'tws',
+    'in',
+    'on',
+    'over',
+    'ear',
+    'buds',
+    'bud',
+    'le',
+    'leaudio',
+    'a2dp',
+    'aac',
+    'sbc',
+    'ldac',
+    'aptx',
+    'device',
+    'output',
+    'dac',
+    'usb',
+    'hifi',
+    'hires',
+    'hi',
+    'res',
+    'the',
+    'for',
+    'and',
+    'by',
+    'with',
+    'phone',
+    'mobile',
+    'default',
+    'built',
+    'builtin',
+    'speaker',
+    'mono',
+    'sound',
+    'card',
+    'target',
+    'curve',
   };
 
   /// Returns the best AutoEQ profile for [deviceName], or null when nothing
@@ -147,9 +192,8 @@ class HeadphoneDeviceMatcher {
 
     // Require at least one substantive token (>= 3 chars) to avoid matches
     // driven purely by two-letter noise like "wh".
-    final hasSubstantive = deviceTokens.any((d) =>
-        d.length >= 3 &&
-        profileTokens.any((pt) => _tokenMatch(d, pt)));
+    final hasSubstantive = deviceTokens.any(
+        (d) => d.length >= 3 && profileTokens.any((pt) => _tokenMatch(d, pt)));
     if (!hasSubstantive) return null;
 
     final clamped = score.clamp(0.0, 1.0).toDouble();

@@ -239,8 +239,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
     if (out.length < suggestionMax) {
       try {
-        final res =
-            await _searchUseCase.searchSongs(trimmed, limit: 20).first;
+        final res = await _searchUseCase.searchSongs(trimmed, limit: 20).first;
         final songs = res.fold((_) => <SongsTableData>[], (r) => r);
         for (final s in songs) {
           if (out.length >= suggestionMax) break;
@@ -264,14 +263,19 @@ class SearchCubit extends PulsrCubit<SearchState> {
     final q = query.trim();
     if (q.isEmpty || q.length < 2) return;
     _historyDebounceTimer?.cancel();
-    _historyDebounceTimer = autoTimer(Timer(const Duration(milliseconds: 400), () async {
+    _historyDebounceTimer =
+        autoTimer(Timer(const Duration(milliseconds: 400), () async {
       await historyReady;
       if (isClosed) return;
       try {
         final prefs = await SharedPreferences.getInstance();
         if (isClosed) return;
-        final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
-        final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(historyMax).toList();
+        final existing =
+            prefs.getStringList(_historyKey) ?? List.from(state.history);
+        final updated = [
+          q,
+          ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
+        ].take(historyMax).toList();
         await prefs.setStringList(_historyKey, updated);
         if (!isClosed) safeEmit(state.copyWith(history: updated));
       } catch (_) {}
@@ -318,8 +322,9 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
 
     // Limit search query to 64 chars to avoid CPU starvation on huge pastes
-    final boundedQuery =
-        trimmed.length > maxQueryLength ? trimmed.substring(0, maxQueryLength) : trimmed;
+    final boundedQuery = trimmed.length > maxQueryLength
+        ? trimmed.substring(0, maxQueryLength)
+        : trimmed;
 
     safeEmit(state.copyWith(isLoading: true));
 
@@ -339,7 +344,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
       // FIX-H4: Explicit limit 500 to prevent unbounded query load
       _searchSub = autoSub(
-        _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded, limit: 500),
+        _searchUseCase.searchSongs(boundedQuery,
+            excludedFolders: excluded, limit: 500),
         (result) async {
           if (generation != _generation || isClosed) return;
           await result.fold(
@@ -356,7 +362,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
                 // and cap candidate results at 500 to avoid UI/memory starvation.
                 try {
                   final prefixRes = await _searchUseCase
-                      .searchSongs(boundedQuery.substring(0, 2), excludedFolders: excluded, limit: 500)
+                      .searchSongs(boundedQuery.substring(0, 2),
+                          excludedFolders: excluded, limit: 500)
                       .first;
                   if (generation != _generation || isClosed) return;
                   var candidates =
@@ -386,7 +393,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
             },
           );
         },
-        onError: (error, stackTrace) => _failSearch(generation, error, stackTrace),
+        onError: (error, stackTrace) =>
+            _failSearch(generation, error, stackTrace),
       );
     } catch (e, st) {
       _failSearch(generation, e, st);

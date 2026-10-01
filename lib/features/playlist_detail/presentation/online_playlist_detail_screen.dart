@@ -176,7 +176,8 @@ class _OnlinePlaylistDetailScreenState
               !details.author.toLowerCase().startsWith('playlist ')) {
             _subtitle = details.author;
           }
-          _artworkUrl = details.artworkUrl ?? fetchedTracks.firstOrNull?.artworkUrl;
+          _artworkUrl =
+              details.artworkUrl ?? fetchedTracks.firstOrNull?.artworkUrl;
         } else {
           _artworkUrl ??= fetchedTracks.firstOrNull?.artworkUrl;
         }
@@ -186,8 +187,8 @@ class _OnlinePlaylistDetailScreenState
       // resolve. Staggered and bot-cooldown-aware inside warmStreams.
       if (!_disposed && mounted) {
         context.read<PlayerCubit>().warmStreams(
-              [for (final t in fetchedTracks.take(3)) t.toSongData()],
-            );
+          [for (final t in fetchedTracks.take(3)) t.toSongData()],
+        );
       }
     } catch (e) {
       if (_disposed || !mounted) return;
@@ -255,8 +256,8 @@ class _OnlinePlaylistDetailScreenState
 
       if (createdId != null) {
         // Single batch insert: one transaction instead of N round-trips.
-        await playlistUseCases.addSongsToPlaylist(
-            createdId, [for (final s in songs) s.id]);
+        await playlistUseCases
+            .addSongsToPlaylist(createdId, [for (final s in songs) s.id]);
         if (mounted) {
           PulsrToast.show(
             context,
@@ -325,7 +326,8 @@ class _OnlinePlaylistDetailScreenState
                       style: FilledButton.styleFrom(
                         backgroundColor: p.accent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r14)),
                       ),
@@ -341,7 +343,8 @@ class _OnlinePlaylistDetailScreenState
                       style: FilledButton.styleFrom(
                         backgroundColor: p.surfaceContainerHigh,
                         foregroundColor: p.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r14)),
                       ),
@@ -365,11 +368,14 @@ class _OnlinePlaylistDetailScreenState
                       onPressed: _downloadAll,
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: Text(context.l10n.downloadAll,
-                          style: TextStyle(fontSize: AppFontSize.label, fontWeight: FontWeight.w600)),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
                         foregroundColor: p.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.s10),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r12)),
                       ),
@@ -381,11 +387,14 @@ class _OnlinePlaylistDetailScreenState
                       onPressed: _saveToLocalPlaylists,
                       icon: const Icon(Icons.playlist_add_rounded, size: 18),
                       label: Text(context.l10n.saveToPulsr,
-                          style: TextStyle(fontSize: AppFontSize.label, fontWeight: FontWeight.w600)),
+                          style: TextStyle(
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w600)),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
                         foregroundColor: p.textPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: AppSpacing.s10),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r12)),
                       ),
@@ -411,19 +420,19 @@ class _OnlinePlaylistDetailScreenState
                   hintText: context.l10n.browseSearchWithinPlaylist,
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            tooltip: context.l10n.clear,
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          tooltip: context.l10n.clear,
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
                       : null,
                   filled: true,
                   fillColor: p.surfaceContainer,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md, vertical: AppSpacing.s10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadii.r14),
                     borderSide: BorderSide(color: p.hairline),
@@ -440,7 +449,8 @@ class _OnlinePlaylistDetailScreenState
           if (_isLoading && _tracks.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-              child: SkeletonList(padding: EdgeInsets.symmetric(horizontal: AppSpacing.md)),
+              child: SkeletonList(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md)),
             )
           else if (_errorMessage != null && _tracks.isEmpty)
             Padding(
@@ -457,7 +467,9 @@ class _OnlinePlaylistDetailScreenState
                     Text(
                       _errorMessage!,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                      style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.bodySmall),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     FilledButton.icon(
@@ -477,7 +489,8 @@ class _OnlinePlaylistDetailScreenState
                   _searchQuery.isNotEmpty
                       ? '${context.l10n.browseNoSongsMatch} "$_searchQuery"'
                       : context.l10n.browsePlaylistHasNoSongs,
-                  style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.body),
+                  style: TextStyle(
+                      color: p.textTertiary, fontSize: AppFontSize.body),
                 ),
               ),
             )
@@ -499,13 +512,14 @@ class _OnlinePlaylistDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       YtmDownloadButton(song: song, iconSize: 18),
-                        IconButton(
-                          icon: Icon(Icons.more_vert_rounded,
-                              size: 18, color: p.textTertiary),
-                          tooltip: MaterialLocalizations.of(context)
-                              .moreButtonTooltip,
-                          onPressed: () => SongInfoSheet.show(context, song: song),
-                        ),
+                      IconButton(
+                        icon: Icon(Icons.more_vert_rounded,
+                            size: 18, color: p.textTertiary),
+                        tooltip:
+                            MaterialLocalizations.of(context).moreButtonTooltip,
+                        onPressed: () =>
+                            SongInfoSheet.show(context, song: song),
+                      ),
                     ],
                   ),
                   onTap: () {
@@ -557,7 +571,7 @@ class _OnlinePlaylistDetailScreenState
 
   Widget _buildHeroCard(
       BuildContext context, PulsrPalette p, int totalDurationMs) {
-    const ytGradient = [AppColors.netflixRed, Color(0xFF7A0000)];
+    const ytGradient = [AppColors.netflixRed, AppColors.ytRedDeep];
 
     return Container(
       decoration: BoxDecoration(
@@ -582,8 +596,11 @@ class _OnlinePlaylistDetailScreenState
                     cacheWidth: 600,
                     cacheHeight: 360,
                     loadingBuilder: (context, child, progress) =>
-                        progress == null ? child : _buildFallbackHeroGradient(ytGradient),
-                    errorBuilder: (_, __, ___) => _buildFallbackHeroGradient(ytGradient),
+                        progress == null
+                            ? child
+                            : _buildFallbackHeroGradient(ytGradient),
+                    errorBuilder: (_, __, ___) =>
+                        _buildFallbackHeroGradient(ytGradient),
                   )
                 else
                   _buildFallbackHeroGradient(ytGradient),
@@ -608,19 +625,20 @@ class _OnlinePlaylistDetailScreenState
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                            horizontal: AppSpacing.xs,
+                            vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: AppColors.ytRed,
                           borderRadius: BorderRadius.circular(AppRadii.r6),
                         ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.play_circle_fill_rounded,
-                            color: Colors.white, size: 14),
-                        const SizedBox(width: AppSpacing.xxs),
-                            Text(context.l10n.ytmHeader,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.play_circle_fill_rounded,
+                                color: Colors.white, size: 14),
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(
+                              context.l10n.ytmHeader,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: AppFontSize.tiny,
@@ -679,7 +697,8 @@ class _OnlinePlaylistDetailScreenState
                       Builder(
                         builder: (_) {
                           const bullet = '•';
-                          return Text(bullet, style: TextStyle(color: p.textTertiary));
+                          return Text(bullet,
+                              style: TextStyle(color: p.textTertiary));
                         },
                       ),
                       const SizedBox(width: AppSpacing.s10),
@@ -715,8 +734,7 @@ class _OnlinePlaylistDetailScreenState
         ),
       ),
       child: const Center(
-        child: Icon(Icons.queue_music_rounded,
-            color: Colors.white, size: 54),
+        child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 54),
       ),
     );
   }

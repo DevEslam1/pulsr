@@ -81,7 +81,8 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   @override
   void initState() {
     super.initState();
-    _beepWav = RoomCorrectionService.synthSweepWav([880.0], toneMs: 60, fadeMs: 4, amp: 0.5);
+    _beepWav = RoomCorrectionService.synthSweepWav([880.0],
+        toneMs: 60, fadeMs: 4, amp: 0.5);
     _initPlayer();
   }
 
@@ -180,8 +181,8 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
   void _finish() {
     _timer?.cancel();
     if (!mounted) return;
-    final offset = BluetoothLatencyCalibrator()
-        .offsetFromTapDeltas(List.of(_deltas));
+    final offset =
+        BluetoothLatencyCalibrator().offsetFromTapDeltas(List.of(_deltas));
     setState(() {
       _running = false;
       _resultMs = offset;
@@ -202,7 +203,8 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,14 +220,16 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
             const SizedBox(height: AppSpacing.xxs),
             Text(
               context.l10n.bluetoothLatencySubtitle(current),
-              style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+              style: TextStyle(
+                  fontSize: AppFontSize.label, color: p.textSecondary),
             ),
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
                 Text(
                   context.l10n.settingsSyncOffset,
-                  style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+                  style: TextStyle(
+                      fontSize: AppFontSize.label, color: p.textSecondary),
                 ),
                 const Spacer(),
                 Text(
@@ -240,7 +244,8 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
             ),
             Text(
               '${_deltas.length} / $kTrials',
-              style: TextStyle(fontSize: AppFontSize.caption, color: p.textTertiary),
+              style: TextStyle(
+                  fontSize: AppFontSize.caption, color: p.textTertiary),
             ),
             const SizedBox(height: AppSpacing.sm),
             GestureDetector(
@@ -284,7 +289,9 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
                 const Spacer(),
                 if (_resultMs == null)
                   FilledButton.icon(
-                    onPressed: (_running || _initError || _player == null) ? null : _start,
+                    onPressed: (_running || _initError || _player == null)
+                        ? null
+                        : _start,
                     icon: const Icon(Icons.play_arrow_rounded, size: 18),
                     label: Text(context.l10n.rcStart),
                   )
@@ -293,7 +300,9 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextButton.icon(
-                        onPressed: (_running || _initError || _player == null) ? null : _start,
+                        onPressed: (_running || _initError || _player == null)
+                            ? null
+                            : _start,
                         icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: Text(context.l10n.retry),
                       ),

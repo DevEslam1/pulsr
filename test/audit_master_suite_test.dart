@@ -16,6 +16,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _TestTimerHost with TimerManager {}
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {

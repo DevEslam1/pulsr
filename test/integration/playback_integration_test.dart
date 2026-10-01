@@ -65,7 +65,9 @@ void main() {
       );
     });
 
-    test('Queue progression and neighbour calculations reflect playback position', () {
+    test(
+        'Queue progression and neighbour calculations reflect playback position',
+        () {
       final queue = [testSong1, testSong2, testSong3];
 
       var state = PlayerState(
@@ -107,7 +109,8 @@ void main() {
       expect(state.hasNextNeighbour, isTrue);
     });
 
-    test('PlayerSponsorBlockManager handles skip detection and segment reset', () {
+    test('PlayerSponsorBlockManager handles skip detection and segment reset',
+        () {
       final manager = PlayerSponsorBlockManager();
       expect(manager.currentSegments, isEmpty);
 
@@ -117,7 +120,8 @@ void main() {
       expect(manager.currentVideoId, isNull);
 
       // checkSkipTarget returns null when no segments are loaded
-      final skip = manager.checkSkipTarget(const Duration(seconds: 30), isPlaying: true);
+      final skip =
+          manager.checkSkipTarget(const Duration(seconds: 30), isPlaying: true);
       expect(skip, isNull);
     });
 

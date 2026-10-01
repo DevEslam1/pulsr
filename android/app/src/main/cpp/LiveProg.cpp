@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <algorithm>
+#include <functional>
 #include <sstream>
 
 namespace {
@@ -248,6 +249,17 @@ double LiveProg::getSlider(int index) const {
 
 void LiveProg::applyParams(const LiveProgParamSet& params) {
     enabled_ = params.enabled;
+    // Preferred path: the script was compiled off the audio thread and packaged
+    // into the snapshot. Applying it only copies bytecode (pre-reserved) and
+    // resizes pre-reserved memory, so the audio callback never compiles/allocates.
+    if (params.program && params.program != activeProgram_) {
+        // Do not copy params.code here: this runs on the audio thread and
+        // std::string assignment can heap-allocate. The compiled program is
+        // the only thing the audio path needs.
+        applyPreparedProgram(params.program);
+    }
+    // Sliders must be written AFTER applyPreparedProgram() (which calls reset()
+    // and zeroes memory) so the first block sees the user's slider values.
     setSlider(1, params.slider1);
     setSlider(2, params.slider2);
     setSlider(3, params.slider3);
@@ -256,22 +268,9 @@ void LiveProg::applyParams(const LiveProgParamSet& params) {
     setSlider(6, params.slider6);
     setSlider(7, params.slider7);
     setSlider(8, params.slider8);
-    // Preferred path: the script was compiled off the audio thread and packaged
-    // into the snapshot. Applying it only copies bytecode (pre-reserved) and
-    // resizes pre-reserved memory, so the audio callback never compiles/allocates.
-    if (params.program) {
-        if (params.program != activeProgram_) {
-            loadedCode_ = params.code;
-            applyPreparedProgram(params.program);
-        }
-        return;
-    }
     // Never compile on the audio thread — compilation involves heap allocations,
     // string parsing, and hash map lookups that violate real-time constraints.
     // The control thread must always pre-compile via buildProgram().
-    // if (!params.code.empty() && params.code != loadedCode_) {
-    //     loadCode(params.code);
-    // }
 }
 
 std::shared_ptr<const LiveProgProgram> LiveProg::buildProgram() const {

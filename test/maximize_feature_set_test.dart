@@ -118,9 +118,7 @@ void main() {
       final t = GaplessTrimHandler.trimFor(
           path: 'a.ogg', preSkipOverrideMs: 100, postTrimOverrideMs: 200);
       expect(t.preSkip, const Duration(milliseconds: 100));
-      expect(
-          GaplessTrimHandler.effectiveEnd(
-              const Duration(seconds: 10), t),
+      expect(GaplessTrimHandler.effectiveEnd(const Duration(seconds: 10), t),
           const Duration(milliseconds: 9800));
     });
   });
@@ -147,8 +145,7 @@ void main() {
           DspSnapshot(presetName: 'Ar', gains: [2], savedAt: now));
       s.save(DspSnapshotStore.albumKey('Al', 'A'),
           DspSnapshot(presetName: 'Al', gains: [3], savedAt: now));
-      expect(
-          s.recallFor(album: 'Al', artist: 'A', genre: 'Rock')!.presetName,
+      expect(s.recallFor(album: 'Al', artist: 'A', genre: 'Rock')!.presetName,
           'Al');
       expect(s.recallFor(artist: 'A', genre: 'Rock')!.presetName, 'Ar');
       expect(s.recallFor(genre: 'Rock')!.presetName, 'G');

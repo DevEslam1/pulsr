@@ -40,7 +40,8 @@ void main() {
     expect(results['search'], isNot('Search failed'));
     expect(results['playlistName'], isNot('Please enter a playlist name'));
     expect(results['wifiOnly'], contains('Wi-Fi'));
-    expect(results['storage'], isNot('Insufficient storage space for downloading audio'));
+    expect(results['storage'],
+        isNot('Insufficient storage space for downloading audio'));
     expect(results['unknown'], 'Something entirely new');
   });
 }

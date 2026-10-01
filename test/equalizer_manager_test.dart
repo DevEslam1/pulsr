@@ -204,7 +204,8 @@ void main() {
     });
   });
 
-  group('EqualizerManager session re-attachment (FIX: DSP Session Detached)', () {
+  group('EqualizerManager session re-attachment (FIX: DSP Session Detached)',
+      () {
     test(
         'reapplyToSession orders release -> setAudioSessionId -> re-apply bands/enables',
         () async {
@@ -326,8 +327,10 @@ void main() {
       final methods = channelCalls.map((c) => c.method).toList();
       expect(methods.sublist(afterAttach).contains('releaseEffects'), isFalse,
           reason: 'route change on the same session must not release effects');
-      expect(methods.sublist(afterAttach).contains('setAudioSessionId'), isFalse);
-      expect(methods.sublist(afterAttach).contains('setNativeEqBandsBulk'), isTrue,
+      expect(
+          methods.sublist(afterAttach).contains('setAudioSessionId'), isFalse);
+      expect(
+          methods.sublist(afterAttach).contains('setNativeEqBandsBulk'), isTrue,
           reason: 'effect state must be re-pushed after a route change');
       expect(methods.sublist(afterAttach).contains('setEqEnabled'), isTrue);
     });
@@ -379,9 +382,8 @@ void main() {
       router.handleRouteChanged();
       await router.idleForTest;
       await Future.wait(tracked);
-      final resyncSends = channelCalls
-          .where((c) => c.method == 'setNativeEqBandsBulk')
-          .length;
+      final resyncSends =
+          channelCalls.where((c) => c.method == 'setNativeEqBandsBulk').length;
       expect(resyncSends, greaterThanOrEqualTo(2));
       expect(
         channelCalls.where((c) => c.method == 'setAudioSessionId').length,

@@ -40,8 +40,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     service = MockYtDownloadService();
     when(() => service.setMaxConcurrentDownloads(any())).thenReturn(null);
-    when(() => service.downloadPolicyBlock())
-        .thenAnswer((_) async => null);
+    when(() => service.downloadPolicyBlock()).thenAnswer((_) async => null);
     repo = DownloadRepositoryImpl(service);
   });
 
@@ -58,7 +57,8 @@ void main() {
   test('rejects a malformed video id', () async {
     final result = await repo.queueDownload(task('short'));
     expect(result.isLeft(), isTrue);
-    verifyNever(() => service.download(any(), onProgress: any(named: 'onProgress')));
+    verifyNever(
+        () => service.download(any(), onProgress: any(named: 'onProgress')));
   });
 
   test('dedupes a task that is already queued', () async {
@@ -125,8 +125,8 @@ void main() {
         .thenAnswer((invocation) async {
       final onProgress = invocation.namedArguments[const Symbol('onProgress')]
           as void Function(YtDownloadProgress)?;
-      onProgress?.call(
-          const YtDownloadProgress(YtDownloadStage.downloading, 0.4));
+      onProgress
+          ?.call(const YtDownloadProgress(YtDownloadStage.downloading, 0.4));
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
       return const Right(501);
     });
@@ -151,7 +151,8 @@ void main() {
         .thenAnswer((invocation) async {
       final onProgress = invocation.namedArguments[const Symbol('onProgress')]
           as void Function(YtDownloadProgress)?;
-      onProgress?.call(const YtDownloadProgress(YtDownloadStage.downloading, 1));
+      onProgress
+          ?.call(const YtDownloadProgress(YtDownloadStage.downloading, 1));
       return const Right(9);
     });
 
@@ -166,12 +167,14 @@ void main() {
     expect(raw, contains('"status":"complete"'));
   });
 
-  test('getStorageStats calculates accurate storage sizes from completed tasks', () async {
+  test('getStorageStats calculates accurate storage sizes from completed tasks',
+      () async {
     when(() => service.download(any(), onProgress: any(named: 'onProgress')))
         .thenAnswer((invocation) async {
       final onProgress = invocation.namedArguments[const Symbol('onProgress')]
           as void Function(YtDownloadProgress)?;
-      onProgress?.call(const YtDownloadProgress(YtDownloadStage.downloading, 1));
+      onProgress
+          ?.call(const YtDownloadProgress(YtDownloadStage.downloading, 1));
       return const Right(10);
     });
 

@@ -43,10 +43,12 @@ void main() {
       expect(
         report.total.inMilliseconds,
         lessThan(300),
-        reason: 'Pre-resolved tap-to-audible-sound must be strictly < 300 ms (Actual: ${report.total.inMilliseconds}ms)',
+        reason:
+            'Pre-resolved tap-to-audible-sound must be strictly < 300 ms (Actual: ${report.total.inMilliseconds}ms)',
       );
       expect(
-        report.stageDurations[PlaybackStage.resolutionRequested]?.inMilliseconds,
+        report
+            .stageDurations[PlaybackStage.resolutionRequested]?.inMilliseconds,
         lessThanOrEqualTo(10),
       );
     });
@@ -90,11 +92,13 @@ void main() {
       expect(
         report.total.inMilliseconds,
         lessThan(1000),
-        reason: 'Warm stream resolution and playback start must be < 1.0 s (Actual: ${report.total.inMilliseconds}ms)',
+        reason:
+            'Warm stream resolution and playback start must be < 1.0 s (Actual: ${report.total.inMilliseconds}ms)',
       );
     });
 
-    test('Cold Track Budget Assertion (< 3000 ms absolute worst-case target)', () {
+    test('Cold Track Budget Assertion (< 3000 ms absolute worst-case target)',
+        () {
       // Scenario: Cold start, first install, poToken generation + 350ms hedged resolution race
       tracker.start(videoId: 'cold_v3');
 
@@ -137,7 +141,8 @@ void main() {
       expect(
         report.total.inMilliseconds,
         lessThan(3000),
-        reason: 'Cold start absolute worst-case must remain strictly < 3.0 s (Actual: ${report.total.inMilliseconds}ms)',
+        reason:
+            'Cold start absolute worst-case must remain strictly < 3.0 s (Actual: ${report.total.inMilliseconds}ms)',
       );
     });
   });

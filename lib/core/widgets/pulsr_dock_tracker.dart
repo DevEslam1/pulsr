@@ -16,14 +16,15 @@ class PulsrDockTracker {
   static final ValueNotifier<bool> hasMiniPlayer = ValueNotifier<bool>(false);
 
   /// Whether the full-screen Now Playing route is currently on top.
-  static final ValueNotifier<bool> isNowPlayingOpen = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> isNowPlayingOpen =
+      ValueNotifier<bool>(false);
 
   /// Combined notifier to trigger updates whenever any dock metric changes.
   static final ValueNotifier<int> changeNotifier = ValueNotifier<int>(0);
 
   static void updateDock({required double height, required bool miniPlayer}) {
-    final changed =
-        (dockHeight.value - height).abs() > 0.5 || hasMiniPlayer.value != miniPlayer;
+    final changed = (dockHeight.value - height).abs() > 0.5 ||
+        hasMiniPlayer.value != miniPlayer;
     if (changed) {
       dockHeight.value = height;
       hasMiniPlayer.value = miniPlayer;

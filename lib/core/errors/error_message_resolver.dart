@@ -102,7 +102,8 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (message.startsWith('Stream extraction failed. Switching route')) {
     return l10n.errYtmExtractFail;
   }
-  if (message.startsWith('YouTube needs verification. Trying alternate route')) {
+  if (message
+      .startsWith('YouTube needs verification. Trying alternate route')) {
     return l10n.errYtmVerify;
   }
   if (message.startsWith('Sign in failed. Please try again')) {
@@ -190,8 +191,9 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   ]) {
     if (message.startsWith(prefix)) {
       final sep = message.indexOf(': ');
-      final detail =
-          sep >= 0 ? message.substring(sep + 2) : message.substring(prefix.length);
+      final detail = sep >= 0
+          ? message.substring(sep + 2)
+          : message.substring(prefix.length);
       return l10n.errAudioSettingFailed(detail);
     }
   }
@@ -236,4 +238,3 @@ class ErrorMessageResolver {
     }
   }
 }
-

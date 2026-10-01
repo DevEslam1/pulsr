@@ -17,7 +17,9 @@ const Map<String, int> kBtCodecLatencyMs = {
 };
 
 int estimateBtLatencyForCodec(String? codecName) {
-  if (codecName == null || codecName.isEmpty) return kBtCodecLatencyMs['default']!;
+  if (codecName == null || codecName.isEmpty) {
+    return kBtCodecLatencyMs['default']!;
+  }
   final key = codecName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   // Match the most specific alias first: 'aptxhd'/'aptxadaptive' must win over
   // the generic 'aptx' entry, which would otherwise always match first.
@@ -64,8 +66,8 @@ class BluetoothLatencyCalibrator {
   /// Returns a clamped offset with the reaction baseline removed.
   int offsetFromTapDeltas(List<int> tapDeltasMs,
       {int reactionBaselineMs = 180}) {
-    final valid =
-        tapDeltasMs.where((d) => d >= 0 && d <= 1500).toList()..sort();
+    final valid = tapDeltasMs.where((d) => d >= 0 && d <= 1500).toList()
+      ..sort();
     if (valid.isEmpty) return estimateBtLatencyForCodec(null);
     final trimmed =
         valid.length >= 4 ? valid.sublist(1, valid.length - 1) : valid;
@@ -73,7 +75,8 @@ class BluetoothLatencyCalibrator {
     return clampOffset(mean - reactionBaselineMs);
   }
 
-  Future<BtCalibrationResult> calibrate({    String? codecName,
+  Future<BtCalibrationResult> calibrate({
+    String? codecName,
     BtProbeFn? probe,
     int samples = 5,
   }) async {
@@ -96,7 +99,8 @@ class BluetoothLatencyCalibrator {
       if (vals.isNotEmpty) {
         vals.sort();
         // Trimmed mean: drop min/max when we have enough samples.
-        final trimmed = vals.length >= 4 ? vals.sublist(1, vals.length - 1) : vals;
+        final trimmed =
+            vals.length >= 4 ? vals.sublist(1, vals.length - 1) : vals;
         probeAvg = (trimmed.reduce((a, b) => a + b) / trimmed.length).round();
         final mean = probeAvg.toDouble();
         final variance = trimmed

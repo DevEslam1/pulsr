@@ -372,8 +372,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                                                   shape: BoxShape.circle,
                                                   gradient: RadialGradient(
                                                     colors: [
-                                                      Colors.grey.shade400,
-                                                      Colors.grey.shade800,
+                                                      AppColors.discSilver,
+                                                      AppColors.discShadow,
                                                       AppColors.darkSurface,
                                                     ],
                                                     stops: const [
@@ -719,8 +719,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                     constraints: BoxConstraints(
                       maxWidth: isTablet ? 440.0 : 380.0,
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Padding(
@@ -852,7 +853,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                       ],
                     ),
                   ),
-                )
+                ),
+              )
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -903,7 +905,10 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
                             fit: StackFit.expand,
                             alignment: Alignment.center,
                             children: <Widget>[
-                              ...previousChildren,
+                              // BUG-FIX: previous panes are fading out —
+                              // prevent them from stealing touch events.
+                              ...previousChildren.map(
+                                  (c) => IgnorePointer(child: c)),
                               if (currentChild != null) currentChild,
                             ],
                           );
@@ -1239,11 +1244,11 @@ class _PlatterStrobePainter extends CustomPainter {
     final bevelPaint = Paint()
       ..shader = SweepGradient(
         colors: [
-          Colors.grey.shade600,
-          Colors.grey.shade400,
-          Colors.grey.shade700,
-          Colors.grey.shade500,
-          Colors.grey.shade600,
+          AppColors.discSteel,
+          AppColors.discSilver,
+          AppColors.discGraphite,
+          AppColors.discAluminum,
+          AppColors.discSteel,
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
@@ -1339,7 +1344,7 @@ class _TonearmPainter extends CustomPainter {
       ..strokeWidth = 1.5;
     canvas.drawCircle(pivot, _gimbalRadius, baseRimPaint);
 
-    final screwPaint = Paint()..color = Colors.grey.shade400;
+    final screwPaint = Paint()..color = AppColors.discSilver;
     for (int i = 0; i < 4; i++) {
       final a = (i * math.pi) / 2 + 0.4;
       final sx = pivot.dx + _screwCircleRadius * math.cos(a);
@@ -1423,10 +1428,10 @@ class _TonearmPainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Colors.grey.shade400,
+          AppColors.discSilver,
           Colors.white,
-          Colors.grey.shade600,
-          Colors.grey.shade800,
+          AppColors.discSteel,
+          AppColors.discShadow,
         ],
         stops: const [0.0, 0.3, 0.7, 1.0],
       ).createShader(Rect.fromLTWH(-10, 0, 20, l))
@@ -1466,7 +1471,7 @@ class _TonearmPainter extends CustomPainter {
 
     final stylusHousingRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(headshellEnd.dx - 3.5, headshellEnd.dy + 3, 7, 6),
-      const Radius.circular(1.5),
+      const Radius.circular(AppRadii.r2),
     );
     final stylusHousingPaint = Paint()..color = activeColor;
     canvas.drawRRect(stylusHousingRect, stylusHousingPaint);
@@ -1491,7 +1496,7 @@ class _TonearmPainter extends CustomPainter {
       headshellEnd.dy - 10,
     );
     final fingerLiftPaint = Paint()
-      ..color = Colors.grey.shade400
+      ..color = AppColors.discSilver
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round;
@@ -1503,8 +1508,8 @@ class _TonearmPainter extends CustomPainter {
       ..shader = RadialGradient(
         colors: [
           Colors.white,
-          Colors.grey.shade400,
-          Colors.grey.shade800,
+          AppColors.discSilver,
+          AppColors.discShadow,
         ],
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
     canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);

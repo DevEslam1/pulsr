@@ -250,9 +250,8 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
     } else {
       _memoizedFilteredSourceRef = allEntries;
       _memoizedFilteredIsPro = state.isProfessional;
-      entries = _memoizedFilteredEntries = allEntries
-          .where((e) => state.isProfessional || !e.pro)
-          .toList();
+      entries = _memoizedFilteredEntries =
+          allEntries.where((e) => state.isProfessional || !e.pro).toList();
     }
 
     final List<_SearchItem> results;

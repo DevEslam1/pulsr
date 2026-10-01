@@ -48,8 +48,7 @@ void main() {
       expect(chapters[0].index, equals(1));
       expect(chapters[0].title, equals('Opening'));
       expect(chapters[0].start, equals(Duration.zero));
-      expect(chapters[0].end,
-          equals(const Duration(minutes: 4, seconds: 30)));
+      expect(chapters[0].end, equals(const Duration(minutes: 4, seconds: 30)));
       expect(chapters[2].end, isNull);
     });
   });
@@ -70,8 +69,7 @@ void main() {
   });
 
   group('buildCueExpansion', () {
-    test('maps chapters onto the container path with the real file fields',
-        () {
+    test('maps chapters onto the container path with the real file fields', () {
       final container = _container('/music/album.flac');
       final chapters = CueParser.parse(_cueContent);
       final companions = MusicRepository.buildCueExpansion(
@@ -131,8 +129,7 @@ void main() {
             cueFile: const Value('/music/album.cue'),
           ));
 
-      final row = await (db.select(db.songsTable)
-            ..where((t) => t.id.equals(1)))
+      final row = await (db.select(db.songsTable)..where((t) => t.id.equals(1)))
           .getSingle();
       expect(row.cueStartMs, equals(1000));
       expect(row.cueEndMs, equals(2000));

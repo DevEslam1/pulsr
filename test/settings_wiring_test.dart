@@ -19,10 +19,12 @@ void main() {
     // constants (scrobblerLastSong = scrobblePendingSong). Resolve aliases to
     // their ultimate string literal.
     final src = keysFile.readAsStringSync();
-    final litDecl =
-        RegExp(r'''static const String (\w+)\s*=\s*['"]([^'"]+)['"]''', dotAll: true);
-    final aliasDecl =
-        RegExp(r'''static const String (\w+)\s*=\s*([A-Za-z_]\w*)\s*;''', dotAll: true);
+    final litDecl = RegExp(
+        r'''static const String (\w+)\s*=\s*['"]([^'"]+)['"]''',
+        dotAll: true);
+    final aliasDecl = RegExp(
+        r'''static const String (\w+)\s*=\s*([A-Za-z_]\w*)\s*;''',
+        dotAll: true);
     final names = <String, String>{};
     for (final m in litDecl.allMatches(src)) {
       names[m.group(1)!] = m.group(2)!;

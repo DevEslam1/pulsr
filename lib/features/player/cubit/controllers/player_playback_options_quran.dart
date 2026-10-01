@@ -87,7 +87,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       }
       await _clearQuranSnapshot();
       final current = _getState();
-      _emit(current.copyWith(dsp: current.dsp.copyWith(isQuranModeEnabled: false)));
+      _emit(current.copyWith(
+          dsp: current.dsp.copyWith(isQuranModeEnabled: false)));
     }
   }
 
@@ -108,7 +109,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       final reason = _dspBlockedReason?.call();
       if (reason != null) {
         _emit(s.copyWith(
-          playback: s.playback.copyWith(errorMessage: 'Reverb blocked: $reason'),
+          playback:
+              s.playback.copyWith(errorMessage: 'Reverb blocked: $reason'),
         ));
         return;
       }
@@ -183,13 +185,12 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore from Quran snapshot',
-          error: e,
-          stackTrace: st,
-          category: 'PlayerPlaybackOptionsQuran');
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');
       _syncAudioEffects?.call();
       final cur = _getState();
       _emit(cur.copyWith(
-        playback: cur.playback.copyWith(errorMessage: 'Failed to restore audio settings'),
+        playback: cur.playback
+            .copyWith(errorMessage: 'Failed to restore audio settings'),
       ));
     }
   }
@@ -240,13 +241,12 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       await setPlaybackSpeed(profile.playbackSpeed, persist: false);
     } catch (e, st) {
       ErrorLogger.log('Failed to apply Quran profile',
-          error: e,
-          stackTrace: st,
-          category: 'PlayerPlaybackOptionsQuran');
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');
       _syncAudioEffects?.call();
       final cur = _getState();
       _emit(cur.copyWith(
-        playback: cur.playback.copyWith(errorMessage: 'Failed to apply Quran profile'),
+        playback: cur.playback
+            .copyWith(errorMessage: 'Failed to apply Quran profile'),
       ));
     }
   }

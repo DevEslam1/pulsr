@@ -150,7 +150,9 @@ class YtmOAuthService {
     final exp = _expiresAt;
     // Unknown expiry: assume valid and let the server reject if not.
     if (exp == null) return true;
-    if (exp.difference(DateTime.now()) > const Duration(minutes: 2)) return true;
+    if (exp.difference(DateTime.now()) > const Duration(minutes: 2)) {
+      return true;
+    }
     // The token is (nearly) expired and cannot be refreshed: treat as signed
     // out instead of reporting a usable session that will 401 on every call.
     if (_refreshToken == null || _refreshToken!.isEmpty) {
@@ -178,8 +180,8 @@ class YtmOAuthService {
     }
     final deviceCode = json['device_code'] as String?;
     final userCode = json['user_code'] as String?;
-    final verificationUrl = (json['verification_url'] ??
-            json['verification_uri']) as String?;
+    final verificationUrl =
+        (json['verification_url'] ?? json['verification_uri']) as String?;
     if (deviceCode == null ||
         userCode == null ||
         verificationUrl == null ||
@@ -327,7 +329,9 @@ class YtmOAuthService {
         await _client
             .post(
               Uri.parse('https://oauth2.googleapis.com/revoke'),
-              headers: const {'Content-Type': 'application/x-www-form-urlencoded'},
+              headers: const {
+                'Content-Type': 'application/x-www-form-urlencoded'
+              },
               body: 'token=${Uri.encodeQueryComponent(tokenToRevoke)}',
             )
             .timeout(const Duration(seconds: 5));

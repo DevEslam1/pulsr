@@ -40,43 +40,43 @@ class QuranModeDockButton extends StatelessWidget {
       },
       excludeSemantics: true,
       child: InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        QuranModeSheet.show(context);
-      },
-      borderRadius: BorderRadius.circular(AppRadii.r20),
-      child: Tooltip(
-        message: label,
-        child: Center(
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              AnimatedContainer(
-                duration: context.motionMs(200),
-                padding: EdgeInsets.all(isTablet ? 8 : 6),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive
-                      ? activeColor.withValues(alpha: 0.22)
-                      : Colors.transparent,
-                  border: isActive
-                      ? Border.all(
-                          color: activeColor.withValues(alpha: 0.45),
-                          width: 1.2,
-                        )
-                      : null,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          QuranModeSheet.show(context);
+        },
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        child: Tooltip(
+          message: label,
+          child: Center(
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: context.motionMs(200),
+                  padding: EdgeInsets.all(isTablet ? 8 : 6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isActive
+                        ? activeColor.withValues(alpha: 0.22)
+                        : Colors.transparent,
+                    border: isActive
+                        ? Border.all(
+                            color: activeColor.withValues(alpha: 0.45),
+                            width: 1.2,
+                          )
+                        : null,
+                  ),
+                  child: Icon(
+                    Icons.menu_book_rounded,
+                    size: isTablet ? 22 : 20,
+                    color: isActive ? activeColor : inactiveColor,
+                  ),
                 ),
-                child: Icon(
-                  Icons.menu_book_rounded,
-                  size: isTablet ? 22 : 20,
-                  color: isActive ? activeColor : inactiveColor,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

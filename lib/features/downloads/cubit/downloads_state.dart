@@ -22,8 +22,7 @@ class DownloadsState {
       (tasks.values.toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
 
-  int get activeCount =>
-      tasks.values.where((t) => t.status.isActive).length;
+  int get activeCount => tasks.values.where((t) => t.status.isActive).length;
 
   int get completedCount =>
       tasks.values.where((t) => t.status == DownloadStatus.complete).length;

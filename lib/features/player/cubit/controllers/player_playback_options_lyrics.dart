@@ -1,7 +1,8 @@
 // lib/features/player/cubit/controllers/player_playback_options_lyrics.dart
 part of 'player_playback_options_controller.dart';
 
-extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsController {
+extension PlayerPlaybackOptionsLyricsExtension
+    on PlayerPlaybackOptionsController {
   // ──────────────────────────────────────────────
   // AB Loop
   // ──────────────────────────────────────────────
@@ -38,7 +39,8 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
 
   void toggleAbLoop() {
     final s = _getState();
-    _emit(s.copyWith(playback: s.playback.copyWith(abLoopEnabled: !s.abLoopEnabled)));
+    _emit(s.copyWith(
+        playback: s.playback.copyWith(abLoopEnabled: !s.abLoopEnabled)));
   }
 
   void seekToBookmark() {
@@ -60,11 +62,12 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     try {
       final key = PlaybackBookmarkStore.keyFor(
           songId: song.id, remoteId: song.remoteId, path: song.path);
-      _audioHandler.bookmarkStore.save(key, posMs,
-          durationMs: s.duration.inMilliseconds);
+      _audioHandler.bookmarkStore
+          .save(key, posMs, durationMs: s.duration.inMilliseconds);
       await _audioHandler.persistBookmarks();
       _emit(s.copyWith(
-          playback: s.playback.copyWith(bookmarkPosition: Duration(milliseconds: posMs))));
+          playback: s.playback
+              .copyWith(bookmarkPosition: Duration(milliseconds: posMs))));
       return true;
     } catch (_) {
       return false;
@@ -126,8 +129,7 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
       final baseName = path.split(RegExp(r'[\\/]')).last;
       final dot = baseName.lastIndexOf('.');
       final stem = dot > 0 ? baseName.substring(0, dot) : baseName;
-      final sidecar =
-          File('${dir.path}${Platform.pathSeparator}$stem.lrc');
+      final sidecar = File('${dir.path}${Platform.pathSeparator}$stem.lrc');
       await sidecar.writeAsString(LrcParser.formatToLrc(lines), flush: true);
       LrcParser.cacheLyricsResult(
         LyricsResult(lines: lines, source: source),
@@ -192,7 +194,9 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
   void toggleLyricsVisibility() {
     HapticFeedback.lightImpact();
     final s = _getState();
-    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
+    _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+            isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
   }
 
   void toggleQueue() => toggleQueueVisibility();
@@ -200,23 +204,31 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
   void toggleQueueVisibility() {
     HapticFeedback.lightImpact();
     final s = _getState();
-    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
+    _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+            isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
   }
 
   void resetOverlayViews() {
     final s = _getState();
     if (s.isLyricsVisible || s.isQueueVisible) {
-      _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: false, isQueueVisible: false)));
+      _emit(s.copyWith(
+          lyricsSlice: s.lyricsSlice
+              .copyWith(isLyricsVisible: false, isQueueVisible: false)));
     }
   }
 
-  void setExpanded(bool expanded) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
-  Future<void> setTrackBpm(SongsTableData song, double? bpm) => _audioHandler.setTrackBpm(song, bpm);
-  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
+  void setExpanded(bool expanded) => _emit(_getState()
+      .copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
+  Future<void> setTrackBpm(SongsTableData song, double? bpm) =>
+      _audioHandler.setTrackBpm(song, bpm);
+  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(
+      playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
   void setSilenceSkipSensitivity(int sensitivity) {
     final clamped = sensitivity.clamp(0, 100);
     final s = _getState();
-    _emit(s.copyWith(playback: s.playback.copyWith(silenceSkipSensitivity: clamped)));
+    _emit(s.copyWith(
+        playback: s.playback.copyWith(silenceSkipSensitivity: clamped)));
     unawaited(_applySilenceSkipSensitivity(clamped));
   }
 
@@ -225,7 +237,9 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
       await _audioHandler.setSilenceSkipSensitivity(value);
     } catch (e, st) {
       ErrorLogger.log('Failed to apply silence-skip sensitivity',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
     }
   }
 }

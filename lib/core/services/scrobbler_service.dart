@@ -729,7 +729,8 @@ class ScrobblerService {
   static const String keyTotalScrobbleCount = 'total_scrobble_count';
   static const String keyDailyScrobbleLog = 'scrobble_daily_log';
 
-  Future<void> _recordSuccessfulScrobble(SharedPreferences prefs, [int? timestampMs]) async {
+  Future<void> _recordSuccessfulScrobble(SharedPreferences prefs,
+      [int? timestampMs]) async {
     try {
       final total = (prefs.getInt(keyTotalScrobbleCount) ?? 0) + 1;
       await prefs.setInt(keyTotalScrobbleCount, total);

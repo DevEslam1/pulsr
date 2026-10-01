@@ -3,6 +3,8 @@
 // Single source of truth for “show the user info on every feature and prevent him to select 2 thing cannot work together”.
 
 import '../../domain/models/audio_output_info.dart';
+import '../../l10n/generated/app_localizations.dart';
+import '../utils/l10n_holder.dart';
 
 /// Human-readable info for one toggle/slider/card.
 class AudioFeatureInfo {
@@ -21,6 +23,249 @@ class AudioFeatureInfo {
     this.conflictsWith,
     this.whyDisabledReason,
   });
+
+  AudioFeatureInfo localized(AppLocalizations l) => AudioFeatureInfo(
+        id: id,
+        title: _title(l),
+        subtitle: _subtitle(l),
+        description: _description(l),
+        conflictsWith: _conflictsWith(l),
+        whyDisabledReason: whyDisabledReason,
+      );
+
+  String _title(AppLocalizations l) {
+    switch (id) {
+      case 'bitPerfect':
+        return l.featureInfoBitPerfectTitle;
+      case 'bypassDsp':
+        return l.featureInfoBypassDspTitle;
+      case 'followTrackSampleRate':
+        return l.featureInfoFollowTrackSampleRateTitle;
+      case 'strictBitPerfect':
+        return l.featureInfoStrictBitPerfectTitle;
+      case 'equalizer':
+        return l.featureInfoEqualizerTitle;
+      case 'bassBoost':
+        return l.featureInfoBassBoostTitle;
+      case 'crossfeed':
+        return l.featureInfoCrossfeedTitle;
+      case 'limiter':
+        return l.featureInfoLimiterTitle;
+      case 'reverb':
+        return l.featureInfoReverbTitle;
+      case 'panner':
+        return l.featureInfoPannerTitle;
+      case 'resampler':
+        return l.featureInfoResamplerTitle;
+      case 'virtualizer':
+        return l.featureInfoVirtualizerTitle;
+      case 'spatializer':
+        return l.featureInfoSpatializerTitle;
+      case 'dynamics':
+        return l.featureInfoDynamicsTitle;
+      case 'roomCorrection':
+        return l.featureInfoRoomCorrectionTitle;
+      case 'dsdNative':
+        return l.featureInfoDsdNativeTitle;
+      case 'mqa':
+        return l.featureInfoMqaTitle;
+      case 'gapless':
+        return l.featureInfoGaplessTitle;
+      case 'crossfade':
+        return l.featureInfoCrossfadeTitle;
+      case 'replayGain':
+        return l.featureInfoReplayGainTitle;
+      case 'oem':
+        return l.featureInfoOemTitle;
+      case 'volumeBoost':
+        return l.featureInfoVolumeBoostTitle;
+      case 'saturation':
+        return l.featureInfoSaturationTitle;
+      case 'stereoWidth':
+        return l.featureInfoStereoWidthTitle;
+      case 'loudnessContour':
+        return l.featureInfoLoudnessContourTitle;
+      case 'subCrossover':
+        return l.featureInfoSubCrossoverTitle;
+      case 'dynamicEq':
+        return l.featureInfoDynamicEqTitle;
+      case 'multibandCompressor':
+        return l.featureInfoMultibandCompressorTitle;
+      case 'dynamicBass':
+        return l.featureInfoDynamicBassTitle;
+      case 'viperDdc':
+        return l.featureInfoViperDdcTitle;
+      case 'arbitraryEq':
+        return l.featureInfoArbitraryEqTitle;
+      case 'liveProg':
+        return l.featureInfoLiveProgTitle;
+      default:
+        return title;
+    }
+  }
+
+  String _subtitle(AppLocalizations l) {
+    switch (id) {
+      case 'bitPerfect':
+        return l.featureInfoBitPerfectSubtitle;
+      case 'bypassDsp':
+        return l.featureInfoBypassDspSubtitle;
+      case 'followTrackSampleRate':
+        return l.featureInfoFollowTrackSampleRateSubtitle;
+      case 'strictBitPerfect':
+        return l.featureInfoStrictBitPerfectSubtitle;
+      case 'equalizer':
+        return l.featureInfoEqualizerSubtitle;
+      case 'bassBoost':
+        return l.featureInfoBassBoostSubtitle;
+      case 'crossfeed':
+        return l.featureInfoCrossfeedSubtitle;
+      case 'limiter':
+        return l.featureInfoLimiterSubtitle;
+      case 'reverb':
+        return l.featureInfoReverbSubtitle;
+      case 'panner':
+        return l.featureInfoPannerSubtitle;
+      case 'resampler':
+        return l.featureInfoResamplerSubtitle;
+      case 'virtualizer':
+        return l.featureInfoVirtualizerSubtitle;
+      case 'spatializer':
+        return l.featureInfoSpatializerSubtitle;
+      case 'dynamics':
+        return l.featureInfoDynamicsSubtitle;
+      case 'roomCorrection':
+        return l.featureInfoRoomCorrectionSubtitle;
+      case 'dsdNative':
+        return l.featureInfoDsdNativeSubtitle;
+      case 'mqa':
+        return l.featureInfoMqaSubtitle;
+      case 'gapless':
+        return l.featureInfoGaplessSubtitle;
+      case 'crossfade':
+        return l.featureInfoCrossfadeSubtitle;
+      case 'replayGain':
+        return l.featureInfoReplayGainSubtitle;
+      case 'oem':
+        return l.featureInfoOemSubtitle;
+      case 'volumeBoost':
+        return l.featureInfoVolumeBoostSubtitle;
+      case 'saturation':
+        return l.featureInfoSaturationSubtitle;
+      case 'stereoWidth':
+        return l.featureInfoStereoWidthSubtitle;
+      case 'loudnessContour':
+        return l.featureInfoLoudnessContourSubtitle;
+      case 'subCrossover':
+        return l.featureInfoSubCrossoverSubtitle;
+      case 'dynamicEq':
+        return l.featureInfoDynamicEqSubtitle;
+      case 'multibandCompressor':
+        return l.featureInfoMultibandCompressorSubtitle;
+      case 'dynamicBass':
+        return l.featureInfoDynamicBassSubtitle;
+      case 'viperDdc':
+        return l.featureInfoViperDdcSubtitle;
+      case 'arbitraryEq':
+        return l.featureInfoArbitraryEqSubtitle;
+      case 'liveProg':
+        return l.featureInfoLiveProgSubtitle;
+      default:
+        return subtitle;
+    }
+  }
+
+  String _description(AppLocalizations l) {
+    switch (id) {
+      case 'bitPerfect':
+        return l.featureInfoBitPerfectDescription;
+      case 'bypassDsp':
+        return l.featureInfoBypassDspDescription;
+      case 'followTrackSampleRate':
+        return l.featureInfoFollowTrackSampleRateDescription;
+      case 'strictBitPerfect':
+        return l.featureInfoStrictBitPerfectDescription;
+      case 'equalizer':
+        return l.featureInfoEqualizerDescription;
+      case 'bassBoost':
+        return l.featureInfoBassBoostDescription;
+      case 'crossfeed':
+        return l.featureInfoCrossfeedDescription;
+      case 'limiter':
+        return l.featureInfoLimiterDescription;
+      case 'reverb':
+        return l.featureInfoReverbDescription;
+      case 'panner':
+        return l.featureInfoPannerDescription;
+      case 'resampler':
+        return l.featureInfoResamplerDescription;
+      case 'virtualizer':
+        return l.featureInfoVirtualizerDescription;
+      case 'spatializer':
+        return l.featureInfoSpatializerDescription;
+      case 'dynamics':
+        return l.featureInfoDynamicsDescription;
+      case 'roomCorrection':
+        return l.featureInfoRoomCorrectionDescription;
+      case 'dsdNative':
+        return l.featureInfoDsdNativeDescription;
+      case 'mqa':
+        return l.featureInfoMqaDescription;
+      case 'gapless':
+        return l.featureInfoGaplessDescription;
+      case 'crossfade':
+        return l.featureInfoCrossfadeDescription;
+      case 'replayGain':
+        return l.featureInfoReplayGainDescription;
+      case 'oem':
+        return l.featureInfoOemDescription;
+      case 'volumeBoost':
+        return l.featureInfoVolumeBoostDescription;
+      case 'saturation':
+        return l.featureInfoSaturationDescription;
+      case 'stereoWidth':
+        return l.featureInfoStereoWidthDescription;
+      case 'loudnessContour':
+        return l.featureInfoLoudnessContourDescription;
+      case 'subCrossover':
+        return l.featureInfoSubCrossoverDescription;
+      case 'dynamicEq':
+        return l.featureInfoDynamicEqDescription;
+      case 'multibandCompressor':
+        return l.featureInfoMultibandCompressorDescription;
+      case 'dynamicBass':
+        return l.featureInfoDynamicBassDescription;
+      case 'viperDdc':
+        return l.featureInfoViperDdcDescription;
+      case 'arbitraryEq':
+        return l.featureInfoArbitraryEqDescription;
+      case 'liveProg':
+        return l.featureInfoLiveProgDescription;
+      default:
+        return description;
+    }
+  }
+
+  String? _conflictsWith(AppLocalizations l) {
+    switch (conflictsWith) {
+      case 'All DSP when “Bypass DSP” is ON':
+        return l.conflictWithAllDspBypassDsp;
+      case 'Bit-Perfect bypass':
+        return l.conflictWithBitPerfect;
+      case 'EQ / ReplayGain / Effects / Crossfade':
+        return l.conflictWithEqReplayGainEffectsCrossfade;
+      case 'Bit-Perfect bypass / Direct':
+        return l.conflictWithResampler;
+      case 'Bit-Perfect bypass, Hardware Spatializer':
+        return l.conflictWithVirtualizer;
+      case 'Crossfade (>0 s)':
+        return l.conflictWithCrossfade;
+      case 'Gapless':
+        return l.conflictWithGapless;
+      default:
+        return conflictsWith;
+    }
+  }
 }
 
 /// All audio features in the app. Used by UI to render an Ⓘ button next to each control.
@@ -219,7 +464,8 @@ class AudioFeatureRegistry {
   static const saturation = AudioFeatureInfo(
     id: 'saturation',
     title: 'Harmonic Saturation / Exciter',
-    subtitle: 'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling',
+    subtitle:
+        'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling',
     description:
         'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
@@ -264,7 +510,8 @@ class AudioFeatureRegistry {
   static const multibandCompressor = AudioFeatureInfo(
     id: 'multibandCompressor',
     title: 'Native 4-Band Multiband Compressor',
-    subtitle: 'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++',
+    subtitle:
+        'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++',
     description:
         'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
@@ -322,45 +569,55 @@ class AudioConflicts {
     bool dsdDopActive = false,
   }) {
     if (aaudioEnabled) {
-      return 'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+      return L10nHolder.current?.conflictAaudioDirect ??
+          'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
     }
     if (dsdDopActive) {
-      return 'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
+      return L10nHolder.current?.conflictDsdDop ??
+          'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
     }
     if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
     if (device?.isBluetooth == true) return null;
     if (device?.isBitPerfectActive != true) return null;
-    return 'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
+    return L10nHolder.current?.conflictDspBitPerfectBypass ??
+        'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
   }
 
   static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
     if (device == null) return null;
     if (device.isBluetooth) {
-      return 'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
+      return L10nHolder.current?.conflictBtBitPerfectUnsupported ??
+          'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
     }
     if (device.bitPerfectFailureReason == 'requires_android_14_for_usb' ||
         device.bitPerfectFailureReason == 'requires_android_14') {
-      return 'Requires Android 14+ for USB bit-perfect output.';
+      return L10nHolder.current?.conflictRequiresAndroid14 ??
+          'Requires Android 14+ for USB bit-perfect output.';
     }
     if (device.bitPerfectFailureReason == 'exclusive_requires_usb_dac') {
-      return 'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
+      return L10nHolder.current?.conflictExclusiveRequiresUsbDac ??
+          'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
     }
     if (device.bitPerfectFailureReason == 'no_supported_mixer_attributes') {
-      return 'This USB DAC does not advertise an exclusive mixer configuration.';
+      return L10nHolder.current?.conflictNoMixerAttributes ??
+          'This USB DAC does not advertise an exclusive mixer configuration.';
     }
     return null;
   }
 
   static String? gaplessBlockedByCrossfade(double crossfadeSeconds) {
     if (crossfadeSeconds > 0.01) {
-      return 'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
+      return L10nHolder.current?.conflictGaplessNeedsZeroCrossfade(
+              crossfadeSeconds.toStringAsFixed(1)) ??
+          'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
     }
     return null;
   }
 
   static String? crossfadeBlockedByGapless(bool gaplessEnabled) {
     if (gaplessEnabled) {
-      return 'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
+      return L10nHolder.current?.conflictCrossfadeNeedsGaplessOff ??
+          'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
     }
     return null;
   }
@@ -386,10 +643,12 @@ class AudioConflicts {
     final base = bitPerfectBlockedReason(device);
     if (base != null) return base;
     if (device == null) {
-      return 'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
+      return L10nHolder.current?.conflictNoDeviceDetected ??
+          'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
     }
     if (!device.isBitPerfectSupported) {
-      return 'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
+      return L10nHolder.current?.conflictNoExclusiveMixer ??
+          'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
     }
     return null;
   }
@@ -403,7 +662,8 @@ class AudioConflicts {
   }) {
     if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
     if (device?.isBluetooth == true) return null;
-    return 'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
+    return L10nHolder.current?.conflictStrictBitPerfectActive ??
+        'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
   }
 
   /// Crossfade is software overlap and cannot run while the DSP bypass is
@@ -415,24 +675,28 @@ class AudioConflicts {
     bool aaudioEnabled = false,
   }) {
     if (aaudioEnabled) {
-      return 'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
+      return L10nHolder.current?.conflictAaudioDirectCrossfade ??
+          'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
     }
     if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
     if (device?.isBluetooth == true) return null;
-    return 'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
+    return L10nHolder.current?.conflictCrossfadeBitPerfectBypass ??
+        'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
   }
 
   /// AAudio direct bypasses the ExoPlayer DSP chain (EQ/speed/pitch/silence
   /// skip) by design — same class of conflict as bit-perfect bypass.
   static String? dspBlockedByAaudioDirect({required bool aaudioEnabled}) {
     if (!aaudioEnabled) return null;
-    return 'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+    return L10nHolder.current?.conflictAaudioDirect ??
+        'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
   }
 
   static String? oemDoubleProcessingWarning(
       {required bool hasOemAudio, required bool anyDspEnabled}) {
     if (hasOemAudio && anyDspEnabled) {
-      return 'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
+      return L10nHolder.current?.conflictOemDoubleProcessing ??
+          'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
     }
     return null;
   }
@@ -441,10 +705,15 @@ class AudioConflicts {
       double volumeBoost, double preampDb) {
     final total = preampDb + volumeBoost * 10.0;
     if (total > 6.0) {
-      return 'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = +${total.toStringAsFixed(1)} dB > 6 dB headroom.';
+      return L10nHolder.current?.conflictVolumeBoostClipping(
+              preampDb.toStringAsFixed(1),
+              (volumeBoost * 10).toStringAsFixed(1),
+              total.toStringAsFixed(1)) ??
+          'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = +${total.toStringAsFixed(1)} dB > 6 dB headroom.';
     }
     if (volumeBoost > 0.6) {
-      return 'High boost may cause distortion or hearing fatigue.';
+      return L10nHolder.current?.conflictHighBoostDistortion ??
+          'High boost may cause distortion or hearing fatigue.';
     }
     return null;
   }

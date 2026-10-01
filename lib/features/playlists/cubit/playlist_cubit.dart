@@ -129,7 +129,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   StreamSubscription? _playlistSongsSub;
   final Map<int, StreamSubscription> _smartSubscriptions = {};
   final Map<int, String> _smartCriteriaJson = {};
-  final Queue<Future<void> Function()> _cacheSaveQueue = Queue<Future<void> Function()>();
+  final Queue<Future<void> Function()> _cacheSaveQueue =
+      Queue<Future<void> Function()>();
   bool _cacheSaveRunning = false;
   bool _isSeedingChecked = false;
 
@@ -142,7 +143,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   bool _disposed = false;
 
   /// Safe accessor that returns default state if cubit/notifier is disposed.
-  YtmOnlineState get onlineState => _disposed ? const YtmOnlineState() : ytmOnline.value;
+  YtmOnlineState get onlineState =>
+      _disposed ? const YtmOnlineState() : ytmOnline.value;
 
   /// Safe state mutator guarded against post-dispose execution (C2).
   void _setOnlineState(YtmOnlineState Function(YtmOnlineState current) update) {
@@ -178,8 +180,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     removeFromComposite(_playlistsSub);
     _playlistsSub = autoSub(_playlistUseCases.watchPlaylists(), (result) {
       result.fold(
-        (failure) => safeEmit(state.copyWith(
-            errorMessage: failure.message, isLoading: false)),
+        (failure) => safeEmit(
+            state.copyWith(errorMessage: failure.message, isLoading: false)),
         (playlists) {
           safeEmit(state.copyWith(
               playlists: playlists, errorMessage: null, isLoading: false));
@@ -239,7 +241,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
         if (decoded is! Map<String, dynamic>) {
-          throw const FormatException('Root of online playlist cache must be a JSON object');
+          throw const FormatException(
+              'Root of online playlist cache must be a JSON object');
         }
         final data = decoded;
         final likedTracks = (data['likedTracks'] as List<dynamic>? ?? [])
@@ -298,8 +301,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         await prefs?.remove(_onlineCacheKey);
       } catch (_) {}
     } on TypeError catch (e, st) {
-      ErrorLogger.log('Type schema mismatch in online playlist cache, clearing cache',
-          error: e, stackTrace: st, category: 'PlaylistCubit');
+      ErrorLogger.log(
+          'Type schema mismatch in online playlist cache, clearing cache',
+          error: e,
+          stackTrace: st,
+          category: 'PlaylistCubit');
       try {
         await prefs?.remove(_onlineCacheKey);
       } catch (_) {}
@@ -326,7 +332,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   int get cacheSaveQueueLength => _cacheSaveQueue.length;
 
   @visibleForTesting
-  void enqueueCacheSaveForTesting(Future<void> Function() task) => _enqueueCacheSave(task);
+  void enqueueCacheSaveForTesting(Future<void> Function() task) =>
+      _enqueueCacheSave(task);
 
   void _enqueueCacheSave(Future<void> Function() task) {
     if (_disposed || isClosed) return;
@@ -382,14 +389,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       final onlineValue = onlineState;
       final liked = onlineValue.likedTracks;
       final customs = onlineValue.customPlaylists;
-      final cappedCustoms = customs.length > 10
-          ? customs.sublist(customs.length - 10)
-          : customs;
+      final cappedCustoms =
+          customs.length > 10 ? customs.sublist(customs.length - 10) : customs;
       final data = {
-        'likedTracks': liked
-            .take(200)
-            .map((t) => t.toJson())
-            .toList(),
+        'likedTracks': liked.take(200).map((t) => t.toJson()).toList(),
         'accountPlaylists':
             onlineValue.accountPlaylists.map((p) => p.toJson()).toList(),
         'customPlaylists': [
@@ -403,8 +406,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         ],
       };
       await prefs.setString(_onlineCacheKey, jsonEncode(data)).timeout(
-        const Duration(seconds: 5),
-      );
+            const Duration(seconds: 5),
+          );
     } catch (e, st) {
       ErrorLogger.log('Failed to save online playlist cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
@@ -500,7 +503,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     );
   }
 
-  Future<void> deletePlaylist(int playlistId) async {    final removedSub = _smartSubscriptions.remove(playlistId);
+  Future<void> deletePlaylist(int playlistId) async {
+    final removedSub = _smartSubscriptions.remove(playlistId);
     removedSub?.cancel();
     removeFromComposite(removedSub);
     _smartCriteriaJson.remove(playlistId);
@@ -593,7 +597,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
 
     if (!await ConnectivityGuard.hasConnection()) {
-      ErrorLogger.log('Skipping autoFetchOnlineLibrary: no network connectivity',
+      ErrorLogger.log(
+          'Skipping autoFetchOnlineLibrary: no network connectivity',
           category: 'PlaylistCubit');
       return;
     }
@@ -622,29 +627,29 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final account = getIt<YtmAccountService>();
     if (!account.isLoggedIn) {
       _setOnlineState((s) => s.copyWith(
-        likedStatus: YtmFetchStatus.error,
-        likedError: 'Not signed in to YouTube Music',
-      ));
+            likedStatus: YtmFetchStatus.error,
+            likedError: 'Not signed in to YouTube Music',
+          ));
       return;
     }
 
     _setOnlineState((s) => s.copyWith(
-      likedStatus: YtmFetchStatus.loading,
-      clearLikedError: true,
-    ));
+          likedStatus: YtmFetchStatus.loading,
+          clearLikedError: true,
+        ));
 
     try {
       final tracks = await account.fetchLikedSongs();
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        likedStatus:
-            tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
-        likedTracks: tracks,
-        likedError: tracks.isEmpty
-            ? 'No liked songs found. Try re-logging into YouTube Music.'
-            : null,
-        clearLikedError: tracks.isNotEmpty,
-      ));
+            likedStatus:
+                tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
+            likedTracks: tracks,
+            likedError: tracks.isEmpty
+                ? 'No liked songs found. Try re-logging into YouTube Music.'
+                : null,
+            clearLikedError: tracks.isNotEmpty,
+          ));
       if (tracks.isNotEmpty) {
         await _saveOnlineCache();
         try {
@@ -657,17 +662,17 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     } on YtmException catch (e) {
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        likedStatus: YtmFetchStatus.error,
-        likedError: e.isAuth
-            ? 'Session expired — please sign in again.'
-            : (e.details ?? e.code),
-      ));
+            likedStatus: YtmFetchStatus.error,
+            likedError: e.isAuth
+                ? 'Session expired — please sign in again.'
+                : (e.details ?? e.code),
+          ));
     } catch (e) {
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        likedStatus: YtmFetchStatus.error,
-        likedError: e.toString().replaceAll('Exception: ', ''),
-      ));
+            likedStatus: YtmFetchStatus.error,
+            likedError: e.toString().replaceAll('Exception: ', ''),
+          ));
     }
   }
 
@@ -677,42 +682,42 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final account = getIt<YtmAccountService>();
     if (!account.isLoggedIn) {
       _setOnlineState((s) => s.copyWith(
-        accountStatus: YtmFetchStatus.error,
-        accountError: 'Not signed in to YouTube Music',
-      ));
+            accountStatus: YtmFetchStatus.error,
+            accountError: 'Not signed in to YouTube Music',
+          ));
       return;
     }
 
     _setOnlineState((s) => s.copyWith(
-      accountStatus: YtmFetchStatus.loading,
-      clearAccountError: true,
-    ));
+          accountStatus: YtmFetchStatus.loading,
+          clearAccountError: true,
+        ));
 
     try {
       final playlists = await account.fetchAccountPlaylists();
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        accountStatus: YtmFetchStatus.done,
-        accountPlaylists: playlists,
-        clearAccountError: true,
-      ));
+            accountStatus: YtmFetchStatus.done,
+            accountPlaylists: playlists,
+            clearAccountError: true,
+          ));
       if (playlists.isNotEmpty) {
         await _saveOnlineCache();
       }
     } on YtmException catch (e) {
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        accountStatus: YtmFetchStatus.error,
-        accountError: e.isAuth
-            ? 'Session expired — please sign in again.'
-            : (e.details ?? e.code),
-      ));
+            accountStatus: YtmFetchStatus.error,
+            accountError: e.isAuth
+                ? 'Session expired — please sign in again.'
+                : (e.details ?? e.code),
+          ));
     } catch (e) {
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        accountStatus: YtmFetchStatus.error,
-        accountError: e.toString().replaceAll('Exception: ', ''),
-      ));
+            accountStatus: YtmFetchStatus.error,
+            accountError: e.toString().replaceAll('Exception: ', ''),
+          ));
     }
   }
 
@@ -728,15 +733,16 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (existing) return;
 
     _setOnlineState((s) => s.copyWith(
-      customStatus: YtmFetchStatus.loading,
-      clearCustomError: true,
-    ));
+          customStatus: YtmFetchStatus.loading,
+          clearCustomError: true,
+        ));
 
     try {
       final accountService = getIt.isRegistered<YtmAccountService>()
           ? getIt<YtmAccountService>()
           : null;
-      final details = await accountService?.fetchPlaylistDetails(input, maxTracks: 200);
+      final details =
+          await accountService?.fetchPlaylistDetails(input, maxTracks: 200);
       if (_disposed || isClosed) return;
 
       List<YtmTrack> tracks = details?.tracks ?? const [];
@@ -748,9 +754,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
       if (tracks.isEmpty) {
         _setOnlineState((s) => s.copyWith(
-          customStatus: YtmFetchStatus.error,
-          customError: 'Playlist is empty or could not be fetched.',
-        ));
+              customStatus: YtmFetchStatus.error,
+              customError: 'Playlist is empty or could not be fetched.',
+            ));
         return;
       }
 
@@ -763,7 +769,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
             title = listId.length > 16 ? '${listId.substring(0, 16)}…' : listId;
           }
         } else if (!input.startsWith('http')) {
-          final short = input.length > 16 ? '${input.substring(0, 16)}…' : input;
+          final short =
+              input.length > 16 ? '${input.substring(0, 16)}…' : input;
           title = 'Playlist ($short)';
         }
       }
@@ -781,17 +788,17 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           List<OnlinePlaylistEntry>.from(onlineState.customPlaylists)
             ..add(entry);
       _setOnlineState((s) => s.copyWith(
-        customStatus: YtmFetchStatus.done,
-        customPlaylists: updated,
-        clearCustomError: true,
-      ));
+            customStatus: YtmFetchStatus.done,
+            customPlaylists: updated,
+            clearCustomError: true,
+          ));
       await _saveOnlineCache();
     } catch (e) {
       if (_disposed || isClosed) return;
       _setOnlineState((s) => s.copyWith(
-        customStatus: YtmFetchStatus.error,
-        customError: e.toString().replaceAll('Exception: ', ''),
-      ));
+            customStatus: YtmFetchStatus.error,
+            customError: e.toString().replaceAll('Exception: ', ''),
+          ));
     }
   }
 

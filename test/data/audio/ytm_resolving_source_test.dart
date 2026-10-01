@@ -43,7 +43,9 @@ void main() {
   });
 
   group('YtmResolvingSource Tests', () {
-    test('instantiates with videoId and resolver closure lazily without initial resolution', () {
+    test(
+        'instantiates with videoId and resolver closure lazily without initial resolution',
+        () {
       var resolvedCount = 0;
       final source = YtmResolvingSource(
         videoId: 'dQw4w9WgXcQ',
@@ -57,7 +59,8 @@ void main() {
       expect(resolvedCount, equals(0));
     });
 
-    test('a failed resolve is not cached — the next request re-resolves', () async {
+    test('a failed resolve is not cached — the next request re-resolves',
+        () async {
       var calls = 0;
       final source = YtmResolvingSource(
         videoId: 'abc123',
@@ -89,7 +92,8 @@ void main() {
       expect(calls, 0);
     });
 
-    test('cache hit skips resolver closure and uses cached stream URL directly', () async {
+    test('cache hit skips resolver closure and uses cached stream URL directly',
+        () async {
       final fakeClock = FakeClock(DateTime.fromMillisecondsSinceEpoch(1000000));
       final urlCache = YtmUrlCache.withClock(fakeClock);
       urlCache.put('preCachedVid', 'https://googlevideo.com/cached_stream.m4a');
@@ -167,8 +171,9 @@ void main() {
       final urlCache = YtmUrlCache();
       await _seedCacheFile('expiringvid1');
 
-      final soon =
-          DateTime.now().add(const Duration(seconds: 90)).millisecondsSinceEpoch;
+      final soon = DateTime.now()
+          .add(const Duration(seconds: 90))
+          .millisecondsSinceEpoch;
       var calls = 0;
       var sawForceRefresh = false;
       final source = YtmResolvingSource(
@@ -223,8 +228,9 @@ void main() {
   group('YtmResolvingSource.isUrlBurned', () {
     test('a refusal from googlevideo burns the URL', () {
       for (final status in const [401, 403, 404, 407, 410, 416, 429]) {
-        expect(YtmResolvingSource.isUrlBurned(
-            Exception('HTTP Status Error: $status')),
+        expect(
+            YtmResolvingSource.isUrlBurned(
+                Exception('HTTP Status Error: $status')),
             isTrue,
             reason: '$status means this URL will never serve bytes again');
       }
@@ -260,8 +266,8 @@ void main() {
       // `contains('403')` matched the digits anywhere — inside an itag, a byte
       // count or a video id — and re-resolved on every one of them.
       expect(
-          YtmResolvingSource.isUrlBurned(
-              const SocketException('connection closed: clen=4030099 itag=251')),
+          YtmResolvingSource.isUrlBurned(const SocketException(
+              'connection closed: clen=4030099 itag=251')),
           isFalse);
     });
 

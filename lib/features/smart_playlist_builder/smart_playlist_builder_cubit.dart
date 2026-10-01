@@ -117,16 +117,20 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       try {
         await oldSub.cancel().timeout(const Duration(milliseconds: 500));
       } catch (e, st) {
-        ErrorLogger.log('Smart playlist old preview sub cancel timed out or failed',
-            error: e, stackTrace: st, category: 'SmartPlaylist');
+        ErrorLogger.log(
+            'Smart playlist old preview sub cancel timed out or failed',
+            error: e,
+            stackTrace: st,
+            category: 'SmartPlaylist');
       }
     }
     if (isClosed || gen != _previewGen) return;
 
-    final queryLimit = (state.criteria.limit == null || state.criteria.limit! > previewCap)
-        ? previewCap + 1
-        : state.criteria.limit;
-    
+    final queryLimit =
+        (state.criteria.limit == null || state.criteria.limit! > previewCap)
+            ? previewCap + 1
+            : state.criteria.limit;
+
     final previewCriteria = state.criteria.copyWith(limit: queryLimit);
 
     _previewSub = autoSub(
@@ -173,13 +177,13 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       final isBoolField = rule.field == SmartRuleField.isFavorite ||
           rule.field == SmartRuleField.isLossless;
       if (isBoolField) {
-        normalizedRules.add(rule.value.trim().isEmpty
-            ? rule.copyWith(value: 'false')
-            : rule);
+        normalizedRules.add(
+            rule.value.trim().isEmpty ? rule.copyWith(value: 'false') : rule);
         continue;
       }
       if (rule.value.trim().isEmpty) {
-        safeEmit(state.copyWith(errorMessage: 'Please enter a value for rule #${i + 1}'));
+        safeEmit(state.copyWith(
+            errorMessage: 'Please enter a value for rule #${i + 1}'));
         return false;
       }
       normalizedRules.add(rule);
@@ -206,7 +210,8 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     } catch (e, st) {
       ErrorLogger.log('Failed to save smart playlist',
           error: e, stackTrace: st, category: 'SmartPlaylist');
-      return _finishSave(false, 'Could not save the playlist. Please try again.');
+      return _finishSave(
+          false, 'Could not save the playlist. Please try again.');
     }
   }
 

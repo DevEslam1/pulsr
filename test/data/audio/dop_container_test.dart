@@ -152,8 +152,8 @@ void main() {
         );
         final wav = await readSourceBytes(source as DsdPcmStreamAudioSource);
         expect(wav.length, equals(44 + 48));
-        expect(ByteData.sublistView(wav).getUint16(34, Endian.little),
-            equals(24));
+        expect(
+            ByteData.sublistView(wav).getUint16(34, Endian.little), equals(24));
       } finally {
         await tempDir.delete(recursive: true);
       }

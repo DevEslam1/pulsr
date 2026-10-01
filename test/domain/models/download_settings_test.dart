@@ -11,7 +11,9 @@ void main() {
       SharedPreferences.setMockInitialValues({});
     });
 
-    test('load prefers setting_download_quality over setting_streaming_quality (B1)', () async {
+    test(
+        'load prefers setting_download_quality over setting_streaming_quality (B1)',
+        () async {
       SharedPreferences.setMockInitialValues({
         'setting_streaming_quality': 'low',
         'setting_download_quality': 'high',
@@ -19,10 +21,13 @@ void main() {
 
       final settings = await DownloadSettings.load();
       expect(settings.quality, equals('high'),
-          reason: 'Explicit download quality choice must take precedence over streaming quality');
+          reason:
+              'Explicit download quality choice must take precedence over streaming quality');
     });
 
-    test('load falls back to setting_streaming_quality when download quality not set', () async {
+    test(
+        'load falls back to setting_streaming_quality when download quality not set',
+        () async {
       SharedPreferences.setMockInitialValues({
         'setting_streaming_quality': 'medium',
       });
@@ -31,7 +36,8 @@ void main() {
       expect(settings.quality, equals('medium'));
     });
 
-    test('save writes to setting_download_quality and round-trips correctly', () async {
+    test('save writes to setting_download_quality and round-trips correctly',
+        () async {
       SharedPreferences.setMockInitialValues({
         'setting_streaming_quality': 'low',
       });

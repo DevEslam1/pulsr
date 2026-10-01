@@ -16,12 +16,11 @@ void main() {
 
     setUpAll(() {
       packageRoot = _findPackageRoot();
-      routerSource =
-          File('${packageRoot.path}/lib/core/router/app_router.dart')
-              .readAsStringSync();
+      routerSource = File('${packageRoot.path}/lib/core/router/app_router.dart')
+          .readAsStringSync();
       libSources = {};
-      for (final entity in Directory('${packageRoot.path}/lib')
-          .listSync(recursive: true)) {
+      for (final entity
+          in Directory('${packageRoot.path}/lib').listSync(recursive: true)) {
         if (entity is File && entity.path.endsWith('.dart')) {
           libSources[entity.path] = entity.readAsStringSync();
         }
@@ -31,10 +30,7 @@ void main() {
     Set<String> routePaths() {
       // Matches: path: '/queue', — including the conditional YTM block.
       final exp = RegExp(r"""path:\s*'([^']+)'""");
-      return exp
-          .allMatches(routerSource)
-          .map((m) => m.group(1)!)
-          .toSet();
+      return exp.allMatches(routerSource).map((m) => m.group(1)!).toSet();
     }
 
     Set<String> navigationTargets() {
@@ -69,8 +65,7 @@ void main() {
       expect(
         orphans,
         isEmpty,
-        reason:
-            'Orphan routes with no push/go call-site: $orphans. '
+        reason: 'Orphan routes with no push/go call-site: $orphans. '
             'Wire an entry point (button/tile/chip) or delete the route.',
       );
     });

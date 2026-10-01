@@ -11,6 +11,8 @@ import '../../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../player_constants.dart';
 import '../player_state.dart';
 
+part 'player_transport_favorites.dart';
+
 /// Owns audio transport controls: play, pause, seek, track skipping, shuffle, repeat, and favorite toggle.
 class PlayerTransportController {
   final PulsrAudioHandler _audioHandler;
@@ -41,6 +43,16 @@ class PlayerTransportController {
     return _seekStopwatch.elapsedMilliseconds - last < 1500;
   }
 
+  /// The engine's own play flag. Used to reconcile the UI when a transport
+  /// call throws, so a failed pause/play cannot leave state diverged from audio.
+  bool get _enginePlaying {
+    try {
+      return _audioHandler.playbackState.value.playing;
+    } catch (_) {
+      return false;
+    }
+  }
+
   PlayerTransportController({
     required PulsrAudioHandler audioHandler,
     required PlayerState Function() getState,
@@ -68,14 +80,19 @@ class PlayerTransportController {
         await _audioHandler.play();
         if (!_isClosed()) {
           final s = _getState();
-          _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: true, errorMessage: null)));
+          _emit(s.copyWith(
+              playback:
+                  s.playback.copyWith(isPlaying: true, errorMessage: null)));
         }
       } catch (e, st) {
         ErrorLogger.log('Play failed',
             error: e, stackTrace: st, category: 'PlayerTransportController');
         if (!_isClosed()) {
           final s = _getState();
-          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to start playback')));
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(
+                  isPlaying: _enginePlaying,
+                  errorMessage: 'Failed to start playback')));
         }
       }
     });
@@ -93,7 +110,12 @@ class PlayerTransportController {
             error: e, stackTrace: st, category: 'PlayerTransportController');
         if (!_isClosed()) {
           final s = _getState();
-          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Failed to pause playback')));
+          // Reconcile with the engine: if pause() threw, audio may still be
+          // running, so never leave the UI stuck showing the optimistic pause.
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(
+                  isPlaying: _enginePlaying,
+                  errorMessage: 'Failed to pause playback')));
         }
       }
     });
@@ -109,14 +131,16 @@ class PlayerTransportController {
 
         if (shouldPause) {
           _onUserPausedIntentionally?.call(true);
-          _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: false)));
+          _emit(state.copyWith(
+              playback: state.playback.copyWith(isPlaying: false)));
           await _audioHandler.pause();
         } else {
           if (state.currentSong == null && state.queue.isEmpty) return;
           _onUserPausedIntentionally?.call(false);
           // Optimistically reflect play; the engine observer confirms it.
           if (!state.isPlaying) {
-            _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: true)));
+            _emit(state.copyWith(
+                playback: state.playback.copyWith(isPlaying: true)));
           }
           await _audioHandler.play();
         }
@@ -125,7 +149,10 @@ class PlayerTransportController {
             error: e, stackTrace: st, category: 'PlayerTransportController');
         if (!_isClosed()) {
           final s = _getState();
-          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Playback action failed')));
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(
+                  isPlaying: _enginePlaying,
+                  errorMessage: 'Playback action failed')));
         }
       }
     });
@@ -133,104 +160,127 @@ class PlayerTransportController {
 
   Future<void> seek(Duration position) {
     if (_isClosed()) return Future.value();
-    final state = _getState();
-    var target = position.isNegative ? Duration.zero : position;
-    if (state.duration > Duration.zero && target > state.duration) {
-      target = state.duration;
-    }
+    return _transportMutex.protect(() async {
+      if (_isClosed()) return;
+      final state = _getState();
+      var target = position.isNegative ? Duration.zero : position;
+      if (state.duration > Duration.zero && target > state.duration) {
+        target = state.duration;
+      }
 
-    _emit(state.copyWith(playback: state.playback.copyWith(position: target)));
+      _emit(
+          state.copyWith(playback: state.playback.copyWith(position: target)));
 
-    final nowMs = _seekStopwatch.elapsedMilliseconds;
-    _lastSeekRequestMs = nowMs;
-    if (nowMs - _lastSeekMs < PlayerConstants.seekThrottleMs) {
-      _pendingSeek = target;
-      _seekThrottleTimer?.cancel();
-      _seekThrottleTimer = Timer(
-        Duration(
-            milliseconds: (PlayerConstants.seekThrottleMs - (nowMs - _lastSeekMs))
-                .clamp(16, PlayerConstants.seekThrottleMs)),
-        () {
-          if (_isClosed()) {
+      final nowMs = _seekStopwatch.elapsedMilliseconds;
+      _lastSeekRequestMs = nowMs;
+      if (nowMs - _lastSeekMs < PlayerConstants.seekThrottleMs) {
+        _pendingSeek = target;
+        _seekThrottleTimer?.cancel();
+        _seekThrottleTimer = Timer(
+          Duration(
+              milliseconds:
+                  (PlayerConstants.seekThrottleMs - (nowMs - _lastSeekMs))
+                      .clamp(16, PlayerConstants.seekThrottleMs)),
+          () {
+            if (_isClosed()) {
+              _pendingSeek = null;
+              return;
+            }
+            final pending = _pendingSeek;
             _pendingSeek = null;
-            return;
-          }
-          final pending = _pendingSeek;
-          _pendingSeek = null;
-          if (pending != null && !_isClosed()) {
-            _lastSeekMs = _seekStopwatch.elapsedMilliseconds;
-            _audioHandler.seek(pending).catchError((Object e, StackTrace st) {
-              ErrorLogger.log('Coalesced seek failed',
-                  error: e, stackTrace: st, category: 'PlayerTransportController');
-              if (!_isClosed()) {
-                final s = _getState();
-                _emit(s.copyWith(
-                    playback: s.playback.copyWith(errorMessage: 'Seek failed, position restored')));
-              }
-            });
-          }
-        },
-      );
-      return Future.value();
-    }
-    _lastSeekMs = nowMs;
+            if (pending != null && !_isClosed()) {
+              _lastSeekMs = _seekStopwatch.elapsedMilliseconds;
+              _audioHandler.seek(pending).catchError((Object e, StackTrace st) {
+                ErrorLogger.log('Coalesced seek failed',
+                    error: e,
+                    stackTrace: st,
+                    category: 'PlayerTransportController');
+                if (!_isClosed()) {
+                  final s = _getState();
+                  _emit(s.copyWith(
+                      playback: s.playback.copyWith(
+                          errorMessage: 'Seek failed, position restored')));
+                }
+              });
+            }
+          },
+        );
+        return;
+      }
+      _lastSeekMs = nowMs;
 
-    return _audioHandler.seekDirect(target).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('Discrete seek failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Seek failed, position restored')));
+      try {
+        await _audioHandler.seekDirect(target);
+      } catch (e, st) {
+        ErrorLogger.log('Discrete seek failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(
+              playback: s.playback
+                  .copyWith(errorMessage: 'Seek failed, position restored')));
+        }
       }
     });
   }
 
   Future<void> next() async {
-    try {
-      await _audioHandler.skipToNext();
-    } catch (e, st) {
-      ErrorLogger.log('Skip to next failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+    await _transportMutex.protect(() async {
+      try {
+        await _audioHandler.skipToNext();
+      } catch (e, st) {
+        ErrorLogger.log('Skip to next failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+        }
       }
-    }
+    });
   }
 
   Future<void> previous() async {
-    try {
-      await _audioHandler.skipToPrevious();
-    } catch (e, st) {
-      ErrorLogger.log('Skip to previous failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+    await _transportMutex.protect(() async {
+      try {
+        await _audioHandler.skipToPrevious();
+      } catch (e, st) {
+        ErrorLogger.log('Skip to previous failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+        }
       }
-    }
+    });
   }
 
   Future<void> skipToQueueItem(int index) async {
-    final state = _getState();
-    if (index < 0 || index >= state.queue.length) return;
-    try {
-      await _audioHandler.skipToQueueItem(index);
-    } catch (e, st) {
-      ErrorLogger.log('Skip to queue item failed',
-          error: e, stackTrace: st, category: 'PlayerTransportController');
-      if (!_isClosed()) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+    await _transportMutex.protect(() async {
+      final state = _getState();
+      if (index < 0 || index >= state.queue.length) return;
+      try {
+        await _audioHandler.skipToQueueItem(index);
+      } catch (e, st) {
+        ErrorLogger.log('Skip to queue item failed',
+            error: e, stackTrace: st, category: 'PlayerTransportController');
+        if (!_isClosed()) {
+          final s = _getState();
+          _emit(s.copyWith(
+              playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+        }
       }
-    }
+    });
   }
 
   Future<void> toggleShuffle() async {
     final state = _getState();
     final prev = state.isShuffle;
     final next = !prev;
-    _emit(state.copyWith(playback: state.playback.copyWith(isShuffle: next, errorMessage: null)));
+    _emit(state.copyWith(
+        playback:
+            state.playback.copyWith(isShuffle: next, errorMessage: null)));
     try {
       await _audioHandler.setShuffleMode(
           next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
@@ -243,7 +293,9 @@ class PlayerTransportController {
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(isShuffle: prev, errorMessage: 'Shuffle failed')));
+        _emit(s.copyWith(
+            playback: s.playback
+                .copyWith(isShuffle: prev, errorMessage: 'Shuffle failed')));
       }
     }
   }
@@ -261,7 +313,9 @@ class PlayerTransportController {
       PlayerRepeatMode.all => AudioServiceRepeatMode.all,
       PlayerRepeatMode.one => AudioServiceRepeatMode.one,
     };
-    _emit(state.copyWith(playback: state.playback.copyWith(repeatMode: next, errorMessage: null)));
+    _emit(state.copyWith(
+        playback:
+            state.playback.copyWith(repeatMode: next, errorMessage: null)));
     try {
       await _audioHandler.setRepeatMode(nextMode);
       // See toggleShuffle: force a full widget push so the repeat icon reflects
@@ -272,80 +326,15 @@ class PlayerTransportController {
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(repeatMode: prev, errorMessage: 'Repeat failed')));
+        _emit(s.copyWith(
+            playback: s.playback
+                .copyWith(repeatMode: prev, errorMessage: 'Repeat failed')));
       }
     }
   }
 
-  Future<void> toggleFavoriteSong(SongsTableData song) =>
-      _executeToggleFavorite(song);
-
-  Future<void> toggleFavoriteById(int songId) async {
-    final state = _getState();
-    final song = (state.currentSong?.id == songId)
-        ? state.currentSong
-        : (state.queue.where((s) => s.id == songId).firstOrNull ??
-            _slotLookupCache?[songId]);
-    if (song != null) {
-      await _executeToggleFavorite(song);
-    }
-  }
-
-  Future<void> toggleFavorite([dynamic target]) async {
-    if (target is SongsTableData) {
-      return toggleFavoriteSong(target);
-    } else if (target is int) {
-      return toggleFavoriteById(target);
-    } else if (target == null) {
-      final current = _getState().currentSong;
-      if (current != null) return toggleFavoriteSong(current);
-    }
-  }
-
-  Future<void> _executeToggleFavorite(SongsTableData song) async {
-    if (_toggleFavoriteUseCase == null) return;
-    final songId = song.id;
-    final result = await _toggleFavoriteUseCase!(song.id);
-    if (_isClosed()) return;
-    result.fold(
-      (failure) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: failure.message)));
-      },
-      (isFav) {
-        final state = _getState();
-        final updatedQueue = state.queue
-            .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
-            .toList();
-        if (_slotLookupCache != null) {
-          final cached = _slotLookupCache![songId];
-          if (cached != null) {
-            _slotLookupCache![songId] = cached.copyWith(isFavorite: isFav);
-          }
-        }
-        _debouncedPersistQueueSlots?.call();
-        if (state.currentSong != null && state.currentSong!.id == songId) {
-          _emit(
-            state.copyWith(
-              playback: state.playback.copyWith(
-                currentSong: state.currentSong!.copyWith(isFavorite: isFav),
-                errorMessage: null,
-              ),
-              queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
-            ),
-          );
-          _updateWidgetThrottled?.call(force: true);
-        } else if (state.queue.any((s) => s.id == songId)) {
-          _emit(state.copyWith(
-            queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
-            playback: state.playback.copyWith(errorMessage: null),
-          ));
-        }
-      },
-    );
-  }
-
-  Future<void> fastForward([Duration step = const Duration(seconds: 10)]) async {
+  Future<void> fastForward(
+      [Duration step = const Duration(seconds: 10)]) async {
     final state = _getState();
     await seek(state.position + step);
   }

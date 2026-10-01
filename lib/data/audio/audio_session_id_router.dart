@@ -90,21 +90,19 @@ class AudioSessionIdRouter {
   void handleRouteChanged() {
     if (_routeResyncPending) return;
     _routeResyncPending = true;
-    _chain = _chain
-        .then((_) {
-          _routeResyncPending = false;
-          final callback = onRouteChanged;
-          if (callback != null) callback();
-        })
-        .catchError((Object e, StackTrace st) {
-          _routeResyncPending = false;
-          ErrorLogger.log(
-            'AudioSessionIdRouter route resync error',
-            error: e,
-            stackTrace: st,
-            category: 'AudioSessionIdRouter',
-          );
-        });
+    _chain = _chain.then((_) {
+      _routeResyncPending = false;
+      final callback = onRouteChanged;
+      if (callback != null) callback();
+    }).catchError((Object e, StackTrace st) {
+      _routeResyncPending = false;
+      ErrorLogger.log(
+        'AudioSessionIdRouter route resync error',
+        error: e,
+        stackTrace: st,
+        category: 'AudioSessionIdRouter',
+      );
+    });
   }
 
   Future<void> _drainQueue() async {

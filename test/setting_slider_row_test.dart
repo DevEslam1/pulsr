@@ -40,8 +40,8 @@ void main() {
         formatValue: (v) => '${v.toStringAsFixed(1)}s',
         onChanged: (_) {},
       )));
-      final button = tester.widget<IconButton>(find.widgetWithIcon(
-          IconButton, Icons.settings_backup_restore));
+      final button = tester.widget<IconButton>(
+          find.widgetWithIcon(IconButton, Icons.settings_backup_restore));
       expect(button.onPressed, isNull);
     });
 

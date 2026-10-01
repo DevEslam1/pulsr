@@ -19,7 +19,8 @@ class SyncDiagnosticsSheet extends StatefulWidget {
     this.sampleRate = 48000.0,
   });
 
-  static Future<void> show(BuildContext context, {double sampleRate = 48000.0}) {
+  static Future<void> show(BuildContext context,
+      {double sampleRate = 48000.0}) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
@@ -98,7 +99,9 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final sr = _appliedSampleRate > 0 ? _appliedSampleRate : (widget.sampleRate > 0 ? widget.sampleRate : 48000.0);
+    final sr = _appliedSampleRate > 0
+        ? _appliedSampleRate
+        : (widget.sampleRate > 0 ? widget.sampleRate : 48000.0);
     final dspMs = (_pipelineLatencyFrames / sr) * 1000.0;
     final isUsbStreaming = _usbDiagnostics['isStreamActive'] == true;
 
@@ -110,7 +113,8 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
         ),
         child: Material(
           color: p.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           clipBehavior: Clip.antiAlias,
           child: SafeArea(
             top: false,
@@ -165,7 +169,8 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                     title: context.l10n.dspPipelineDelay,
                     subtitle: context.l10n.dspPipelineDelayDesc,
                     value: '${dspMs.toStringAsFixed(2)} ms',
-                    detail: '$_pipelineLatencyFrames frames @ ${(sr / 1000.0).toStringAsFixed(1)} kHz',
+                    detail:
+                        '$_pipelineLatencyFrames frames @ ${(sr / 1000.0).toStringAsFixed(1)} kHz',
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   if (isUsbStreaming) ...[
@@ -175,7 +180,8 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                       title: context.l10n.usbBufferedDelay,
                       subtitle: context.l10n.usbBufferedDelayDesc,
                       value: '${_usbBufferedMs.toStringAsFixed(1)} ms',
-                      detail: 'Underruns: ${_usbDiagnostics['underrunCount'] ?? 0} | Overruns: ${_usbDiagnostics['overrunCount'] ?? 0}',
+                      detail:
+                          'Underruns: ${_usbDiagnostics['underrunCount'] ?? 0} | Overruns: ${_usbDiagnostics['overrunCount'] ?? 0}',
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ],
@@ -184,8 +190,11 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                     icon: Icons.speed_rounded,
                     title: context.l10n.totalMonitoredLatency,
                     subtitle: context.l10n.totalMonitoredLatencyDesc,
-                    value: '${(dspMs + (isUsbStreaming ? _usbBufferedMs : 0.0)).toStringAsFixed(2)} ms',
-                    detail: isUsbStreaming ? context.l10n.directUsbExclusivePath : context.l10n.lowLatencyDirectOutput,
+                    value:
+                        '${(dspMs + (isUsbStreaming ? _usbBufferedMs : 0.0)).toStringAsFixed(2)} ms',
+                    detail: isUsbStreaming
+                        ? context.l10n.directUsbExclusivePath
+                        : context.l10n.lowLatencyDirectOutput,
                   ),
                 ],
               ),

@@ -231,7 +231,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     _pausedVideoIds.remove(videoId);
     _ytDownloadService.clearPaused(videoId);
     _notifyNativePaused(videoId, false);
-    final queuedTask = task.copyWith(status: DownloadStatus.queued, error: null);
+    final queuedTask =
+        task.copyWith(status: DownloadStatus.queued, error: null);
     _updateTask(queuedTask);
 
     if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
@@ -255,7 +256,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       status: DownloadStatus.queued,
       progress: 0.0,
       error: null,
-    ))).fold(
+    )))
+        .fold(
       (f) => Left(f),
       (_) => const Right(unit),
     );
@@ -498,7 +500,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
                     .getSingleOrNull();
                 if (song != null) {
                   var size = song.fileSize;
-                  if ((size == null || size <= 0) && File(song.path).existsSync()) {
+                  if ((size == null || size <= 0) &&
+                      File(song.path).existsSync()) {
                     size = File(song.path).lengthSync();
                   }
                   task = task.copyWith(
@@ -512,8 +515,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               }
             }
             if (task.filePath != null && !File(task.filePath!).existsSync()) {
-              _tasks[task.videoId] =
-                  task.copyWith(status: DownloadStatus.failed, error: 'File deleted');
+              _tasks[task.videoId] = task.copyWith(
+                  status: DownloadStatus.failed, error: 'File deleted');
             } else {
               _tasks[task.videoId] = task;
             }
@@ -616,7 +619,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         task.status == DownloadStatus.failed ||
         task.status == DownloadStatus.paused;
 
-    if (isIntermediateProgress && (now - lastEmit < _throttleMs) && !isTerminal) {
+    if (isIntermediateProgress &&
+        (now - lastEmit < _throttleMs) &&
+        !isTerminal) {
       _pendingThrottledTasks[videoId] = task;
       _throttleFlushTimers[videoId]?.cancel();
       _throttleFlushTimers[videoId] =
@@ -753,7 +758,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           // Exponential backoff with ~20% jitter: ~2s, ~4s.
           final backoffMs = (2000 << (attempt - 1)) + _random.nextInt(400);
           await Future.delayed(Duration(milliseconds: backoffMs));
-          if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
+          if (_pausedVideoIds.contains(videoId) ||
+              !_tasks.containsKey(videoId)) {
             break;
           }
           final current = _tasks[videoId] ?? task;
@@ -791,7 +797,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         );
         final failure = result.getLeft().toNullable();
         if (failure == null) break; // success
-        if (!_isTransientFailure(failure)) break; // permanent: don't burn retries
+        if (!_isTransientFailure(failure)) {
+          break; // permanent: don't burn retries
+        }
       }
       result ??= const Left(DownloadFailure('Download cancelled'));
 
@@ -823,9 +831,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           ));
         },
         (newId) async {
-          _cachedStorageStats = null; // Invalidate storage stats cache on completion
+          _cachedStorageStats =
+              null; // Invalidate storage stats cache on completion
           final current = _tasks[videoId] ?? task;
-          String? resolvedPath = current.filePath ?? _ytDownloadService.getDownloadedPath(videoId);
+          String? resolvedPath =
+              current.filePath ?? _ytDownloadService.getDownloadedPath(videoId);
           int? resolvedSize = current.fileSize;
 
           final db = _effectiveDb;

@@ -55,10 +55,9 @@ void main() {
 
     test('2. Proxy endpoint validator supports IPv6-mapped IPv4 addresses', () {
       // Valid IPv6-mapped IPv4 addresses
-      expect(
-          validateProxyHostAndPort(host: '::ffff:192.0.2.1', port: 8080), isNull);
-      expect(
-          validateProxyHostAndPort(host: '[::ffff:127.0.0.1]', port: 1080),
+      expect(validateProxyHostAndPort(host: '::ffff:192.0.2.1', port: 8080),
+          isNull);
+      expect(validateProxyHostAndPort(host: '[::ffff:127.0.0.1]', port: 1080),
           isNull);
       expect(
           validateProxyHostAndPort(
@@ -99,7 +98,8 @@ void main() {
       expect(result1, isNull);
       expect(result2, isNull);
       expect(elapsed1, lessThan(50),
-          reason: 'Pathological input took ${elapsed1}ms, exceeding 50ms ceiling');
+          reason:
+              'Pathological input took ${elapsed1}ms, exceeding 50ms ceiling');
       expect(elapsed2, lessThan(50),
           reason:
               'Pathological subdomains took ${elapsed2}ms, exceeding 50ms ceiling');
@@ -117,7 +117,8 @@ void main() {
           equals('dQw4w9WgXcQ'));
     });
 
-    test('4. PlaylistShareService enforces JSON tree depth <= 5 to block attacks',
+    test(
+        '4. PlaylistShareService enforces JSON tree depth <= 5 to block attacks',
         () {
       final service = PlaylistShareService();
 
@@ -168,7 +169,8 @@ void main() {
       expect(rejected, isNull);
     });
 
-    test('5. YtmWebLoginSheet builds hardened sandbox settings and navigation policy',
+    test(
+        '5. YtmWebLoginSheet builds hardened sandbox settings and navigation policy',
         () {
       final settings = YtmWebLoginSheet.buildDefaultSettings();
 
@@ -188,20 +190,20 @@ void main() {
               Uri.parse('javascript:alert("pwned")')),
           equals(NavigationActionPolicy.CANCEL));
       expect(
-          YtmWebLoginSheet.evaluateNavigation(
-              Uri.parse('file:///data/user/0/com.pulsr.music/databases/pulsr.db')),
+          YtmWebLoginSheet.evaluateNavigation(Uri.parse(
+              'file:///data/user/0/com.pulsr.music/databases/pulsr.db')),
           equals(NavigationActionPolicy.CANCEL));
       expect(
-          YtmWebLoginSheet.evaluateNavigation(
-              Uri.parse('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==')),
+          YtmWebLoginSheet.evaluateNavigation(Uri.parse(
+              'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==')),
           equals(NavigationActionPolicy.CANCEL));
       expect(
           YtmWebLoginSheet.evaluateNavigation(
               Uri.parse('blob:https://evil.attacker.com/uuid')),
           equals(NavigationActionPolicy.CANCEL));
       expect(
-          YtmWebLoginSheet.evaluateNavigation(
-              Uri.parse('market://details?id=com.google.android.apps.youtube.music')),
+          YtmWebLoginSheet.evaluateNavigation(Uri.parse(
+              'market://details?id=com.google.android.apps.youtube.music')),
           equals(NavigationActionPolicy.CANCEL));
       expect(
           YtmWebLoginSheet.evaluateNavigation(

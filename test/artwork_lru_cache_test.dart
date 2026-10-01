@@ -68,7 +68,8 @@ void main() {
       expect(cache.maxCapacity, equals(200));
     });
 
-    test('put with persistToDisk false stores item in memory without error', () {
+    test('put with persistToDisk false stores item in memory without error',
+        () {
       final cache = ArtworkLruCache.withCapacity(5);
       final bytes = Uint8List.fromList([10, 20, 30]);
       cache.put('memory_only_key', bytes, persistToDisk: false);

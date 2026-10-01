@@ -140,7 +140,8 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final hasText = _currentQuery.isNotEmpty;
-    final fieldHeight = widget.height ?? PulsrLayoutMetrics.fieldHeight(context);
+    final fieldHeight =
+        widget.height ?? PulsrLayoutMetrics.fieldHeight(context);
 
     Widget field = Container(
       height: fieldHeight,
@@ -149,9 +150,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
         borderRadius: BorderRadius.circular(AppRadii.card),
         border: widget.showBorder
             ? Border.all(
-                color: hasText
-                    ? p.accent.withValues(alpha: 0.55)
-                    : p.hairline,
+                color: hasText ? p.accent.withValues(alpha: 0.55) : p.hairline,
                 width: hasText ? 1.5 : 1.0,
               )
             : null,

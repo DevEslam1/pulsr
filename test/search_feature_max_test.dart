@@ -78,8 +78,7 @@ void main() {
       await _pumpUntil(() => cubit.state.history.isNotEmpty);
 
       final suggestions = await cubit.suggestionsFor('Bea');
-      expect(suggestions.length,
-          lessThanOrEqualTo(SearchCubit.suggestionMax));
+      expect(suggestions.length, lessThanOrEqualTo(SearchCubit.suggestionMax));
       expect(suggestions, contains('Beat'));
       expect(suggestions, contains('Beat Flow'));
       await cubit.close();

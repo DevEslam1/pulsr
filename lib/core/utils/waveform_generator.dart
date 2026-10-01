@@ -148,7 +148,8 @@ class WaveformGenerator {
     final peaks = <double>[];
     for (int b = 0; b < targetBarCount; b++) {
       final start = b * bucketSize;
-      final end = (b == targetBarCount - 1) ? samples.length : (b + 1) * bucketSize;
+      final end =
+          (b == targetBarCount - 1) ? samples.length : (b + 1) * bucketSize;
       double maxVal = 0.0;
       for (int i = start; i < end && i < samples.length; i++) {
         final abs = samples[i].abs();
@@ -206,17 +207,21 @@ class WaveformGenerator {
     }
 
     List<double> result;
-    if (filePath != null && filePath.isNotEmpty && File(filePath).existsSync()) {
+    if (filePath != null &&
+        filePath.isNotEmpty &&
+        File(filePath).existsSync()) {
       try {
         result = await compute(
           _extractPcmPeaksTask,
           (songId: songId, count: count, filePath: filePath),
         );
       } catch (_) {
-        result = generateWaveformSync(songId: songId, filePath: filePath, count: count);
+        result = generateWaveformSync(
+            songId: songId, filePath: filePath, count: count);
       }
     } else {
-      result = generateWaveformSync(songId: songId, filePath: filePath, count: count);
+      result = generateWaveformSync(
+          songId: songId, filePath: filePath, count: count);
     }
 
     if (_cache.length >= _maxCacheSize) {

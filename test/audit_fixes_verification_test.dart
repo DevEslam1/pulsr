@@ -212,7 +212,9 @@ void main() {
       expect(fromMap.positionMs, 45000);
     });
 
-    test('CastDevice and CastRoute map parsing handles valid and fallback values', () {
+    test(
+        'CastDevice and CastRoute map parsing handles valid and fallback values',
+        () {
       final dev = CastDevice.fromMap({
         'id': 'nest_audio_1',
         'name': 'Studio Speaker',

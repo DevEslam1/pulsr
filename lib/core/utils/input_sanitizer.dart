@@ -6,14 +6,16 @@ class InputSanitizer {
 
   static final RegExp _dangerousCharsRegex = RegExp(r'[\x00-\x1F\x7F]');
   static final RegExp _regexEscapePattern = RegExp(r'[.*+?^${}()|[\]\\]');
-  static final RegExp _invalidFileNameCharsRegex = RegExp(r'[\\/:*?"<>|\x00-\x1F\x7F]');
+  static final RegExp _invalidFileNameCharsRegex =
+      RegExp(r'[\\/:*?"<>|\x00-\x1F\x7F]');
   static final RegExp _hostnameRegex = RegExp(
     r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$|^localhost$|^(?:\d{1,3}\.){3}\d{1,3}$|^\[?[a-fA-F0-9:]+\]?$',
   );
 
   /// Sanitizes playlist names: trims, removes control/null characters,
   /// caps to 100 characters, and falls back to a safe default if blank.
-  static String sanitizePlaylistName(String name, {String defaultFallback = 'Untitled Playlist'}) {
+  static String sanitizePlaylistName(String name,
+      {String defaultFallback = 'Untitled Playlist'}) {
     var sanitized = name.replaceAll(_dangerousCharsRegex, '').trim();
     // Normalize any repeated internal whitespace
     sanitized = sanitized.replaceAll(RegExp(r'\s+'), ' ');
@@ -26,7 +28,8 @@ class InputSanitizer {
   /// Trims search queries and escapes regex special characters.
   static String sanitizeSearchQuery(String query) {
     final trimmed = query.trim();
-    return trimmed.replaceAllMapped(_regexEscapePattern, (match) => '\\${match.group(0)}');
+    return trimmed.replaceAllMapped(
+        _regexEscapePattern, (match) => '\\${match.group(0)}');
   }
 
   /// Validates that a relative file path does not attempt path traversal (`..`)
@@ -48,7 +51,8 @@ class InputSanitizer {
   /// Sanitizes a filename by replacing reserved filesystem characters:
   /// `/ \ : * ? " < > |` and control characters with an underscore.
   static String sanitizeFileName(String fileName, {String replacement = '_'}) {
-    var clean = fileName.replaceAll(_invalidFileNameCharsRegex, replacement).trim();
+    var clean =
+        fileName.replaceAll(_invalidFileNameCharsRegex, replacement).trim();
     while (clean.endsWith('.')) {
       clean = clean.substring(0, clean.length - 1);
     }

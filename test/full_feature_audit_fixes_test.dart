@@ -28,16 +28,22 @@ import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/widgets/widget_service.dart';
 
 class MockAudioPlayer extends Mock implements AudioPlayer {}
+
 class MockDownloadRepository extends Mock implements IDownloadRepository {}
-class MockObserveDownloadsUseCase extends Mock implements ObserveDownloadsUseCase {}
-class MockGetDownloadStorageStatsUseCase extends Mock implements GetDownloadStorageStatsUseCase {}
+
+class MockObserveDownloadsUseCase extends Mock
+    implements ObserveDownloadsUseCase {}
+
+class MockGetDownloadStorageStatsUseCase extends Mock
+    implements GetDownloadStorageStatsUseCase {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Pulsr Full Feature Audit Fixes Verification Suite', () {
     // 1. DownloadTask.copyWith with clearError: true sets error to null
-    test('1. DownloadTask.copyWith with clearError: true sets error to null', () {
+    test('1. DownloadTask.copyWith with clearError: true sets error to null',
+        () {
       final task = DownloadTask(
         id: 'task_1',
         videoId: 'vid_1',
@@ -59,7 +65,8 @@ void main() {
     });
 
     // 2. DownloadSettings.load() returns defaults when prefs corrupted
-    test('2. DownloadSettings.load() returns defaults when prefs corrupted', () async {
+    test('2. DownloadSettings.load() returns defaults when prefs corrupted',
+        () async {
       // Intentionally store incompatible type so prefs.getBool throws TypeError
       SharedPreferences.setMockInitialValues({
         'setting_wifi_only_mode': 'not_a_boolean',
@@ -73,7 +80,9 @@ void main() {
     });
 
     // 3. YtmService per-video circuit breaker: 3 failures on videoA trips for videoA, but videoB is not blocked
-    test('3. YtmService per-video circuit breaker: 3 failures on videoA trips for videoA, but videoB is not blocked', () {
+    test(
+        '3. YtmService per-video circuit breaker: 3 failures on videoA trips for videoA, but videoB is not blocked',
+        () {
       final ytmService = YtmService();
 
       expect(ytmService.isVideoCoolingDown('videoA'), isFalse);
@@ -93,27 +102,36 @@ void main() {
     });
 
     // 4. YtmUrlCache.parseUrlExpiryStamp handles seconds and milliseconds epochs correctly
-    test('4. YtmUrlCache.parseUrlExpiryStamp handles seconds and milliseconds epochs correctly', () {
+    test(
+        '4. YtmUrlCache.parseUrlExpiryStamp handles seconds and milliseconds epochs correctly',
+        () {
       // Query param with seconds (< 1e11)
-      const secUrl = 'https://rr1---sn.googlevideo.com/videoplayback?expire=1712345678&id=xyz';
+      const secUrl =
+          'https://rr1---sn.googlevideo.com/videoplayback?expire=1712345678&id=xyz';
       final secDate = YtmUrlCache.parseUrlExpiryStamp(secUrl);
       expect(secDate, isNotNull);
-      expect(secDate, equals(DateTime.fromMillisecondsSinceEpoch(1712345678 * 1000)));
+      expect(secDate,
+          equals(DateTime.fromMillisecondsSinceEpoch(1712345678 * 1000)));
 
       // Query param with milliseconds (>= 1e11)
-      const msUrl = 'https://rr1---sn.googlevideo.com/videoplayback?expire=1712345678000&id=xyz';
+      const msUrl =
+          'https://rr1---sn.googlevideo.com/videoplayback?expire=1712345678000&id=xyz';
       final msDate = YtmUrlCache.parseUrlExpiryStamp(msUrl);
       expect(msDate, isNotNull);
-      expect(msDate, equals(DateTime.fromMillisecondsSinceEpoch(1712345678000)));
+      expect(
+          msDate, equals(DateTime.fromMillisecondsSinceEpoch(1712345678000)));
 
       // Path format with seconds
-      const pathUrl = 'https://rr1---sn.googlevideo.com/videoplayback/expire/1712345678/id/xyz';
+      const pathUrl =
+          'https://rr1---sn.googlevideo.com/videoplayback/expire/1712345678/id/xyz';
       final pathDate = YtmUrlCache.parseUrlExpiryStamp(pathUrl);
       expect(pathDate, isNotNull);
-      expect(pathDate, equals(DateTime.fromMillisecondsSinceEpoch(1712345678 * 1000)));
+      expect(pathDate,
+          equals(DateTime.fromMillisecondsSinceEpoch(1712345678 * 1000)));
 
       // Invalid / missing
-      const invalidUrl = 'https://rr1---sn.googlevideo.com/videoplayback?id=xyz';
+      const invalidUrl =
+          'https://rr1---sn.googlevideo.com/videoplayback?id=xyz';
       expect(YtmUrlCache.parseUrlExpiryStamp(invalidUrl), isNull);
     });
 
@@ -129,7 +147,9 @@ void main() {
     });
 
     // 6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5
-    test('6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5', () {
+    test(
+        '6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5',
+        () {
       expect(
         () => ImportBackupUseCase.validateSchema({'version': 5}),
         throwsA(isA<FormatException>().having(
@@ -140,14 +160,19 @@ void main() {
       );
 
       // Valid versions (1..4) do not throw version error
-      expect(() => ImportBackupUseCase.validateSchema({'version': 1}), returnsNormally);
-      expect(() => ImportBackupUseCase.validateSchema({'version': 2}), returnsNormally);
-      expect(() => ImportBackupUseCase.validateSchema({'version': 3}), returnsNormally);
-      expect(() => ImportBackupUseCase.validateSchema({'version': 4}), returnsNormally);
+      expect(() => ImportBackupUseCase.validateSchema({'version': 1}),
+          returnsNormally);
+      expect(() => ImportBackupUseCase.validateSchema({'version': 2}),
+          returnsNormally);
+      expect(() => ImportBackupUseCase.validateSchema({'version': 3}),
+          returnsNormally);
+      expect(() => ImportBackupUseCase.validateSchema({'version': 4}),
+          returnsNormally);
     });
 
     // 7. LrcParser.parse skips malformed timestamp lines without throwing
-    test('7. LrcParser.parse skips malformed timestamp lines without throwing', () {
+    test('7. LrcParser.parse skips malformed timestamp lines without throwing',
+        () {
       const lrcContent = '''
 [ar:Artist]
 [ti:Title]
@@ -160,13 +185,17 @@ void main() {
       final lines = LrcParser.parse(lrcContent);
       expect(lines.length, equals(2));
       expect(lines[0].text, equals('Valid Line 1'));
-      expect(lines[0].timestamp, equals(const Duration(minutes: 1, seconds: 23, milliseconds: 450)));
+      expect(lines[0].timestamp,
+          equals(const Duration(minutes: 1, seconds: 23, milliseconds: 450)));
       expect(lines[1].text, equals('Valid Line 2'));
-      expect(lines[1].timestamp, equals(const Duration(minutes: 2, seconds: 34, milliseconds: 560)));
+      expect(lines[1].timestamp,
+          equals(const Duration(minutes: 2, seconds: 34, milliseconds: 560)));
     });
 
     // 8. CrossfadeManager.cancel() completes _crossfadeCompleter safely without throwing
-    test('8. CrossfadeManager.cancel() completes _crossfadeCompleter safely without throwing', () async {
+    test(
+        '8. CrossfadeManager.cancel() completes _crossfadeCompleter safely without throwing',
+        () async {
       final crossfadeManager = CrossfadeManager();
       final playerA = MockAudioPlayer();
       final playerB = MockAudioPlayer();
@@ -175,8 +204,10 @@ void main() {
       when(() => playerB.setVolume(any())).thenAnswer((_) async {});
       when(() => playerA.stop()).thenAnswer((_) async {});
       when(() => playerB.stop()).thenAnswer((_) async {});
-      when(() => playerA.dspSetGainCurve(any(), segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
-      when(() => playerB.dspSetGainCurve(any(), segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
+      when(() => playerA.dspSetGainCurve(any(),
+          segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
+      when(() => playerB.dspSetGainCurve(any(),
+          segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => false);
       when(() => playerA.dspClearGainCurve()).thenAnswer((_) async => false);
       when(() => playerB.dspClearGainCurve()).thenAnswer((_) async => false);
 
@@ -201,15 +232,19 @@ void main() {
       final mockRepo = MockDownloadRepository();
       when(() => mockRepo.reconcileOnBoot()).thenAnswer((_) async {});
       when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => []);
-      when(() => mockRepo.observeDownloads()).thenAnswer((_) => const Stream.empty());
-      when(() => mockRepo.pauseDownload('vid_abc')).thenAnswer((_) async => const Right(unit));
-      when(() => mockRepo.deleteDownload('vid_abc')).thenAnswer((_) async => const Right(unit));
-      when(() => mockRepo.getStorageStats()).thenAnswer((_) async => const Right(StorageStats(
-            totalBytes: 1000,
-            freeBytes: 500,
-            usedBytes: 100,
-            downloadedSongsCount: 1,
-          )));
+      when(() => mockRepo.observeDownloads())
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockRepo.pauseDownload('vid_abc'))
+          .thenAnswer((_) async => const Right(unit));
+      when(() => mockRepo.deleteDownload('vid_abc'))
+          .thenAnswer((_) async => const Right(unit));
+      when(() => mockRepo.getStorageStats())
+          .thenAnswer((_) async => const Right(StorageStats(
+                totalBytes: 1000,
+                freeBytes: 500,
+                usedBytes: 100,
+                downloadedSongsCount: 1,
+              )));
 
       final queueUseCase = QueueDownloadUseCase(mockRepo);
       final pauseUseCase = PauseDownloadUseCase(mockRepo);
@@ -239,7 +274,8 @@ void main() {
     });
 
     // 10. WidgetService._pruneOldWidgetArtwork prunes oldest files first
-    test('10. WidgetService._pruneOldWidgetArtwork prunes oldest files first', () async {
+    test('10. WidgetService._pruneOldWidgetArtwork prunes oldest files first',
+        () async {
       final tempDir = Directory.systemTemp.createTempSync('widget_prune_test_');
 
       try {
@@ -249,7 +285,8 @@ void main() {
         // Create 52 artwork files (cache limit is 50, so 2 oldest should be pruned)
         final createdFiles = <File>[];
         for (int i = 0; i < 52; i++) {
-          final file = File('${tempDir.path}${Platform.pathSeparator}pulsr_widget_art_$i.png');
+          final file = File(
+              '${tempDir.path}${Platform.pathSeparator}pulsr_widget_art_$i.png');
           file.writeAsBytesSync([0, 1, 2]);
           // Set modified timestamp: file 0 is 52 hours ago, file 51 is 1 hour ago
           file.setLastModifiedSync(now.subtract(Duration(hours: 52 - i)));

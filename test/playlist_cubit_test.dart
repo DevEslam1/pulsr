@@ -83,7 +83,9 @@ void main() {
       await cubit.close();
     });
 
-    test('H-06: cache save queue is capped at maxCacheSaveQueueSize (50) and coalesces', () async {
+    test(
+        'H-06: cache save queue is capped at maxCacheSaveQueueSize (50) and coalesces',
+        () async {
       final cubit = PlaylistCubit(playlistUseCases: playlistUseCases);
 
       expect(cubit.cacheSaveQueueLength, equals(0));
@@ -94,13 +96,16 @@ void main() {
       }
 
       // The queue must never exceed 50 items
-      expect(cubit.cacheSaveQueueLength, equals(PlaylistCubit.maxCacheSaveQueueSize));
+      expect(cubit.cacheSaveQueueLength,
+          equals(PlaylistCubit.maxCacheSaveQueueSize));
       expect(cubit.cacheSaveQueueLength, equals(50));
 
       await cubit.close();
     });
 
-    test('[M-09] _loadOnlineCache safely catches FormatException and corrupted data and purges cache', () async {
+    test(
+        '[M-09] _loadOnlineCache safely catches FormatException and corrupted data and purges cache',
+        () async {
       SharedPreferences.setMockInitialValues({
         PlaylistCubit.onlineCacheKey: '{corrupted: json [',
       });

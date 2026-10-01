@@ -35,12 +35,17 @@ class DspTelemetry {
       return const DspTelemetry.zero();
     }
     final limiter = (list[0] as num?)?.toDouble() ?? 0.0;
-    final dynEq = List<double>.generate(8, (i) => (list[1 + i] as num?)?.toDouble() ?? 0.0);
-    final mb = List<double>.generate(4, (i) => (list[9 + i] as num?)?.toDouble() ?? 0.0);
+    final dynEq = List<double>.generate(
+        8, (i) => (list[1 + i] as num?)?.toDouble() ?? 0.0);
+    final mb = List<double>.generate(
+        4, (i) => (list[9 + i] as num?)?.toDouble() ?? 0.0);
     final rtf = (list[13] as num?)?.toDouble() ?? 0.0;
     final degraded = (list[14] as num?)?.toInt() ?? 0;
-    final dose = list.length >= 16 ? ((list[15] as num?)?.toDouble() ?? 0.0) : 0.0;
-    final attenuation = list.length >= 17 ? (((list[16] as num?)?.toDouble() ?? 0.0) > 0.5) : false;
+    final dose =
+        list.length >= 16 ? ((list[15] as num?)?.toDouble() ?? 0.0) : 0.0;
+    final attenuation = list.length >= 17
+        ? (((list[16] as num?)?.toDouble() ?? 0.0) > 0.5)
+        : false;
 
     return DspTelemetry(
       limiterGrDb: limiter,

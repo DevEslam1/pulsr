@@ -27,8 +27,8 @@ class PulsrResponsiveSheet {
     double? maxHeight,
   }) {
     final breakpoint = context.breakpoint;
-    final isDialogMode =
-        !breakpoint.isCompact || PulsrLayoutMetrics.shouldUseDialogForSheet(context);
+    final isDialogMode = !breakpoint.isCompact ||
+        PulsrLayoutMetrics.shouldUseDialogForSheet(context);
 
     if (!isDialogMode) {
       // Bottom Sheet on compact portrait screens

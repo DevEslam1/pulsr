@@ -50,7 +50,8 @@ class UsbRateSwitchDialog extends StatefulWidget {
     }
 
     // Otherwise closest supported rate
-    candidates.sort((a, b) => (a - trackRate).abs().compareTo((b - trackRate).abs()));
+    candidates
+        .sort((a, b) => (a - trackRate).abs().compareTo((b - trackRate).abs()));
     return candidates.first;
   }
 
@@ -203,10 +204,12 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 InkWell(
-                  onTap: () => setState(() => _rememberChoice = !_rememberChoice),
+                  onTap: () =>
+                      setState(() => _rememberChoice = !_rememberChoice),
                   borderRadius: BorderRadius.circular(AppRadii.r8),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
                     child: Row(
                       children: [
                         SizedBox(
@@ -214,10 +217,11 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                           height: 24,
                           child: Checkbox(
                             value: _rememberChoice,
-                            onChanged: (v) => setState(() => _rememberChoice = v ?? false),
+                            onChanged: (v) =>
+                                setState(() => _rememberChoice = v ?? false),
                             activeColor: AppColors.dacGold,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(AppRadii.r4),
                             ),
                           ),
                         ),
@@ -241,10 +245,12 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                     Expanded(
                       child: TextButton(
                         onPressed: () =>
-                            Navigator.of(context, rootNavigator: true).pop(null),
+                            Navigator.of(context, rootNavigator: true)
+                                .pop(null),
                         style: TextButton.styleFrom(
                           foregroundColor: p.textSecondary,
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r12),
                           ),
@@ -259,7 +265,8 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.dacGold,
                           foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.sm),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r12),

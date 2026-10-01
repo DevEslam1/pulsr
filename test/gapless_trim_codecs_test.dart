@@ -16,8 +16,8 @@ void main() {
     });
 
     test('MP3 codec hint (no extension) is detected via codec string', () {
-      final trim = GaplessTrimHandler.trimFor(
-          path: '/music/stream_001', codec: 'mp3');
+      final trim =
+          GaplessTrimHandler.trimFor(path: '/music/stream_001', codec: 'mp3');
       expect(trim.preSkip, GaplessTrimHandler.mp3EncoderDelay);
     });
 

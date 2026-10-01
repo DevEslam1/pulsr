@@ -60,253 +60,271 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         appBar: AppBar(
           leading: const PulsrBackButton(),
           title: Text(folder.name),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _isExcluded
-                  ? Icons.visibility_off_rounded
-                  : Icons.visibility_rounded,
-              color: _isExcluded ? p.error : p.textSecondary,
-            ),
-            tooltip: _isExcluded
-                ? context.l10n.browseIncludeInScan
-                : context.l10n.browseExcludeFromScan,
-            onPressed: () async {
-              final prevExcluded = _isExcluded;
-              final newExcluded = !prevExcluded;
-              setState(() => _isExcluded = newExcluded);
-              LibraryCubit? libraryCubit;
-              try {
-                libraryCubit = context.read<LibraryCubit>();
-              } catch (_) {}
-              
-              Result<void> result;
-              try {
-                if (libraryCubit != null) {
-                  result = await libraryCubit.toggleFolderExclusion(folder.path);
-                } else {
-                  result = await _useCase.toggleExcludeFolder(folder.path);
+          actions: [
+            IconButton(
+              icon: Icon(
+                _isExcluded
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                color: _isExcluded ? p.error : p.textSecondary,
+              ),
+              tooltip: _isExcluded
+                  ? context.l10n.browseIncludeInScan
+                  : context.l10n.browseExcludeFromScan,
+              onPressed: () async {
+                final prevExcluded = _isExcluded;
+                final newExcluded = !prevExcluded;
+                setState(() => _isExcluded = newExcluded);
+                LibraryCubit? libraryCubit;
+                try {
+                  libraryCubit = context.read<LibraryCubit>();
+                } catch (_) {}
+
+                Result<void> result;
+                try {
+                  if (libraryCubit != null) {
+                    result =
+                        await libraryCubit.toggleFolderExclusion(folder.path);
+                  } else {
+                    result = await _useCase.toggleExcludeFolder(folder.path);
+                  }
+                } catch (e) {
+                  result = Left(DatabaseFailure(e.toString()));
                 }
-              } catch (e) {
-                result = Left(DatabaseFailure(e.toString()));
-              }
 
-              if (!context.mounted) return;
-              final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
-              if (failureMessage != null) {
-                setState(() => _isExcluded = prevExcluded);
+                if (!context.mounted) return;
+                final failureMessage =
+                    result.fold<String?>((l) => l.message, (_) => null);
+                if (failureMessage != null) {
+                  setState(() => _isExcluded = prevExcluded);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(failureMessage)),
+                  );
+                  return;
+                }
+
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(failureMessage)),
-                );
-                return;
-              }
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    newExcluded
-                        ? context.l10n.folderExcluded
-                        : context.l10n.folderIncluded,
-                  ),
-                  action: SnackBarAction(
-                    label: context.l10n.undo,
-                    onPressed: () async {
-                      if (mounted) setState(() => _isExcluded = prevExcluded);
-                      try {
-                        if (libraryCubit != null) {
-                          await libraryCubit.toggleFolderExclusion(folder.path);
-                        } else {
-                          await _useCase.toggleExcludeFolder(folder.path);
+                  SnackBar(
+                    content: Text(
+                      newExcluded
+                          ? context.l10n.folderExcluded
+                          : context.l10n.folderIncluded,
+                    ),
+                    action: SnackBarAction(
+                      label: context.l10n.undo,
+                      onPressed: () async {
+                        if (mounted) setState(() => _isExcluded = prevExcluded);
+                        try {
+                          if (libraryCubit != null) {
+                            await libraryCubit
+                                .toggleFolderExclusion(folder.path);
+                          } else {
+                            await _useCase.toggleExcludeFolder(folder.path);
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            setState(() => _isExcluded = newExcluded);
+                          }
                         }
-                      } catch (_) {
-                        if (mounted) setState(() => _isExcluded = newExcluded);
-                      }
-                    },
+                      },
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildBreadcrumbs(context, p, folder.path),
-          Expanded(
-            child: StreamBuilder<Result<List<SongsTableData>>>(
-              stream: _useCase.watchFolderSongs(folder.path).distinct(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const SkeletonList(
-                padding: EdgeInsets.only(top: AppSpacing.xs));
-          }
-          final loadFailed = snapshot.hasError ||
-              (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-          if (loadFailed) {
-            return EmptyStateWidget(
-              icon: Icons.error_outline_rounded,
-              iconColor: p.error,
-              title: context.l10n.couldNotLoadFolderSongs,
-              subtitle: context.l10n.libraryReadError,
-              primaryActionLabel: context.l10n.retry,
-              primaryActionIcon: Icons.refresh_rounded,
-              onPrimaryAction: () => setState(() {}),
-            );
-          }
+                );
+              },
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            _buildBreadcrumbs(context, p, folder.path),
+            Expanded(
+              child: StreamBuilder<Result<List<SongsTableData>>>(
+                stream: _useCase.watchFolderSongs(folder.path).distinct(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
+                    return const SkeletonList(
+                        padding: EdgeInsets.only(top: AppSpacing.xs));
+                  }
+                  final loadFailed = snapshot.hasError ||
+                      (snapshot.data?.fold((l) => true, (_) => false) ?? false);
+                  if (loadFailed) {
+                    return EmptyStateWidget(
+                      icon: Icons.error_outline_rounded,
+                      iconColor: p.error,
+                      title: context.l10n.couldNotLoadFolderSongs,
+                      subtitle: context.l10n.libraryReadError,
+                      primaryActionLabel: context.l10n.retry,
+                      primaryActionIcon: Icons.refresh_rounded,
+                      onPrimaryAction: () => setState(() {}),
+                    );
+                  }
 
-          final songs =
-              snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+                  final songs = snapshot.data
+                          ?.fold((l) => <SongsTableData>[], (r) => r) ??
+                      [];
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: PulsrLayoutMetrics.contentConstraints(context),
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
-                children: [
-                  const SizedBox(height: AppSpacing.md),
-                  Center(
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: p.accentContainer,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: p.hairline),
-                        boxShadow: [
-                          BoxShadow(
-                            color: p.glow,
-                            blurRadius: 24,
-                            spreadRadius: -4,
-                            offset: const Offset(0, 8),
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints:
+                          PulsrLayoutMetrics.contentConstraints(context),
+                      child: ListView(
+                        padding: const EdgeInsets.only(
+                            bottom: AppSpacing.scrollBottom),
+                        children: [
+                          const SizedBox(height: AppSpacing.md),
+                          Center(
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: p.accentContainer,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: p.hairline),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: p.glow,
+                                    blurRadius: 24,
+                                    spreadRadius: -4,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                _isExcluded
+                                    ? Icons.folder_off_rounded
+                                    : Icons.folder_rounded,
+                                size: 48,
+                                color: _isExcluded ? p.error : p.accent,
+                              ),
+                            ),
                           ),
+                          const SizedBox(height: AppSpacing.md),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.lg),
+                              child: Text(
+                                folder.name,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.xl),
+                              child: Text(
+                                folder.path,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.label),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s6),
+                          Center(
+                            child: Text(
+                              Formatters.formatTrackCount(songs.length),
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.bodySmall,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s20),
+
+                          // Action Buttons (Play All, Shuffle)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: songs.isNotEmpty
+                                        ? () => context
+                                            .read<PlayerCubit>()
+                                            .playSong(songs.first, queue: songs)
+                                        : null,
+                                    icon: const Icon(Icons.play_arrow_rounded),
+                                    label: Text(context.l10n.playAll),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: songs.isNotEmpty
+                                        ? () {
+                                            final shuffled =
+                                                List<SongsTableData>.from(songs)
+                                                  ..shuffle();
+                                            context
+                                                .read<PlayerCubit>()
+                                                .playSong(shuffled.first,
+                                                    queue: shuffled);
+                                          }
+                                        : null,
+                                    icon: Icon(Icons.shuffle_rounded,
+                                        color: p.accent),
+                                    label: Text(context.l10n.shuffle),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: AppSpacing.s20),
+
+                          // Songs List
+                          if (songs.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(AppSpacing.xl),
+                              child: EmptyStateWidget(
+                                icon: Icons.music_off_rounded,
+                                title: context.l10n.browseNoTracksFound,
+                                subtitle: context.l10n.browseNoTracksInFolder,
+                              ),
+                            )
+                          else
+                            for (int i = 0; i < songs.length; i++)
+                              SongTile(
+                                song: songs[i],
+                                index: i,
+                                subtitleOverride:
+                                    '${songs[i].artist} • ${songs[i].album}',
+                                onTap: () => context
+                                    .read<PlayerCubit>()
+                                    .playSong(songs[i], queue: songs),
+                                onMorePressed: () =>
+                                    SongInfoSheet.show(context, song: songs[i]),
+                              ),
                         ],
                       ),
-                      child: Icon(
-                        _isExcluded
-                            ? Icons.folder_off_rounded
-                            : Icons.folder_rounded,
-                        size: 48,
-                        color: _isExcluded ? p.error : p.accent,
-                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                      child: Text(
-                        folder.name,
-                        textAlign: TextAlign.center,
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xxs),
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                      child: Text(
-                        folder.path,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s6),
-                  Center(
-                    child: Text(
-                      Formatters.formatTrackCount(songs.length),
-                      style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.bodySmall,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // Action Buttons (Play All, Shuffle)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () => context
-                                    .read<PlayerCubit>()
-                                    .playSong(songs.first, queue: songs)
-                                : null,
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: Text(context.l10n.playAll),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () {
-                                    final shuffled =
-                                        List<SongsTableData>.from(songs)
-                                          ..shuffle();
-                                    context.read<PlayerCubit>().playSong(
-                                        shuffled.first,
-                                        queue: shuffled);
-                                  }
-                                : null,
-                            icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                            label: Text(context.l10n.shuffle),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // Songs List
-                  if (songs.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: EmptyStateWidget(
-                        icon: Icons.music_off_rounded,
-                        title: context.l10n.browseNoTracksFound,
-                        subtitle: context.l10n.browseNoTracksInFolder,
-                      ),
-                    )
-                  else
-                    for (int i = 0; i < songs.length; i++)
-                      SongTile(
-                        song: songs[i],
-                        index: i,
-                        subtitleOverride:
-                            '${songs[i].artist} • ${songs[i].album}',
-                        onTap: () => context
-                            .read<PlayerCubit>()
-                            .playSong(songs[i], queue: songs),
-                        onMorePressed: () => SongInfoSheet.show(context, song: songs[i]),
-                      ),
-                ],
+                  );
+                },
               ),
             ),
-          );
-        },
-      ),
-    ),
-  ],
-),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBreadcrumbs(BuildContext context, PulsrPalette p, String fullPath) {
+  Widget _buildBreadcrumbs(
+      BuildContext context, PulsrPalette p, String fullPath) {
     final cleanPath = fullPath.replaceAll('\\', '/');
     final parts = cleanPath.split('/').where((s) => s.isNotEmpty).toList();
     if (parts.isEmpty) return const SizedBox.shrink();

@@ -243,13 +243,16 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     if (bytesPerFrame_ <= 0) return -1;
     if (sizeBytes < 0 || (sizeBytes % bytesPerFrame_) != 0) return -1;
 
-    if (releasing_.load(std::memory_order_acquire)) return -1;
-
+    // Register as an in-flight writer *before* checking releasing_ so
+    // CloseLocked() cannot observe zero writers and close the stream while we
+    // are about to enter (check-then-increment TOCTOU).
     activeWriters_.fetch_add(1, std::memory_order_acquire);
     struct WriterGuard {
         std::atomic<int32_t>& ref;
         ~WriterGuard() { ref.fetch_sub(1, std::memory_order_release); }
     } guard{activeWriters_};
+
+    if (releasing_.load(std::memory_order_acquire)) return -1;
 
     if (disconnected_.load(std::memory_order_acquire)) {
         std::unique_lock<std::mutex> lock(streamMutex_, std::try_to_lock);
@@ -279,25 +282,28 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
 
     const float curVol = volume_.load(std::memory_order_relaxed);
     if (!bitPerfect_ && curVol != 1.0f) {
-        if (static_cast<size_t>(remaining) <= volumeScratch_.capacity()) {
-            volumeScratch_.resize(static_cast<size_t>(remaining));
-            std::memcpy(volumeScratch_.data(), src, static_cast<size_t>(remaining));
-            if (config_.encoding == Encoding::Float) {
-                float* f = reinterpret_cast<float*>(volumeScratch_.data());
-                const int n = remaining / static_cast<int32_t>(sizeof(float));
-                for (int i = 0; i < n; ++i) f[i] *= curVol;
-            } else {
-                int16_t* s = reinterpret_cast<int16_t*>(volumeScratch_.data());
-                const int n = remaining / static_cast<int32_t>(sizeof(int16_t));
-                for (int i = 0; i < n; ++i) {
-                    float v = static_cast<float>(s[i]) * curVol;
-                    v = v < -32768.0f ? -32768.0f
-                                      : (v > 32767.0f ? 32767.0f : v);
-                    s[i] = static_cast<int16_t>(v);
-                }
-            }
-            src = volumeScratch_.data();
+        // Grow the scratch to fit abnormally large blocks instead of silently
+        // writing the block at full scale (a surprise-loudness defect).
+        if (static_cast<size_t>(remaining) > volumeScratch_.capacity()) {
+            volumeScratch_.reserve(static_cast<size_t>(remaining));
         }
+        volumeScratch_.resize(static_cast<size_t>(remaining));
+        std::memcpy(volumeScratch_.data(), src, static_cast<size_t>(remaining));
+        if (config_.encoding == Encoding::Float) {
+            float* f = reinterpret_cast<float*>(volumeScratch_.data());
+            const int n = remaining / static_cast<int32_t>(sizeof(float));
+            for (int i = 0; i < n; ++i) f[i] *= curVol;
+        } else {
+            int16_t* s = reinterpret_cast<int16_t*>(volumeScratch_.data());
+            const int n = remaining / static_cast<int32_t>(sizeof(int16_t));
+            for (int i = 0; i < n; ++i) {
+                float v = static_cast<float>(s[i]) * curVol;
+                v = v < -32768.0f ? -32768.0f
+                                  : (v > 32767.0f ? 32767.0f : v);
+                s[i] = static_cast<int16_t>(v);
+            }
+        }
+        src = volumeScratch_.data();
     }
 
     int32_t framesLeft = remaining / bytesPerFrame_;

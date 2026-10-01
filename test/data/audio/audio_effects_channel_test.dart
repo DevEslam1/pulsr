@@ -15,12 +15,12 @@ void main() {
       log.clear();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (MethodCall call) async {
-            log.add(call);
-            if (call.method == 'setCacheBudgetBytes') {
-              return true;
-            }
-            return null;
-          });
+        log.add(call);
+        if (call.method == 'setCacheBudgetBytes') {
+          return true;
+        }
+        return null;
+      });
     });
 
     tearDown(() {
@@ -42,7 +42,8 @@ void main() {
       },
     );
 
-    test('setAudioSessionId forwards the session id to the native side', () async {
+    test('setAudioSessionId forwards the session id to the native side',
+        () async {
       final effectsChannel = AudioEffectsChannel();
 
       await effectsChannel.setAudioSessionId(5);
@@ -87,7 +88,8 @@ void main() {
 
     test('setBypassCompare forwards bypass and gainCompensationDb', () async {
       final effectsChannel = AudioEffectsChannel();
-      await effectsChannel.setBypassCompare(bypass: true, gainCompensationDb: -3.5);
+      await effectsChannel.setBypassCompare(
+          bypass: true, gainCompensationDb: -3.5);
 
       final sent = log.where((c) => c.method == 'setBypassCompare').toList();
       expect(sent, hasLength(1));
@@ -97,11 +99,14 @@ void main() {
       });
     });
 
-    test('setRtfGovernorEnabled and getRtfGovernorStatus interact with platform channel', () async {
+    test(
+        'setRtfGovernorEnabled and getRtfGovernorStatus interact with platform channel',
+        () async {
       final effectsChannel = AudioEffectsChannel();
       await effectsChannel.setRtfGovernorEnabled(true);
 
-      final sent = log.where((c) => c.method == 'setRtfGovernorEnabled').toList();
+      final sent =
+          log.where((c) => c.method == 'setRtfGovernorEnabled').toList();
       expect(sent, hasLength(1));
       expect(sent.single.arguments, {'enabled': true});
 
@@ -110,4 +115,3 @@ void main() {
     });
   });
 }
-

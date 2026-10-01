@@ -107,18 +107,18 @@ class VisualizerPreset {
           ? (map['name'] as String).trim()
           : 'Custom Preset',
       shape: _shapeFromName(map['shape'] as String?),
-      primaryColor: _parseColor(
-          map['primaryColor'] ?? map['color'], 0xFF9B9EF5),
+      primaryColor:
+          _parseColor(map['primaryColor'] ?? map['color'], 0xFF9B9EF5),
       secondaryColor: _parseColor(map['secondaryColor'], 0xFF3DDC97),
       backgroundColor: _parseColor(map['backgroundColor'], 0x00000000),
       barCount: map['barCount'] is num
           ? (map['barCount'] as num).toInt().clamp(4, 128)
           : 32,
-      rotationSpeed: _clamp(
-          (map['rotationSpeed'] as num?)?.toDouble() ?? 0.0, -2.0, 2.0),
+      rotationSpeed:
+          _clamp((map['rotationSpeed'] as num?)?.toDouble() ?? 0.0, -2.0, 2.0),
       glow: _clamp((map['glow'] as num?)?.toDouble() ?? 0.5, 0.0, 1.0),
-      sensitivity: _clamp(
-          (map['sensitivity'] as num?)?.toDouble() ?? 1.0, 0.2, 4.0),
+      sensitivity:
+          _clamp((map['sensitivity'] as num?)?.toDouble() ?? 1.0, 0.2, 4.0),
       mirror: map['mirror'] == true,
     );
   }

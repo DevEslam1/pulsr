@@ -54,6 +54,7 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
         TAPS_PER_PHASE + 1,
         MAX_LOOKAHEAD_SAMPLES - 1
     );
+    latencyFramesAtomic_.store(lookaheadSamples_, std::memory_order_relaxed);
 
     threshold_ = static_cast<float>(std::pow(10.0, thresholdDb_ / 20.0));
     fastReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (0.015 * sampleRate_))); // 15ms fast transient release

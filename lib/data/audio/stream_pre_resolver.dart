@@ -68,7 +68,8 @@ class StreamPreResolver {
   static String _defaultQuality() => 'high';
 
   /// Current video ID actively resolving in background, if any.
-  String? get inFlightVideoId => _inFlightVideoIds.isEmpty ? null : _inFlightVideoIds.first;
+  String? get inFlightVideoId =>
+      _inFlightVideoIds.isEmpty ? null : _inFlightVideoIds.first;
   Set<String> get inFlightVideoIds => Set.unmodifiable(_inFlightVideoIds);
 
   /// Called immediately when a track starts playing.
@@ -100,10 +101,12 @@ class StreamPreResolver {
     Duration? duration,
   }) {
     if (_disposed) return;
-    final timeRemaining = (duration != null && position != null && duration > position)
-        ? duration - position
-        : null;
-    final urgent = timeRemaining != null && timeRemaining < const Duration(seconds: 15);
+    final timeRemaining =
+        (duration != null && position != null && duration > position)
+            ? duration - position
+            : null;
+    final urgent =
+        timeRemaining != null && timeRemaining < const Duration(seconds: 15);
     _debounceTimer?.cancel();
     if (urgent) {
       _planPreResolution(
@@ -133,7 +136,10 @@ class StreamPreResolver {
     if (videoId == null || videoId.isEmpty) return;
 
     final quality = qualityProvider();
-    if (!urlCache.needsRefresh(videoId, quality: quality, refreshThreshold: const Duration(minutes: 10))) return;
+    if (!urlCache.needsRefresh(videoId,
+        quality: quality, refreshThreshold: const Duration(minutes: 10))) {
+      return;
+    }
     if (_inFlightVideoIds.contains(videoId) ||
         isAlreadyPrefetching?.call(videoId) == true) {
       return;
@@ -208,13 +214,17 @@ class StreamPreResolver {
     _activeResolutionTokens[videoId] = token;
 
     resolveUrl(videoId, quality: quality).then((stream) {
-      if (_disposed || !identical(_activeResolutionTokens[videoId], token)) return;
+      if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
+        return;
+      }
       urlCache.putStream(stream, quality: quality);
       unawaited(PreconnectedSocketPool().preconnect(Uri.parse(stream.url)));
       debugPrint(
           '[StreamPreResolver] Successfully pre-resolved track ($videoId)');
     }).catchError((e) {
-      if (_disposed || !identical(_activeResolutionTokens[videoId], token)) return;
+      if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
+        return;
+      }
       debugPrint(
           '[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
     }).whenComplete(() {
@@ -247,7 +257,8 @@ class StreamPreResolver {
               results.add(queue[nextOriginalIndex]);
             }
           } else if (repeatQueue && shuffleIndices.isNotEmpty) {
-            final wrappedPos = (nextPos - shuffleIndices.length) % shuffleIndices.length;
+            final wrappedPos =
+                (nextPos - shuffleIndices.length) % shuffleIndices.length;
             final nextOriginalIndex = shuffleIndices[wrappedPos];
             if (nextOriginalIndex >= 0 && nextOriginalIndex < queue.length) {
               results.add(queue[nextOriginalIndex]);

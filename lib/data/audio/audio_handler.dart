@@ -292,7 +292,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   HeadsetControlConfig? get cachedHeadsetConfig => _cachedHeadsetConfig;
   @override
-  set cachedHeadsetConfig(HeadsetControlConfig? value) => _cachedHeadsetConfig = value;
+  set cachedHeadsetConfig(HeadsetControlConfig? value) =>
+      _cachedHeadsetConfig = value;
   double? _preDuckVolume;
   double? _preDuckInactiveVolume;
   @override
@@ -797,9 +798,11 @@ class PulsrAudioHandler extends BaseAudioHandler
               ? ArtworkUriResolver.getCachedAlbumArtUri(song.albumId!)
               : null);
       if (finalArtUri == null && song.albumId != null && song.albumId! > 0) {
-        finalArtUri = Uri.parse('content://media/external/audio/albumart/${song.albumId}');
+        finalArtUri = Uri.parse(
+            'content://media/external/audio/albumart/${song.albumId}');
       } else if (finalArtUri == null && song.id > 0) {
-        finalArtUri = Uri.parse('content://media/external/audio/media/${song.id}/albumart');
+        finalArtUri = Uri.parse(
+            'content://media/external/audio/media/${song.id}/albumart');
       }
     }
 
@@ -1752,7 +1755,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                 if (!_duckActive && _activePlayer.playing) {
                   _duckActive = true;
                   _duckSafetyTimer?.cancel();
-                  _duckSafetyTimer = Timer(const Duration(seconds: 3), () async {
+                  _duckSafetyTimer =
+                      Timer(const Duration(seconds: 3), () async {
                     if (_duckActive) {
                       _duckActive = false;
                       _duckDepthCounter = 0;
@@ -1765,7 +1769,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                   _preDuckVolume = _activePlayer.volume;
                   _preDuckInactiveVolume = _inactivePlayer.volume;
                   final f = duckingController.duckFactor;
-                  _volumeController?.updateSettings(duckFactor: f, isDucked: true);
+                  _volumeController?.updateSettings(
+                      duckFactor: f, isDucked: true);
                   await _activePlayer.setVolume(f * (_preDuckVolume ?? 1.0));
                   if (_crossfadeManager.isCrossfading) {
                     await _inactivePlayer
@@ -1825,8 +1830,11 @@ class PulsrAudioHandler extends BaseAudioHandler
                   try {
                     await _activePlayer.setVolume(target);
                   } catch (e, st) {
-                    ErrorLogger.log('Failed to restore active player volume after duck',
-                        error: e, stackTrace: st, category: 'AudioHandler');
+                    ErrorLogger.log(
+                        'Failed to restore active player volume after duck',
+                        error: e,
+                        stackTrace: st,
+                        category: 'AudioHandler');
                   }
                   if (_crossfadeManager.isCrossfading) {
                     try {
@@ -1836,8 +1844,11 @@ class PulsrAudioHandler extends BaseAudioHandler
                               ? _songs[_currentIndex]
                               : null));
                     } catch (e, st) {
-                      ErrorLogger.log('Failed to restore inactive volume during crossfade duck',
-                          error: e, stackTrace: st, category: 'AudioHandler');
+                      ErrorLogger.log(
+                          'Failed to restore inactive volume during crossfade duck',
+                          error: e,
+                          stackTrace: st,
+                          category: 'AudioHandler');
                     }
                   }
                   // The correct ReplayGain-compensated target was applied above.
@@ -2107,13 +2118,18 @@ class PulsrAudioHandler extends BaseAudioHandler
           _latencyTracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
         final songIndex = _songs.indexWhere((s) =>
-            s.id == song.id || (s.remoteId != null && s.remoteId == song.remoteId));
+            s.id == song.id ||
+            (s.remoteId != null && s.remoteId == song.remoteId));
         if (songIndex != -1 && songIndex < _songs.length) {
           final target = _songs[songIndex];
-          if (target.id == song.id || (target.remoteId != null && target.remoteId == song.remoteId)) {
+          if (target.id == song.id ||
+              (target.remoteId != null && target.remoteId == song.remoteId)) {
             if (target.bitrateKbps == null || target.bitrateKbps == 0) {
-              final defaultKbps =
-                  quality == 'low' ? 64 : quality == 'medium' ? 128 : 160;
+              final defaultKbps = quality == 'low'
+                  ? 64
+                  : quality == 'medium'
+                      ? 128
+                      : 160;
               final defaultCodec = quality == 'medium' ? 'AAC' : 'OPUS';
               final updated = target.copyWith(
                 bitrateKbps: Value(defaultKbps),
@@ -2121,7 +2137,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                 sampleRate: Value(defaultCodec == 'OPUS' ? 48000 : 44100),
               );
               _songs[songIndex] = updated;
-              if (songIndex == _currentIndex && !_onTrackChangedSubject.isClosed) {
+              if (songIndex == _currentIndex &&
+                  !_onTrackChangedSubject.isClosed) {
                 _onTrackChangedSubject.add(updated);
               }
             }
@@ -2161,7 +2178,11 @@ class PulsrAudioHandler extends BaseAudioHandler
 
       final realBitrate = stream.bitrateKbps > 0
           ? stream.bitrateKbps
-          : (quality == 'low' ? 64 : quality == 'medium' ? 128 : 160);
+          : (quality == 'low'
+              ? 64
+              : quality == 'medium'
+                  ? 128
+                  : 160);
       final realCodec = stream.container.toUpperCase() == 'WEBM' ||
               stream.mimeType.contains('webm') ||
               stream.mimeType.contains('opus')
@@ -2173,10 +2194,12 @@ class PulsrAudioHandler extends BaseAudioHandler
               : 'OPUS');
 
       final songIndex = _songs.indexWhere((s) =>
-          s.id == song.id || (s.remoteId != null && s.remoteId == song.remoteId));
+          s.id == song.id ||
+          (s.remoteId != null && s.remoteId == song.remoteId));
       if (songIndex != -1 && songIndex < _songs.length) {
         final target = _songs[songIndex];
-        if (target.id == song.id || (target.remoteId != null && target.remoteId == song.remoteId)) {
+        if (target.id == song.id ||
+            (target.remoteId != null && target.remoteId == song.remoteId)) {
           final updated = target.copyWith(
             bitrateKbps: Value(realBitrate),
             codec: Value(realCodec),
@@ -2190,7 +2213,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
       // Prefer the resolver-provided expiry, then the URL stamp (which may be a
       // ?expire= query param or /expire/<s>/ path segment), then a safe default.
-      final expireStamp = stream.expiresAt ?? YtmStream.expiryFromUrl(stream.url);
+      final expireStamp =
+          stream.expiresAt ?? YtmStream.expiryFromUrl(stream.url);
       final DateTime expireAt;
       if (expireStamp != null) {
         expireAt = DateTime.fromMillisecondsSinceEpoch(expireStamp);
@@ -2324,14 +2348,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       [Map<String, dynamic>? extras]) async {
     switch (name) {
       case 'toggleFavorite':
-        if (_songs.isNotEmpty && _currentIndex < _songs.length) {
+        if (_songs.isNotEmpty &&
+            _currentIndex >= 0 &&
+            _currentIndex < _songs.length) {
           final currentSong = _songs[_currentIndex];
           final result = await _repository.toggleFavorite(currentSong.id);
           final newFav = result.fold((l) => currentSong.isFavorite, (r) => r);
-          _songs[_currentIndex] = currentSong.copyWith(isFavorite: newFav);
-          final artUri =
-              await ArtworkUriResolver.resolveArtworkUri(_songs[_currentIndex]);
-          mediaItem.add(_songToMediaItem(_songs[_currentIndex], artUri));
+          // Centralized so mediaItem, queue and notification controls all update.
+          updateFavorite(currentSong.id, newFav);
           return newFav;
         }
         return false;
@@ -2369,13 +2393,15 @@ class PulsrAudioHandler extends BaseAudioHandler
       case 'bassBoost':
         final current = _equalizerManager.currentPreset.bassBoost;
         final enable = extras?['enable'] as bool? ?? (current <= 0.05);
-        final strength = (extras?['strength'] as num?)?.toDouble() ?? (enable ? 0.6 : 0.0);
+        final strength =
+            (extras?['strength'] as num?)?.toDouble() ?? (enable ? 0.6 : 0.0);
         await _equalizerManager.setBassBoost(strength);
         return enable;
       case 'action_virtualizer':
       case 'toggleVirtualizer':
       case 'virtualizer':
-        final enable = extras?['enable'] as bool? ?? !_equalizerManager.isVirtualizerEnabled;
+        final enable = extras?['enable'] as bool? ??
+            !_equalizerManager.isVirtualizerEnabled;
         final strength = (extras?['strength'] as num?)?.toDouble() ?? 0.5;
         await _equalizerManager.setVirtualizerEnabled(enable);
         if (enable) await _equalizerManager.setVirtualizerStrength(strength);
@@ -2393,7 +2419,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
       case 'cycleSpeed':
         final currentSpeed = _activePlayer.speed;
-        final nextSpeed = currentSpeed < 1.15 ? 1.25 : (currentSpeed < 1.4 ? 1.5 : 1.0);
+        final nextSpeed =
+            currentSpeed < 1.15 ? 1.25 : (currentSpeed < 1.4 ? 1.5 : 1.0);
         await setSpeed(nextSpeed);
         return nextSpeed;
       case 'switchEqPreset':
@@ -2574,7 +2601,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       final curVol = _activePlayer.volume;
       await _activePlayer.setVolume(f * curVol);
       Timer(const Duration(milliseconds: 500), () async {
-        if (_duckActive && _interruption.activeKind == InterruptionKind.systemUiSound) {
+        if (_duckActive &&
+            _interruption.activeKind == InterruptionKind.systemUiSound) {
           _duckActive = false;
           _interruption.end(InterruptionKind.systemUiSound);
           final target = _calculateReplayGainVolume(currentSong);
@@ -2588,7 +2616,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   /// Media button long-press: pause playback without clearing queue or position.
   Future<void> handleMediaButtonLongPress() async {
-    _interruption.begin(InterruptionKind.mediaButtonLongPress, playing: _activePlayer.playing);
+    _interruption.begin(InterruptionKind.mediaButtonLongPress,
+        playing: _activePlayer.playing);
     if (_crossfadeManager.isCrossfading) {
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _preCrossfadeVolume ?? _volume);

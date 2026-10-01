@@ -81,8 +81,7 @@ abstract class ResponsiveFontSize {
     return baseFontSize * scaleFactor(context);
   }
 
-  static double body(BuildContext context) =>
-      scale(context, AppFontSize.body);
+  static double body(BuildContext context) => scale(context, AppFontSize.body);
 
   static double bodySmall(BuildContext context) =>
       scale(context, AppFontSize.bodySmall);

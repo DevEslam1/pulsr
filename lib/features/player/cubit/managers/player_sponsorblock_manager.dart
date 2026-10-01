@@ -15,7 +15,9 @@ class PlayerSponsorBlockManager {
   List<SponsorBlockSegment> _currentSegments = const [];
   String? _currentVideoId;
   Duration? _lastSkippedSegmentEnd;
-  DateTime? _lastSkipTime;
+  // Monotonic cooldown between auto-skips; wall-clock DateTime could jump
+  // backwards/forwards and either spam or block skips.
+  final Stopwatch _skipCooldown = Stopwatch();
 
   List<SponsorBlockSegment> get currentSegments => _currentSegments;
   String? get currentVideoId => _currentVideoId;
@@ -34,6 +36,9 @@ class PlayerSponsorBlockManager {
     _currentSegments = const [];
     _currentVideoId = null;
     _lastSkippedSegmentEnd = null;
+    _skipCooldown
+      ..stop()
+      ..reset();
   }
 
   Future<List<SponsorBlockSegment>> loadSegmentsForSong(
@@ -87,9 +92,7 @@ class PlayerSponsorBlockManager {
       return null;
     }
 
-    final now = DateTime.now();
-    if (_lastSkipTime != null &&
-        now.difference(_lastSkipTime!).inMilliseconds < 1500) {
+    if (_skipCooldown.isRunning && _skipCooldown.elapsedMilliseconds < 1500) {
       return null;
     }
 
@@ -112,7 +115,9 @@ class PlayerSponsorBlockManager {
     }
 
     _lastSkippedSegmentEnd = target;
-    _lastSkipTime = now;
+    _skipCooldown
+      ..reset()
+      ..start();
     return seekTarget;
   }
 }

@@ -21,7 +21,8 @@ class MqaDecoderHelper {
   static bool Function()? isMqaEnabled;
 
   /// Injected unfold processor for tests.
-  static Future<Uint8List?> Function(Uint8List rawBytes, {required int originalRate})? testUnfold;
+  static Future<Uint8List?> Function(Uint8List rawBytes,
+      {required int originalRate})? testUnfold;
 
   /// Paths whose bytes were confirmed to carry an MQA signature while resolving
   /// playback. Lets the quality model report MQA honestly without a fresh scan.
@@ -192,10 +193,19 @@ class MqaDecoderHelper {
     int bitsPerSample = 24,
   }) {
     final ByteData bd = ByteData(44);
-    bd.setUint8(0, 0x52); bd.setUint8(1, 0x49); bd.setUint8(2, 0x46); bd.setUint8(3, 0x46); // 'RIFF'
+    bd.setUint8(0, 0x52);
+    bd.setUint8(1, 0x49);
+    bd.setUint8(2, 0x46);
+    bd.setUint8(3, 0x46); // 'RIFF'
     bd.setUint32(4, 36 + dataLength, Endian.little);
-    bd.setUint8(8, 0x57); bd.setUint8(9, 0x41); bd.setUint8(10, 0x56); bd.setUint8(11, 0x45); // 'WAVE'
-    bd.setUint8(12, 0x66); bd.setUint8(13, 0x6D); bd.setUint8(14, 0x74); bd.setUint8(15, 0x20); // 'fmt '
+    bd.setUint8(8, 0x57);
+    bd.setUint8(9, 0x41);
+    bd.setUint8(10, 0x56);
+    bd.setUint8(11, 0x45); // 'WAVE'
+    bd.setUint8(12, 0x66);
+    bd.setUint8(13, 0x6D);
+    bd.setUint8(14, 0x74);
+    bd.setUint8(15, 0x20); // 'fmt '
     bd.setUint32(16, 16, Endian.little);
     bd.setUint16(20, 1, Endian.little); // PCM
     bd.setUint16(22, channels, Endian.little);
@@ -204,7 +214,10 @@ class MqaDecoderHelper {
     bd.setUint32(28, sampleRate * blockAlign, Endian.little);
     bd.setUint16(32, blockAlign, Endian.little);
     bd.setUint16(34, bitsPerSample, Endian.little);
-    bd.setUint8(36, 0x64); bd.setUint8(37, 0x61); bd.setUint8(38, 0x74); bd.setUint8(39, 0x61); // 'data'
+    bd.setUint8(36, 0x64);
+    bd.setUint8(37, 0x61);
+    bd.setUint8(38, 0x74);
+    bd.setUint8(39, 0x61); // 'data'
     bd.setUint32(40, dataLength, Endian.little);
     return bd.buffer.asUint8List();
   }

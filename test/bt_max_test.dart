@@ -24,8 +24,7 @@ void main() {
 
   test('A2DP hides LE-only codecs, LE keeps all', () {
     const repo = ['SBC', 'AAC', 'aptX', 'LDAC', 'LC3', 'Opus'];
-    final a2dp =
-        visibleBtCodecsForRoute(repoCodecs: repo, isLeAudio: false);
+    final a2dp = visibleBtCodecsForRoute(repoCodecs: repo, isLeAudio: false);
     expect(a2dp, ['SBC', 'AAC', 'aptX', 'LDAC']);
     final le = visibleBtCodecsForRoute(repoCodecs: repo, isLeAudio: true);
     expect(le, repo);

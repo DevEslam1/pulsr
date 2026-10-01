@@ -56,7 +56,9 @@ void main() {
     expect(value, isTrue);
   });
 
-  testWidgets('PulsrSegmentedControl supports 3+ segments with sliding indicator', (tester) async {
+  testWidgets(
+      'PulsrSegmentedControl supports 3+ segments with sliding indicator',
+      (tester) async {
     int selected = 0;
     await tester.pumpWidget(_wrap(
       StatefulBuilder(
@@ -99,7 +101,8 @@ void main() {
     ));
     expect(find.text('Something went wrong'), findsOneWidget);
   });
-  testWidgets('PulsrSlider renders and responds to value changes', (tester) async {
+  testWidgets('PulsrSlider renders and responds to value changes',
+      (tester) async {
     double sliderVal = 0.5;
     await tester.pumpWidget(_wrap(
       PulsrSlider(

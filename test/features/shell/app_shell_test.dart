@@ -12,7 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
-class FakeNavigationShell extends StatefulWidget implements StatefulNavigationShell {
+class FakeNavigationShell extends StatefulWidget
+    implements StatefulNavigationShell {
   @override
   final int currentIndex;
   final void Function(int, {bool initialLocation})? onGoBranch;
@@ -48,7 +49,8 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (MethodCall methodCall) async {
+        .setMockMethodCallHandler(SystemChannels.platform,
+            (MethodCall methodCall) async {
       return null;
     });
     mockPlayerCubit = MockPlayerCubit();
@@ -80,7 +82,8 @@ void main() {
     );
   }
 
-  testWidgets('M-16: AppShell stopwatch lifecycle and back press reset', (tester) async {
+  testWidgets('M-16: AppShell stopwatch lifecycle and back press reset',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(buildWidget(currentIndex: 0));
     await tester.pumpAndSettle();
@@ -116,7 +119,9 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('M-16: AppShell stopwatch reset on non-home tab and inspector back navigation', (tester) async {
+  testWidgets(
+      'M-16: AppShell stopwatch reset on non-home tab and inspector back navigation',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     int navigatedBranch = -1;
     await tester.pumpWidget(buildWidget(

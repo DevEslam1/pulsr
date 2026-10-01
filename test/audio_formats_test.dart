@@ -58,12 +58,12 @@ void main() {
           AudioFormats.extractExtension(
               '/storage/emulated/0/Music/song.part1.flac'),
           'flac');
-      expect(
-          AudioFormats.extractExtension('artist.feat.guest - track.01.m4a'),
+      expect(AudioFormats.extractExtension('artist.feat.guest - track.01.m4a'),
           'm4a');
 
       // Extensionless paths and filenames (B9 regression tests)
-      expect(AudioFormats.extractExtension('/storage/emulated/0/Music/song'), '');
+      expect(
+          AudioFormats.extractExtension('/storage/emulated/0/Music/song'), '');
       expect(AudioFormats.extractExtension(r'C:\Music\song'), '');
       expect(AudioFormats.extractExtension('song'), '');
       expect(AudioFormats.extractExtension('my_track_name'), '');
@@ -90,7 +90,8 @@ void main() {
       expect(AudioFormats.isSupportedExtension('.mp3'), isTrue);
       expect(AudioFormats.isSupportedExtension('mp3'), isTrue);
       expect(AudioFormats.isSupportedExtension('/path/to/.gitignore'), isFalse);
-      expect(AudioFormats.isSupportedExtension('/path/to/extensionless_file'), isFalse);
+      expect(AudioFormats.isSupportedExtension('/path/to/extensionless_file'),
+          isFalse);
       expect(AudioFormats.isSupportedExtension('extensionless_file'), isFalse);
     });
   });

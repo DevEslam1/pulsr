@@ -206,7 +206,9 @@ class _SegmentButton extends StatelessWidget {
         color: isSelected ? p.accentContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadii.r12),
         border: Border.all(
-          color: isSelected ? p.accent.withValues(alpha: 0.38) : Colors.transparent,
+          color: isSelected
+              ? p.accent.withValues(alpha: 0.38)
+              : Colors.transparent,
         ),
       ),
       child: Row(

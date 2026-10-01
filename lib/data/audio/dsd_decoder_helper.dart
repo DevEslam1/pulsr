@@ -116,7 +116,8 @@ class DsdDecoderHelper {
   /// Injected decoder for tests when running outside of the Android runtime.
   static DsdDecodeFunction? testDecoder;
 
-  static const MethodChannel _hiresChannel = MethodChannel(PulsrChannels.hiresDac);
+  static const MethodChannel _hiresChannel =
+      MethodChannel(PulsrChannels.hiresDac);
 
   /// Probes the native output path for DSD-over-PCM capability.
   ///
@@ -234,8 +235,8 @@ class DsdDecoderHelper {
 
     final targetSampleRate = switch (dsdRate) {
       >= 256 || >= 11289600 => 705600, // DSD256
-      >= 128 || >= 5644800 => 352800,  // DSD128
-      _ => 176400,                     // DSD64
+      >= 128 || >= 5644800 => 352800, // DSD128
+      _ => 176400, // DSD64
     };
 
     final decoder = testDecoder ?? AudioEffectsChannel().decodeDsd;
@@ -271,7 +272,8 @@ class DsdDecoderHelper {
   static ({Uint8List dsdL, Uint8List dsdR, int dsdRate}) parseDsfBytes(
       Uint8List bytes) {
     if (bytes.length < 52) {
-      throw const FormatException('DSF file too small to contain valid headers');
+      throw const FormatException(
+          'DSF file too small to contain valid headers');
     }
     final byteData = ByteData.sublistView(bytes);
 
@@ -351,7 +353,8 @@ class DsdDecoderHelper {
   static ({Uint8List dsdL, Uint8List dsdR, int dsdRate}) parseDffBytes(
       Uint8List bytes) {
     if (bytes.length < 32) {
-      throw const FormatException('DFF file too small to contain valid headers');
+      throw const FormatException(
+          'DFF file too small to contain valid headers');
     }
     final byteData = ByteData.sublistView(bytes);
 
@@ -464,8 +467,7 @@ class DsdDecoderHelper {
         offset += 2;
       } else {
         // 24-bit packed little-endian
-        final int pcm24 =
-            (sample * 8388607.0).round().clamp(-8388608, 8388607);
+        final int pcm24 = (sample * 8388607.0).round().clamp(-8388608, 8388607);
         byteData.setUint8(offset, pcm24 & 0xFF);
         byteData.setUint8(offset + 1, (pcm24 >> 8) & 0xFF);
         byteData.setUint8(offset + 2, (pcm24 >> 16) & 0xFF);

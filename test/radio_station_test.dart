@@ -61,8 +61,7 @@ void main() {
       await store.ready;
       expect(store.list, isEmpty);
 
-      final station =
-          RadioStation.create(name: 'A', url: 'https://a.com/live');
+      final station = RadioStation.create(name: 'A', url: 'https://a.com/live');
       await store.add(station);
       expect(store.list.length, 1);
       expect(store.list.first.name, 'A');
@@ -92,8 +91,10 @@ void main() {
     test('re-adding the same url replaces instead of duplicating', () async {
       final store = RadioStationStore();
       await store.ready;
-      await store.add(RadioStation.create(name: 'Old', url: 'https://a.com/live'));
-      await store.add(RadioStation.create(name: 'New', url: 'https://a.com/live'));
+      await store
+          .add(RadioStation.create(name: 'Old', url: 'https://a.com/live'));
+      await store
+          .add(RadioStation.create(name: 'New', url: 'https://a.com/live'));
       expect(store.list.length, 1);
       expect(store.list.first.name, 'New');
     });
@@ -101,8 +102,7 @@ void main() {
     test('markPlayed updates lastPlayed and persists', () async {
       final store = RadioStationStore();
       await store.ready;
-      final station =
-          RadioStation.create(name: 'A', url: 'https://a.com/live');
+      final station = RadioStation.create(name: 'A', url: 'https://a.com/live');
       await store.add(station);
       await store.markPlayed(station.id, 999);
 
@@ -158,8 +158,8 @@ void main() {
 
     test('deduplicates repeated urls', () {
       const content = 'https://a.com/live\nhttps://a.com/live\n';
-      expect(RadioStationStore.extractStreamUrls(content),
-          ['https://a.com/live']);
+      expect(
+          RadioStationStore.extractStreamUrls(content), ['https://a.com/live']);
     });
   });
 }

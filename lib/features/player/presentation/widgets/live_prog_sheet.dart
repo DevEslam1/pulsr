@@ -45,7 +45,6 @@ spl0 = spl0 * lfo;
 spl1 = spl1 * lfo;
 phase = phase + (2 * 3.141592653589793 * freq / srate);
 if (phase > 2 * 3.141592653589793) phase = phase - 2 * 3.141592653589793;''',
-
     'Analog Soft Saturation': '''@init
 
 @sample
@@ -54,7 +53,6 @@ spl0 = spl0 * (1.0 + drive);
 spl1 = spl1 * (1.0 + drive);
 spl0 = spl0 / (1.0 + abs(spl0));
 spl1 = spl1 / (1.0 + abs(spl1));''',
-
     'Dynamic Auto-Panner': '''@init
 pan_pos = 0;
 
@@ -65,7 +63,6 @@ spl0 = spl0 * (0.5 * (1.0 - pan));
 spl1 = spl1 * (0.5 * (1.0 + pan));
 pan_pos = pan_pos + (2 * 3.141592653589793 * rate / srate);
 if (pan_pos > 2 * 3.141592653589793) pan_pos = pan_pos - 2 * 3.141592653589793;''',
-
     'Gentle Bitcrusher': '''@init
 
 @sample
@@ -73,7 +70,6 @@ bits = slider1;
 steps = pow(2, bits);
 spl0 = floor(spl0 * steps + 0.5) / steps;
 spl1 = floor(spl1 * steps + 0.5) / steps;''',
-
     'Slapback Echo': '''@init
 pos = 0;
 buf0_0 = 0; buf0_1 = 0; buf0_2 = 0; buf0_3 = 0;
@@ -85,7 +81,6 @@ spl0 = spl0 + (buf0_0 + buf0_1 + buf0_2 + buf0_3) * 0.125 * mix;
 spl1 = spl1 + (buf1_0 + buf1_1 + buf1_2 + buf1_3) * 0.125 * mix;
 buf0_3 = buf0_2; buf0_2 = buf0_1; buf0_1 = buf0_0; buf0_0 = spl0;
 buf1_3 = buf1_2; buf1_2 = buf1_1; buf1_1 = buf1_0; buf1_0 = spl1;''',
-
     'Bass Lift': '''@init
 lp0 = 0; lp1 = 0;
 
@@ -148,10 +143,12 @@ spl1 = spl1 + lp1 * amount;''',
         final cubit = context.read<PlayerCubit>();
 
         return Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -175,7 +172,8 @@ spl1 = spl1 + lp1 * amount;''',
                       children: [
                         Icon(Icons.terminal_rounded, color: p.primary),
                         const SizedBox(width: AppSpacing.s10),
-                        Text(context.l10n.liveProgDspTitle,
+                        Text(
+                          context.l10n.liveProgDspTitle,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: AppFontSize.title,
@@ -195,8 +193,11 @@ spl1 = spl1 + lp1 * amount;''',
                   ],
                 ),
                 Text(
-                  AudioFeatureRegistry.liveProg.subtitle,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                  AudioFeatureRegistry.liveProg
+                      .localized(context.l10n)
+                      .subtitle,
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
@@ -214,7 +215,8 @@ spl1 = spl1 + lp1 * amount;''',
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(context.l10n.eelEditor,
+                          Text(
+                            context.l10n.eelEditor,
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.label,
@@ -223,13 +225,14 @@ spl1 = spl1 + lp1 * amount;''',
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-
-                                horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                                horizontal: AppSpacing.s6,
+                                vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: p.primary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(AppRadii.r6),
                             ),
-                            child: Text(context.l10n.bytecodeJit,
+                            child: Text(
+                              context.l10n.bytecodeJit,
                               style: TextStyle(
                                 color: p.primary,
                                 fontSize: AppFontSize.tiny,
@@ -249,7 +252,8 @@ spl1 = spl1 + lp1 * amount;''',
                           color: p.textPrimary,
                         ),
                         decoration: InputDecoration(
-                          hintText: '@init\nphase = 0;\n\n@sample\nspl0 = spl0 * 0.8;',
+                          hintText:
+                              '@init\nphase = 0;\n\n@sample\nspl0 = spl0 * 0.8;',
                           hintStyle: TextStyle(
                             color: p.textTertiary,
                             fontFamily: 'monospace',
@@ -274,13 +278,15 @@ spl1 = spl1 + lp1 * amount;''',
                         children: [
                           FilledButton.icon(
                             onPressed: () => _compileAndRun(context),
-                            icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                            icon:
+                                const Icon(Icons.play_arrow_rounded, size: 16),
                             label: Text(context.l10n.compileRun),
                             style: FilledButton.styleFrom(
                               backgroundColor: p.accent,
                               foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r10),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r10),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -293,7 +299,8 @@ spl1 = spl1 + lp1 * amount;''',
                 const SizedBox(height: AppSpacing.s20),
 
                 // Real-time Slider Controls (slider1..slider8)
-                Text(context.l10n.liveSliders,
+                Text(
+                  context.l10n.liveSliders,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: AppFontSize.body,
@@ -306,7 +313,8 @@ spl1 = spl1 + lp1 * amount;''',
                     label: i == 1
                         ? context.l10n.dspSlider1Label
                         : (i == 2 ? context.l10n.dspSlider2Label : 'slider$i'),
-                    value: _sliderValues[i] ?? (i == 1 ? 5.0 : (i == 2 ? 0.5 : 0.0)),
+                    value: _sliderValues[i] ??
+                        (i == 1 ? 5.0 : (i == 2 ? 0.5 : 0.0)),
                     min: i == 1 ? 0.1 : 0.0,
                     max: i == 1 ? 20.0 : 1.0,
                     onChanged: (val) {
@@ -317,7 +325,8 @@ spl1 = spl1 + lp1 * amount;''',
                   ),
                 const SizedBox(height: AppSpacing.s20),
 
-                Text(context.l10n.exampleScripts,
+                Text(
+                  context.l10n.exampleScripts,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: AppFontSize.body,
@@ -338,8 +347,8 @@ spl1 = spl1 + lp1 * amount;''',
                       borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+                            horizontal: AppSpacing.s14,
+                            vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
                           borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -392,7 +401,8 @@ spl1 = spl1 + lp1 * amount;''',
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
         borderRadius: BorderRadius.circular(AppRadii.r12),
@@ -406,7 +416,8 @@ spl1 = spl1 + lp1 * amount;''',
             children: [
               Text(
                 label,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               Text(
                 value.toStringAsFixed(2),

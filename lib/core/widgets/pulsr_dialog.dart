@@ -81,7 +81,8 @@ class PulsrDialogHelper {
           : null,
       title: Text(
         title,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
+        style: const TextStyle(
+            fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
       ),
       content: Text(
         message,
@@ -93,12 +94,15 @@ class PulsrDialogHelper {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(false),
           style: TextButton.styleFrom(
             foregroundColor: context.palette.textSecondary,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.sm),
           ),
-          child: Text(cancelLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+          child: Text(cancelLabel,
+              style: const TextStyle(fontWeight: FontWeight.w600)),
         ),
         FilledButton(
           onPressed: () {
@@ -115,11 +119,11 @@ class PulsrDialogHelper {
             Navigator.of(context, rootNavigator: true).pop(true);
           },
           style: FilledButton.styleFrom(
-            backgroundColor: isDestructive
-                ? context.palette.error
-                : context.palette.accent,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+            backgroundColor:
+                isDestructive ? context.palette.error : context.palette.accent,
+            foregroundColor: context.palette.onAccent,
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
@@ -218,7 +222,8 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
           : null,
       title: Text(
         widget.title,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
+        style: const TextStyle(
+            fontWeight: FontWeight.w800, fontSize: AppFontSize.title),
       ),
       content: SingleChildScrollView(
         child: Column(
@@ -228,7 +233,8 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
             if (widget.message != null) ...[
               Text(
                 widget.message!,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.bodySmall),
               ),
               const SizedBox(height: AppSpacing.s14),
             ],
@@ -249,10 +255,10 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
                 ),
                 decoration: InputDecoration(
                   hintText: widget.hintText,
-                  hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.body),
+                  hintStyle: TextStyle(
+                      color: p.textTertiary, fontSize: AppFontSize.body),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
-
                     horizontal: AppSpacing.s14,
                     vertical: AppSpacing.sm,
                   ),
@@ -277,7 +283,8 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
@@ -331,7 +338,8 @@ class PulsrDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+      insetPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: context.responsive.value(
@@ -382,9 +390,15 @@ class PulsrDialog extends StatelessWidget {
               // Dialog Title
               if (titleWidget != null)
                 Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, iconWidget != null ? 14 : 24, AppSpacing.lg, 0, ),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.lg,
+                    iconWidget != null ? 14 : 24,
+                    AppSpacing.lg,
+                    0,
+                  ),
                   child: DefaultTextStyle.merge(
-                    textAlign: iconWidget != null ? TextAlign.center : TextAlign.start,
+                    textAlign:
+                        iconWidget != null ? TextAlign.center : TextAlign.start,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontSize: AppFontSize.title,
@@ -398,7 +412,12 @@ class PulsrDialog extends StatelessWidget {
               // Dialog Content
               if (content != null)
                 Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.lg, title != null ? 14 : 24, AppSpacing.lg, AppSpacing.md, ),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.lg,
+                    title != null ? 14 : 24,
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                  ),
                   child: DefaultTextStyle.merge(
                     style: TextStyle(
                       color: p.textSecondary,
@@ -412,7 +431,8 @@ class PulsrDialog extends StatelessWidget {
               // Action Buttons
               if (actions != null && actions!.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.xs, AppSpacing.s20, AppSpacing.s18),
+                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20,
+                      AppSpacing.xs, AppSpacing.s20, AppSpacing.s18),
                   child: Align(
                     alignment: AlignmentDirectional.centerEnd,
                     child: Wrap(

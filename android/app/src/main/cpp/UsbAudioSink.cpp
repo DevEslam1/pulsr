@@ -152,6 +152,19 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         return UsbStreamResult::ClaimFailed;
     }
 
+    // Defensive: if a previous worker self-exited (device unplug / URB error)
+    // its std::thread is still joinable. Reassigning it below would abort the
+    // process, so reap it first.
+    if (worker_.joinable()) {
+        worker_.join();
+    }
+    // Wait for any in-flight producer before reassigning the ring buffer below.
+    for (int spin = 0;
+         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 1000;
+         ++spin) {
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+
     lastError_.store(0, std::memory_order_relaxed);
     underrunCount_.store(0, std::memory_order_relaxed);
     overrunCount_.store(0, std::memory_order_relaxed);
@@ -256,26 +269,59 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
 }
 
 void UsbAudioSink::Close() {
-    if (!active_.load() && !running_.load()) {
-        releaseResources();
-        return;
-    }
+    // Always stop and join the worker, even if it already self-exited: a
+    // joinable std::thread must never be reassigned (Open) or destroyed
+    // (destructor), both of which call std::terminate().
     running_.store(false, std::memory_order_release);
+    active_.store(false, std::memory_order_release);
 
     if (worker_.joinable()) {
         worker_.join();
     }
 
-    for (void* raw : urbs_) {
-        if (raw == nullptr || fd_ < 0) continue;
-        ioctl(fd_, USBDEVFS_DISCARDURB, raw);
-    }
-
-    active_.store(false, std::memory_order_release);
     releaseResources();
 }
 
+void UsbAudioSink::drainUrbCompletions() {
+#if defined(__linux__) || defined(__ANDROID__)
+    if (fd_ < 0) return;
+    // DISCARDURB is asynchronous: ask the kernel to cancel every URB, then reap
+    // until it hands them back (or we time out) so buffers are never freed while
+    // the kernel still owns/DMAs them.
+    for (void* raw : urbs_) {
+        if (raw != nullptr) {
+            ioctl(fd_, USBDEVFS_DISCARDURB, raw);
+        }
+    }
+    const int maxUrbs = static_cast<int>(urbs_.size());
+    int drained = 0;
+    for (int spin = 0; drained < maxUrbs && spin < 200; ++spin) {
+        struct usbdevfs_urb* urb = nullptr;
+        if (ioctl(fd_, USBDEVFS_REAPURBNDELAY, &urb) < 0) {
+            if (errno == EAGAIN || errno == EINPROGRESS) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+            break; // ESHUTDOWN / ENOENT: no further completions will arrive
+        }
+        if (urb != nullptr) ++drained;
+    }
+#endif
+}
+
 void UsbAudioSink::releaseResources() {
+    // Stop accepting producers, then wait for any in-flight WriteInterleaved()
+    // to finish before touching the ring buffer.
+    active_.store(false, std::memory_order_release);
+    for (int spin = 0;
+         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 1000;
+         ++spin) {
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+
+    // Cancel + reap any URBs the kernel still owns before freeing their buffers.
+    drainUrbCompletions();
+
     for (uint8_t* b : urbBuffers_) {
         delete[] b;
     }
@@ -285,13 +331,15 @@ void UsbAudioSink::releaseResources() {
     urbBuffers_.shrink_to_fit();
     urbs_.shrink_to_fit();
     urbStorage_.shrink_to_fit();
+    ring_.clear();
+    ring_.shrink_to_fit();
+    ringMask_ = 0;
     if (claimed_ && fd_ >= 0) {
         int iface = interfaceNumber_;
         ioctl(fd_, USBDEVFS_RELEASEINTERFACE, &iface);
     }
     claimed_ = false;
     fd_ = -1;
-    active_.store(false, std::memory_order_release);
     running_.store(false, std::memory_order_release);
 }
 
@@ -347,15 +395,25 @@ void UsbAudioSink::workerLoop() {
 
 void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
                                     int channels) {
-    if (!active_.load(std::memory_order_acquire) || buffer == nullptr ||
-        frames <= 0 || channels <= 0) {
+    if (buffer == nullptr || frames <= 0 || channels <= 0) return;
+
+    // Register as an in-flight producer *before* the active_ check so
+    // releaseResources() cannot free the ring out from under us. Re-check
+    // active_ after incrementing to close the TOCTOU window.
+    activeWriters_.fetch_add(1, std::memory_order_acquire);
+    if (!active_.load(std::memory_order_acquire)) {
+        activeWriters_.fetch_sub(1, std::memory_order_release);
         return;
     }
+
     const int bps = bytesPerSample_;
     const size_t totalSamples = static_cast<size_t>(frames) * channels;
     const size_t cap = ring_.size();
     const size_t mask = ringMask_;
-    if (cap == 0) return;
+    if (cap == 0) {
+        activeWriters_.fetch_sub(1, std::memory_order_release);
+        return;
+    }
 
     size_t w = ringWrite_.load(std::memory_order_relaxed);
     size_t r = ringRead_.load(std::memory_order_acquire);
@@ -378,6 +436,8 @@ void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
         const size_t droppedSamples = totalSamples - s;
         overrunCount_.fetch_add(droppedSamples / channels, std::memory_order_relaxed);
     }
+
+    activeWriters_.fetch_sub(1, std::memory_order_release);
 }
 
 double UsbAudioSink::GetBufferedMs() {
@@ -422,7 +482,7 @@ std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
                 currentClass = desc[i + 5];
                 currentSubclass = desc[i + 6];
             }
-        } else if (bType == 0x24) { // DESC_CS_INTERFACE
+        } else if (bType == 0x24 && bLength >= 3) { // DESC_CS_INTERFACE
             if (currentClass == 0x01 && currentSubclass == 0x02 &&
                 (targetInterface < 0 || currentInterface == targetInterface)) {
                 // AudioStreaming CS_INTERFACE

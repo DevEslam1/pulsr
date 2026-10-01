@@ -25,9 +25,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
+
 class MockYtmService extends Mock implements YtmService {}
+
 class MockSmartPlaylistEngine extends Mock implements ISmartPlaylistEngine {}
+
 class MockPlaylistUseCases extends Mock implements PlaylistUseCases {}
 
 void main() {
@@ -38,20 +42,26 @@ void main() {
   });
 
   group('Phase 2: P1 Functional Bug Fixes', () {
-    test('H1: DynamicThemeCubit queues latest extraction when extraction is in-flight', () async {
+    test(
+        'H1: DynamicThemeCubit queues latest extraction when extraction is in-flight',
+        () async {
       final cubit = DynamicThemeCubit();
       addTearDown(cubit.close);
 
       // Trigger rapid updates
-      await cubit.updateFromSongId(1, remoteArtworkUrl: 'https://example.com/art1.jpg');
-      await cubit.updateFromSongId(2, remoteArtworkUrl: 'https://example.com/art2.jpg');
+      await cubit.updateFromSongId(1,
+          remoteArtworkUrl: 'https://example.com/art1.jpg');
+      await cubit.updateFromSongId(2,
+          remoteArtworkUrl: 'https://example.com/art2.jpg');
 
       // Resetting to default properly clears any queued request and resets mode
       cubit.resetToDefault();
       expect(cubit.state.hasCustomArtworkColor, isFalse);
     });
 
-    testWidgets('H2: MiniPlayer double-swipe guard prevents rapid second gesture', (tester) async {
+    testWidgets(
+        'H2: MiniPlayer double-swipe guard prevents rapid second gesture',
+        (tester) async {
       final mockPlayerCubit = MockPlayerCubit();
       final mockSettingsCubit = MockSettingsCubit();
 
@@ -71,7 +81,8 @@ void main() {
       );
 
       when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-      when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+      when(() => mockSettingsCubit.stream)
+          .thenAnswer((_) => const Stream.empty());
       when(() => mockPlayerCubit.state).thenReturn(
         const PlayerState(
           playback: PlaybackSlice(
@@ -85,7 +96,8 @@ void main() {
           ),
         ),
       );
-      when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
+      when(() => mockPlayerCubit.stream)
+          .thenAnswer((_) => const Stream.empty());
 
       int swipeDownCount = 0;
 
@@ -122,31 +134,40 @@ void main() {
       // Drain the cooldown timer before test teardown
       await tester.pump(const Duration(milliseconds: 600));
 
-      expect(swipeDownCount, equals(1), reason: 'Second swipe while in-flight must be ignored');
+      expect(swipeDownCount, equals(1),
+          reason: 'Second swipe while in-flight must be ignored');
     });
 
-    test('H3: YtmSearchCubit emits rate-limiting message on bot block exhaustion and supports retryAfterCooldown', () async {
+    test(
+        'H3: YtmSearchCubit emits rate-limiting message on bot block exhaustion and supports retryAfterCooldown',
+        () async {
       final mockService = MockYtmService();
       when(() => mockService.isBotCoolingDown).thenReturn(false);
-      when(() => mockService.botCooldownNotifier).thenReturn(ValueNotifier(false));
+      when(() => mockService.botCooldownNotifier)
+          .thenReturn(ValueNotifier(false));
       when(() => mockService.searchWithFallback(any())).thenThrow(
         const YtmException('BOT_CHALLENGE', 'Bot verification required'),
       );
       when(() => mockService.invalidatePoToken()).thenAnswer((_) async {});
-      when(() => mockService.ensurePoTokenReady()).thenAnswer((_) async => true);
+      when(() => mockService.ensurePoTokenReady())
+          .thenAnswer((_) async => true);
 
       final cubit = YtmSearchCubit(service: mockService);
       addTearDown(cubit.close);
 
       cubit.onQueryChanged('Radiohead');
       await cubit.retry();
-      expect(cubit.state.errorMessage, contains('YouTube is rate-limiting requests'));
+      expect(cubit.state.errorMessage,
+          contains('YouTube is rate-limiting requests'));
 
       await cubit.retryAfterCooldown();
-      expect(cubit.state.errorMessage, contains('YouTube is rate-limiting requests'));
+      expect(cubit.state.errorMessage,
+          contains('YouTube is rate-limiting requests'));
     });
 
-    testWidgets('H4 & H5: SmartPlaylistBuilderCubit debounces preview updates and flags truncation', (tester) async {
+    testWidgets(
+        'H4 & H5: SmartPlaylistBuilderCubit debounces preview updates and flags truncation',
+        (tester) async {
       final mockEngine = MockSmartPlaylistEngine();
       final mockPlaylistUseCases = MockPlaylistUseCases();
 
@@ -167,7 +188,8 @@ void main() {
         ),
       ];
 
-      when(() => mockEngine.watchCriteria(any())).thenAnswer((_) => Stream.value(songList));
+      when(() => mockEngine.watchCriteria(any()))
+          .thenAnswer((_) => Stream.value(songList));
 
       final cubit = SmartPlaylistBuilderCubit(mockEngine, mockPlaylistUseCases);
       addTearDown(cubit.close);
@@ -182,7 +204,9 @@ void main() {
       expect(cubit.state.previewTruncated, isFalse);
     });
 
-    test('[C-04] SmartPlaylistBuilderCubit preview race condition cancels and supersedes stale emissions', () async {
+    test(
+        '[C-04] SmartPlaylistBuilderCubit preview race condition cancels and supersedes stale emissions',
+        () async {
       final mockEngine = MockSmartPlaylistEngine();
       final mockPlaylistUseCases = MockPlaylistUseCases();
 
@@ -199,19 +223,23 @@ void main() {
       addTearDown(cubit.close);
 
       // Trigger first preview
-      cubit.updateRule(0, const SmartRule(
-        field: SmartRuleField.title,
-        operator: SmartOperator.contains,
-        value: 'A',
-      ));
+      cubit.updateRule(
+          0,
+          const SmartRule(
+            field: SmartRuleField.title,
+            operator: SmartOperator.contains,
+            value: 'A',
+          ));
       await Future<void>.delayed(const Duration(milliseconds: 250));
 
       // Rapidly trigger second preview before controller1 emits
-      cubit.updateRule(0, const SmartRule(
-        field: SmartRuleField.title,
-        operator: SmartOperator.contains,
-        value: 'B',
-      ));
+      cubit.updateRule(
+          0,
+          const SmartRule(
+            field: SmartRuleField.title,
+            operator: SmartOperator.contains,
+            value: 'B',
+          ));
       await Future<void>.delayed(const Duration(milliseconds: 250));
 
       // Emit on old stream
@@ -234,7 +262,8 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Stale data must not have been applied
-      expect(cubit.state.previewSongs.any((s) => s.title == 'Stale A'), isFalse);
+      expect(
+          cubit.state.previewSongs.any((s) => s.title == 'Stale A'), isFalse);
 
       // Emit on latest stream
       controller2.add([
@@ -261,15 +290,20 @@ void main() {
       await controller2.close();
     });
 
-    testWidgets('H6: StackedBottomDock updates dock height immediately when SchedulerPhase.idle', (tester) async {
+    testWidgets(
+        'H6: StackedBottomDock updates dock height immediately when SchedulerPhase.idle',
+        (tester) async {
       final mockPlayerCubit = MockPlayerCubit();
       final mockSettingsCubit = MockSettingsCubit();
       when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-      when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+      when(() => mockSettingsCubit.stream)
+          .thenAnswer((_) => const Stream.empty());
       when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
-      when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
+      when(() => mockPlayerCubit.stream)
+          .thenAnswer((_) => const Stream.empty());
 
-      expect(SchedulerBinding.instance.schedulerPhase, equals(SchedulerPhase.idle));
+      expect(SchedulerBinding.instance.schedulerPhase,
+          equals(SchedulerPhase.idle));
 
       await tester.pumpWidget(
         MultiBlocProvider(
@@ -300,7 +334,9 @@ void main() {
       expect(PulsrDockTracker.dockHeight.value, greaterThan(0.0));
     });
 
-    test('H10: WidgetService handles rapid now playing updates without dropping artwork requests', () async {
+    test(
+        'H10: WidgetService handles rapid now playing updates without dropping artwork requests',
+        () async {
       final widgetService = WidgetService();
 
       const song1 = SongsTableData(
@@ -341,7 +377,9 @@ void main() {
       await widgetService.updateNowPlaying(song: null, isPlaying: false);
     });
 
-    test('[C-12] AddToPlaylistSheet maintains global mutation lock set to prevent concurrent duplicate adds', () {
+    test(
+        '[C-12] AddToPlaylistSheet maintains global mutation lock set to prevent concurrent duplicate adds',
+        () {
       expect(AddToPlaylistSheet.activePlaylistMutations, isEmpty);
       // Simulate lock acquisition for playlist 42
       AddToPlaylistSheet.activePlaylistMutations.add(42);
@@ -354,4 +392,3 @@ void main() {
     });
   });
 }
-

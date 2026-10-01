@@ -175,6 +175,11 @@ class PlaybackQueueStateMachine {
   }
 
   /// Computes the next track index given playback configuration.
+  ///
+  /// Intentional behavior: under [LoopMode.one] this returns the current index
+  /// (see the state-machine test), so an explicit Next re-plays the current
+  /// track rather than advancing. This is a deliberate product choice, not a
+  /// bug — change it here and in `skipToNext` if Next should always advance.
   int? getNextIndex({
     int offset = 1,
     bool peek = false,

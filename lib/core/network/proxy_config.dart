@@ -79,10 +79,10 @@ class ProxyConfig {
     }
     final cleanHost = host.trim();
     // Don't double-wrap already-bracketed IPv6 like [::1].
-    final formattedHost =
-        (cleanHost.contains(':') && !(cleanHost.startsWith('[') && cleanHost.endsWith(']')))
-            ? '[$cleanHost]'
-            : cleanHost;
+    final formattedHost = (cleanHost.contains(':') &&
+            !(cleanHost.startsWith('[') && cleanHost.endsWith(']')))
+        ? '[$cleanHost]'
+        : cleanHost;
     switch (type) {
       case AppProxyType.http:
         return 'PROXY $formattedHost:$port; DIRECT';
@@ -93,7 +93,8 @@ class ProxyConfig {
   }
 
   /// True when the Dart `HttpClient` path can apply this config.
-  bool get isSupportedOnDart => !enabled || !isValid || type == AppProxyType.http;
+  bool get isSupportedOnDart =>
+      !enabled || !isValid || type == AppProxyType.http;
 
   Map<String, dynamic> toMap() {
     return {
@@ -254,7 +255,8 @@ class ProxyEntry {
 
       String host;
       int port = 8080;
-      final bracketed = RegExp(r'^\[(.+)\](?::(\d+))?$').firstMatch(serverPart.trim());
+      final bracketed =
+          RegExp(r'^\[(.+)\](?::(\d+))?$').firstMatch(serverPart.trim());
       if (bracketed != null) {
         host = bracketed.group(1)!.trim();
         final portStr = bracketed.group(2);
@@ -294,7 +296,8 @@ class ProxyEntry {
     } else if (line.startsWith('[')) {
       // Malformed bracketed entry — reject instead of shredding on ':'.
       return null;
-    } else if (line.contains(':') && !RegExp(r'^\d{0,4}(:[\da-fA-F]{0,4}){2,}').hasMatch(line)) {
+    } else if (line.contains(':') &&
+        !RegExp(r'^\d{0,4}(:[\da-fA-F]{0,4}){2,}').hasMatch(line)) {
       parts = line.split(':');
     } else if (RegExp(r'^\d{0,4}(:[\da-fA-F]{0,4}){2,}').hasMatch(line)) {
       // Bare IPv6 without port/brackets — treat whole line as host, default port.
@@ -339,9 +342,7 @@ class ProxyEntry {
     final results = <ProxyEntry>[];
     final seen = <String>{};
 
-    for (int i = 0;
-        i < lines.length && results.length < 5000;
-        i++) {
+    for (int i = 0; i < lines.length && results.length < 5000; i++) {
       final entry = parse(lines[i]);
       if (entry != null && entry.isValid) {
         final key = '${entry.host}:${entry.port}:${entry.username}';

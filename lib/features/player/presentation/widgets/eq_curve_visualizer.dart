@@ -122,7 +122,8 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     if (_activeDraggingBand == null) return;
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
-    _updateGainForPosition(_activeDraggingBand!, localPos.dy, renderBox.size.height);
+    _updateGainForPosition(
+        _activeDraggingBand!, localPos.dy, renderBox.size.height);
   }
 
   void _updateGainForPosition(int bandIndex, double yPos, double totalHeight) {
@@ -167,7 +168,8 @@ class _CatmullRomEqPainter extends CustomPainter {
     if (gains.isEmpty) return;
 
     final midY = size.height / 2;
-    final stepX = gains.length > 1 ? size.width / (gains.length - 1) : size.width;
+    final stepX =
+        gains.length > 1 ? size.width / (gains.length - 1) : size.width;
     final verticalScale = (size.height / 2 * 0.9);
 
     // 1. Draw Real-time FFT Spectrum background if provided

@@ -20,6 +20,7 @@ import '../queue_slot_codec.dart';
 import 'queue_slot_data.dart';
 
 part 'player_queue_slots.dart';
+part 'player_queue_warm.dart';
 
 /// Controls playback queue management, slot switching, and reordering.
 class PlayerQueueController {
@@ -102,7 +103,9 @@ class PlayerQueueController {
     required Duration position,
     required double speed,
   }) {
-    for (final s in songs) { _slotLookupCache[s.id] = s; }
+    for (final s in songs) {
+      _slotLookupCache[s.id] = s;
+    }
     _queueSlots[slot] = QueueSlotData(
       songIds: songs.map((s) => s.id).toList(),
       currentIndex: currentIndex,
@@ -121,41 +124,6 @@ class PlayerQueueController {
       timer.cancel();
     }
     _warmTimers.clear();
-  }
-
-  /// Fire-and-forget stream pre-resolution for a track the user is likely to play next.
-  void warmStream(SongsTableData song) {
-    try {
-      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
-    } catch (_) {}
-  }
-
-  /// Gap between successive speculative warms in [warmStreams].
-  static const Duration _warmStreamStagger = Duration(milliseconds: 400);
-
-  /// Fire-and-forget pre-resolution of the first [count] streaming-eligible tracks.
-  void warmStreams(List<SongsTableData> songs, {int count = 3}) {
-    if (songs.isEmpty || count <= 0) return;
-    var warmed = 0;
-    for (final song in songs) {
-      if (warmed >= count) break;
-      if (song.source != SongSource.youtube ||
-          song.isDownloaded == true ||
-          (song.remoteId?.isEmpty ?? true)) {
-        continue;
-      }
-      final delay = _warmStreamStagger * warmed;
-      warmed++;
-      late final Timer timer;
-      timer = Timer(delay, () {
-        _warmTimers.remove(timer);
-        if (_isClosed()) return;
-        try {
-          _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
-        } catch (_) {}
-      });
-      _warmTimers.add(timer);
-    }
   }
 
   Future<void> playSong(
@@ -178,7 +146,14 @@ class PlayerQueueController {
             state.queue.map((s) => s.id).toList(growable: false),
           );
       if (queueUnchanged) {
-        _emit(state.copyWith(playback: state.playback.copyWith(isExpanded: true)));
+        // Refresh the stored track with the caller's (possibly newer) metadata
+        // while keeping the live engine/position untouched.
+        _emit(state.copyWith(
+          playback: state.playback.copyWith(
+            isExpanded: true,
+            currentSong: song,
+          ),
+        ));
         if (!state.isPlaying) {
           try {
             await _audioHandler.play();
@@ -188,7 +163,8 @@ class PlayerQueueController {
             if (!_isClosed()) {
               final s = _getState();
               _emit(s.copyWith(
-                  playback: s.playback.copyWith(errorMessage: 'Failed to play ${song.title}')));
+                  playback: s.playback
+                      .copyWith(errorMessage: 'Failed to play ${song.title}')));
             }
           }
         }
@@ -259,7 +235,9 @@ class PlayerQueueController {
         : null;
     final prevQueue = state.queue, prevIndex = state.currentIndex;
     final prevSong = state.currentSong, prevPosition = state.position;
-    final prevDuration = state.duration, prevLyrics = state.lyrics, prevLyricsSource = state.lyricsSource;
+    final prevDuration = state.duration,
+        prevLyrics = state.lyrics,
+        prevLyricsSource = state.lyricsSource;
 
     setQueueSlot(
       state.activeQueueSlot,
@@ -272,7 +250,8 @@ class PlayerQueueController {
     _bumpQueueVersion();
 
     _emit(state.copyWith(
-      queueSlice: state.queueSlice.copyWith(queue: effectiveQueue, currentIndex: effectiveIndex),
+      queueSlice: state.queueSlice
+          .copyWith(queue: effectiveQueue, currentIndex: effectiveIndex),
       playback: state.playback.copyWith(
         currentSong: song,
         duration: Duration(milliseconds: song.durationMs),
@@ -320,7 +299,8 @@ class PlayerQueueController {
         _bumpQueueVersion();
         final s = _getState();
         _emit(s.copyWith(
-          queueSlice: s.queueSlice.copyWith(queue: prevQueue, currentIndex: prevIndex),
+          queueSlice:
+              s.queueSlice.copyWith(queue: prevQueue, currentIndex: prevIndex),
           playback: s.playback.copyWith(
             currentSong: prevSong,
             duration: prevDuration,
@@ -328,7 +308,8 @@ class PlayerQueueController {
             isPlaying: false,
             errorMessage: 'Failed to play ${song.title}',
           ),
-          lyricsSlice: s.lyricsSlice.copyWith(lyrics: prevLyrics, lyricsSource: prevLyricsSource),
+          lyricsSlice: s.lyricsSlice
+              .copyWith(lyrics: prevLyrics, lyricsSource: prevLyricsSource),
         ));
         try {
           if (prevQueue.isNotEmpty) {
@@ -341,27 +322,38 @@ class PlayerQueueController {
           }
         } catch (rollbackError, rollbackSt) {
           ErrorLogger.log('Queue rollback failed after load error',
-              error: rollbackError, stackTrace: rollbackSt, category: 'PlayerQueueController');
+              error: rollbackError,
+              stackTrace: rollbackSt,
+              category: 'PlayerQueueController');
           _queueSlots.remove(state.activeQueueSlot);
           _debouncedPersistQueueSlots();
           _bumpQueueVersion();
-          try { await _audioHandler.pause(); } catch (_) {}
-          try { await _audioHandler.clearQueue(); } catch (_) {}
+          try {
+            await _audioHandler.pause();
+          } catch (_) {}
+          try {
+            await _audioHandler.clearQueue();
+          } catch (_) {}
           try {
             if (!_isClosed()) {
               final broken = _getState();
               _emit(broken.copyWith(
-                queueSlice: broken.queueSlice.copyWith(queue: const [], currentIndex: 0),
+                queueSlice: broken.queueSlice
+                    .copyWith(queue: const [], currentIndex: 0),
                 playback: broken.playback.copyWith(
                   currentSong: null,
                   isPlaying: false,
-                  errorMessage: 'Playback unavailable — please pick another track',
+                  errorMessage:
+                      'Playback unavailable — please pick another track',
                 ),
               ));
             }
           } catch (emitError, emitSt) {
-            ErrorLogger.log('Failed to emit terminal error state on queue failure',
-                error: emitError, stackTrace: emitSt, category: 'PlayerQueueController');
+            ErrorLogger.log(
+                'Failed to emit terminal error state on queue failure',
+                error: emitError,
+                stackTrace: emitSt,
+                category: 'PlayerQueueController');
           }
         }
       }
@@ -376,7 +368,8 @@ class PlayerQueueController {
     }
 
     if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-      _findNextLocalMatch(song, effectiveQueue, effectiveIndex, capturedSwapGen, capturedGen);
+      _findNextLocalMatch(
+          song, effectiveQueue, effectiveIndex, capturedSwapGen, capturedGen);
     }
   }
 

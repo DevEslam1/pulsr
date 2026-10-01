@@ -12,6 +12,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -40,7 +41,8 @@ void main() {
     mockSettingsCubit = MockSettingsCubit();
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
 
     when(() => mockPlayerCubit.state).thenReturn(
       const PlayerState(
@@ -77,7 +79,9 @@ void main() {
     );
   }
 
-  testWidgets('M-17: MiniPlayer cleanly disposes _isInteracting and guards post-disposal mutations', (tester) async {
+  testWidgets(
+      'M-17: MiniPlayer cleanly disposes _isInteracting and guards post-disposal mutations',
+      (tester) async {
     await tester.pumpWidget(
       buildWidget(
         child: MiniPlayer(

@@ -69,8 +69,12 @@ abstract class Adaptive {
     return WindowClass.compact;
   }
 
-  static bool isTablet(BuildContext context) =>
-      windowOf(context) != WindowClass.compact;
+  static bool isTablet(BuildContext context) {
+    final w = widthOf(context);
+    final h = heightOf(context);
+    final smallestDim = math.min(w, h);
+    return smallestDim >= 600.0 || (w >= tabletBreakpoint && h >= 550.0);
+  }
 
   static bool isLandscape(BuildContext context) =>
       MediaQuery.orientationOf(context) == Orientation.landscape;
@@ -101,8 +105,7 @@ abstract class Adaptive {
   static bool isTabletLandscape(BuildContext context) =>
       isTablet(context) && isLandscape(context);
 
-  static bool isLargeTablet(BuildContext context) =>
-      widthOf(context) >= 900;
+  static bool isLargeTablet(BuildContext context) => widthOf(context) >= 900;
 
   /// Optimal column count for song/track tile lists across phone, tablet portrait, and tablet landscape
   static int trackGridColumns(BuildContext context) {

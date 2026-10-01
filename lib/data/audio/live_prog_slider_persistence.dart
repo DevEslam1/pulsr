@@ -21,7 +21,8 @@ bool isValidLiveProgSlider(int index, double value) {
     return false;
   }
   if (!value.isFinite) {
-    ErrorLogger.log('Rejected non-finite LiveProg slider value for index $index',
+    ErrorLogger.log(
+        'Rejected non-finite LiveProg slider value for index $index',
         category: 'EqualizerManager');
     return false;
   }

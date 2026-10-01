@@ -52,10 +52,12 @@ class DetailScaffold extends StatelessWidget {
     final p = context.palette;
     final isLandscape = PulsrBreakpoint.isLandscape(context);
     final isTablet = Adaptive.isTablet(context);
-    final shouldSplit = landscapeSplit && (isLandscape || (isTablet && context.screenWidth >= 800));
+    final shouldSplit = landscapeSplit &&
+        (isLandscape || (isTablet && context.screenWidth >= 800));
 
     final effectiveLeading = leading ?? const PulsrBackButton();
-    final effectiveTitle = title ?? (titleText != null ? Text(titleText!) : null);
+    final effectiveTitle =
+        title ?? (titleText != null ? Text(titleText!) : null);
 
     Widget content;
 
@@ -122,7 +124,8 @@ class DetailScaffold extends StatelessWidget {
               ),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
+                  padding:
+                      const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
                   physics: const BouncingScrollPhysics(),
                   children: [
                     hero,

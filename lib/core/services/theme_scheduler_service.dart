@@ -4,8 +4,7 @@ import 'package:injectable/injectable.dart';
 @singleton
 class ThemeSchedulerService {
   Timer? _timer;
-  StreamController<bool> _isNightSubject =
-      StreamController<bool>.broadcast();
+  StreamController<bool> _isNightSubject = StreamController<bool>.broadcast();
   int startHour = 19;
   int endHour = 6;
 

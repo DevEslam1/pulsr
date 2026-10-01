@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
 
-SongsTableData _makeSong(int id, {String title = 'Song', String path = '/music/song.mp3'}) {
+SongsTableData _makeSong(int id,
+    {String title = 'Song', String path = '/music/song.mp3'}) {
   return SongsTableData(
     id: id,
     title: title,
@@ -20,7 +21,9 @@ SongsTableData _makeSong(int id, {String title = 'Song', String path = '/music/s
 
 void main() {
   group('Codebase Audit Bug Fixes (B-1 to B-14)', () {
-    test('B-1: _SongLock ref counting prevents premature mutex deletion during concurrency', () {
+    test(
+        'B-1: _SongLock ref counting prevents premature mutex deletion during concurrency',
+        () {
       int refCount = 0;
       final map = <int, int>{};
 
@@ -57,7 +60,9 @@ void main() {
       expect(map.containsKey(101), isFalse);
     });
 
-    test('B-7: Folder extraction memoization prevents redundant parsing for identical song list', () {
+    test(
+        'B-7: Folder extraction memoization prevents redundant parsing for identical song list',
+        () {
       final songs1 = [
         _makeSong(1, path: '/storage/emulated/0/Music/Pop/song1.mp3'),
         _makeSong(2, path: '/storage/emulated/0/Music/Rock/song2.mp3'),
@@ -96,18 +101,22 @@ void main() {
       expect(res3.length, 2);
     });
 
-    test('B-9: Visible window freezing maintains stable coordinates during drag scrubbing', () {
+    test(
+        'B-9: Visible window freezing maintains stable coordinates during drag scrubbing',
+        () {
       ({int startIndex, int visibleCount}) computeVisibleWindow(
         int totalCount,
         double positionMs,
         double durationMs,
         double zoomScale,
       ) {
-        final visibleCount = (totalCount / zoomScale).round().clamp(2, totalCount);
+        final visibleCount =
+            (totalCount / zoomScale).round().clamp(2, totalCount);
         final centerRatio = durationMs > 0 ? positionMs / durationMs : 0.0;
         final centerIndex = (centerRatio.clamp(0.0, 1.0) * totalCount).round();
         final halfVisible = visibleCount ~/ 2;
-        final startIndex = (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
+        final startIndex =
+            (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
         return (startIndex: startIndex, visibleCount: visibleCount);
       }
 
@@ -116,15 +125,18 @@ void main() {
       const zoomScale = 4.0;
 
       // Position at 50,000 ms (25% progress)
-      final initialWindow = computeVisibleWindow(totalCount, 50000.0, durationMs, zoomScale);
+      final initialWindow =
+          computeVisibleWindow(totalCount, 50000.0, durationMs, zoomScale);
 
       // User starts dragging: freeze the window
       ({int startIndex, int visibleCount})? dragFrozenWindow = initialWindow;
 
       // Dragging moves finger to 80,000 ms
       // Unfrozen window would shift startIndex:
-      final unfrozenWindowAt80k = computeVisibleWindow(totalCount, 80000.0, durationMs, zoomScale);
-      expect(unfrozenWindowAt80k.startIndex, isNot(equals(initialWindow.startIndex)));
+      final unfrozenWindowAt80k =
+          computeVisibleWindow(totalCount, 80000.0, durationMs, zoomScale);
+      expect(unfrozenWindowAt80k.startIndex,
+          isNot(equals(initialWindow.startIndex)));
 
       // With frozen window, the mapping frame stays locked during drag:
       final effectiveWindow = dragFrozenWindow;
@@ -163,9 +175,17 @@ void main() {
       expect(shouldShowShowLess(), isFalse);
     });
 
-    test('B-11: Quick actions song cache is invalidated when song identity changes', () {
-      final listA = [_makeSong(1, title: 'Track 1'), _makeSong(2, title: 'Track 2')];
-      final listB = [_makeSong(3, title: 'Track 3'), _makeSong(2, title: 'Track 2')];
+    test(
+        'B-11: Quick actions song cache is invalidated when song identity changes',
+        () {
+      final listA = [
+        _makeSong(1, title: 'Track 1'),
+        _makeSong(2, title: 'Track 2')
+      ];
+      final listB = [
+        _makeSong(3, title: 'Track 3'),
+        _makeSong(2, title: 'Track 2')
+      ];
 
       bool shouldInvalidate(
         List<SongsTableData> current,

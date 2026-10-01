@@ -131,13 +131,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                 PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
             final m = PlayerThemeMetrics.of(
-
               isTablet: isTablet,
-
               isLandscape: isLandscape,
-
               constraints: constraints,
-
             );
 
             final double heightRatio = m.heightRatio;
@@ -589,19 +585,21 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                         constraints: BoxConstraints(
                           maxWidth: m.paneMaxWidth,
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(
-                                bottom:
-                                    isTablet ? AppSpacing.lg : AppSpacing.md,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      isTablet ? AppSpacing.lg : AppSpacing.md,
+                                ),
+                                child: viewSwitcher,
                               ),
-                              child: viewSwitcher,
-                            ),
-                            controlsColumn,
-                          ],
+                              controlsColumn,
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -651,7 +649,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                               fit: StackFit.expand,
                               alignment: Alignment.center,
                               children: <Widget>[
-                                ...previousChildren,
+                                // BUG-FIX: previous panes are fading out —
+                                // prevent them from stealing touch events.
+                                ...previousChildren.map(
+                                    (c) => IgnorePointer(child: c)),
                                 if (currentChild != null) currentChild,
                               ],
                             );

@@ -9,7 +9,8 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/settings/presentation/proxy_settings_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
-class MockSettingsCubit extends MockCubit<SettingsState> implements SettingsCubit {}
+class MockSettingsCubit extends MockCubit<SettingsState>
+    implements SettingsCubit {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -29,15 +30,19 @@ void main() {
     );
 
     when(() => mockSettingsCubit.state).thenReturn(initialState);
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => stateController.stream);
-    when(() => mockSettingsCubit.getProxyPassword()).thenAnswer((_) async => 'secret123');
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => stateController.stream);
+    when(() => mockSettingsCubit.getProxyPassword())
+        .thenAnswer((_) async => 'secret123');
   });
 
   tearDown(() {
     stateController.close();
   });
 
-  testWidgets('[M-07] _syncControllersWithState synchronizes password on state updates', (tester) async {
+  testWidgets(
+      '[M-07] _syncControllersWithState synchronizes password on state updates',
+      (tester) async {
     tester.view.physicalSize = const Size(800, 1400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -60,7 +65,8 @@ void main() {
     expect(passwordFieldFinder, findsOneWidget);
 
     // Now emit state where hasProxyPassword is false (e.g. proxy cleared or switched)
-    when(() => mockSettingsCubit.getProxyPassword()).thenAnswer((_) async => '');
+    when(() => mockSettingsCubit.getProxyPassword())
+        .thenAnswer((_) async => '');
     stateController.add(const SettingsState(
       proxyEnabled: true,
       proxyHost: '1.2.3.4',

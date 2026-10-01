@@ -70,8 +70,11 @@ class _BackupSectionState extends State<BackupSection> {
       );
 
       if (outputUri != null) {
-        final pathStr = outputUri.isScheme('file') ? outputUri.toFilePath() : outputUri.path;
-        final safeOutput = SafeFilePath.validateSavePath(pathStr, allowedExtensions: ['json']);
+        final pathStr = outputUri.isScheme('file')
+            ? outputUri.toFilePath()
+            : outputUri.path;
+        final safeOutput =
+            SafeFilePath.validateSavePath(pathStr, allowedExtensions: ['json']);
         if (safeOutput == null) throw 'Invalid save location or file extension';
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -104,7 +107,8 @@ class _BackupSectionState extends State<BackupSection> {
     );
 
     if (result == null) return;
-    final safeFile = SafeFilePath.validate(result.path, allowedExtensions: ['json']);
+    final safeFile =
+        SafeFilePath.validate(result.path, allowedExtensions: ['json']);
     if (safeFile == null) return;
     const maxBackupBytes = 10 * 1024 * 1024;
 
@@ -129,7 +133,8 @@ class _BackupSectionState extends State<BackupSection> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.backupInvalid),
+          SnackBar(
+            content: Text(context.l10n.backupInvalid),
             backgroundColor: context.palette.error,
           ),
         );
@@ -170,8 +175,9 @@ class _BackupSectionState extends State<BackupSection> {
           const SizedBox(height: AppSpacing.sm),
           Text(
             context.l10n.existingLibraryUpdateNotice,
-            style:
-                TextStyle(fontSize: AppFontSize.label, color: context.palette.textSecondary),
+            style: TextStyle(
+                fontSize: AppFontSize.label,
+                color: context.palette.textSecondary),
           ),
         ],
       ),
@@ -223,18 +229,21 @@ class _BackupSectionState extends State<BackupSection> {
                   .restoredFavoritesCount(importResult.restoredFavoritesCount)),
               Text(l10n
                   .restoredPlaylistsCount(importResult.restoredPlaylistsCount)),
+              Text(
+                  l10n.restoredHistoryCount(importResult.restoredHistoryCount)),
               Text(l10n
-                  .restoredHistoryCount(importResult.restoredHistoryCount)),
-              Text(l10n.restoredSettingsKeys(
-                  importResult.restoredSettingsCount)),
+                  .restoredSettingsKeys(importResult.restoredSettingsCount)),
               if (importResult.restoredExcludedFoldersCount > 0)
                 Text(l10n.restoredExcludedFoldersCount(
                     importResult.restoredExcludedFoldersCount)),
               if (importResult.unmatchedPaths.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  l10n.unmatchedPathsWarning(importResult.unmatchedPaths.length),
-                  style: TextStyle(color: context.palette.warning, fontSize: AppFontSize.label),
+                  l10n.unmatchedPathsWarning(
+                      importResult.unmatchedPaths.length),
+                  style: TextStyle(
+                      color: context.palette.warning,
+                      fontSize: AppFontSize.label),
                 ),
               ],
             ],
@@ -270,14 +279,18 @@ class _BackupSectionState extends State<BackupSection> {
       children: [
         ListTile(
           leading: _buildIconContainer(context, Icons.upload_file_rounded),
-          title: Text(context.l10n.exportBackup,
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
+          title: Text(
+            context.l10n.exportBackup,
+            style: TextStyle(
+                fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
           ),
-          subtitle: Text(context.l10n.backupExportDesc,
+          subtitle: Text(
+            context.l10n.backupExportDesc,
             style: TextStyle(color: textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: _isExporting
-              ? const SizedBox(width: AppSpacing.s20,
+              ? const SizedBox(
+                  width: AppSpacing.s20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
@@ -287,14 +300,18 @@ class _BackupSectionState extends State<BackupSection> {
         ListTile(
           leading:
               _buildIconContainer(context, Icons.download_for_offline_rounded),
-          title: Text(context.l10n.importBackup,
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
+          title: Text(
+            context.l10n.importBackup,
+            style: TextStyle(
+                fontWeight: FontWeight.w600, fontSize: AppFontSize.body),
           ),
-          subtitle: Text(context.l10n.backupImportDesc,
+          subtitle: Text(
+            context.l10n.backupImportDesc,
             style: TextStyle(color: textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: _isImporting
-              ? const SizedBox(width: AppSpacing.s20,
+              ? const SizedBox(
+                  width: AppSpacing.s20,
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )

@@ -62,9 +62,7 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
       _start = start;
       _end = end;
     });
-    context
-        .read<SettingsCubit>()
-        .setThemeScheduleHours(start: start, end: end);
+    context.read<SettingsCubit>().setThemeScheduleHours(start: start, end: end);
   }
 
   @override
@@ -109,7 +107,8 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
       );
     }
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.sm),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

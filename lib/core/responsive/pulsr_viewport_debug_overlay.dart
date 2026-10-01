@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
+import '../constants/app_typography.dart';
 import 'pulsr_responsive_tokens.dart';
 
 /// Developer debug overlay that displays live viewport metrics, breakpoint tiers,
@@ -17,7 +18,8 @@ class PulsrViewportDebugOverlay extends StatefulWidget {
   });
 
   @override
-  State<PulsrViewportDebugOverlay> createState() => _PulsrViewportDebugOverlayState();
+  State<PulsrViewportDebugOverlay> createState() =>
+      _PulsrViewportDebugOverlayState();
 }
 
 class _PulsrViewportDebugOverlayState extends State<PulsrViewportDebugOverlay> {
@@ -53,7 +55,7 @@ class _PulsrViewportDebugOverlayState extends State<PulsrViewportDebugOverlay> {
                         '📐 ${vp.width.round()}x${vp.height.round()} [${vp.sizeClass.name}]',
                         style: const TextStyle(
                           color: Colors.greenAccent,
-                          fontSize: 10,
+                          fontSize: AppFontSize.tiny,
                           fontWeight: FontWeight.bold,
                           fontFamily: 'monospace',
                         ),
@@ -64,13 +66,36 @@ class _PulsrViewportDebugOverlayState extends State<PulsrViewportDebugOverlay> {
                         children: [
                           Text(
                             'VIEWPORT: ${vp.width.round()} x ${vp.height.round()}',
-                            style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.bold),
                           ),
-                          Text('Class: ${vp.deviceClass.name} | Size: ${vp.sizeClass.name}', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                          Text('Orientation: ${vp.orientation.name} | Short: ${vp.isShortHeight}', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                          Text('Content Max: ${vp.contentMaxWidth.round()}dp | Pad: ${vp.pagePadding.round()}dp', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                          Text('Grid Cols: ${vp.gridColumns} | Nav: ${vp.navMode.name}', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                          Text('Insets: T${insets.top.round()} B${insets.bottom.round()} L${insets.left.round()} R${insets.right.round()}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                          Text(
+                              'Class: ${vp.deviceClass.name} | Size: ${vp.sizeClass.name}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppFontSize.tiny)),
+                          Text(
+                              'Orientation: ${vp.orientation.name} | Short: ${vp.isShortHeight}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppFontSize.tiny)),
+                          Text(
+                              'Content Max: ${vp.contentMaxWidth.round()}dp | Pad: ${vp.pagePadding.round()}dp',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppFontSize.tiny)),
+                          Text(
+                              'Grid Cols: ${vp.gridColumns} | Nav: ${vp.navMode.name}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppFontSize.tiny)),
+                          Text(
+                              'Insets: T${insets.top.round()} B${insets.bottom.round()} L${insets.left.round()} R${insets.right.round()}',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: AppFontSize.tiny)),
                         ],
                       ),
               ),

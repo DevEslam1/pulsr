@@ -6,7 +6,8 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 void main() {
   group('Adaptive Tablet & Responsive Engine Tests', () {
-    testWidgets('Phone Portrait (400x800) returns phone posture and single track col',
+    testWidgets(
+        'Phone Portrait (400x800) returns phone posture and single track col',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -29,7 +30,8 @@ void main() {
       );
     });
 
-    testWidgets('Tablet Portrait (768x1024) returns tablet portrait posture and 2 track cols',
+    testWidgets(
+        'Tablet Portrait (768x1024) returns tablet portrait posture and 2 track cols',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -51,7 +53,8 @@ void main() {
       );
     });
 
-    testWidgets('Tablet Landscape (1024x768) returns tablet landscape posture and 2 track cols',
+    testWidgets(
+        'Tablet Landscape (1024x768) returns tablet landscape posture and 2 track cols',
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(

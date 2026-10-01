@@ -233,9 +233,12 @@ void main() {
       expect(repo.addedSongIds, [7]);
     });
 
-    test('normalizes relative paths and strips file:// prefixes from M3U', () async {
-      final subDir = Directory('${tempDir.path}/music/albums')..createSync(recursive: true);
-      final songFile = File('${subDir.path}/track1.mp3')..writeAsStringSync('dummy');
+    test('normalizes relative paths and strips file:// prefixes from M3U',
+        () async {
+      final subDir = Directory('${tempDir.path}/music/albums')
+        ..createSync(recursive: true);
+      final songFile = File('${subDir.path}/track1.mp3')
+        ..writeAsStringSync('dummy');
       final song = _song(id: 99, path: songFile.path);
       final repo = _FakeRepository([song]);
       final useCase = PlaylistImportUseCase(repo);

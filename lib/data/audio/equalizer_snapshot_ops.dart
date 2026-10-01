@@ -156,10 +156,9 @@ extension EqualizerSnapshotOps on EqualizerManager {
     }
 
     // EQ curve + preamp + boosts.
-    final gains = (m['gains'] as List?)
-            ?.map((e) => (e as num).toDouble())
-            .toList() ??
-        List<double>.from(currentPreset.gains);
+    final gains =
+        (m['gains'] as List?)?.map((e) => (e as num).toDouble()).toList() ??
+            List<double>.from(currentPreset.gains);
     await setPreset(EqPreset(
       name: s('presetName', currentPreset.name),
       gains: gains,
@@ -267,8 +266,8 @@ extension EqualizerSnapshotOps on EqualizerManager {
     if (dynEqRaw != null) {
       final bands = dynEqRaw
           .whereType<Map>()
-          .map((e) => DynamicEqBandConfig.fromJson(
-              Map<String, dynamic>.from(e)))
+          .map(
+              (e) => DynamicEqBandConfig.fromJson(Map<String, dynamic>.from(e)))
           .toList();
       if (bands.isNotEmpty) dynamicEqBands = bands;
     }

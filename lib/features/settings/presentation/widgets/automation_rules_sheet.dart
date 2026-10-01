@@ -60,7 +60,8 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
     final updated = rule.copyWith(enabled: value);
     setState(() {
       _rules = [
-        for (final r in _rules) if (r.id == rule.id) updated else r,
+        for (final r in _rules)
+          if (r.id == rule.id) updated else r,
       ];
     });
     await _rulesService.saveRule(updated);
@@ -105,7 +106,8 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
           maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.lg),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,7 +116,8 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
                 children: [
                   Icon(Icons.auto_awesome_rounded, color: p.accent, size: 24),
                   const SizedBox(width: AppSpacing.s10),
-                  Text(context.l10n.automationRules,
+                  Text(
+                    context.l10n.automationRules,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -124,19 +127,23 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
                 ],
               ),
               const SizedBox(height: AppSpacing.s6),
-              Text(context.l10n.automationRulesDesc,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+              Text(
+                context.l10n.automationRulesDesc,
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               const SizedBox(height: AppSpacing.md),
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                  child: Center(
-                      child: CircularProgressIndicator(strokeWidth: 2)),
+                  child:
+                      Center(child: CircularProgressIndicator(strokeWidth: 2)),
                 )
               else if (_rules.isEmpty)
-                Text(context.l10n.noAutomationRules,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                Text(
+                  context.l10n.noAutomationRules,
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 )
               else
                 Flexible(

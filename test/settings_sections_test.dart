@@ -76,10 +76,8 @@ void main() {
       )));
 
       // Conflict card visible with the one-tap resolution.
-      expect(
-          find.text('Turn off Gapless & enable Crossfade'), findsOneWidget);
-      await tester
-          .tap(find.text('Turn off Gapless & enable Crossfade'));
+      expect(find.text('Turn off Gapless & enable Crossfade'), findsOneWidget);
+      await tester.tap(find.text('Turn off Gapless & enable Crossfade'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -123,8 +121,7 @@ void main() {
   });
 
   group('Restore-default slider rows wired to cubit setters', () {
-    testWidgets('crossfade reset icon restores 0.0 s default',
-        (tester) async {
+    testWidgets('crossfade reset icon restores 0.0 s default', (tester) async {
       final cubit = SettingsCubit(scannerService: mockScanner);
       addTearDown(cubit.close);
       const state = SettingsState(gaplessPlayback: false, crossfadeSeconds: 6);
@@ -200,7 +197,9 @@ void main() {
       );
     });
 
-    test('AudioConflicts logic: only blocks when bit-perfect is armed and on DAC', () {
+    test(
+        'AudioConflicts logic: only blocks when bit-perfect is armed and on DAC',
+        () {
       const normalSpeaker = AudioOutputInfo(
         deviceName: 'Speaker',
         isUsbDac: false,
@@ -329,8 +328,8 @@ void main() {
           child: BlocProvider<PlayerCubit>.value(
             value: playerCubit,
             child: const AudioSoundSection(
-                state: SettingsState(
-                    experienceMode: ExperienceMode.professional)),
+                state:
+                    SettingsState(experienceMode: ExperienceMode.professional)),
           ),
         ),
       ));
@@ -373,8 +372,8 @@ void main() {
           child: BlocProvider<PlayerCubit>.value(
             value: playerCubit,
             child: const AudioSoundSection(
-                state: SettingsState(
-                    experienceMode: ExperienceMode.professional)),
+                state:
+                    SettingsState(experienceMode: ExperienceMode.professional)),
           ),
         ),
       ));

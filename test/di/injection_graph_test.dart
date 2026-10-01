@@ -28,8 +28,11 @@ void main() {
     // `domain/services/x.dart`) compares equal to its canonical registration.
     // get_it resolves by runtime Type, so these are the same registration; the
     // generator merely aliases the same library under two prefixes.
-    String firstTypeArg(String args) =>
-        args.split(',').first.trim().replaceFirst(RegExp(r'^_[A-Za-z0-9]+\.'), '');
+    String firstTypeArg(String args) => args
+        .split(',')
+        .first
+        .trim()
+        .replaceFirst(RegExp(r'^_[A-Za-z0-9]+\.'), '');
 
     test('every requested type is registered', () {
       final registered = RegExp(

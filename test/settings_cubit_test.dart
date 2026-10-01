@@ -436,7 +436,9 @@ void main() {
       MqaDecoderHelper.isMqaEnabled = null;
     });
 
-    test('[C-03] Concurrent reloadSettings calls serialize without race conditions', () async {
+    test(
+        '[C-03] Concurrent reloadSettings calls serialize without race conditions',
+        () async {
       final cubit = SettingsCubit(scannerService: mockScannerService);
 
       // Trigger multiple concurrent reloads
@@ -453,7 +455,9 @@ void main() {
       await cubit.close();
     });
 
-    test('[M-06] reloadSettings invalidates cachedPrefs and reloads preferences from disk', () async {
+    test(
+        '[M-06] reloadSettings invalidates cachedPrefs and reloads preferences from disk',
+        () async {
       final cubit = SettingsCubit(scannerService: mockScannerService);
       await cubit.preferencesReady;
 

@@ -39,7 +39,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('P0-1 & P1-1: FTS Unicode Tokenization Tests', () {
-    test('toFtsQuery correctly parses Latin, CJK, Arabic, Cyrillic, and Hebrew', () {
+    test('toFtsQuery correctly parses Latin, CJK, Arabic, Cyrillic, and Hebrew',
+        () {
       // Latin
       expect(MusicRepository.toFtsQuery('hello world'), '"hello"* "world"*');
 
@@ -75,7 +76,9 @@ void main() {
     });
   });
 
-  group('P0-2 & P2-1: DuplicateFinderService Audio Checksum & Unicode Normalization Tests', () {
+  group(
+      'P0-2 & P2-1: DuplicateFinderService Audio Checksum & Unicode Normalization Tests',
+      () {
     late Directory tempDir;
     late File fileA;
     late File fileB;
@@ -107,7 +110,9 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
-    test('findDuplicates identifies identical audio content and distinguishes collisions', () async {
+    test(
+        'findDuplicates identifies identical audio content and distinguishes collisions',
+        () async {
       final service = DuplicateFinderService();
 
       final song1 = SongsTableData(
@@ -166,7 +171,9 @@ void main() {
       expect(duplicates.first.songs.map((s) => s.id), isNot(contains(3)));
     });
 
-    test('findDuplicates matches exact title and artist with Unicode normalization', () async {
+    test(
+        'findDuplicates matches exact title and artist with Unicode normalization',
+        () async {
       final service = DuplicateFinderService();
 
       final song1 = SongsTableData(
@@ -208,8 +215,11 @@ void main() {
     });
   });
 
-  group('P0-3 & P1-6: PlaylistSuggestionsService Single-Pass & Caching Tests', () {
-    test('generateSuggestions partitions songs in single pass and caches output for 30 minutes', () {
+  group('P0-3 & P1-6: PlaylistSuggestionsService Single-Pass & Caching Tests',
+      () {
+    test(
+        'generateSuggestions partitions songs in single pass and caches output for 30 minutes',
+        () {
       final service = PlaylistSuggestionsService();
 
       final now = DateTime.now();
@@ -289,7 +299,8 @@ void main() {
   });
 
   group('P1-10: AudioCapabilities Model Tests', () {
-    test('AudioCapabilities is immutable, serializable, and correctly typed', () {
+    test('AudioCapabilities is immutable, serializable, and correctly typed',
+        () {
       const caps = AudioCapabilities(
         hasEqualizer: true,
         hasAudioEffects: true,

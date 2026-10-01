@@ -11,7 +11,8 @@ void main() {
       service = ChainOfCustodyService();
     });
 
-    test('generates valid report with deterministic SHA-256 integrity hash', () async {
+    test('generates valid report with deterministic SHA-256 integrity hash',
+        () async {
       final headerBytes = [0x4F, 0x67, 0x67, 0x53, 0x00, 0x02]; // "OggS" header
       final report = await service.generateReport(
         trackId: 'track-42',
@@ -57,7 +58,8 @@ void main() {
         thermalStatus: 0,
         verifiedAt: DateTime.fromMillisecondsSinceEpoch(0),
       );
-      expect(bitExactReport.verificationBadge, contains('Bit-Exact Direct Output'));
+      expect(bitExactReport.verificationBadge,
+          contains('Bit-Exact Direct Output'));
 
       final dspReport = ChainOfCustodyReport(
         trackId: '2',
@@ -77,7 +79,8 @@ void main() {
         thermalStatus: 0,
         verifiedAt: DateTime.fromMillisecondsSinceEpoch(0),
       );
-      expect(dspReport.verificationBadge, contains('Verified Native DSP (2 stages)'));
+      expect(dspReport.verificationBadge,
+          contains('Verified Native DSP (2 stages)'));
     });
 
     test('serializes report correctly to JSON', () async {

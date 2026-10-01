@@ -185,7 +185,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       final useCases = getIt<PlaylistUseCases>();
       final List<SongsTableData> songs;
       if (pl.isSmart && pl.smartCriteria != null) {
-        songs = await useCases.watchSmartPlaylistSongs(
+        songs = await useCases
+            .watchSmartPlaylistSongs(
                 SmartCriteria.fromJsonString(pl.smartCriteria!))
             .first;
       } else {
@@ -197,9 +198,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         PulsrToast.show(context, message: context.l10n.cannotExportEmpty);
         return;
       }
-      final file =
-          await getIt<PlaylistExportUseCase>()
-              .exportToFile(pl.name, songs, format: format);
+      final file = await getIt<PlaylistExportUseCase>()
+          .exportToFile(pl.name, songs, format: format);
       if (!context.mounted) return;
       if (share) {
         final sharedBundle = await _sharePlaylistBundle(pl.name, songs);
@@ -373,8 +373,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       (failure) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(context.l10n
-                  .importPlaylistFailed(failure.message))),
+              content:
+                  Text(context.l10n.importPlaylistFailed(failure.message))),
         );
       },
       (importResult) {
@@ -514,7 +514,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     if (context.hasHinge)
                       SizedBox(width: context.hinge!.bounds.width)
                     else
-                      VerticalDivider(width: 1, thickness: 1, color: p.hairline),
+                      VerticalDivider(
+                          width: 1, thickness: 1, color: p.hairline),
                     Expanded(
                       child: resolvedSelection != null
                           ? PlaylistDetailScreen(
@@ -529,7 +530,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                                   Icon(Icons.queue_music_rounded,
                                       size: 64, color: p.textTertiary),
                                   const SizedBox(height: AppSpacing.md),
-                                  Text(context.l10n.selectPlaylistHint,
+                                  Text(
+                                    context.l10n.selectPlaylistHint,
                                     style: TextStyle(
                                       color: p.textSecondary,
                                       fontSize: AppFontSize.bodyLarge,
@@ -572,8 +574,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         if (_selectedTab == _PlaylistTabMode.online) {
           await cubit.autoFetchOnlineLibrary(force: true);
         } else {
-          final count =
-              await context.read<SettingsCubit>().rescanLibrary();
+          final count = await context.read<SettingsCubit>().rescanLibrary();
           if (context.mounted) {
             PulsrToast.show(
               context,
@@ -584,12 +585,13 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.sm),
+        padding: const EdgeInsets.only(
+            bottom: AppSpacing.scrollBottom, top: AppSpacing.sm),
         children: [
           // Liked songs hero card (Local favorites)
           Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal: Adaptive.pagePadding(context)),
+            padding:
+                EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
             child: _PlaylistHeroCard(
               title: context.l10n.favorites,
               subtitle: context.l10n.likedTracks,
@@ -609,7 +611,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 top: 24,
                 bottom: 10,
               ),
-              child: Text(context.l10n.suggestedForYou,
+              child: Text(
+                context.l10n.suggestedForYou,
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
@@ -623,7 +626,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
                 itemCount: _suggestions.length,
-                separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: AppSpacing.sm),
                 itemBuilder: (context, index) {
                   final suggestion = _suggestions[index];
                   return _SuggestionCard(
@@ -661,13 +665,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     borderRadius: BorderRadius.circular(AppRadii.r8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.add_rounded,
-                              size: 14, color: p.accent),
+                          Icon(Icons.add_rounded, size: 14, color: p.accent),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
                             context.l10n.createSmartPlaylist,
@@ -694,8 +696,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
-                gridDelegate:
-                    SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: isTabletLandscape ? 2 : columns,
                   crossAxisSpacing: 14,
                   mainAxisSpacing: 14,
@@ -706,45 +707,49 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   final pl = smartPlaylists[index];
                   final count = state.smartPlaylistCounts[pl.id] ?? 0;
                   return StaggeredReveal(
-                    index: index,
-                    // BUG-24: a stable group key prevents every row from
-                    // re-animating when the list length changes on add/remove.
-                    groupKey: 'smart_playlists',
-                    child: _PlaylistCard(
-                    name: pl.name,
-                    subtitle:
-                        '${context.l10n.tracksCount(count)} • ${context.l10n.browseSmart}',
-                    icon: Icons.auto_awesome_rounded,
-                    isSmart: true,
-                    gradient: [
-                      p.accent,
-                      AppColors.ldacViolet,
-                    ],
-                    isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
-                    onTap: () => _onSelectPlaylist(pl),
-                    onLongPress: () => _onSelectPlaylist(pl),
-                    menuItems: (_) => [
-                      PopupMenuItem(
-                          value: 'edit-smart',
-                          child: Text(context.l10n.editSmartRules)),
-                      PopupMenuItem(value: 'share', child: Text(context.l10n.share)),
-                      PopupMenuItem(
-                          value: 'rename', child: Text(context.l10n.rename)),
-                      PopupMenuItem(
-                          value: 'delete', child: Text(context.l10n.delete)),
-                    ],
-                    onMenuSelected: (v) {
-                      if (v == 'edit-smart') {
-                        context.push('/smart-playlist-builder', extra: pl);
-                      } else if (v == 'share') {
-                        _exportPlaylistSongs(context, pl, share: true);
-                      } else if (v == 'rename') {
-                        _showRenameDialog(context, cubit, pl);
-                      } else if (v == 'delete') {
-                        _confirmDelete(context, cubit, pl);
-                      }
-                    },
-                  ));
+                      index: index,
+                      // BUG-24: a stable group key prevents every row from
+                      // re-animating when the list length changes on add/remove.
+                      groupKey: 'smart_playlists',
+                      child: _PlaylistCard(
+                        name: pl.name,
+                        subtitle:
+                            '${context.l10n.tracksCount(count)} • ${context.l10n.browseSmart}',
+                        icon: Icons.auto_awesome_rounded,
+                        isSmart: true,
+                        gradient: [
+                          p.accent,
+                          AppColors.ldacViolet,
+                        ],
+                        isSelected:
+                            isTabletLandscape && _selectedPlaylist?.id == pl.id,
+                        onTap: () => _onSelectPlaylist(pl),
+                        onLongPress: () => _onSelectPlaylist(pl),
+                        menuItems: (_) => [
+                          PopupMenuItem(
+                              value: 'edit-smart',
+                              child: Text(context.l10n.editSmartRules)),
+                          PopupMenuItem(
+                              value: 'share', child: Text(context.l10n.share)),
+                          PopupMenuItem(
+                              value: 'rename',
+                              child: Text(context.l10n.rename)),
+                          PopupMenuItem(
+                              value: 'delete',
+                              child: Text(context.l10n.delete)),
+                        ],
+                        onMenuSelected: (v) {
+                          if (v == 'edit-smart') {
+                            context.push('/smart-playlist-builder', extra: pl);
+                          } else if (v == 'share') {
+                            _exportPlaylistSongs(context, pl, share: true);
+                          } else if (v == 'rename') {
+                            _showRenameDialog(context, cubit, pl);
+                          } else if (v == 'delete') {
+                            _confirmDelete(context, cubit, pl);
+                          }
+                        },
+                      ));
                 },
               ),
             ),
@@ -772,8 +777,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
           // ── TABS UNDER YOUR PLAYLISTS (Local vs Online) ─────────
           Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal: Adaptive.pagePadding(context)),
+            padding:
+                EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
             child: PulsrSegmentedControl(
               selectedIndex: _selectedTab == _PlaylistTabMode.local ? 0 : 1,
               onChanged: (i) {
@@ -827,8 +832,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 subtitle: context.l10n.emptyPlaylistsSubtitle,
                 primaryActionLabel: context.l10n.createPlaylist,
                 primaryActionIcon: Icons.add_rounded,
-                onPrimaryAction: () =>
-                    _showCreateDialog(context, cubit),
+                onPrimaryAction: () => _showCreateDialog(context, cubit),
                 secondaryActionLabel: context.l10n.importM3u,
                 secondaryActionIcon: Icons.file_upload_rounded,
                 onSecondaryAction: () => _importPlaylist(context),
@@ -842,8 +846,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   physics: const NeverScrollableScrollPhysics(),
                   addAutomaticKeepAlives: false,
                   addRepaintBoundaries: true,
-                  gridDelegate:
-                      SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: isTabletLandscape ? 2 : columns,
                     crossAxisSpacing: 14,
                     mainAxisSpacing: 14,
@@ -853,41 +856,47 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   itemBuilder: (context, index) {
                     final pl = userPlaylists[index];
                     return StaggeredReveal(
-                      index: index,
-                      groupKey: 'user_playlists',
-                      child: _PlaylistCard(
-                      name: pl.name,
-                      subtitle: context.l10n.browseOfflinePlaylist,
-                      icon: Icons.queue_music_rounded,
-                      gradient: [
-                        p.surfaceContainerHigh,
-                        p.surfaceContainer
-                      ],
-                      muted: true,
-                      isSelected: isTabletLandscape && _selectedPlaylist?.id == pl.id,
-                      onTap: () => _onSelectPlaylist(pl),
-                      onLongPress: () => _onSelectPlaylist(pl),
-                      menuItems: (_) => [
-                        PopupMenuItem(
-                            value: 'export', child: Text(context.l10n.export)),
-                        PopupMenuItem(value: 'share', child: Text(context.l10n.share)),
-                        PopupMenuItem(
-                            value: 'rename', child: Text(context.l10n.rename)),
-                        PopupMenuItem(
-                            value: 'delete', child: Text(context.l10n.delete)),
-                      ],
-                      onMenuSelected: (v) {
-                        if (v == 'export') {
-                          _showExportFormatSheet(context, pl);
-                        } else if (v == 'share') {
-                          _exportPlaylistSongs(context, pl, share: true);
-                        } else if (v == 'rename') {
-                          _showRenameDialog(context, cubit, pl);
-                        } else if (v == 'delete') {
-                          _confirmDelete(context, cubit, pl);
-                        }
-                      },
-                    ));
+                        index: index,
+                        groupKey: 'user_playlists',
+                        child: _PlaylistCard(
+                          name: pl.name,
+                          subtitle: context.l10n.browseOfflinePlaylist,
+                          icon: Icons.queue_music_rounded,
+                          gradient: [
+                            p.surfaceContainerHigh,
+                            p.surfaceContainer
+                          ],
+                          muted: true,
+                          isSelected: isTabletLandscape &&
+                              _selectedPlaylist?.id == pl.id,
+                          onTap: () => _onSelectPlaylist(pl),
+                          onLongPress: () => _onSelectPlaylist(pl),
+                          menuItems: (_) => [
+                            PopupMenuItem(
+                                value: 'export',
+                                child: Text(context.l10n.export)),
+                            PopupMenuItem(
+                                value: 'share',
+                                child: Text(context.l10n.share)),
+                            PopupMenuItem(
+                                value: 'rename',
+                                child: Text(context.l10n.rename)),
+                            PopupMenuItem(
+                                value: 'delete',
+                                child: Text(context.l10n.delete)),
+                          ],
+                          onMenuSelected: (v) {
+                            if (v == 'export') {
+                              _showExportFormatSheet(context, pl);
+                            } else if (v == 'share') {
+                              _exportPlaylistSongs(context, pl, share: true);
+                            } else if (v == 'rename') {
+                              _showRenameDialog(context, cubit, pl);
+                            } else if (v == 'delete') {
+                              _confirmDelete(context, cubit, pl);
+                            }
+                          },
+                        ));
                   },
                 ),
               ),
@@ -896,8 +905,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             _OnlinePlaylistsContent(
               cubit: cubit,
               playerCubit: playerCubit,
-              onAddPlaylist: () =>
-                  _showAddOnlinePlaylistDialog(context, cubit),
+              onAddPlaylist: () => _showAddOnlinePlaylistDialog(context, cubit),
             ),
           ],
         ],
@@ -1057,7 +1065,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(context.l10n.connectYtm,
+                                Text(
+                                  context.l10n.connectYtm,
                                   style: TextStyle(
                                     fontSize: AppFontSize.callout,
                                     fontWeight: FontWeight.w800,
@@ -1065,7 +1074,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: AppSpacing.xxs),
-                                Text(context.l10n.signInToSync,
+                                Text(
+                                  context.l10n.signInToSync,
                                   style: TextStyle(
                                     fontSize: AppFontSize.label,
                                     color: p.textSecondary,
@@ -1084,13 +1094,15 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             },
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
-
-                                  horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+                                  horizontal: AppSpacing.s14,
+                                  vertical: AppSpacing.xs),
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppRadii.r12)),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r12)),
                             ),
                             child: Text(context.l10n.signIn,
-                                style: const TextStyle(fontSize: AppFontSize.label)),
+                                style: const TextStyle(
+                                    fontSize: AppFontSize.label)),
                           ),
                         ],
                       ),
@@ -1123,12 +1135,16 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
                   // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
                   Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-                        24, Adaptive.pagePadding(context), 10),
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                        Adaptive.pagePadding(context),
+                        24,
+                        Adaptive.pagePadding(context),
+                        10),
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(context.l10n.accountPlaylists,
+                          child: Text(
+                            context.l10n.accountPlaylists,
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall
@@ -1136,7 +1152,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           ),
                         ),
                         if (online.accountStatus == YtmFetchStatus.loading)
-                          SizedBox(width: AppSpacing.s14,
+                          SizedBox(
+                            width: AppSpacing.s14,
                             height: 14,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: p.accent),
@@ -1182,9 +1199,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 online.accountError ??
-                                    context.l10n.browseFailedToLoadAccountPlaylists,
+                                    context.l10n
+                                        .browseFailedToLoadAccountPlaylists,
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: AppFontSize.label),
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label),
                               ),
                             ),
                             TextButton(
@@ -1212,9 +1231,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                 color: p.textTertiary, size: 26),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
-                              child: Text(context.l10n.noAccountPlaylists,
+                              child: Text(
+                                context.l10n.noAccountPlaylists,
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.bodySmall),
                               ),
                             ),
                           ],
@@ -1256,9 +1277,13 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     online.customStatus == YtmFetchStatus.error ||
                     online.customStatus == YtmFetchStatus.loading) ...[
                   Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-                        24, Adaptive.pagePadding(context), 10),
-                    child: Text(context.l10n.addedPlaylists,
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                        Adaptive.pagePadding(context),
+                        24,
+                        Adaptive.pagePadding(context),
+                        10),
+                    child: Text(
+                      context.l10n.addedPlaylists,
                       style: Theme.of(context)
                           .textTheme
                           .labelSmall
@@ -1314,8 +1339,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: true,
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: columns,
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 14,
@@ -1339,8 +1363,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
                 // Add YouTube Playlist Button
                 Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-                      16, Adaptive.pagePadding(context), 0),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                      Adaptive.pagePadding(context),
+                      16,
+                      Adaptive.pagePadding(context),
+                      0),
                   child: InkWell(
                     onTap: onAddPlaylist,
                     borderRadius: BorderRadius.circular(AppRadii.r18),
@@ -1352,7 +1379,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           const Icon(Icons.add_rounded,
                               color: AppColors.ytRed, size: 20),
                           const SizedBox(width: AppSpacing.xs),
-                          Text(context.l10n.addYtmUrl,
+                          Text(
+                            context.l10n.addYtmUrl,
                             style: TextStyle(
                               color: AppColors.ytRed,
                               fontWeight: FontWeight.w800,
@@ -1400,47 +1428,63 @@ class _AccountPlaylistCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadii.r20),
         child: Container(
-        decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r20),
-          border: Border.all(color: p.hairline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
-                    child: playlist.artworkUrl != null
-                        ? Image.network(
-                            playlist.artworkUrl!,
-                            fit: BoxFit.cover,
-                            cacheWidth: 360,
-                            cacheHeight: 360,
-                            loadingBuilder: (context, child, progress) => progress == null
-                                ? child
-                                : Container(
-                                    decoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: gradientColors,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                    ),
-                                    child: const Center(
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: Colors.white),
-                                      ),
-                                    ),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadii.r20),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(AppRadii.r20)),
+                      child: playlist.artworkUrl != null
+                          ? Image.network(
+                              playlist.artworkUrl!,
+                              fit: BoxFit.cover,
+                              cacheWidth: 360,
+                              cacheHeight: 360,
+                              loadingBuilder: (context, child, progress) =>
+                                  progress == null
+                                      ? child
+                                      : Container(
+                                          decoration: const BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: gradientColors,
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                          ),
+                                          child: const Center(
+                                            child: SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                              errorBuilder: (_, __, ___) => Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: gradientColors,
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                            errorBuilder: (_, __, ___) => Container(
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.queue_music_rounded,
+                                      color: Colors.white, size: 36),
+                                ),
+                              ),
+                            )
+                          : Container(
                               decoration: const BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: gradientColors,
@@ -1453,72 +1497,60 @@ class _AccountPlaylistCard extends StatelessWidget {
                                     color: Colors.white, size: 36),
                               ),
                             ),
-                          )
-                        : Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: gradientColors,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                    ),
+                    if (onDownload != null)
+                      PositionedDirectional(
+                        top: 8,
+                        end: 8,
+                        child: GestureDetector(
+                          onTap: onDownload,
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.s6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              shape: BoxShape.circle,
                             ),
-                            child: const Center(
-                              child: Icon(Icons.queue_music_rounded,
-                                  color: Colors.white, size: 36),
-                            ),
+                            child: const Icon(Icons.download_rounded,
+                                color: Colors.white, size: 16),
                           ),
-                  ),
-                  if (onDownload != null)
-                    PositionedDirectional(
-                      top: 8,
-                      end: 8,
-                      child: GestureDetector(
-                        onTap: onDownload,
-                        child: Container(
-                          padding: const EdgeInsets.all(AppSpacing.s6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.download_rounded,
-                              color: Colors.white, size: 16),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    playlist.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: AppFontSize.bodySmall,
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14,
+                    AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      playlist.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: AppFontSize.bodySmall,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.s2),
-                  Text(
-                    playlist.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
-                  ),
-                ],
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      playlist.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: p.textSecondary, fontSize: AppFontSize.label),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1544,7 +1576,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const gradientColors = [Color(0xFF1ED760), Color(0xFF14833B)];
+    const gradientColors = [AppColors.spotifyGreen, AppColors.spotifyGreenDeep];
 
     String subtitle;
     switch (status) {
@@ -1608,7 +1640,8 @@ class _LikedMusicOnlineCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(context.l10n.likedMusic,
+                  Text(
+                    context.l10n.likedMusic,
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -1629,10 +1662,10 @@ class _LikedMusicOnlineCard extends StatelessWidget {
               ),
             ),
             if (status == YtmFetchStatus.loading)
-              const SizedBox(width: AppSpacing.s40,
-                height: 40,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2.5),
+              const SkeletonBox(
+                width: AppSpacing.s40,
+                height: AppSpacing.s40,
+                radius: AppRadii.r20,
               )
             else if (status == YtmFetchStatus.done)
               Row(
@@ -1713,96 +1746,99 @@ class _OnlinePlaylistCard extends StatelessWidget {
         onLongPress: onRemove,
         borderRadius: BorderRadius.circular(AppRadii.r20),
         child: Container(
-        decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r20),
-          border: Border.all(color: p.hairline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.ytRed.withValues(alpha: 0.8),
-                      AppColors.ytRed.withValues(alpha: 0.35)
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadii.r20),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.ytRed.withValues(alpha: 0.8),
+                        AppColors.ytRed.withValues(alpha: 0.35)
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppRadii.r20)),
                   ),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
-                ),
-                child: Stack(
-                  children: [
-                    const Center(
-                        child: Icon(Icons.queue_music_rounded,
-                            color: Colors.white, size: 40)),
-                    if (onDownload != null)
+                  child: Stack(
+                    children: [
+                      const Center(
+                          child: Icon(Icons.queue_music_rounded,
+                              color: Colors.white, size: 40)),
+                      if (onDownload != null)
+                        PositionedDirectional(
+                          top: 8,
+                          start: 8,
+                          child: GestureDetector(
+                            onTap: onDownload,
+                            child: Container(
+                              padding: const EdgeInsets.all(AppSpacing.xxs),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.35),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.download_rounded,
+                                  color: Colors.white, size: 14),
+                            ),
+                          ),
+                        ),
                       PositionedDirectional(
                         top: 8,
-                        start: 8,
+                        end: 8,
                         child: GestureDetector(
-                          onTap: onDownload,
+                          onTap: onRemove,
                           child: Container(
                             padding: const EdgeInsets.all(AppSpacing.xxs),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.35),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.download_rounded,
+                            child: const Icon(Icons.close_rounded,
                                 color: Colors.white, size: 14),
                           ),
                         ),
                       ),
-                    PositionedDirectional(
-                      top: 8,
-                      end: 8,
-                      child: GestureDetector(
-                        onTap: onRemove,
-                        child: Container(
-                          padding: const EdgeInsets.all(AppSpacing.xxs),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close_rounded,
-                              color: Colors.white, size: 14),
-                        ),
-                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14,
+                    AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: AppFontSize.bodySmall),
                     ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(context.l10n.entryAdded(entry.tracks.length),
+                        style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.label)),
                   ],
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: AppFontSize.bodySmall),
-                  ),
-                  const SizedBox(height: AppSpacing.s2),
-                  Text(context.l10n.entryAdded(entry.tracks.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1940,12 +1976,14 @@ class _SuggestionCard extends StatelessWidget {
                 suggestion.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               const Spacer(),
               Text(
                 context.l10n.tapToCreate(suggestion.songs.length),
-                style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+                style: TextStyle(
+                    color: p.textTertiary, fontSize: AppFontSize.caption),
               ),
             ],
           ),
@@ -2012,124 +2050,127 @@ class _PlaylistCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadii.r20),
         child: Container(
-        decoration: BoxDecoration(
-          color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r20),
-          border: Border.all(
-            color: isSelected ? p.accent : p.hairline,
-            width: isSelected ? 2.2 : 1.0,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: p.glow.withValues(alpha: 0.35),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      colors: gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(AppRadii.r20)),
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Icon(icon,
-                          color: muted ? p.textSecondary : Colors.white, size: 40),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(AppRadii.r20),
+            border: Border.all(
+              color: isSelected ? p.accent : p.hairline,
+              width: isSelected ? 2.2 : 1.0,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: p.glow.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      spreadRadius: 1,
                     ),
-                    if (isSmart)
-                      PositionedDirectional(
-                        top: AppSpacing.xs,
-                        end: AppSpacing.xs,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s6,
-                            vertical: AppSpacing.s2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            borderRadius: BorderRadius.circular(AppRadii.r6),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                              width: 0.8,
+                  ]
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        colors: gradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(AppRadii.r20)),
+                  ),
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: Icon(icon,
+                            color: muted ? p.textSecondary : Colors.white,
+                            size: 40),
+                      ),
+                      if (isSmart)
+                        PositionedDirectional(
+                          top: AppSpacing.xs,
+                          end: AppSpacing.xs,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s6,
+                              vertical: AppSpacing.s2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.35),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  size: 10,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: AppSpacing.xxs),
+                                Text(
+                                  _smartBadgeText,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.micro,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: AppTracking.wide,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.auto_awesome_rounded,
-                                size: 10,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: AppSpacing.xxs),
-                              Text(
-                                _smartBadgeText,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.micro,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: AppTracking.wide,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14,
+                    AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w800,
+                                fontSize: AppFontSize.body),
+                          ),
+                          const SizedBox(height: AppSpacing.s2),
+                          Text(subtitle,
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.label)),
+                        ],
+                      ),
+                    ),
+                    if (menuItems != null)
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert_rounded,
+                            size: 18, color: p.textTertiary),
+                        onSelected: onMenuSelected,
+                        itemBuilder: menuItems!,
                       ),
                   ],
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s14, AppSpacing.s10, AppSpacing.s14, AppSpacing.sm),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: AppFontSize.body),
-                        ),
-                        const SizedBox(height: AppSpacing.s2),
-                        Text(subtitle,
-                            style: TextStyle(
-                                color: p.textSecondary, fontSize: AppFontSize.label)),
-                      ],
-                    ),
-                  ),
-                  if (menuItems != null)
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert_rounded,
-                          size: 18, color: p.textTertiary),
-                      onSelected: onMenuSelected,
-                      itemBuilder: menuItems!,
-                    ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
     );
     if (menuItems != null) {
       return GestureDetector(

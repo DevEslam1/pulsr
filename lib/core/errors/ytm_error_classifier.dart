@@ -115,7 +115,8 @@ class YtmErrorClassifier {
 
   /// A bare `bot` substring also matches "bottleneck", "sabotage" and "robots",
   /// so the word has to stand alone.
-  static final RegExp _botWordPattern = RegExp(r'\bbots?\b', caseSensitive: false);
+  static final RegExp _botWordPattern =
+      RegExp(r'\bbots?\b', caseSensitive: false);
 
   static int? _httpStatusIn(String text) {
     final match = _httpStatusPattern.firstMatch(text);
@@ -164,7 +165,8 @@ class YtmErrorClassifier {
 
   /// True for a 5xx: YouTube's own fault, so retry rather than skip the track.
   /// `contains('unavailable')` used to read a 503 as a deleted video.
-  static bool _isServerError(int? status) => status != null && status >= 500 && status <= 599;
+  static bool _isServerError(int? status) =>
+      status != null && status >= 500 && status <= 599;
 
   static YtmErrorInfo _networkInfo(String? traceId) => YtmErrorInfo(
         message: 'No connection. Check your network.',
@@ -356,7 +358,8 @@ class YtmErrorClassifier {
     );
   }
 
-  static YtmErrorInfo classifyCode(String code, [String? details, String? traceId]) {
+  static YtmErrorInfo classifyCode(String code,
+      [String? details, String? traceId]) {
     final explicitSignal = YtmBlockSignal.fromCode(code);
     if (explicitSignal != null) {
       return _mapSignal(explicitSignal, details, traceId);
@@ -495,7 +498,8 @@ class YtmErrorClassifier {
     return null;
   }
 
-  static YtmErrorInfo _mapSignal(YtmBlockSignal signal, String? details, String? traceId) {
+  static YtmErrorInfo _mapSignal(
+      YtmBlockSignal signal, String? details, String? traceId) {
     switch (signal) {
       case YtmBlockSignal.rateLimited:
         return YtmErrorInfo(

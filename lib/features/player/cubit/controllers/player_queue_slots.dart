@@ -55,7 +55,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         final rawSlot = data[key];
         if (rawSlot is! Map) continue;
         final decoded = QueueSlotCodec.decodeSlot(
-            Map<String, dynamic>.from(rawSlot), PlayerQueueController.maxQueueSize);
+            Map<String, dynamic>.from(rawSlot),
+            PlayerQueueController.maxQueueSize);
         if (decoded == null) continue;
         try {
           final songsResult = await _repository.getSongsByIds(decoded.songIds);
@@ -121,6 +122,9 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   void restoreQueue(List<SongsTableData> previousQueue, int previousIndex) {
     final state = _getState();
+    // Undo of a clear/removal on an already-empty queue: nothing to restore.
+    // Guard the clamp below, which would throw on clamp(0, -1) for an empty list.
+    if (previousQueue.isEmpty) return;
     final validIndex = previousIndex.clamp(0, previousQueue.length - 1);
     setQueueSlot(
       state.activeQueueSlot,
@@ -165,9 +169,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     int newCurrentIndex = state.currentIndex;
     if (state.currentIndex == oldIndex) {
       newCurrentIndex = newIndex;
-    } else if (oldIndex < state.currentIndex && newIndex >= state.currentIndex) {
+    } else if (oldIndex < state.currentIndex &&
+        newIndex >= state.currentIndex) {
       newCurrentIndex = state.currentIndex - 1;
-    } else if (oldIndex > state.currentIndex && newIndex <= state.currentIndex) {
+    } else if (oldIndex > state.currentIndex &&
+        newIndex <= state.currentIndex) {
       newCurrentIndex = state.currentIndex + 1;
     }
 
@@ -225,7 +231,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       return;
     }
 
-    final updatedQueue = List<SongsTableData>.from(state.queue)..removeAt(index);
+    final updatedQueue = List<SongsTableData>.from(state.queue)
+      ..removeAt(index);
     int newIndex = state.currentIndex;
     if (index < state.currentIndex) {
       newIndex = state.currentIndex - 1;
@@ -297,6 +304,19 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       if (slot == state.activeQueueSlot) return;
       final wasPlaying = state.isPlaying;
 
+      // Snapshot everything the switch will overwrite so a failed engine load
+      // can be rolled back atomically instead of leaving the UI on the new slot
+      // while the engine still plays the old queue.
+      final prevActiveSlot = state.activeQueueSlot;
+      final prevQueue = state.queue;
+      final prevIndex = state.currentIndex;
+      final prevSong = state.currentSong;
+      final prevPosition = state.position;
+      final prevDuration = state.duration;
+      final prevSpeed = state.playbackSpeed;
+      final prevLyrics = state.lyrics;
+      final prevLyricsSource = state.lyricsSource;
+
       setQueueSlot(
         state.activeQueueSlot,
         songs: List.from(state.queue),
@@ -307,7 +327,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       queueIntegrityCheck(slot);
       final targetSlot = _queueSlots[slot] ??
           const QueueSlotData(
-              songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+              songIds: [],
+              currentIndex: 0,
+              position: Duration.zero,
+              speed: 1.0);
       final targetSongs = targetSlot.songsFrom(_slotLookupCache);
       final targetOriginalSong = (targetSlot.currentIndex >= 0 &&
               targetSlot.currentIndex < targetSongs.length)
@@ -319,7 +342,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
       if (validSongs.isEmpty) {
         _emit(state.copyWith(
-          playback: state.playback.copyWith(errorMessage: 'Queue slot is empty'),
+          playback:
+              state.playback.copyWith(errorMessage: 'Queue slot is empty'),
         ));
         return;
       }
@@ -327,7 +351,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _bumpQueueVersion();
       int safeIdx = -1;
       if (targetOriginalSong != null) {
-        safeIdx = validSongs.indexWhere((s) => _isSameTrack(s, targetOriginalSong));
+        safeIdx =
+            validSongs.indexWhere((s) => _isSameTrack(s, targetOriginalSong));
       }
       if (safeIdx == -1) {
         safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
@@ -346,6 +371,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           playbackSpeed: targetSlot.speed,
         ),
       ));
+      var engineLoaded = false;
       try {
         await _audioHandler.setSpeed(targetSlot.speed);
         await _audioHandler.loadQueue(
@@ -354,15 +380,49 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           initialPosition: targetSlot.position,
           autoPlay: wasPlaying,
         );
+        engineLoaded = true;
         _loadLyrics(song);
       } catch (e, st) {
         ErrorLogger.log('Failed to switch queue slot $slot',
             error: e, stackTrace: st, category: 'PlayerQueueController');
         if (!_isClosed()) {
+          // Roll the UI back to the previous slot/queue and resync the engine so
+          // the two can never diverge after a rejected slot switch.
           final s = _getState();
           _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: 'Failed to switch queue slot'),
+            queueSlice: s.queueSlice.copyWith(
+              activeQueueSlot: prevActiveSlot,
+              queue: prevQueue,
+              currentIndex: prevIndex,
+            ),
+            playback: s.playback.copyWith(
+              currentSong: prevSong,
+              duration: prevDuration,
+              position: prevPosition,
+              playbackSpeed: prevSpeed,
+              errorMessage: 'Failed to switch queue slot',
+            ),
+            lyricsSlice: s.lyricsSlice
+                .copyWith(lyrics: prevLyrics, lyricsSource: prevLyricsSource),
           ));
+          _bumpQueueVersion();
+        }
+      } finally {
+        if (!engineLoaded && !_isClosed() && prevQueue.isNotEmpty) {
+          try {
+            await _audioHandler.setSpeed(prevSpeed);
+            await _audioHandler.loadQueue(
+              prevQueue,
+              initialIndex: prevIndex,
+              initialPosition: prevPosition,
+              autoPlay: wasPlaying,
+            );
+          } catch (rollbackError, rollbackSt) {
+            ErrorLogger.log('Queue slot switch rollback failed',
+                error: rollbackError,
+                stackTrace: rollbackSt,
+                category: 'PlayerQueueController');
+          }
         }
       }
     } finally {
@@ -370,8 +430,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
-  Future<void> swapReconciledSong(dynamic oldSongOrId, dynamic newSongOrId) async {
-    final int oldId = oldSongOrId is SongsTableData ? oldSongOrId.id : (oldSongOrId as int);
+  Future<void> swapReconciledSong(
+      dynamic oldSongOrId, dynamic newSongOrId) async {
+    final int oldId =
+        oldSongOrId is SongsTableData ? oldSongOrId.id : (oldSongOrId as int);
     SongsTableData? newSong;
     if (newSongOrId is SongsTableData) {
       newSong = newSongOrId;
@@ -388,7 +450,9 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;
         return QueueSlotData(
-          songIds: data.songIds.map((id) => id == oldId ? safeNewSong.id : id).toList(),
+          songIds: data.songIds
+              .map((id) => id == oldId ? safeNewSong.id : id)
+              .toList(),
           currentIndex: data.currentIndex,
           position: data.position,
           speed: data.speed,
@@ -402,7 +466,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _bumpQueueVersion();
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
-          queue: state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
+          queue:
+              state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
         ),
         playback: state.playback.copyWith(
           currentSong:
@@ -584,11 +649,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final nextTrack = queue[currentIndex + 1];
     if (nextTrack.source != SongSource.youtube) return;
 
-    _repository.findMatchingLocalSong(
+    _repository
+        .findMatchingLocalSong(
       remoteId: nextTrack.remoteId,
       title: nextTrack.title,
       artist: nextTrack.artist,
-    ).then((res) {
+    )
+        .then((res) {
       final match = res.fold((_) => null, (s) => s);
       if (match != null &&
           _localMatchSwapGuard.isValid(capturedSwapGen) &&
@@ -597,7 +664,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         swapReconciledSong(nextTrack.id, match);
       }
     }).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('Find next local match failed', error: e, stackTrace: st, category: 'PlayerQueueController');
+      ErrorLogger.log('Find next local match failed',
+          error: e, stackTrace: st, category: 'PlayerQueueController');
     });
   }
 
@@ -607,7 +675,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     if (data.currentIndex < 0 ||
         (data.songIds.isNotEmpty && data.currentIndex >= data.songIds.length) ||
         data.position.isNegative) {
-      ErrorLogger.log('Corrupted queue slot data detected at slot $slot', category: 'PlayerQueueController');
+      ErrorLogger.log('Corrupted queue slot data detected at slot $slot',
+          category: 'PlayerQueueController');
       _queueSlots.remove(slot);
       return false;
     }
@@ -616,9 +685,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   Future<void> playRadioStation(RadioStation station) async {
     final uri = Uri.tryParse(station.url);
-    if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    if (!RadioStation.isHttpUrl(station.url) ||
+        uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https')) {
       final s = _getState();
-      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(
+              errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
       return;
     }
     final song = SongsTableData(
@@ -645,4 +718,3 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     await playSong(song);
   }
 }
-

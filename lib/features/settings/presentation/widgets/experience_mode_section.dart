@@ -57,9 +57,8 @@ class ExperienceModeSection extends StatelessWidget {
             ],
             selectedIndex: isPro ? 1 : 0,
             onChanged: (i) {
-              final newMode = i == 1
-                  ? ExperienceMode.professional
-                  : ExperienceMode.normal;
+              final newMode =
+                  i == 1 ? ExperienceMode.professional : ExperienceMode.normal;
               cubit.setExperienceMode(newMode);
               if (newMode == ExperienceMode.professional) {
                 PulsrToast.show(
@@ -94,7 +93,8 @@ class ExperienceModeSection extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.surfaceContainerHigh.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -126,7 +126,6 @@ class ExperienceModeSection extends StatelessWidget {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-
                         horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: (isPro ? p.accent : p.textTertiary)
@@ -287,47 +286,47 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
             button: true,
             expanded: _expanded,
             child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.r10),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _expanded = !_expanded);
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: AppSpacing.xs,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.help_outline_rounded,
-                    size: 15,
-                    color: p.accent,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      context.l10n.whatChanges,
-                      style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w700,
-                        color: p.textPrimary,
+              borderRadius: BorderRadius.circular(AppRadii.r10),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _expanded = !_expanded);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.help_outline_rounded,
+                      size: 15,
+                      color: p.accent,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        context.l10n.whatChanges,
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                          color: p.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                  AnimatedRotation(
-                    turns: _expanded ? 0.5 : 0.0,
-                    duration: context.motionMs(200),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 18,
-                      color: p.textTertiary,
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0.0,
+                      duration: context.motionMs(200),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: p.textTertiary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           ),
           // Only the visible content is laid out; collapsed content is not
           // built with unbounded height (see settings_screen section note).

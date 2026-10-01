@@ -26,7 +26,8 @@ class _ArtworkRateLimiter {
         return;
       }
       final oldest = _timestamps.first;
-      final waitMs = interval.inMilliseconds - now.difference(oldest).inMilliseconds + 10;
+      final waitMs =
+          interval.inMilliseconds - now.difference(oldest).inMilliseconds + 10;
       if (waitMs > 0) {
         await Future.delayed(Duration(milliseconds: waitMs));
       }
@@ -56,8 +57,8 @@ class MissingArtworkService {
 
   /// Searches iTunes Cover Art API for missing album artwork with rate limiting & exponential backoff.
   /// Returns null immediately when offline-only mode is enabled.
-  Future<String?> fetchArtworkForAlbum(
-      String albumTitle, String artistName, {int maxRetries = 2}) async {
+  Future<String?> fetchArtworkForAlbum(String albumTitle, String artistName,
+      {int maxRetries = 2}) async {
     try {
       if (!AppConfig.isCloudSyncAllowed) return null;
       final prefs = await SharedPreferences.getInstance();
@@ -97,8 +98,11 @@ class MissingArtworkService {
         }
       } catch (e, st) {
         if (attempt == maxRetries) {
-          ErrorLogger.log('Failed to fetch artwork for $albumTitle after retries',
-              error: e, stackTrace: st, category: 'MissingArtworkService');
+          ErrorLogger.log(
+              'Failed to fetch artwork for $albumTitle after retries',
+              error: e,
+              stackTrace: st,
+              category: 'MissingArtworkService');
         } else {
           await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
         }

@@ -50,7 +50,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     return a2.abs() < 1.0 && a1.abs() < (1.0 + a2);
   }
 
-  static List<double> _generateSampleDdcCoeffs(double bassScale, double trebleScale) {
+  static List<double> _generateSampleDdcCoeffs(
+      double bassScale, double trebleScale) {
     // Generate valid Direct Form II biquad coefficients for 44.1k and 48k
     final list = <double>[];
     // 44.1 kHz block: 2 SOS stages
@@ -73,7 +74,9 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     if (coeffs.isEmpty) return const [];
     final sections = <List<double>>[];
     int i = 0;
-    if (coeffs.length >= 6 && coeffs[0] <= 32.0 && coeffs[0] == coeffs[0].roundToDouble()) {
+    if (coeffs.length >= 6 &&
+        coeffs[0] <= 32.0 &&
+        coeffs[0] == coeffs[0].roundToDouble()) {
       final numSections = coeffs[0].toInt();
       i = 1;
       for (int s = 0; s < numSections && (i + 5) <= coeffs.length; s++) {
@@ -89,7 +92,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     return sections;
   }
 
-  static double responseAtFrequency(List<List<double>> biquads, double f, {double sampleRate = 48000.0}) {
+  static double responseAtFrequency(List<List<double>> biquads, double f,
+      {double sampleRate = 48000.0}) {
     if (biquads.isEmpty) return 0.0;
     final w = 2.0 * math.pi * f / sampleRate;
     final cosW = math.cos(w);
@@ -147,7 +151,11 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
       double env = 1.0;
       if (i < 500) env = i / 500.0;
       if (i > numSweepSamples - 500) env = (numSweepSamples - i) / 500.0;
-      final phase = 2.0 * math.pi * f0 * ((math.pow(f1 / f0, t / tTotal) - 1.0) / math.log(f1 / f0)) * tTotal;
+      final phase = 2.0 *
+          math.pi *
+          f0 *
+          ((math.pow(f1 / f0, t / tTotal) - 1.0) / math.log(f1 / f0)) *
+          tTotal;
       final s = math.sin(phase) * 0.25 * env;
       pcm[numRefSamples + i] = (s * 32767).round().clamp(-32768, 32767);
     }
@@ -205,7 +213,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         allowedExtensions: ['vdc', 'txt'],
       );
       if (result != null) {
-        final file = SafeFilePath.validate(result.path, allowedExtensions: ['vdc', 'txt']);
+        final file = SafeFilePath.validate(result.path,
+            allowedExtensions: ['vdc', 'txt']);
         if (file == null) {
           throw 'Invalid or inaccessible file';
         }
@@ -217,12 +226,13 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         final coeffs = ViperDdcParser.parseBytes(bytes);
 
         if (coeffs.isNotEmpty && context.mounted) {
-          final fileName = result.name.replaceAll(RegExp(r'\.vdc$', caseSensitive: false), '');
+          final fileName = result.name
+              .replaceAll(RegExp(r'\.vdc$', caseSensitive: false), '');
           await context.read<PlayerCubit>().setViperDdcEnabled(
-            true,
-            profileName: fileName,
-            coeffs: coeffs,
-          );
+                true,
+                profileName: fileName,
+                coeffs: coeffs,
+              );
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(context.l10n.vdcLoaded(fileName))),
@@ -251,10 +261,12 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
         final cubit = context.read<PlayerCubit>();
 
         return Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -298,8 +310,11 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                   ],
                 ),
                 Text(
-                  AudioFeatureRegistry.viperDdc.subtitle,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                  AudioFeatureRegistry.viperDdc
+                      .localized(context.l10n)
+                      .subtitle,
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
                 const SizedBox(height: AppSpacing.md),
 
@@ -320,13 +335,17 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.s10),
                         decoration: BoxDecoration(
-                          color: (state.isViperDdcEnabled ? p.primary : p.textSecondary)
+                          color: (state.isViperDdcEnabled
+                                  ? p.primary
+                                  : p.textSecondary)
                               .withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.album_rounded,
-                          color: state.isViperDdcEnabled ? p.primary : p.textSecondary,
+                          color: state.isViperDdcEnabled
+                              ? p.primary
+                              : p.textSecondary,
                           size: 22,
                         ),
                       ),
@@ -335,7 +354,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(context.l10n.activeProfile,
+                            Text(
+                              context.l10n.activeProfile,
                               style: TextStyle(
                                 color: p.textTertiary,
                                 fontSize: AppFontSize.caption,
@@ -380,8 +400,9 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
 
                 // Interactive Frequency Response Curve & Tools
                 Builder(builder: (context) {
-                  final activeCoeffs = _builtInProfiles[state.viperDdcProfileName] ??
-                      _builtInProfiles.values.first;
+                  final activeCoeffs =
+                      _builtInProfiles[state.viperDdcProfileName] ??
+                          _builtInProfiles.values.first;
                   final biquads = extractBiquadSections(activeCoeffs);
                   final avgGain = averageGainDb(biquads);
 
@@ -403,7 +424,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.show_chart_rounded, size: 18, color: p.primary),
+                                    Icon(Icons.show_chart_rounded,
+                                        size: 18, color: p.primary),
                                     const SizedBox(width: AppSpacing.xs),
                                     Text(
                                       context.l10n.correctionCurveRange,
@@ -442,11 +464,26 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(context.l10n.freq20Hz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq100Hz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq1kHz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq10kHz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq20kHz, style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq20Hz,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq100Hz,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq1kHz,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq10kHz,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.tiny)),
+                                Text(context.l10n.freq20kHz,
+                                    style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.tiny)),
                               ],
                             ),
                           ],
@@ -460,20 +497,29 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             child: OutlinedButton.icon(
                               onPressed: _toggleTestTone,
                               icon: Icon(
-                                _isPlayingTone ? Icons.stop_rounded : Icons.volume_up_rounded,
+                                _isPlayingTone
+                                    ? Icons.stop_rounded
+                                    : Icons.volume_up_rounded,
                                 size: 16,
-                                color: _isPlayingTone ? Colors.redAccent : p.primary,
+                                color: _isPlayingTone
+                                    ? Colors.redAccent
+                                    : p.primary,
                               ),
                               label: Text(
-                                _isPlayingTone ? 'Stop Sweep' : 'Test Tone (1k+Sweep)',
+                                _isPlayingTone
+                                    ? 'Stop Sweep'
+                                    : 'Test Tone (1k+Sweep)',
                                 style: TextStyle(fontSize: AppFontSize.tiny),
                               ),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
-                                  color: _isPlayingTone ? Colors.redAccent : p.hairline,
+                                  color: _isPlayingTone
+                                      ? Colors.redAccent
+                                      : p.hairline,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r12),
                                 ),
                               ),
                             ),
@@ -497,12 +543,16 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                 );
                               },
                               icon: Icon(
-                                _abBypassed ? Icons.compare_arrows_rounded : Icons.check_circle_outline_rounded,
+                                _abBypassed
+                                    ? Icons.compare_arrows_rounded
+                                    : Icons.check_circle_outline_rounded,
                                 size: 16,
                                 color: _abBypassed ? p.accent : p.primary,
                               ),
                               label: Text(
-                                _abBypassed ? 'Bypassed (Matched)' : 'A/B Compare',
+                                _abBypassed
+                                    ? 'Bypassed (Matched)'
+                                    : 'A/B Compare',
                                 style: TextStyle(fontSize: AppFontSize.tiny),
                               ),
                               style: OutlinedButton.styleFrom(
@@ -510,7 +560,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   color: _abBypassed ? p.accent : p.hairline,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r12),
                                 ),
                               ),
                             ),
@@ -522,11 +573,24 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                 }),
                 const SizedBox(height: AppSpacing.s20),
 
-                Text(context.l10n.refHpProfiles,
+                Text(
+                  context.l10n.dspViperDdcDemoTitle,
                   style: TextStyle(
                     color: p.textPrimary,
                     fontSize: AppFontSize.body,
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                // These profiles are generated placeholders, not measured
+                // correction curves. Say so plainly rather than implying they
+                // were derived from real headphone measurements.
+                Text(
+                  context.l10n.dspViperDdcDemoNote,
+                  style: TextStyle(
+                    color: p.textTertiary,
+                    fontSize: AppFontSize.tiny,
+                    height: 1.3,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.s10),
@@ -545,17 +609,15 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                       borderRadius: BorderRadius.circular(AppRadii.r14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-
-                            horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
+                            horizontal: AppSpacing.s14,
+                            vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? p.primary.withValues(alpha: 0.12)
                               : p.surfaceContainer,
                           borderRadius: BorderRadius.circular(AppRadii.r14),
                           border: Border.all(
-                            color: isSelected
-                                ? p.primary
-                                : p.hairline,
+                            color: isSelected ? p.primary : p.hairline,
                           ),
                         ),
                         child: Row(
@@ -585,13 +647,15 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                             if (isSelected)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-
-                                    horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+                                    horizontal: AppSpacing.xs,
+                                    vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.primary,
-                                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r8),
                                 ),
-                                child: Text(context.l10n.activeLabel,
+                                child: Text(
+                                  context.l10n.activeLabel,
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: AppFontSize.tiny,
@@ -627,8 +691,11 @@ class ViperDdcParser {
     }
 
     final coeffs = <double>[];
-    final sampleStr = String.fromCharCodes(bytes.take(math.min(bytes.length, 128)));
-    final isTextFormat = sampleStr.contains(',') || sampleStr.contains('###') || sampleStr.contains('\n');
+    final sampleStr =
+        String.fromCharCodes(bytes.take(math.min(bytes.length, 128)));
+    final isTextFormat = sampleStr.contains(',') ||
+        sampleStr.contains('###') ||
+        sampleStr.contains('\n');
 
     if (isTextFormat) {
       final fullText = String.fromCharCodes(bytes);
@@ -648,7 +715,8 @@ class ViperDdcParser {
           }
           continue;
         }
-        final parts = line.split(RegExp(r'[, \t]+')).where((s) => s.isNotEmpty).toList();
+        final parts =
+            line.split(RegExp(r'[, \t]+')).where((s) => s.isNotEmpty).toList();
         if (parts.length >= 5) {
           final nums = parts.take(5).map(double.tryParse).toList();
           if (nums.every((n) => n != null && n.isFinite)) {
@@ -759,7 +827,8 @@ class _DdcFrequencyResponsePainter extends CustomPainter {
     for (int i = 0; i <= numPoints; i++) {
       final t = i / numPoints;
       final f = 20.0 * math.pow(20000.0 / 20.0, t);
-      final db = _ViperDdcSheetState.responseAtFrequency(biquads, f).clamp(-12.0, 12.0);
+      final db = _ViperDdcSheetState.responseAtFrequency(biquads, f)
+          .clamp(-12.0, 12.0);
       final x = t * w;
       final y = h * (0.5 - (db / 24.0));
 
@@ -799,8 +868,7 @@ class _DdcFrequencyResponsePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DdcFrequencyResponsePainter oldDelegate) {
-    return oldDelegate.biquads != biquads || oldDelegate.primaryColor != primaryColor;
+    return oldDelegate.biquads != biquads ||
+        oldDelegate.primaryColor != primaryColor;
   }
 }
-
-

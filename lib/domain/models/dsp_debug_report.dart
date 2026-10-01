@@ -89,7 +89,8 @@ class DspDebugReport {
     if (rawStages is List) {
       for (final s in rawStages) {
         if (s is Map) {
-          parsedStages.add(DspStageDebugInfo.fromMap(s.cast<String, dynamic>()));
+          parsedStages
+              .add(DspStageDebugInfo.fromMap(s.cast<String, dynamic>()));
         }
       }
     }
@@ -114,10 +115,12 @@ class DspDebugReport {
       audioSessionId: (map['audioSessionId'] as num?)?.toInt() ?? 0,
       isSessionAttached: (map['isSessionAttached'] as bool?) ?? false,
       dspPreference: map['dspPreference'] as String? ?? 'native',
-      isBitPerfectBypassActive: (map['isBitPerfectBypassActive'] as bool?) ?? false,
+      isBitPerfectBypassActive:
+          (map['isBitPerfectBypassActive'] as bool?) ?? false,
       isNativeDspLoaded: (map['isNativeDspLoaded'] as bool?) ?? false,
       activeDspStagesMask: (map['activeDspStagesMask'] as num?)?.toInt() ?? 0,
-      autoDegradedStagesMask: (map['autoDegradedStagesMask'] as num?)?.toInt() ?? 0,
+      autoDegradedStagesMask:
+          (map['autoDegradedStagesMask'] as num?)?.toInt() ?? 0,
       hasOemAudio: (map['hasOemAudio'] as bool?) ?? false,
       detectedOemEngines: parsedOem,
       stages: parsedStages,

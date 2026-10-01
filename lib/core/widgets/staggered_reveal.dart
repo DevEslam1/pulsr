@@ -32,7 +32,8 @@ class StaggeredReveal extends StatelessWidget {
     if (!context.motionEnabled || index >= 15) return child;
     final delay = (index.clamp(0, 14) * 20).ms;
     final anim = child
-        .animate(key: ValueKey('${groupKey ?? ''}#${horizontal ? 'h' : 'v'}$index'))
+        .animate(
+            key: ValueKey('${groupKey ?? ''}#${horizontal ? 'h' : 'v'}$index'))
         .fadeIn(duration: 240.ms, delay: delay, curve: Curves.easeOut);
     final animated = horizontal
         ? anim.slideX(

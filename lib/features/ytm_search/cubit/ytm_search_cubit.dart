@@ -55,7 +55,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       return prefs.getStringList(_historyKey) ?? [];
     } catch (e, st) {
       // FIX-A05: Log failure to read history
-      ErrorLogger.log('Failed to read search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+      ErrorLogger.log('Failed to read search history',
+          error: e, stackTrace: st, category: 'YtmSearchCubit');
       return [];
     }
   }
@@ -75,7 +76,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       }
     } catch (e, st) {
       // FIX-A05: Log failure to save history
-      ErrorLogger.log('Failed to save query to search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+      ErrorLogger.log('Failed to save query to search history',
+          error: e, stackTrace: st, category: 'YtmSearchCubit');
     }
   }
 
@@ -90,7 +92,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         historyNotifier.value = List.unmodifiable(list.take(10));
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to remove query from search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+      ErrorLogger.log('Failed to remove query from search history',
+          error: e, stackTrace: st, category: 'YtmSearchCubit');
     }
   }
 
@@ -103,7 +106,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       }
     } catch (e, st) {
       // FIX-A05: Log failure to clear history
-      ErrorLogger.log('Failed to clear search history', error: e, stackTrace: st, category: 'YtmSearchCubit');
+      ErrorLogger.log('Failed to clear search history',
+          error: e, stackTrace: st, category: 'YtmSearchCubit');
     }
   }
 
@@ -156,7 +160,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   Future<void> retryAfterCooldown() async {
     if (_service.isBotCoolingDown) {
       safeEmit(state.copyWith(
-        errorMessage: 'YouTube is rate-limiting requests. Please wait a few minutes.',
+        errorMessage:
+            'YouTube is rate-limiting requests. Please wait a few minutes.',
       ));
       while (_service.isBotCoolingDown && !isClosed) {
         await Future.delayed(const Duration(milliseconds: 500));
@@ -176,7 +181,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     final effectiveGeneration = generation ?? ++_generation;
 
     if (query.trim().isEmpty) {
-      safeEmit(state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(
+          state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
@@ -199,8 +205,11 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           return;
         } catch (e, st) {
           // FIX-A05: Log failure before falling back to regular search
-          ErrorLogger.log('Failed to resolve stream by video ID, falling back to text search',
-              error: e, stackTrace: st, category: 'YtmSearchCubit');
+          ErrorLogger.log(
+              'Failed to resolve stream by video ID, falling back to text search',
+              error: e,
+              stackTrace: st,
+              category: 'YtmSearchCubit');
         }
       }
 
@@ -224,12 +233,15 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
             for (var i = 0; i < results.length && i < _warmTopN; i++) {
               final warmId = results[i].videoId;
               if (warmId.isEmpty) continue;
-              unawaited(Future<void>.delayed(_warmStagger * i).then((_) async {
-                // A newer query superseded this result set while the stagger
-                // was pending; don't spend a resolve on a stale hit.
-                if (isClosed || warmGeneration != _generation) return;
-                await _service.resolveStream(warmId);
-              }).timeout(const Duration(seconds: 25)).catchError((Object _) {}));
+              unawaited(Future<void>.delayed(_warmStagger * i)
+                  .then((_) async {
+                    // A newer query superseded this result set while the stagger
+                    // was pending; don't spend a resolve on a stale hit.
+                    if (isClosed || warmGeneration != _generation) return;
+                    await _service.resolveStream(warmId);
+                  })
+                  .timeout(const Duration(seconds: 25))
+                  .catchError((Object _) {}));
             }
           }
         } catch (_) {
@@ -240,7 +252,10 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       if (effectiveGeneration != _generation || isClosed) return;
 
       // FIX-C7: Auto-recovery with _botRetryInFlight latch
-      if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2 && !_botRetryInFlight) {
+      if (e.isBotBlocked &&
+          !isRetryAfterBotBlock &&
+          retryDepth < 2 &&
+          !_botRetryInFlight) {
         _botRetryInFlight = true;
         try {
           var refreshed = false;
@@ -265,7 +280,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
               return;
             } catch (retryErr, retrySt) {
               ErrorLogger.log('Bot block retry search failed',
-                  error: retryErr, stackTrace: retrySt, category: 'YtmSearchCubit');
+                  error: retryErr,
+                  stackTrace: retrySt,
+                  category: 'YtmSearchCubit');
               return;
             }
           }
@@ -280,8 +297,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       final msg = e.isBotBlocked
           ? 'YouTube is rate-limiting requests. Please wait a few minutes.'
           : errorInfo.message;
-      safeEmit(state.copyWith(
-          isLoading: false, results: [], errorMessage: msg));
+      safeEmit(
+          state.copyWith(isLoading: false, results: [], errorMessage: msg));
     } catch (e) {
       // FIX-C04: Ensure generation guard precedes emit
       if (effectiveGeneration != _generation || isClosed) return;

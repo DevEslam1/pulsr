@@ -29,7 +29,9 @@ SongsTableData _makeSong(int id, String title, String artist) {
 
 void main() {
   group('Player Audit Remediation Tests', () {
-    test('PlayerScrobbleCoordinator has independent monotonic clocks per instance', () {
+    test(
+        'PlayerScrobbleCoordinator has independent monotonic clocks per instance',
+        () {
       final coordinator1 = PlayerScrobbleCoordinator(
         service: () => null,
         isQuranMode: () => false,
@@ -49,7 +51,9 @@ void main() {
       coordinator2.dispose();
     });
 
-    test('Equalizer band gains hash differentiates permuted bands (Object.hashAll)', () {
+    test(
+        'Equalizer band gains hash differentiates permuted bands (Object.hashAll)',
+        () {
       // Previously XOR fold caused identical hash for permuted bands
       final gainsA = [1.0, 2.0, 3.0];
       final gainsB = [3.0, 2.0, 1.0];
@@ -60,7 +64,8 @@ void main() {
       expect(hashA, isNot(equals(hashB)));
     });
 
-    test('PlayerWidgetCoordinator nextTitles includes songs hash in cache key', () {
+    test('PlayerWidgetCoordinator nextTitles includes songs hash in cache key',
+        () {
       final coordinator = PlayerWidgetCoordinator(null);
       final songA = _makeSong(1, 'Song 1', 'Artist 1');
       final songB = _makeSong(2, 'Song 2', 'Artist 2');
@@ -98,9 +103,14 @@ DSP Chain Status:
 
       final sanitized = DspInspectorSheet.sanitizeReport(rawReport);
 
-      expect(sanitized.contains('/data/user/0/com.pulsr.music/files/dsp_state.json'), isFalse);
-      expect(sanitized.contains('/storage/emulated/0/Music/Impulses/hall.wav'), isFalse);
-      expect(sanitized.contains('C:\\Users\\Eslam\\Music\\preset.json'), isFalse);
+      expect(
+          sanitized
+              .contains('/data/user/0/com.pulsr.music/files/dsp_state.json'),
+          isFalse);
+      expect(sanitized.contains('/storage/emulated/0/Music/Impulses/hall.wav'),
+          isFalse);
+      expect(
+          sanitized.contains('C:\\Users\\Eslam\\Music\\preset.json'), isFalse);
       expect(sanitized.contains('[REDACTED_APP_PATH]'), isTrue);
       expect(sanitized.contains('[REDACTED_STORAGE_PATH]'), isTrue);
       expect(sanitized.contains('[REDACTED_LOCAL_PATH]'), isTrue);
@@ -117,7 +127,8 @@ DSP Chain Status:
       expect(SongSource.radio, isNot(equals(SongSource.youtube)));
     });
 
-    test('PlaybackSlice preserves and differentiates sleepTimerRemainingTracks', () {
+    test('PlaybackSlice preserves and differentiates sleepTimerRemainingTracks',
+        () {
       final slice1 = PlaybackSlice(sleepTimerRemainingTracks: 3);
       final slice2 = PlaybackSlice(sleepTimerRemainingTracks: 2);
       final slice3 = PlaybackSlice(sleepTimerRemainingTracks: 3);
@@ -130,9 +141,11 @@ DSP Chain Status:
       expect(state.sleepTimerRemainingTracks, 3);
     });
 
-    test('PlayerState.differsFromBeyondPosition ignores internal DSP parameters but triggers on user-visible toggles', () {
+    test(
+        'PlayerState.differsFromBeyondPosition ignores internal DSP parameters but triggers on user-visible toggles',
+        () {
       final base = PlayerState();
-      
+
       // Internal DSP parameter tweak (e.g. saturation drive / stereo width) should NOT trigger full screen rebuild
       final internalTweak = base.copyWith(
         dsp: base.dsp.copyWith(saturationDrive: 0.8, stereoWidthLow: 0.5),
@@ -152,7 +165,8 @@ DSP Chain Status:
     });
 
     test('QuranRestoreSnapshot serializes and deserializes correctly', () {
-      final rockPreset = EqPreset.defaultPresets.firstWhere((p) => p.name == 'Rock');
+      final rockPreset =
+          EqPreset.defaultPresets.firstWhere((p) => p.name == 'Rock');
       final snapshot = QuranRestoreSnapshot(
         eqPreset: rockPreset,
         isEqEnabled: true,
@@ -189,11 +203,14 @@ DSP Chain Status:
       expect(restored.preampDb, -1.5);
     });
 
-    test('PlayerWidgetCoordinator.updateProgressThrottled drops calls faster than widgetThrottleDuration', () {
+    test(
+        'PlayerWidgetCoordinator.updateProgressThrottled drops calls faster than widgetThrottleDuration',
+        () {
       final fakeService = _FakeWidgetService();
       final coordinator = PlayerWidgetCoordinator(fakeService);
       const state = PlayerState(
-        playback: PlaybackSlice(isPlaying: true, position: Duration(seconds: 1)),
+        playback:
+            PlaybackSlice(isPlaying: true, position: Duration(seconds: 1)),
       );
 
       // First call executes immediately

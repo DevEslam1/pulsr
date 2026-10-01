@@ -248,7 +248,8 @@ void main() {
       expect(resPlays.map((s) => s.title), isNot(contains('NinetiesSong')));
     });
 
-    test('bpm rule filters using the override store and drops songs without one',
+    test(
+        'bpm rule filters using the override store and drops songs without one',
         () async {
       await insertSong(id: 401, title: 'Song1');
       await insertSong(id: 402, title: 'Song2');

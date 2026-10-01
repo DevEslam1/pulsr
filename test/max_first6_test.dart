@@ -72,8 +72,7 @@ void main() {
     final similar = svc.suggestForSeed(seed, pool, limit: 3);
     expect(similar.any((e) => e.id == 1), isFalse);
     expect(similar.first.artist, 'A');
-    final q = svc.buildAutoDjQueue(seed, pool,
-        limit: 2, excludeIds: {4});
+    final q = svc.buildAutoDjQueue(seed, pool, limit: 2, excludeIds: {4});
     expect(q.any((e) => e.id == 4), isFalse);
     expect(q.length, lessThanOrEqualTo(2));
   });

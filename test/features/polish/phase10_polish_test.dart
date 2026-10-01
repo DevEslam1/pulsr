@@ -11,9 +11,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Phase 10: Polish & Delight Tests', () {
-    test('1. SoundFeedbackService is disabled by default and can be toggled', () {
+    test('1. SoundFeedbackService is disabled by default and can be toggled',
+        () {
       expect(SoundFeedbackService.enabled, isFalse);
-      
+
       // Should not throw when calling methods while disabled
       SoundFeedbackService.playClick();
       SoundFeedbackService.playAlert();
@@ -37,7 +38,8 @@ void main() {
       expect(() => PulsrHaptics.selection(), returnsNormally);
     });
 
-    testWidgets('3. PulsrRefreshIndicator integrates with AuraTheme and triggers callback',
+    testWidgets(
+        '3. PulsrRefreshIndicator integrates with AuraTheme and triggers callback',
         (tester) async {
       bool refreshed = false;
 
@@ -66,7 +68,8 @@ void main() {
       expect(find.byType(RefreshIndicator), findsOneWidget);
 
       // Trigger pull down gesture
-      await tester.fling(find.text('Pull down item 1'), const Offset(0.0, 300.0), 1000.0);
+      await tester.fling(
+          find.text('Pull down item 1'), const Offset(0.0, 300.0), 1000.0);
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
@@ -74,7 +77,8 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('4. PlayerAnimatedFavoriteButton triggers heart burst transition and callbacks',
+    testWidgets(
+        '4. PlayerAnimatedFavoriteButton triggers heart burst transition and callbacks',
         (tester) async {
       bool tapped = false;
       bool isFavorite = false;

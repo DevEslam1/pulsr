@@ -65,7 +65,8 @@ class AdaptiveBufferEngine {
 
   final StreamController<String> _qualityStepDownController =
       StreamController<String>.broadcast();
-  Stream<String> get onStepDownQualityRequested => _qualityStepDownController.stream;
+  Stream<String> get onStepDownQualityRequested =>
+      _qualityStepDownController.stream;
 
   final List<DateTime> _recentUnderruns = [];
 
@@ -102,7 +103,8 @@ class AdaptiveBufferEngine {
   /// `bucketFor` returned the forced value, `evaluateBucket` wrote that back
   /// into `_currentBucket`, and `releaseForce` then emitted the stale forced
   /// value instead of the true environment bucket.
-  BufferBucket _environmentBucket({required bool isWifi, required bool isLocal}) {
+  BufferBucket _environmentBucket(
+      {required bool isWifi, required bool isLocal}) {
     if (isLocal) return BufferBucket.minimal;
     final stdDev = math.sqrt(_varianceMbps);
     final jittery = stdDev > _ewmaMbps * 0.4; // swinging link -> larger buffer
@@ -172,8 +174,9 @@ class AdaptiveBufferEngine {
     final downloadTimeSec = dataNeededMb / math.max(0.1, safeSpeed);
     // Buffer target = safetyMultiplier * download time, clamped between min and max bounds
     final stdDev = math.sqrt(_varianceMbps);
-    final jitterFactor =
-        (_ewmaMbps > 0 && stdDev > 0) ? (stdDev / _ewmaMbps).clamp(0.0, 2.0) : 0.0;
+    final jitterFactor = (_ewmaMbps > 0 && stdDev > 0)
+        ? (stdDev / _ewmaMbps).clamp(0.0, 2.0)
+        : 0.0;
     final safetyMultiplier = 1.5 + jitterFactor;
     final targetSec = (downloadTimeSec * safetyMultiplier).ceil();
     final clampedSec = targetSec.clamp(

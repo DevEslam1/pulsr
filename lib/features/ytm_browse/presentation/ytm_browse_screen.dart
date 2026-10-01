@@ -46,7 +46,8 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
     });
     try {
       final sections = await _browseService.getHomeFeed();
-      final nonEmptySections = sections.where((s) => s.items.isNotEmpty).toList();
+      final nonEmptySections =
+          sections.where((s) => s.items.isNotEmpty).toList();
       if (mounted) {
         setState(() {
           _sections = nonEmptySections;
@@ -79,123 +80,133 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(context.l10n.ytmExplore,
-          style: TextStyle(
-            color: p.textPrimary,
-            fontSize: AppFontSize.titleLarge,
-            fontWeight: FontWeight.w700,
+          title: Text(
+            context.l10n.ytmExplore,
+            style: TextStyle(
+              color: p.textPrimary,
+              fontSize: AppFontSize.titleLarge,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        actions: [
+          actions: [
             IconButton(
               icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
               tooltip: context.l10n.refresh,
               onPressed: _isLoading ? null : _loadFeed,
             ),
-        ],
-        bottom: _isLoading
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(2.0),
-                child: LinearProgressIndicator(
-                  color: p.accent,
-                  backgroundColor: Colors.transparent,
-                  minHeight: 2.0,
-                ),
-              )
-            : null,
-      ),
+          ],
+          bottom: _isLoading
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(2.0),
+                  child: LinearProgressIndicator(
+                    color: p.accent,
+                    backgroundColor: Colors.transparent,
+                    minHeight: 2.0,
+                  ),
+                )
+              : null,
+        ),
         body: (_isLoading && _sections.isEmpty)
             ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
             : (_error != null && _loadFailed)
-              ? EmptyStateWidget(
-                  icon: Icons.cloud_off_rounded,
-                  iconColor: p.error,
-                  title: context.l10n.browseFailedLoadFeed,
-                  subtitle: _error!,
-                  primaryActionLabel: context.l10n.retry,
-                  primaryActionIcon: Icons.refresh_rounded,
-                  onPrimaryAction: _loadFeed,
-                )
-              : _sections.isEmpty
-                  ? EmptyStateWidget(
-                      icon: Icons.explore_off_rounded,
-                      title: context.l10n.browseNoRecommendations,
-                      subtitle: context.l10n.browseSearchSongsHint,
-                      primaryActionLabel: context.l10n.retry,
-                      primaryActionIcon: Icons.refresh_rounded,
-                      onPrimaryAction: _loadFeed,
-                    )
-              : RefreshIndicator(
-              onRefresh: _loadFeed,
-              color: p.accent,
-              backgroundColor: p.surfaceContainer,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: Adaptive.contentConstraints(context),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.scrollBottom),
-                    itemCount: _sections.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.lg),
-                    itemBuilder: (context, index) {
-                      final section = _sections[index];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  section.title,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.title,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                if (section.subtitle != null) ...[
-                                  const SizedBox(height: AppSpacing.s2),
-                                  Text(
-                                    section.subtitle!,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          SizedBox(
-                            height: Adaptive.isTablet(context) ? 260 : 210,
+                ? EmptyStateWidget(
+                    icon: Icons.cloud_off_rounded,
+                    iconColor: p.error,
+                    title: context.l10n.browseFailedLoadFeed,
+                    subtitle: _error!,
+                    primaryActionLabel: context.l10n.retry,
+                    primaryActionIcon: Icons.refresh_rounded,
+                    onPrimaryAction: _loadFeed,
+                  )
+                : _sections.isEmpty
+                    ? EmptyStateWidget(
+                        icon: Icons.explore_off_rounded,
+                        title: context.l10n.browseNoRecommendations,
+                        subtitle: context.l10n.browseSearchSongsHint,
+                        primaryActionLabel: context.l10n.retry,
+                        primaryActionIcon: Icons.refresh_rounded,
+                        onPrimaryAction: _loadFeed,
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadFeed,
+                        color: p.accent,
+                        backgroundColor: p.surfaceContainer,
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: ConstrainedBox(
+                            constraints: Adaptive.contentConstraints(context),
                             child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-                              itemCount: section.items.length,
+                              padding: const EdgeInsets.only(
+                                  top: AppSpacing.md,
+                                  bottom: AppSpacing.scrollBottom),
+                              itemCount: _sections.length,
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(width: AppSpacing.s14),
-                              itemBuilder: (context, i) {
-                                final item = section.items[i];
-                                final queueSongs = [
-                                  for (final e in section.items)
-                                    e.toYtmTrack().toSongData()
-                                ];
-                                return _buildBrowseCard(
-                                    context, item, queueSongs, p);
+                                  const SizedBox(height: AppSpacing.lg),
+                              itemBuilder: (context, index) {
+                                final section = _sections[index];
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.s20),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            section.title,
+                                            style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontSize: AppFontSize.title,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          if (section.subtitle != null) ...[
+                                            const SizedBox(
+                                                height: AppSpacing.s2),
+                                            Text(
+                                              section.subtitle!,
+                                              style: TextStyle(
+                                                color: p.textSecondary,
+                                                fontSize: AppFontSize.label,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    SizedBox(
+                                      height: Adaptive.isTablet(context)
+                                          ? 260
+                                          : 210,
+                                      child: ListView.separated(
+                                        scrollDirection: Axis.horizontal,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.s20),
+                                        itemCount: section.items.length,
+                                        separatorBuilder: (_, __) =>
+                                            const SizedBox(
+                                                width: AppSpacing.s14),
+                                        itemBuilder: (context, i) {
+                                          final item = section.items[i];
+                                          final queueSongs = [
+                                            for (final e in section.items)
+                                              e.toYtmTrack().toSongData()
+                                          ];
+                                          return _buildBrowseCard(
+                                              context, item, queueSongs, p);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
                               },
                             ),
                           ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
+                        ),
+                      ),
       ),
     );
   }
@@ -230,23 +241,24 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                         fit: BoxFit.cover,
                         cacheWidth: (cardWidth * 2).round(),
                         cacheHeight: (imgHeight * 2).round(),
-                        loadingBuilder: (context, child, progress) => progress == null
-                            ? child
-                            : Container(
-                                width: cardWidth,
-                                height: imgHeight,
-                                color: p.surfaceContainer,
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: p.accent,
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                                ? child
+                                : Container(
+                                    width: cardWidth,
+                                    height: imgHeight,
+                                    color: p.surfaceContainer,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: p.accent,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
                         errorBuilder: (_, __, ___) => Container(
                           width: cardWidth,
                           height: imgHeight,

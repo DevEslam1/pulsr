@@ -69,7 +69,8 @@ class PlayerLayoutMetrics {
     required this.horizontalPadding,
   });
 
-  factory PlayerLayoutMetrics.of(BuildContext context, BoxConstraints constraints) {
+  factory PlayerLayoutMetrics.of(
+      BuildContext context, BoxConstraints constraints) {
     final breakpoint = context.breakpoint;
     final isLandscape = context.isLandscape;
     final orientation = MediaQuery.orientationOf(context);
@@ -98,21 +99,24 @@ class PlayerLayoutMetrics {
       // Landscape phone: side-by-side; artwork takes ~40-45% of width, bounded by height
       final maxArtByHeight = availableHeight - 48.0;
       final maxArtByWidth = availableWidth * 0.42;
-      artworkSize = math.max(120.0, math.min(maxArtByHeight, math.min(maxArtByWidth, 280.0)));
+      artworkSize = math.max(
+          120.0, math.min(maxArtByHeight, math.min(maxArtByWidth, 280.0)));
       horizontalPadding = 16.0;
       maxContentWidth = double.infinity;
     } else if (layoutMode == PlayerLayoutMode.mediumLandscape) {
       // Medium landscape: artwork left, controls right
       final maxArtByHeight = availableHeight - 64.0;
       final maxArtByWidth = availableWidth * 0.45;
-      artworkSize = math.max(180.0, math.min(maxArtByHeight, math.min(maxArtByWidth, 380.0)));
+      artworkSize = math.max(
+          180.0, math.min(maxArtByHeight, math.min(maxArtByWidth, 380.0)));
       horizontalPadding = 24.0;
       maxContentWidth = 900.0;
     } else if (layoutMode == PlayerLayoutMode.expandedLarge) {
       // Large tablet / desktop
       final maxArtByHeight = availableHeight - 80.0;
       final maxArtByWidth = availableWidth * 0.42;
-      artworkSize = math.max(240.0, math.min(maxArtByHeight, math.min(maxArtByWidth, 480.0)));
+      artworkSize = math.max(
+          240.0, math.min(maxArtByHeight, math.min(maxArtByWidth, 480.0)));
       horizontalPadding = 32.0;
       maxContentWidth = 1100.0;
     } else if (layoutMode == PlayerLayoutMode.mediumPortrait) {
@@ -129,7 +133,8 @@ class PlayerLayoutMetrics {
 
     final double heightRatio = (availableHeight / 720.0).clamp(0.6, 1.2);
 
-    final double playPauseButtonSize = breakpoint >= PulsrBreakpoint.medium ? 64.0 : 56.0;
+    final double playPauseButtonSize =
+        breakpoint >= PulsrBreakpoint.medium ? 64.0 : 56.0;
     final double secondaryButtonSize = 48.0; // Guaranteed >= 48dp touch target
     final double seekBarTouchHeight = 48.0;
 

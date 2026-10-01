@@ -5,8 +5,7 @@ class CacheEntry<V> {
   final V value;
   final DateTime expiresAt;
 
-  CacheEntry(this.value, Duration ttl)
-      : expiresAt = DateTime.now().add(ttl);
+  CacheEntry(this.value, Duration ttl) : expiresAt = DateTime.now().add(ttl);
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 }

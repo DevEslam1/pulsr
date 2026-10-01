@@ -40,13 +40,16 @@ void main() {
     );
   }
 
-  testWidgets('H-08: TabletSideInspector customWidth scales proportionally on screen width/orientation change', (tester) async {
+  testWidgets(
+      'H-08: TabletSideInspector customWidth scales proportionally on screen width/orientation change',
+      (tester) async {
     // 1. Initial screen size (width 1000)
     await tester.binding.setSurfaceSize(const Size(1000, 700));
     await tester.pumpWidget(buildWidget(screenSize: const Size(1000, 700)));
     await tester.pumpAndSettle();
 
-    final state = tester.state<TabletSideInspectorState>(find.byType(TabletSideInspector));
+    final state = tester
+        .state<TabletSideInspectorState>(find.byType(TabletSideInspector));
 
     // 2. Set custom width to 300 (ratio = 300 / 1000 = 0.30)
     state.customWidth = 300.0;
@@ -72,12 +75,15 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('M-15: Drag handle accumulates sub-pixel deltas and prevents thrashing', (tester) async {
+  testWidgets(
+      'M-15: Drag handle accumulates sub-pixel deltas and prevents thrashing',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(1000, 700));
     await tester.pumpWidget(buildWidget(screenSize: const Size(1000, 700)));
     await tester.pumpAndSettle();
 
-    final state = tester.state<TabletSideInspectorState>(find.byType(TabletSideInspector));
+    final state = tester
+        .state<TabletSideInspectorState>(find.byType(TabletSideInspector));
     // Default width is 1000 * 0.35 = 350.0
     expect(state.customWidth, isNull);
 
@@ -86,7 +92,8 @@ void main() {
     expect(dragHandleFinder, findsOneWidget);
 
     // Start drag
-    final gesture = await tester.startGesture(tester.getCenter(dragHandleFinder));
+    final gesture =
+        await tester.startGesture(tester.getCenter(dragHandleFinder));
     await tester.pump();
     expect(state.dragDeltaAccumulator, equals(0.0));
 
@@ -113,17 +120,21 @@ void main() {
     await tester.binding.setSurfaceSize(null);
   });
 
-  testWidgets('M-15: Drag handle does not update or thrash when clamped at boundaries', (tester) async {
+  testWidgets(
+      'M-15: Drag handle does not update or thrash when clamped at boundaries',
+      (tester) async {
     await tester.binding.setSurfaceSize(const Size(1000, 700));
     await tester.pumpWidget(buildWidget(screenSize: const Size(1000, 700)));
     await tester.pumpAndSettle();
 
-    final state = tester.state<TabletSideInspectorState>(find.byType(TabletSideInspector));
+    final state = tester
+        .state<TabletSideInspectorState>(find.byType(TabletSideInspector));
     state.customWidth = 400.0;
     await tester.pump();
 
     final dragHandleFinder = find.byType(GestureDetector).last;
-    final gesture = await tester.startGesture(tester.getCenter(dragHandleFinder));
+    final gesture =
+        await tester.startGesture(tester.getCenter(dragHandleFinder));
     await tester.pump();
 
     // Drag further to expand (negative dx in LTR expands width)

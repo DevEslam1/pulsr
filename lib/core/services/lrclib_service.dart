@@ -87,7 +87,9 @@ class LrclibService {
     final searchQueries = <String>{};
     for (final cand in candidates.take(2)) {
       if (cand.artistName.isNotEmpty &&
-          !cand.trackName.toLowerCase().contains(cand.artistName.toLowerCase())) {
+          !cand.trackName
+              .toLowerCase()
+              .contains(cand.artistName.toLowerCase())) {
         searchQueries.add('${cand.trackName} ${cand.artistName}');
       }
       searchQueries.add(cand.trackName);
@@ -209,19 +211,22 @@ class LrclibService {
 
     // Strip standalone keywords
     cleaned = cleaned.replaceAll(
-      RegExp(r'\b(official\s+video|official\s+audio|lyric\s+video|4k|hd|hq)\b', caseSensitive: false),
+      RegExp(r'\b(official\s+video|official\s+audio|lyric\s+video|4k|hd|hq)\b',
+          caseSensitive: false),
       '',
     );
 
     // Strip common YouTube "feat." or "ft." in brackets or standalone
     cleaned = cleaned.replaceAll(
-      RegExp(r'\s*[\(\[\{]?\s*(feat\.|ft\.|with)\s+.*?[\)\]\}]?', caseSensitive: false),
+      RegExp(r'\s*[\(\[\{]?\s*(feat\.|ft\.|with)\s+.*?[\)\]\}]?',
+          caseSensitive: false),
       '',
     );
 
     // Strip remaining generic Arabic video labels
     cleaned = cleaned.replaceAll(
-      RegExp(r'\s*(فيديو كليب|حفل|مهرجان|جلسة|سهرة|كوكتيل|ميكس|حصري|حصرى).*', caseSensitive: false),
+      RegExp(r'\s*(فيديو كليب|حفل|مهرجان|جلسة|سهرة|كوكتيل|ميكس|حصري|حصرى).*',
+          caseSensitive: false),
       '',
     );
 
@@ -231,7 +236,8 @@ class LrclibService {
   String _cleanArtist(String artist) {
     return artist
         .replaceAll(
-          RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]', caseSensitive: false),
+          RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]',
+              caseSensitive: false),
           '',
         )
         .replaceAll(RegExp(r'\s*-\s*Topic', caseSensitive: false), '')
@@ -263,7 +269,8 @@ class LrclibService {
     final resultArtist = (json['artistName'] as String?)?.trim();
     final resultDuration = (json['duration'] as num?)?.toInt();
 
-    final hasExpectedArtist = expectedArtist != null && expectedArtist.isNotEmpty;
+    final hasExpectedArtist =
+        expectedArtist != null && expectedArtist.isNotEmpty;
     final hasExpectedDuration =
         expectedDurationSec != null && expectedDurationSec > 0;
 
@@ -418,7 +425,8 @@ class LrclibService {
     return out;
   }
 
-  LyricsResult? _extractLyricsFromJson(Map<String, dynamic> json) {    final syncedLyrics = json['syncedLyrics'] as String?;
+  LyricsResult? _extractLyricsFromJson(Map<String, dynamic> json) {
+    final syncedLyrics = json['syncedLyrics'] as String?;
     final plainLyrics = json['plainLyrics'] as String?;
 
     if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
@@ -438,4 +446,3 @@ class LrclibService {
     return null;
   }
 }
-

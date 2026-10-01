@@ -223,9 +223,8 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
           MediaItem(
             id: 'action_virtualizer',
             title: 'Virtualizer',
-            displaySubtitle: _equalizerManager.isVirtualizerEnabled
-                ? 'Enabled'
-                : 'Disabled',
+            displaySubtitle:
+                _equalizerManager.isVirtualizerEnabled ? 'Enabled' : 'Disabled',
             playable: true,
           ),
           MediaItem(
@@ -302,16 +301,52 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
         if (parentMediaId.startsWith('mood_')) {
           final mood = parentMediaId.substring(5).toLowerCase();
           final allSongsRes = await _repository.getAllSongs();
-          final allSongs = allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
+          final allSongs =
+              allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
           final keywords = switch (mood) {
-            'chill' => ['chill', 'relax', 'acoustic', 'ambient', 'lofi', 'calm', 'peaceful'],
-            'workout' => ['workout', 'energy', 'power', 'gym', 'fast', 'rock', 'electronic', 'dance'],
-            'focus' => ['focus', 'study', 'instrumental', 'piano', 'classical', 'jazz', 'ambient'],
-            'party' => ['party', 'dance', 'club', 'pop', 'disco', 'house', 'hip hop', 'upbeat'],
+            'chill' => [
+                'chill',
+                'relax',
+                'acoustic',
+                'ambient',
+                'lofi',
+                'calm',
+                'peaceful'
+              ],
+            'workout' => [
+                'workout',
+                'energy',
+                'power',
+                'gym',
+                'fast',
+                'rock',
+                'electronic',
+                'dance'
+              ],
+            'focus' => [
+                'focus',
+                'study',
+                'instrumental',
+                'piano',
+                'classical',
+                'jazz',
+                'ambient'
+              ],
+            'party' => [
+                'party',
+                'dance',
+                'club',
+                'pop',
+                'disco',
+                'house',
+                'hip hop',
+                'upbeat'
+              ],
             _ => [mood],
           };
           final filtered = allSongs.where((s) {
-            final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'.toLowerCase();
+            final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'
+                .toLowerCase();
             return keywords.any((k) => text.contains(k));
           }).toList();
           _warmArtworkAsync(filtered);
@@ -349,8 +384,8 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       return;
     }
 
-    final queueIndex = _songs.indexWhere(
-        (s) => s.id.toString() == mediaId || s.remoteId == mediaId);
+    final queueIndex = _songs
+        .indexWhere((s) => s.id.toString() == mediaId || s.remoteId == mediaId);
     if (queueIndex != -1) {
       await loadQueue(_songs, initialIndex: queueIndex);
       return;
@@ -472,14 +507,49 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       final songsRes = await _repository.getAllSongs();
       songsRes.fold((l) => null, (songs) {
         final keywords = switch (mood) {
-          'chill' => ['chill', 'relax', 'acoustic', 'ambient', 'lofi', 'calm', 'peaceful'],
-          'workout' => ['workout', 'energy', 'power', 'gym', 'fast', 'rock', 'electronic', 'dance'],
-          'focus' => ['focus', 'study', 'instrumental', 'piano', 'classical', 'jazz', 'ambient'],
-          'party' => ['party', 'dance', 'club', 'pop', 'disco', 'house', 'hip hop', 'upbeat'],
+          'chill' => [
+              'chill',
+              'relax',
+              'acoustic',
+              'ambient',
+              'lofi',
+              'calm',
+              'peaceful'
+            ],
+          'workout' => [
+              'workout',
+              'energy',
+              'power',
+              'gym',
+              'fast',
+              'rock',
+              'electronic',
+              'dance'
+            ],
+          'focus' => [
+              'focus',
+              'study',
+              'instrumental',
+              'piano',
+              'classical',
+              'jazz',
+              'ambient'
+            ],
+          'party' => [
+              'party',
+              'dance',
+              'club',
+              'pop',
+              'disco',
+              'house',
+              'hip hop',
+              'upbeat'
+            ],
           _ => [mood],
         };
         final filtered = songs.where((s) {
-          final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'.toLowerCase();
+          final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'
+              .toLowerCase();
           return keywords.any((k) => text.contains(k));
         }).toList();
         if (filtered.isNotEmpty) loadQueue(filtered);
@@ -544,12 +614,12 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     try {
       final focus = extras?['android.media.extra.MEDIA_FOCUS'] as String?;
       if (focus != null && focus.contains('v16')) autoShuffle = true;
-      final artist = extras?['android.media.extra.EXTRA_METADATA_ARTIST']
-          as String?;
+      final artist =
+          extras?['android.media.extra.EXTRA_METADATA_ARTIST'] as String?;
       final album =
           extras?['android.media.extra.EXTRA_METADATA_ALBUM'] as String?;
-      final genre = extras?['android.media.extra.EXTRA_METADATA_GENRE']
-          as String?;
+      final genre =
+          extras?['android.media.extra.EXTRA_METADATA_GENRE'] as String?;
       final title =
           extras?['android.media.extra.EXTRA_METADATA_TITLE'] as String?;
       final pick = title?.isNotEmpty == true
@@ -583,9 +653,8 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     }
 
     // Indexed FTS search (title/artist/album) instead of a full-library scan.
-    final songsRes = await _repository
-        .watchAllSongs(searchQuery: cleanQ, limit: 50)
-        .first;
+    final songsRes =
+        await _repository.watchAllSongs(searchQuery: cleanQ, limit: 50).first;
     final matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
     if (matches.isNotEmpty) {
       if (autoShuffle) matches.shuffle();
@@ -606,41 +675,6 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     }
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   void _warmArtworkAsync(List<SongsTableData> songs, {int limit = 30}) {
     unawaited(() async {
       for (final song in songs.take(limit)) {
@@ -651,25 +685,25 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     }());
   }
 
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  // Requires: provided by the composing class (same library).
-  Future<List<R>> _boundedParallelMap<T, R>( List<T> items, Future<R> Function(T) mapper, { int concurrency = 6, });
+  Future<List<R>> _boundedParallelMap<T, R>(
+    List<T> items,
+    Future<R> Function(T) mapper, {
+    int concurrency = 6,
+  });
 
-  // Requires: provided by the composing class (same library).
   IMusicRepository get _repository;
 
-  // Requires: provided by the composing class (same library).
   List<SongsTableData> get _songs;
 
-  // Requires: provided by the composing class (same library).
   YtmService get _ytmService;
 
-  // Requires: provided by the composing class (same library).
   EqualizerManager get _equalizerManager;
 
-  // Requires: provided by the composing class (same library).
   SleepTimerManager get _sleepTimerManager;
 
   Future<void> _toggleBassBoost({bool? forceEnable}) async {
@@ -694,6 +728,6 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     }
   }
 
-  // Requires: provided by the composing class (same library).
-  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
+  Future<void> loadQueue(List<SongsTableData> songs,
+      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
 }

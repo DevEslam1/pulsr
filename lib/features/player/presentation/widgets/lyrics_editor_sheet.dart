@@ -72,12 +72,16 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
           });
         }
       } catch (e, st) {
-        ErrorLogger.log('PlayerCubit unavailable for lyrics editor position stream',
-            error: e, stackTrace: st, category: 'LyricsEditor');
+        ErrorLogger.log(
+            'PlayerCubit unavailable for lyrics editor position stream',
+            error: e,
+            stackTrace: st,
+            category: 'LyricsEditor');
       }
     }
     if (_positionSub == null) {
-      _fallbackTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      _fallbackTimer =
+          Timer.periodic(const Duration(milliseconds: 250), (timer) {
         if (!mounted) {
           timer.cancel();
           return;
@@ -93,7 +97,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
           } catch (_) {}
         }
         if (isPlaying) {
-          _livePosition.value = _livePosition.value + const Duration(milliseconds: 250);
+          _livePosition.value =
+              _livePosition.value + const Duration(milliseconds: 250);
         }
       });
     }
@@ -112,8 +117,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     final stamp = _livePosition.value;
     setState(() {
       final old = _lines[index];
-      _lines[index] =
-          LyricsLine(timestamp: stamp, text: old.text);
+      _lines[index] = LyricsLine(timestamp: stamp, text: old.text);
     });
   }
 
@@ -121,8 +125,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     if (index < 0 || index >= _lines.length) return;
     setState(() {
       final old = _lines[index];
-      final newMs =
-          (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
+      final newMs = (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
       _lines[index] =
           LyricsLine(timestamp: Duration(milliseconds: newMs), text: old.text);
     });
@@ -130,8 +133,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
 
   void _addNewLine() {
     setState(() {
-      _lines.add(
-          LyricsLine(timestamp: _livePosition.value, text: 'New line...'));
+      _lines
+          .add(LyricsLine(timestamp: _livePosition.value, text: 'New line...'));
       _rowKeys.add(UniqueKey());
     });
   }
@@ -147,8 +150,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
 
   void _sortLines() {
     setState(() {
-      final pairs = List.generate(
-          _lines.length, (i) => (_lines[i], _rowKeys[i]));
+      final pairs =
+          List.generate(_lines.length, (i) => (_lines[i], _rowKeys[i]));
       pairs.sort((a, b) => a.$1.timestamp.compareTo(b.$1.timestamp));
       _lines = [for (final p in pairs) p.$1];
       _rowKeys = [for (final p in pairs) p.$2];
@@ -161,10 +164,12 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.82,
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.lg),
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,14 +191,16 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(context.l10n.lyricsEditorTitle,
+                  Text(
+                    context.l10n.lyricsEditorTitle,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontSize: AppFontSize.title,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Text(context.l10n.nowAtLabel,
+                  Text(
+                    context.l10n.nowAtLabel,
                     style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.label,
@@ -248,7 +255,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
           Expanded(
             child: ListView.separated(
               itemCount: _lines.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.xs),
               itemBuilder: (context, index) {
                 final line = _lines[index];
                 return Container(
@@ -293,7 +301,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                           child: Container(
                             alignment: Alignment.center,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
+                                horizontal: AppSpacing.xs,
+                                vertical: AppSpacing.s6),
                             decoration: BoxDecoration(
                               color: p.primary.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -311,13 +320,15 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       ),
                       const SizedBox(width: AppSpacing.s10),
                       // Text input field
-                        Expanded(
-                          child: TextFormField(
-                            // Stable per-row key so deleting a row cannot make
-                            // the wrong line's editing state render here.
-                            key: _rowKeys[index],
+                      Expanded(
+                        child: TextFormField(
+                          // Stable per-row key so deleting a row cannot make
+                          // the wrong line's editing state render here.
+                          key: _rowKeys[index],
                           initialValue: line.text,
-                          style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                          style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.bodySmall),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             isDense: true,
@@ -341,7 +352,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                         onPressed: () => _adjustOffset(index, 250),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                        icon:
+                            const Icon(Icons.delete_outline_rounded, size: 16),
                         color: p.textSecondary,
                         onPressed: () => _deleteLine(index),
                         tooltip: context.l10n.dspDeleteLine,

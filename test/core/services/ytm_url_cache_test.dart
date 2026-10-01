@@ -66,7 +66,8 @@ void main() {
       expect(entry, isNotNull);
 
       // Expiry should be 3600 - 300 (5 min safety margin) = 3300s = 55 minutes from start
-      expect(entry!.expiresAt, equals(clock.now().add(const Duration(minutes: 55))));
+      expect(entry!.expiresAt,
+          equals(clock.now().add(const Duration(minutes: 55))));
 
       // Advance by 54 minutes -> still valid
       clock.advance(const Duration(minutes: 54));

@@ -212,8 +212,7 @@ void main() {
       when(() => account.dataSyncId).thenReturn(null);
       when(() => account.ensureDataSyncId()).thenAnswer((_) async {});
       when(() => account.resolvePlayerStream(any(),
-              quality: any(named: 'quality')))
-          .thenAnswer((_) async {
+          quality: any(named: 'quality'))).thenAnswer((_) async {
         await _ms(4000);
         return null;
       });
@@ -240,14 +239,12 @@ void main() {
       );
     });
 
-    test('a fast Tier-1 still wins without starting the native tier',
-        () async {
+    test('a fast Tier-1 still wins without starting the native tier', () async {
       final account = MockYtmAccountService();
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.dataSyncId).thenReturn('dsid||');
       when(() => account.resolvePlayerStream(any(),
-              quality: any(named: 'quality')))
-          .thenAnswer((_) async {
+          quality: any(named: 'quality'))).thenAnswer((_) async {
         await _ms(50);
         return const YtmStream(
           videoId: 'dQw4w9WgXcQ',
@@ -376,7 +373,8 @@ void main() {
     });
   });
 
-  group('resolve: the Dart-level hedge is a real second chain, not a promise', () {
+  group('resolve: the Dart-level hedge is a real second chain, not a promise',
+      () {
     test('two concurrent default resolves still share one native chain',
         () async {
       var resolveCalls = 0;

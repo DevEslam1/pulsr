@@ -83,13 +83,16 @@ class ExportBackupUseCase {
       'visualizerStyle': prefs.getString('setting_visualizer_style') ?? 'bar',
       // Extended settings (previously missing — caused data loss on restore)
       'replayGainMode': prefs.getString('setting_replay_gain_mode') ?? 'track',
-      'replayGainPreampWithRg': prefs.getDouble('setting_replay_gain_preamp_with_rg') ?? 0.0,
-      'replayGainPreampWithoutRg': prefs.getDouble('setting_replay_gain_preamp_without_rg') ?? -3.0,
+      'replayGainPreampWithRg':
+          prefs.getDouble('setting_replay_gain_preamp_with_rg') ?? 0.0,
+      'replayGainPreampWithoutRg':
+          prefs.getDouble('setting_replay_gain_preamp_without_rg') ?? -3.0,
       'wifiOnlyMode': prefs.getBool('setting_wifi_only_mode') ?? false,
       'offlineOnlyMode': prefs.getBool('setting_offline_only_mode') ?? false,
       'bitPerfectMode': prefs.getBool('setting_bit_perfect') ?? false,
       'dspPreference': prefs.getString('setting_dsp_preference') ?? 'native',
-      'streamingQuality': prefs.getString('setting_streaming_quality') ?? 'high',
+      'streamingQuality':
+          prefs.getString('setting_streaming_quality') ?? 'high',
       'downloadQuality': prefs.getString('setting_download_quality') ?? 'high',
       'isLosslessMode': prefs.getBool('setting_lossless') ?? false,
       // EQ state lives under the EqualizerManager keys (eq_*) — the legacy
@@ -254,8 +257,7 @@ class ExportBackupUseCase {
         ];
         final cur = items.indexWhere((e) => e.isCurrent);
         queueIndex = cur == -1 ? 0 : cur;
-        queuePositionMs =
-            cur == -1 ? 0 : items[cur].positionMs;
+        queuePositionMs = cur == -1 ? 0 : items[cur].positionMs;
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to encode queue backup data',
@@ -270,7 +272,8 @@ class ExportBackupUseCase {
       'settings': settingsMap,
       'playHistory': historyData,
       'excludedFolders': excludedFolders,
-      if (customEqProfilesData != null) 'customEqProfiles': customEqProfilesData,
+      if (customEqProfilesData != null)
+        'customEqProfiles': customEqProfilesData,
       if (automationRulesData != null) 'automationRules': automationRulesData,
       if (dspSnapshotsRaw != null) 'dspSnapshots': dspSnapshotsRaw,
       if (deviceProfilesRaw != null) 'deviceProfiles': deviceProfilesRaw,
@@ -312,7 +315,8 @@ class ImportBackupUseCase {
               'Backup file exceeds maximum allowed size of 10 MB');
         }
         final content = await (file as dynamic).readAsString();
-        return await execute(content, knownByteLength: (len is int) ? len : null);
+        return await execute(content,
+            knownByteLength: (len is int) ? len : null);
       } catch (e) {
         if (e is FormatException) rethrow;
         throw FormatException('Failed reading backup file: $e');
@@ -321,7 +325,8 @@ class ImportBackupUseCase {
     return execute(file);
   }
 
-  Future<ImportResult> execute(String jsonString, {int? knownByteLength}) async {
+  Future<ImportResult> execute(String jsonString,
+      {int? knownByteLength}) async {
     // FIX B3: Avoid double-allocating a second full copy of a ≤10MB string just to check utf8 size.
     // If the caller already know the byte length (e.g. from File.length()), reuse it directly.
     if (knownByteLength != null) {
@@ -581,25 +586,75 @@ class ImportBackupUseCase {
             (settings['visualizerStyle'] as String?) ?? 'bar');
       }
       // Restore extended settings with validation
-      if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode']);
-      if (settings['replayGainPreampWithRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_with_rg', (settings['replayGainPreampWithRg'] as num).toDouble());
-      if (settings['replayGainPreampWithoutRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_without_rg', (settings['replayGainPreampWithoutRg'] as num).toDouble());
-      if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode']);
-      if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode']);
-      if (settings['bitPerfectMode'] is bool) await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode']);
-      if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference']);
-      if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality']);
-      if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality']);
-      if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode']);
-      if (settings['eqEnabled'] is bool) await prefs.setBool(PrefsKeys.eqEnabled, settings['eqEnabled']);
-      if (settings['eqGains'] is String) await prefs.setString(PrefsKeys.eqGains, settings['eqGains']);
-      if (settings['eqPreset'] is String) await prefs.setString(PrefsKeys.eqPresetName, settings['eqPreset']);
-      if (settings['eqPreamp'] is num) await prefs.setDouble(PrefsKeys.eqPreamp, (settings['eqPreamp'] as num).toDouble());
-      if (settings['eqBandCount'] is int) await prefs.setInt(PrefsKeys.eqBandCount, settings['eqBandCount']);
-      if (settings['eqCustomFrequencies'] is String) await prefs.setString(PrefsKeys.eqCustomFrequencies, settings['eqCustomFrequencies']);
-      if (settings['eqCustom32Frequencies'] is String) await prefs.setString(PrefsKeys.eqCustom32Frequencies, settings['eqCustom32Frequencies']);
-      if (settings['eqCustom64Frequencies'] is String) await prefs.setString(PrefsKeys.eqCustom64Frequencies, settings['eqCustom64Frequencies']);
-      if (settings['playbackSpeed'] is num) await prefs.setDouble('setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
+      if (settings['replayGainMode'] is String) {
+        await prefs.setString(
+            'setting_replay_gain_mode', settings['replayGainMode']);
+      }
+      if (settings['replayGainPreampWithRg'] is num) {
+        await prefs.setDouble('setting_replay_gain_preamp_with_rg',
+            (settings['replayGainPreampWithRg'] as num).toDouble());
+      }
+      if (settings['replayGainPreampWithoutRg'] is num) {
+        await prefs.setDouble('setting_replay_gain_preamp_without_rg',
+            (settings['replayGainPreampWithoutRg'] as num).toDouble());
+      }
+      if (settings['wifiOnlyMode'] is bool) {
+        await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode']);
+      }
+      if (settings['offlineOnlyMode'] is bool) {
+        await prefs.setBool(
+            'setting_offline_only_mode', settings['offlineOnlyMode']);
+      }
+      if (settings['bitPerfectMode'] is bool) {
+        await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode']);
+      }
+      if (settings['dspPreference'] is String) {
+        await prefs.setString(
+            'setting_dsp_preference', settings['dspPreference']);
+      }
+      if (settings['streamingQuality'] is String) {
+        await prefs.setString(
+            'setting_streaming_quality', settings['streamingQuality']);
+      }
+      if (settings['downloadQuality'] is String) {
+        await prefs.setString(
+            'setting_download_quality', settings['downloadQuality']);
+      }
+      if (settings['isLosslessMode'] is bool) {
+        await prefs.setBool('setting_lossless', settings['isLosslessMode']);
+      }
+      if (settings['eqEnabled'] is bool) {
+        await prefs.setBool(PrefsKeys.eqEnabled, settings['eqEnabled']);
+      }
+      if (settings['eqGains'] is String) {
+        await prefs.setString(PrefsKeys.eqGains, settings['eqGains']);
+      }
+      if (settings['eqPreset'] is String) {
+        await prefs.setString(PrefsKeys.eqPresetName, settings['eqPreset']);
+      }
+      if (settings['eqPreamp'] is num) {
+        await prefs.setDouble(
+            PrefsKeys.eqPreamp, (settings['eqPreamp'] as num).toDouble());
+      }
+      if (settings['eqBandCount'] is int) {
+        await prefs.setInt(PrefsKeys.eqBandCount, settings['eqBandCount']);
+      }
+      if (settings['eqCustomFrequencies'] is String) {
+        await prefs.setString(
+            PrefsKeys.eqCustomFrequencies, settings['eqCustomFrequencies']);
+      }
+      if (settings['eqCustom32Frequencies'] is String) {
+        await prefs.setString(
+            PrefsKeys.eqCustom32Frequencies, settings['eqCustom32Frequencies']);
+      }
+      if (settings['eqCustom64Frequencies'] is String) {
+        await prefs.setString(
+            PrefsKeys.eqCustom64Frequencies, settings['eqCustom64Frequencies']);
+      }
+      if (settings['playbackSpeed'] is num) {
+        await prefs.setDouble('setting_playback_speed',
+            (settings['playbackSpeed'] as num).toDouble());
+      }
 
       restoredSettingsCount = settings.length;
     }
@@ -622,10 +677,15 @@ class ImportBackupUseCase {
                 final matched = matchPath(path);
                 if (matched != null) {
                   // Merge with max to avoid restore reducing play counts incremented since backup
-                  final mergedCount = playCount > matched.playCount ? playCount : matched.playCount;
-                  final mergedLastPlayed = (lastPlayed != null && matched.lastPlayed != null)
-                      ? (lastPlayed > matched.lastPlayed! ? lastPlayed : matched.lastPlayed!)
-                      : (lastPlayed ?? matched.lastPlayed);
+                  final mergedCount = playCount > matched.playCount
+                      ? playCount
+                      : matched.playCount;
+                  final mergedLastPlayed =
+                      (lastPlayed != null && matched.lastPlayed != null)
+                          ? (lastPlayed > matched.lastPlayed!
+                              ? lastPlayed
+                              : matched.lastPlayed!)
+                          : (lastPlayed ?? matched.lastPlayed);
                   await (_db.update(_db.songsTable)
                         ..where((t) => t.id.equals(matched.id)))
                       .write(
@@ -670,7 +730,8 @@ class ImportBackupUseCase {
         final profilesData = data['customEqProfiles'];
         final serialized = jsonEncode(profilesData);
         await prefs.setString(PrefsKeys.customEqProfiles, serialized);
-        restoredEqProfilesCount = (profilesData is List) ? profilesData.length : 1;
+        restoredEqProfilesCount =
+            (profilesData is List) ? profilesData.length : 1;
       } catch (e, st) {
         ErrorLogger.log('Failed restoring custom EQ profiles',
             error: e, stackTrace: st, category: 'Backup');
@@ -682,7 +743,8 @@ class ImportBackupUseCase {
     if (data['automationRules'] != null && data['automationRules'] is List) {
       try {
         final rulesList = data['automationRules'] as List;
-        await prefs.setString('setting_automation_rules', jsonEncode(rulesList));
+        await prefs.setString(
+            'setting_automation_rules', jsonEncode(rulesList));
         restoredAutomationRulesCount = rulesList.length;
       } catch (e, st) {
         ErrorLogger.log('Failed restoring automation rules',
@@ -699,7 +761,8 @@ class ImportBackupUseCase {
           if (item is Map<String, dynamic>) {
             final path = item['path'] as String?;
             final remoteId = item['remoteId'] as String?;
-            final matched = matchPath(path ?? '') ?? (remoteId != null ? remoteIdMap[remoteId] : null);
+            final matched = matchPath(path ?? '') ??
+                (remoteId != null ? remoteIdMap[remoteId] : null);
             if (matched != null && !matched.isDownloaded) {
               await (_db.update(_db.songsTable)
                     ..where((t) => t.id.equals(matched.id)))
@@ -741,8 +804,9 @@ class ImportBackupUseCase {
       try {
         final prefs = await SharedPreferences.getInstance();
         final existing = prefs.getString(key);
-        final base =
-            (existing != null && existing.isNotEmpty) ? jsonDecode(existing) : {};
+        final base = (existing != null && existing.isNotEmpty)
+            ? jsonDecode(existing)
+            : {};
         final merged = <String, dynamic>{
           if (base is Map<String, dynamic>) ...base,
           for (final e in incoming.entries)
@@ -805,8 +869,8 @@ class ImportBackupUseCase {
                       songId: matched.id,
                       orderIndex: order,
                       isCurrent: Value(i == idx.clamp(0, paths.length - 1)),
-                      positionMs:
-                          Value(i == idx.clamp(0, paths.length - 1) ? posMs : 0),
+                      positionMs: Value(
+                          i == idx.clamp(0, paths.length - 1) ? posMs : 0),
                     ),
                   );
               order++;
@@ -839,10 +903,12 @@ class ImportBackupUseCase {
   static void validateSchema(Map<String, dynamic> data) {
     final version = data['version'];
     if (version == null || version is! int || version < 1) {
-      throw const FormatException('Invalid backup version: missing or malformed version field');
+      throw const FormatException(
+          'Invalid backup version: missing or malformed version field');
     }
     if (version > 4) {
-      throw FormatException('Unsupported backup version: $version. Please update Pulsr.');
+      throw FormatException(
+          'Unsupported backup version: $version. Please update Pulsr.');
     }
 
     if (data['favorites'] != null && data['favorites'] is! List) {
@@ -879,7 +945,9 @@ class ImportBackupUseCase {
       throw const FormatException('excludedFolders must be a list');
     }
 
-    if (data['customEqProfiles'] != null && data['customEqProfiles'] is! List && data['customEqProfiles'] is! Map) {
+    if (data['customEqProfiles'] != null &&
+        data['customEqProfiles'] is! List &&
+        data['customEqProfiles'] is! Map) {
       throw const FormatException('customEqProfiles must be a list or map');
     }
 

@@ -87,7 +87,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     ));
   }
 
-  Future<void> setBitPerfectOutput(bool enabled) async {    if (enabled) {
+  Future<void> setBitPerfectOutput(bool enabled) async {
+    if (enabled) {
       final block = AudioConflicts.bitPerfectBlockedReason(
         state.currentOutputDevice,
       );
@@ -153,7 +154,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       } catch (_) {}
       // Also force ReplayGain off — software gain breaks bit-perfect
       if (state.replayGainMode != ReplayGainMode.off) {
-        await prefs.setString(SettingsCubit._keyReplayGainMode, ReplayGainMode.off.name);
+        await prefs.setString(
+            SettingsCubit._keyReplayGainMode, ReplayGainMode.off.name);
         safeEmit(
           state.copyWith(
             replayGainMode: ReplayGainMode.off,
@@ -194,7 +196,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> loadMqaDecodingPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      SettingsCubit.mqaEnabledCache = prefs.getBool(PrefsKeys.mqaDecodingEnabled) ?? true;
+      SettingsCubit.mqaEnabledCache =
+          prefs.getBool(PrefsKeys.mqaDecodingEnabled) ?? true;
     } catch (e, st) {
       ErrorLogger.log('MQA preference load failed',
           error: e, stackTrace: st, category: 'Settings');
@@ -309,7 +312,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // Software gain would alter the bitstream; turn it off like the normal
     // Bit-Perfect path does.
     if (state.replayGainMode != ReplayGainMode.off) {
-      await prefs.setString(SettingsCubit._keyReplayGainMode, ReplayGainMode.off.name);
+      await prefs.setString(
+          SettingsCubit._keyReplayGainMode, ReplayGainMode.off.name);
       if (!isClosed) {
         safeEmit(state.copyWith(replayGainMode: ReplayGainMode.off));
       }
@@ -867,13 +871,19 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   /// F5: Bluetooth latency auto-calibration. Uses the codec latency table
   /// plus optional probe samples, then persists the winning offset.
-  Future<int> autoCalibrateBluetoothLatency({Future<int> Function()? probe}) async {
+  Future<int> autoCalibrateBluetoothLatency(
+      {Future<int> Function()? probe}) async {
     final codec = state.currentOutputDevice?.btCodecName;
     int codecEst = 180;
     try {
       const table = {
-        'sbc': 220, 'aac': 200, 'aptx': 150, 'ldac': 250,
-        'lc3': 60, 'opus': 100, 'lhdc': 180,
+        'sbc': 220,
+        'aac': 200,
+        'aptx': 150,
+        'ldac': 250,
+        'lc3': 60,
+        'opus': 100,
+        'lhdc': 180,
       };
       if (codec != null && codec.isNotEmpty) {
         final key = codec.toLowerCase();
@@ -931,25 +941,6 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await setGapless(false);
     await setStreamingQuality(YtmAudioQuality.low);
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   // Requires: provided by the composing class (same library).
   HiResAudioService get _hiResAudioService;

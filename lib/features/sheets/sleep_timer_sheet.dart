@@ -51,8 +51,8 @@ class SleepTimerSheet extends StatelessWidget {
                     Navigator.pop(context);
                   },
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: p.error.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -86,230 +86,230 @@ class SleepTimerSheet extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                            if (isActive)
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                                child: Text(
-                                  isQueueMode
-                                      ? context.l10n.musicWillStopEndOfQueue
-                                      : remainingTracks != null
-                                          ? (remainingTracks == 1
-                                              ? context.l10n
-                                                  .musicWillStopEndOfTrack
-                                              : context.l10n
-                                                  .musicWillStopAfterSongs(
-                                                      remainingTracks))
-                                          : context.l10n.musicWillStopIn(
-                                              (sleepTimerRemaining?.inMinutes ?? 0),
-                                              (sleepTimerRemaining?.inSeconds ?? 0) % 60),
-                                  style: TextStyle(
-                                    color: p.accent,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(height: AppSpacing.md),
-                            Text(
-                              context.l10n.bySongs,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: AppFontSize.bodySmall,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                ChoiceChip(
-                                  label: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.skip_next_rounded, size: 14),
-                                      const SizedBox(width: AppSpacing.xxs),
-                                      Text(context.l10n.endOfTrack),
-                                    ],
-                                  ),
-                                  // FIX BUG-5: Show as selected when end-of-track
-                                  // timer is active so the user has visual feedback.
-                                  selected: timerMode == SleepTimerMode.endOfTrack,
-                                  onSelected: (_) {
-                                    cubit.startEndOfTrackTimer();
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                ChoiceChip(
-                                  label: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.queue_music_rounded, size: 14),
-                                      const SizedBox(width: AppSpacing.xxs),
-                                      Text(context.l10n.endOfQueue),
-                                    ],
-                                  ),
-                                  // FIX BUG-6: Show as selected when end-of-queue
-                                  // timer is active.
-                                  selected: isQueueMode,
-                                  onSelected: (_) {
-                                    cubit.startEndOfQueueTimer();
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                ChoiceChip(
-                                  label: Text(context.l10n.songsCount(2)),
-                                  // FIX BUG-5: Show as selected when N-tracks timer
-                                  // is active with exactly 2 tracks remaining.
-                                  selected: timerMode == SleepTimerMode.afterNTracks &&
-                                      remainingTracks == 2,
-                                  onSelected: (_) {
-                                    cubit.startAfterNTracksTimer(2);
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                ChoiceChip(
-                                  label: Text(context.l10n.songsCount(3)),
-                                  selected: timerMode == SleepTimerMode.afterNTracks &&
-                                      remainingTracks == 3,
-                                  onSelected: (_) {
-                                    cubit.startAfterNTracksTimer(3);
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                ChoiceChip(
-                                  label: Text(context.l10n.songsCount(5)),
-                                  selected: timerMode == SleepTimerMode.afterNTracks &&
-                                      remainingTracks == 5,
-                                  onSelected: (_) {
-                                    cubit.startAfterNTracksTimer(5);
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                                ChoiceChip(
-                                  label: Text(context.l10n.songsCount(10)),
-                                  selected: timerMode == SleepTimerMode.afterNTracks &&
-                                      remainingTracks == 10,
-                                  onSelected: (_) {
-                                    cubit.startAfterNTracksTimer(10);
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.s20),
-                            Text(
-                              context.l10n.presets,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: AppFontSize.bodySmall,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                ...presets.map((mins) {
-                                  return ChoiceChip(
-                                    label: Text(context.l10n.sleepTimerMinutes(mins)),
-                                    selected: false,
-                                    onSelected: (_) {
-                                      cubit.startSleepTimer(mins);
-                                      Navigator.pop(context);
-                                    },
-                                  );
-                                }),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.lg),
-                            Text(
-                              context.l10n.customTime,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: AppFontSize.bodySmall,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Material(
-                              type: MaterialType.transparency,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: Container(
-                                      padding: const EdgeInsets.all(AppSpacing.xs),
-                                      decoration: BoxDecoration(
-                                        color: p.surfaceContainer,
-                                        borderRadius: BorderRadius.circular(AppRadii.r8),
-                                      ),
-                                      child: Icon(Icons.timer_outlined,
-                                          color: p.accent),
-                                    ),
-                                    title: Text(context.l10n.customDurationMinutes,
-                                        style: TextStyle(color: p.textPrimary)),
-                                    trailing: Icon(Icons.chevron_right_rounded,
-                                        color: p.textSecondary),
-                                    onTap: () async {
-                                      final minutes = await _showCustomMinutesDialog(context);
-                                      if (minutes != null && minutes > 0 && context.mounted) {
-                                        cubit.startSleepTimer(minutes);
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                                  ),
-                                  ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: Container(
-                                      padding: const EdgeInsets.all(AppSpacing.xs),
-                                      decoration: BoxDecoration(
-                                        color: p.surfaceContainer,
-                                        borderRadius: BorderRadius.circular(AppRadii.r8),
-                                      ),
-                                      child: Icon(Icons.access_time_rounded,
-                                          color: p.accent),
-                                    ),
-                                    title: Text(context.l10n.stopAtSpecificTime,
-                                        style: TextStyle(color: p.textPrimary)),
-                                    trailing: Icon(Icons.chevron_right_rounded,
-                                        color: p.textSecondary),
-                                    onTap: () async {
-                                      final now = TimeOfDay.now();
-                                      final selectedTime = await showTimePicker(
-                                        context: context,
-                                        initialTime: now,
-                                      );
-                                      if (selectedTime != null && context.mounted) {
-                                        final today = DateTime.now();
-                                        var stopDate = DateTime(
-                                            today.year,
-                                            today.month,
-                                            today.day,
-                                            selectedTime.hour,
-                                            selectedTime.minute);
-                                        if (stopDate.isBefore(today)) {
-                                          stopDate =
-                                              stopDate.add(const Duration(days: 1));
-                                        }
-                                        cubit.startAbsoluteSleepTimer(stopDate);
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                  if (isActive)
+                    Padding(
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                      child: Text(
+                        isQueueMode
+                            ? context.l10n.musicWillStopEndOfQueue
+                            : remainingTracks != null
+                                ? (remainingTracks == 1
+                                    ? context.l10n.musicWillStopEndOfTrack
+                                    : context.l10n.musicWillStopAfterSongs(
+                                        remainingTracks))
+                                : context.l10n.musicWillStopIn(
+                                    (sleepTimerRemaining?.inMinutes ?? 0),
+                                    (sleepTimerRemaining?.inSeconds ?? 0) % 60),
+                        style: TextStyle(
+                          color: p.accent,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                  );
-                },
-              );
-            }
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    context.l10n.bySongs,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.skip_next_rounded, size: 14),
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(context.l10n.endOfTrack),
+                          ],
+                        ),
+                        // FIX BUG-5: Show as selected when end-of-track
+                        // timer is active so the user has visual feedback.
+                        selected: timerMode == SleepTimerMode.endOfTrack,
+                        onSelected: (_) {
+                          cubit.startEndOfTrackTimer();
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ChoiceChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.queue_music_rounded, size: 14),
+                            const SizedBox(width: AppSpacing.xxs),
+                            Text(context.l10n.endOfQueue),
+                          ],
+                        ),
+                        // FIX BUG-6: Show as selected when end-of-queue
+                        // timer is active.
+                        selected: isQueueMode,
+                        onSelected: (_) {
+                          cubit.startEndOfQueueTimer();
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ChoiceChip(
+                        label: Text(context.l10n.songsCount(2)),
+                        // FIX BUG-5: Show as selected when N-tracks timer
+                        // is active with exactly 2 tracks remaining.
+                        selected: timerMode == SleepTimerMode.afterNTracks &&
+                            remainingTracks == 2,
+                        onSelected: (_) {
+                          cubit.startAfterNTracksTimer(2);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ChoiceChip(
+                        label: Text(context.l10n.songsCount(3)),
+                        selected: timerMode == SleepTimerMode.afterNTracks &&
+                            remainingTracks == 3,
+                        onSelected: (_) {
+                          cubit.startAfterNTracksTimer(3);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ChoiceChip(
+                        label: Text(context.l10n.songsCount(5)),
+                        selected: timerMode == SleepTimerMode.afterNTracks &&
+                            remainingTracks == 5,
+                        onSelected: (_) {
+                          cubit.startAfterNTracksTimer(5);
+                          Navigator.pop(context);
+                        },
+                      ),
+                      ChoiceChip(
+                        label: Text(context.l10n.songsCount(10)),
+                        selected: timerMode == SleepTimerMode.afterNTracks &&
+                            remainingTracks == 10,
+                        onSelected: (_) {
+                          cubit.startAfterNTracksTimer(10);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s20),
+                  Text(
+                    context.l10n.presets,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...presets.map((mins) {
+                        return ChoiceChip(
+                          label: Text(context.l10n.sleepTimerMinutes(mins)),
+                          selected: false,
+                          onSelected: (_) {
+                            cubit.startSleepTimer(mins);
+                            Navigator.pop(context);
+                          },
+                        );
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    context.l10n.customTime,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Material(
+                    type: MaterialType.transparency,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: p.surfaceContainer,
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                            ),
+                            child: Icon(Icons.timer_outlined, color: p.accent),
+                          ),
+                          title: Text(context.l10n.customDurationMinutes,
+                              style: TextStyle(color: p.textPrimary)),
+                          trailing: Icon(Icons.chevron_right_rounded,
+                              color: p.textSecondary),
+                          onTap: () async {
+                            final minutes =
+                                await _showCustomMinutesDialog(context);
+                            if (minutes != null &&
+                                minutes > 0 &&
+                                context.mounted) {
+                              cubit.startSleepTimer(minutes);
+                              Navigator.pop(context);
+                            }
+                          },
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: p.surfaceContainer,
+                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                            ),
+                            child: Icon(Icons.access_time_rounded,
+                                color: p.accent),
+                          ),
+                          title: Text(context.l10n.stopAtSpecificTime,
+                              style: TextStyle(color: p.textPrimary)),
+                          trailing: Icon(Icons.chevron_right_rounded,
+                              color: p.textSecondary),
+                          onTap: () async {
+                            final now = TimeOfDay.now();
+                            final selectedTime = await showTimePicker(
+                              context: context,
+                              initialTime: now,
+                            );
+                            if (selectedTime != null && context.mounted) {
+                              final today = DateTime.now();
+                              var stopDate = DateTime(
+                                  today.year,
+                                  today.month,
+                                  today.day,
+                                  selectedTime.hour,
+                                  selectedTime.minute);
+                              if (stopDate.isBefore(today)) {
+                                stopDate =
+                                    stopDate.add(const Duration(days: 1));
+                              }
+                              cubit.startAbsoluteSleepTimer(stopDate);
+                              Navigator.pop(context);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<int?> _showCustomMinutesDialog(BuildContext context) {
     return PulsrDialogHelper.showCustomDialog<int>(

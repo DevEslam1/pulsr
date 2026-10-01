@@ -36,7 +36,8 @@ class DspSnapshot {
 
   static DspSnapshot? fromMap(Map<String, dynamic> m) {
     try {
-      final gains = (m['gains'] as List).map((e) => (e as num).toDouble()).toList();
+      final gains =
+          (m['gains'] as List).map((e) => (e as num).toDouble()).toList();
       final rawEffects = m['effects'];
       return DspSnapshot(
         presetName: m['preset'] as String? ?? 'Flat',
@@ -91,16 +92,18 @@ class DspSnapshotStore {
     String? artist,
     String? genre,
   }) {
+    // Route through recall() so a hit is refreshed to the MRU position and is
+    // not evicted ahead of stale entries by the LRU cap.
     if (album != null && artist != null) {
-      final s = _snapshots[albumKey(album, artist)];
+      final s = recall(albumKey(album, artist));
       if (s != null) return s;
     }
     if (artist != null) {
-      final s = _snapshots[artistKey(artist)];
+      final s = recall(artistKey(artist));
       if (s != null) return s;
     }
     if (genre != null) {
-      final s = _snapshots[genreKey(genre)];
+      final s = recall(genreKey(genre));
       if (s != null) return s;
     }
     return null;
@@ -130,8 +133,8 @@ class DspSnapshotStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('${prefsKey}_enabled', enabled);
-      await prefs.setString(
-          prefsKey, jsonEncode(_snapshots.map((k, v) => MapEntry(k, v.toMap()))));
+      await prefs.setString(prefsKey,
+          jsonEncode(_snapshots.map((k, v) => MapEntry(k, v.toMap()))));
     } catch (_) {}
   }
 }

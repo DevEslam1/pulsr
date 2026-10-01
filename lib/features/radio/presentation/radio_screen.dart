@@ -72,7 +72,8 @@ class _RadioScreenState extends State<RadioScreen> {
   List<RadioStation>? _cachedFilteredStations;
 
   List<RadioStation> get _filteredStations {
-    final key = '$_selectedGenre|$_searchQuery|${_stations.length}|${identityHashCode(_stations)}';
+    final key =
+        '$_selectedGenre|$_searchQuery|${_stations.length}|${identityHashCode(_stations)}';
     if (_cachedFilterKey == key && _cachedFilteredStations != null) {
       return _cachedFilteredStations!;
     }
@@ -155,12 +156,12 @@ class _RadioScreenState extends State<RadioScreen> {
 
     final urls = RadioStationStore.extractStreamUrls(content);
     if (urls.isEmpty) {
-      PulsrToast.show(context, message: context.l10n.radioNoStreamsFound, isError: true);
+      PulsrToast.show(context,
+          message: context.l10n.radioNoStreamsFound, isError: true);
       return;
     }
     for (final url in urls) {
-      await _store.add(
-          RadioStation.create(name: _nameForUrl(url), url: url));
+      await _store.add(RadioStation.create(name: _nameForUrl(url), url: url));
     }
     _refresh();
     if (mounted) {
@@ -208,7 +209,7 @@ class _RadioScreenState extends State<RadioScreen> {
     final filtered = _filteredStations;
 
     return PulsrPagePopScope(
-      child: Scaffold(
+        child: Scaffold(
       backgroundColor: p.bg,
       appBar: AppBar(
         backgroundColor: p.surface,
@@ -241,7 +242,8 @@ class _RadioScreenState extends State<RadioScreen> {
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: SizedBox(
-                  height: MediaQuery.of(context).size.height - kToolbarHeight - 100,
+                  height:
+                      MediaQuery.of(context).size.height - kToolbarHeight - 100,
                   child: Center(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -288,7 +290,8 @@ class _RadioScreenState extends State<RadioScreen> {
                             icon: const Icon(Icons.add_rounded, size: 20),
                             label: Text(
                               context.l10n.radioAddStation,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             style: FilledButton.styleFrom(
                               backgroundColor: p.accent,
@@ -296,7 +299,8 @@ class _RadioScreenState extends State<RadioScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 22, vertical: AppSpacing.sm),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r14),
                               ),
                             ),
                           ),
@@ -310,9 +314,11 @@ class _RadioScreenState extends State<RadioScreen> {
                               side: BorderSide(
                                   color: p.accent.withValues(alpha: 0.5)),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+                                  horizontal: AppSpacing.s20,
+                                  vertical: AppSpacing.sm),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.r14),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r14),
                               ),
                             ),
                           ),
@@ -326,17 +332,23 @@ class _RadioScreenState extends State<RadioScreen> {
           : Column(
               children: [
                 Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
+                      AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                   child: TextField(
                     controller: _searchController,
-                    style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                    style: TextStyle(
+                        color: p.textPrimary, fontSize: AppFontSize.bodySmall),
                     decoration: InputDecoration(
                       hintText: context.l10n.radioSearchHint,
-                      hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
-                      prefixIcon: Icon(Icons.search_rounded, color: p.textSecondary, size: 20),
+                      hintStyle: TextStyle(
+                          color: p.textTertiary,
+                          fontSize: AppFontSize.bodySmall),
+                      prefixIcon: Icon(Icons.search_rounded,
+                          color: p.textSecondary, size: 20),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                              icon: Icon(Icons.close_rounded,
+                                  color: p.textSecondary, size: 18),
                               tooltip: context.l10n.clear,
                               onPressed: () {
                                 _searchController.clear();
@@ -346,7 +358,8 @@ class _RadioScreenState extends State<RadioScreen> {
                           : null,
                       filled: true,
                       fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppRadii.r12),
                         borderSide: BorderSide(color: p.hairline),
@@ -367,9 +380,11 @@ class _RadioScreenState extends State<RadioScreen> {
                     height: 38,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       itemCount: availableGenres.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(width: AppSpacing.xs),
                       itemBuilder: (context, idx) {
                         final g = availableGenres[idx];
                         final isSelected = _selectedGenre == g;
@@ -380,11 +395,14 @@ class _RadioScreenState extends State<RadioScreen> {
                           checkmarkColor: p.accent,
                           labelStyle: TextStyle(
                             color: isSelected ? p.accent : p.textSecondary,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
                             fontSize: AppFontSize.caption,
                           ),
                           side: BorderSide(
-                            color: isSelected ? p.accent.withValues(alpha: 0.4) : p.hairline,
+                            color: isSelected
+                                ? p.accent.withValues(alpha: 0.4)
+                                : p.hairline,
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppRadii.r12),
@@ -409,8 +427,9 @@ class _RadioScreenState extends State<RadioScreen> {
                               height: 350,
                               child: EmptyStateWidget(
                                 icon: Icons.search_off_rounded,
-                                title: 'No stations match "$_searchQuery"',
-                                subtitle: 'Try searching by a different genre or station URL',
+                                title: context.l10n
+                                    .radioNoStationsMatch(_searchQuery),
+                                subtitle: context.l10n.radioNoStationsMatchDesc,
                               ),
                             ),
                           ),
@@ -420,7 +439,9 @@ class _RadioScreenState extends State<RadioScreen> {
                           color: p.accent,
                           backgroundColor: p.surfaceContainer,
                           child: ListView.separated(
-                            padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: AppSpacing.scrollBottom),
+                            padding: const EdgeInsets.only(
+                                top: AppSpacing.xs,
+                                bottom: AppSpacing.scrollBottom),
                             itemCount: filtered.length,
                             separatorBuilder: (_, __) => Divider(
                               height: 1,
@@ -428,127 +449,156 @@ class _RadioScreenState extends State<RadioScreen> {
                               endIndent: 16,
                               color: p.hairline,
                             ),
-                          itemBuilder: (context, index) {
-                            final station = filtered[index];
-                            return StaggeredReveal(
-                              index: index,
-                              groupKey: filtered.length,
-                              child: BlocBuilder<PlayerCubit, PlayerState>(
-                                buildWhen: (prev, curr) =>
-                                    prev.currentSong?.path != curr.currentSong?.path ||
-                                    prev.isPlaying != curr.isPlaying,
-                                builder: (context, playerState) {
-                                  final isCurrent = playerState.currentSong?.path == station.url;
-                                  final isPlaying = isCurrent && playerState.isPlaying;
+                            itemBuilder: (context, index) {
+                              final station = filtered[index];
+                              return StaggeredReveal(
+                                index: index,
+                                groupKey: filtered.length,
+                                child: BlocBuilder<PlayerCubit, PlayerState>(
+                                  buildWhen: (prev, curr) =>
+                                      prev.currentSong?.path !=
+                                          curr.currentSong?.path ||
+                                      prev.isPlaying != curr.isPlaying,
+                                  builder: (context, playerState) {
+                                    final isCurrent =
+                                        playerState.currentSong?.path ==
+                                            station.url;
+                                    final isPlaying =
+                                        isCurrent && playerState.isPlaying;
 
-                                  return ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-                                    leading: Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: isPlaying
-                                            ? p.accent.withValues(alpha: 0.2)
-                                            : p.accentContainer.withValues(alpha: 0.35),
-                                        borderRadius: BorderRadius.circular(AppRadii.r12),
-                                        border: isPlaying
-                                            ? Border.all(color: p.accent, width: 1.5)
-                                            : null,
+                                    return ListTile(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.md,
+                                              vertical: AppSpacing.xxs),
+                                      leading: Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: isPlaying
+                                              ? p.accent.withValues(alpha: 0.2)
+                                              : p.accentContainer
+                                                  .withValues(alpha: 0.35),
+                                          borderRadius: BorderRadius.circular(
+                                              AppRadii.r12),
+                                          border: isPlaying
+                                              ? Border.all(
+                                                  color: p.accent, width: 1.5)
+                                              : null,
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Icon(
+                                          isPlaying
+                                              ? Icons.graphic_eq_rounded
+                                              : Icons.radio_rounded,
+                                          color: p.accent,
+                                          size: 22,
+                                        ),
                                       ),
-                                      alignment: Alignment.center,
-                                      child: Icon(
-                                        isPlaying ? Icons.graphic_eq_rounded : Icons.radio_rounded,
-                                        color: p.accent,
-                                        size: 22,
+                                      title: Text(
+                                        station.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isCurrent
+                                              ? p.accent
+                                              : p.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: AppFontSize.callout,
+                                        ),
                                       ),
-                                    ),
-                                    title: Text(
-                                      station.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: isCurrent ? p.accent : p.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: AppFontSize.callout,
-                                      ),
-                                    ),
-                                    subtitle: Row(
-                                      children: [
-                                        if (station.genre != null && station.genre!.isNotEmpty) ...[
-                                          Container(
-                                            margin: const EdgeInsetsDirectional.only(end: 6),
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 1.5),
-                                            decoration: BoxDecoration(
-                                              color: p.accentContainer.withValues(alpha: 0.35),
-                                              borderRadius: BorderRadius.circular(AppRadii.r6),
-                                            ),
-                                            child: Text(
-                                              station.genre!,
-                                              style: TextStyle(
-                                                color: p.accent,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w700,
+                                      subtitle: Row(
+                                        children: [
+                                          if (station.genre != null &&
+                                              station.genre!.isNotEmpty) ...[
+                                            Container(
+                                              margin:
+                                                  const EdgeInsetsDirectional
+                                                      .only(end: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: p.accentContainer
+                                                    .withValues(alpha: 0.35),
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        AppRadii.r6),
                                               ),
+                                              child: Text(
+                                                station.genre!,
+                                                style: TextStyle(
+                                                  color: p.accent,
+                                                  fontSize: AppFontSize.tiny,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                          Expanded(
+                                            child: Text(
+                                              station.url,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                  color: p.textSecondary,
+                                                  fontSize: AppFontSize.label),
                                             ),
                                           ),
                                         ],
-                                        Expanded(
-                                          child: Text(
-                                            station.url,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            tooltip: context.l10n.radioEdit,
+                                            icon: Icon(Icons.edit_rounded,
                                                 color: p.textSecondary,
-                                                fontSize: AppFontSize.label),
+                                                size: 22),
+                                            onPressed: () => _showAddDialog(
+                                                initial: station),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          tooltip: context.l10n.radioEdit,
-                                          icon: Icon(Icons.edit_rounded,
-                                              color: p.textSecondary, size: 22),
-                                          onPressed: () => _showAddDialog(initial: station),
-                                        ),
-                                        IconButton(
-                                          tooltip: isPlaying ? context.l10n.pause : context.l10n.radioPlay,
-                                          icon: Icon(
-                                            isPlaying
-                                                ? Icons.pause_circle_filled_rounded
-                                                : Icons.play_circle_fill_rounded,
-                                            color: p.accent,
-                                            size: 32,
+                                          IconButton(
+                                            tooltip: isPlaying
+                                                ? context.l10n.pause
+                                                : context.l10n.radioPlay,
+                                            icon: Icon(
+                                              isPlaying
+                                                  ? Icons
+                                                      .pause_circle_filled_rounded
+                                                  : Icons
+                                                      .play_circle_fill_rounded,
+                                              color: p.accent,
+                                              size: 32,
+                                            ),
+                                            onPressed: () {
+                                              if (isCurrent) {
+                                                playerCubit.togglePlayPause();
+                                              } else {
+                                                playerCubit
+                                                    .playRadioStation(station);
+                                              }
+                                            },
                                           ),
-                                          onPressed: () {
-                                            if (isCurrent) {
-                                              playerCubit.togglePlayPause();
-                                            } else {
-                                              playerCubit.playRadioStation(station);
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                    onTap: () {
-                                      if (isCurrent) {
-                                        playerCubit.togglePlayPause();
-                                      } else {
-                                        playerCubit.playRadioStation(station);
-                                      }
-                                    },
-                                    onLongPress: () => _showStationActions(station),
-                                  );
-                                },
-                              ),
-                            );
-                          },
+                                        ],
+                                      ),
+                                      onTap: () {
+                                        if (isCurrent) {
+                                          playerCubit.togglePlayPause();
+                                        } else {
+                                          playerCubit.playRadioStation(station);
+                                        }
+                                      },
+                                      onLongPress: () =>
+                                          _showStationActions(station),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
                 ),
               ],
             ),
@@ -593,12 +643,14 @@ class _AddStationDialogState extends State<_AddStationDialog> {
   /// Returns a user-facing reason the URL is invalid, or null when valid.
   String? _validateUrl(String raw) {
     final url = raw.trim();
-    if (url.isEmpty) return 'Please enter a URL';
+    if (url.isEmpty) return context.l10n.radioErrorEnterUrl;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      return 'URL must start with http:// or https://';
+      return context.l10n.radioErrorUrlScheme;
     }
     final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) return 'Invalid URL format';
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return context.l10n.radioErrorInvalidUrl;
+    }
     return null;
   }
 
@@ -638,7 +690,8 @@ class _AddStationDialogState extends State<_AddStationDialog> {
             TextField(
               controller: _nameController,
               textInputAction: TextInputAction.next,
-              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+              style:
+                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 labelText: context.l10n.radioStationName,
                 labelStyle: TextStyle(color: p.textSecondary),
@@ -664,11 +717,12 @@ class _AddStationDialogState extends State<_AddStationDialog> {
             TextField(
               controller: _genreController,
               textInputAction: TextInputAction.next,
-              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+              style:
+                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
-                labelText: 'Genre / Category (Optional)',
+                labelText: context.l10n.radioGenreLabel,
                 labelStyle: TextStyle(color: p.textSecondary),
-                hintText: 'e.g. Chill, Classical, Jazz, Quran...',
+                hintText: context.l10n.radioGenreHint,
                 hintStyle: TextStyle(color: p.textTertiary),
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
@@ -692,7 +746,8 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               keyboardType: TextInputType.url,
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _submit(),
-              style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+              style:
+                  TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
               decoration: InputDecoration(
                 labelText: context.l10n.radioStationUrl,
                 labelStyle: TextStyle(color: p.textSecondary),
@@ -736,7 +791,8 @@ class _AddStationDialogState extends State<_AddStationDialog> {
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
@@ -783,10 +839,12 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
         child: TextField(
           controller: _controller,
           maxLines: 6,
-          style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+          style:
+              TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall),
           decoration: InputDecoration(
             hintText: context.l10n.radioImportHint,
-            hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
+            hintStyle: TextStyle(
+                color: p.textTertiary, fontSize: AppFontSize.bodySmall),
             filled: true,
             fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
             border: OutlineInputBorder(
@@ -813,12 +871,13 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
           child: Text(context.l10n.radioCancel),
         ),
         FilledButton(
-          onPressed: () => Navigator.of(context, rootNavigator: true)
-              .pop(_controller.text),
+          onPressed: () =>
+              Navigator.of(context, rootNavigator: true).pop(_controller.text),
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadii.r12),
             ),
@@ -832,4 +891,3 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
     );
   }
 }
-

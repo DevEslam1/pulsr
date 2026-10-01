@@ -76,13 +76,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                 PulsrLayoutMetrics.isPlayerSplitMode(context, constraints);
 
             final m = PlayerThemeMetrics.of(
-
               isTablet: isTablet,
-
               isLandscape: isLandscape,
-
               constraints: constraints,
-
             );
 
             final double spacingTrackToSeek = m.spacingTrackToSeek;
@@ -165,12 +161,10 @@ class MinimalPlayerTheme extends StatelessWidget {
                               Center(
                                 child: ConstrainedBox(
                                   constraints: BoxConstraints(
-                                    maxHeight: isLandscape
-                                        ? 280
-                                        : double.infinity,
-                                    maxWidth: isLandscape
-                                        ? 280
-                                        : double.infinity,
+                                    maxHeight:
+                                        isLandscape ? 280 : double.infinity,
+                                    maxWidth:
+                                        isLandscape ? 280 : double.infinity,
                                   ),
                                   child: AspectRatio(
                                     aspectRatio: 1.0,
@@ -178,13 +172,12 @@ class MinimalPlayerTheme extends StatelessWidget {
                                       tag: 'now_playing_art_minimal',
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(
-                                  resolveCustomRadius(context, 20)),
+                                          borderRadius: BorderRadius.circular(
+                                              resolveCustomRadius(context, 20)),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: activeColor
-                                                  .withValues(alpha: 0.25),
+                                              color: activeColor.withValues(
+                                                  alpha: 0.25),
                                               blurRadius: 28,
                                               spreadRadius: 1,
                                               offset: const Offset(0, 10),
@@ -194,7 +187,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                         child: song != null
                                             ? CachedArtwork(
                                                 id: song.id,
-                                                remoteUrl: song.remoteArtworkUrl,
+                                                remoteUrl:
+                                                    song.remoteArtworkUrl,
                                                 type: ArtworkType.AUDIO,
                                                 size: double.infinity,
                                                 borderRadius:
@@ -233,7 +227,6 @@ class MinimalPlayerTheme extends StatelessWidget {
                 // Symmetrical Track Header: [Download/Playlist] Title/Artist [Favorite]
                 Padding(
                   padding: EdgeInsets.symmetric(
-
                     horizontal: isTablet ? 28 : 16,
                     vertical: AppSpacing.s2,
                   ),
@@ -264,13 +257,15 @@ class MinimalPlayerTheme extends StatelessWidget {
                                       onTap: () {
                                         if (song != null) {
                                           HapticFeedback.lightImpact();
-                                          AddToPlaylistSheet.show(context, song: song);
+                                          AddToPlaylistSheet.show(context,
+                                              song: song);
                                         }
                                       },
                                       child: Center(
                                         child: Icon(
                                           Icons.playlist_add_rounded,
-                                          semanticLabel: context.l10n.addToPlaylist,
+                                          semanticLabel:
+                                              context.l10n.addToPlaylist,
                                           size: isTablet ? 24 : 22,
                                           color: p.textSecondary,
                                         ),
@@ -282,8 +277,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                           // Center: Title & Artist
                           Expanded(
                             child: Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s10),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -292,7 +287,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                                         context.l10n.noTrackSelected,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet ? AppFontSize.headline : AppFontSize.title,
+                                      fontSize: isTablet
+                                          ? AppFontSize.headline
+                                          : AppFontSize.title,
                                       fontWeight: FontWeight.w900,
                                       color: p.textPrimary,
                                       height: 1.22,
@@ -305,7 +302,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                                         context.l10n.unknownArtist,
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: isTablet ? AppFontSize.callout : AppFontSize.bodySmall,
+                                      fontSize: isTablet
+                                          ? AppFontSize.callout
+                                          : AppFontSize.bodySmall,
                                       fontWeight: FontWeight.w600,
                                       color: p.textSecondary,
                                     ),
@@ -316,7 +315,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                           ),
 
                           // Right Symmetrical Action: Animated Favorite Button
-                          SizedBox(width: AppSpacing.xxl,
+                          SizedBox(
+                            width: AppSpacing.xxl,
                             height: 48,
                             child: Material(
                               color: Colors.white.withValues(alpha: 0.06),
@@ -403,7 +403,8 @@ class MinimalPlayerTheme extends StatelessWidget {
             );
 
             if (isLandscape) {
-              final bool isSplitContentMode = state.isLyricsVisible || state.isQueueVisible;
+              final bool isSplitContentMode =
+                  state.isLyricsVisible || state.isQueueVisible;
 
               final Widget heroArtwork = Center(
                 key: const ValueKey('artwork_minimal_landscape'),
@@ -413,8 +414,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                     tag: 'now_playing_art_minimal_landscape',
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius:
-                            BorderRadius.circular(resolveCustomRadius(context, 20)),
+                        borderRadius: BorderRadius.circular(
+                            resolveCustomRadius(context, 20)),
                         boxShadow: [
                           BoxShadow(
                             color: activeColor.withValues(alpha: 0.25),
@@ -445,18 +446,21 @@ class MinimalPlayerTheme extends StatelessWidget {
                         constraints: BoxConstraints(
                           maxWidth: m.paneMaxWidth,
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(
-                                bottom: isTablet ? AppSpacing.lg : AppSpacing.md,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      isTablet ? AppSpacing.lg : AppSpacing.md,
+                                ),
+                                child: viewSwitcher,
                               ),
-                              child: viewSwitcher,
-                            ),
-                            controlsColumn,
-                          ],
+                              controlsColumn,
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -470,8 +474,10 @@ class MinimalPlayerTheme extends StatelessWidget {
                         ),
                         ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxHeight: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 520.0 : 310.0),
-                            maxWidth: (constraints.maxHeight - 56).clamp(160.0, isTablet ? 520.0 : 310.0),
+                            maxHeight: (constraints.maxHeight - 56)
+                                .clamp(160.0, isTablet ? 520.0 : 310.0),
+                            maxWidth: (constraints.maxHeight - 56)
+                                .clamp(160.0, isTablet ? 520.0 : 310.0),
                           ),
                           child: heroArtwork,
                         ),
@@ -492,7 +498,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                         child: AnimatedSwitcher(
                           duration: context.motionMs(260),
                           child: KeyedSubtree(
-                            key: ValueKey('left_pane_${isSplitContentMode ? "split" : "minimal"}'),
+                            key: ValueKey(
+                                'left_pane_${isSplitContentMode ? "split" : "minimal"}'),
                             child: leftPaneContent,
                           ),
                         ),
@@ -509,14 +516,18 @@ class MinimalPlayerTheme extends StatelessWidget {
                               fit: StackFit.expand,
                               alignment: Alignment.center,
                               children: <Widget>[
-                                ...previousChildren,
+                                // BUG-FIX: previous panes are fading out —
+                                // prevent them from stealing touch events.
+                                ...previousChildren.map(
+                                    (c) => IgnorePointer(child: c)),
                                 if (currentChild != null) currentChild,
                               ],
                             );
                           },
                           child: state.isLyricsVisible
                               ? LyricsView(
-                                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                                  key: ValueKey(
+                                      'lyrics_${song?.id}_${song?.remoteId}'),
                                   lyrics: state.lyrics,
                                   isLoading: state.isLoadingLyrics,
                                   activeColor: activeColor,
@@ -527,7 +538,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                       key: ValueKey('queue_view_minimal'),
                                     )
                                   : Center(
-                                      key: const ValueKey('track_controls_pane'),
+                                      key:
+                                          const ValueKey('track_controls_pane'),
                                       child: SingleChildScrollView(
                                         child: controlsColumn,
                                       ),
@@ -544,7 +556,8 @@ class MinimalPlayerTheme extends StatelessWidget {
               children: [
                 // Top Pull-down Handle Indicator
                 Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.s2),
+                  padding: const EdgeInsets.only(
+                      top: AppSpacing.xxs, bottom: AppSpacing.s2),
                   child: Center(
                     child: Container(
                       width: 38,
@@ -560,7 +573,6 @@ class MinimalPlayerTheme extends StatelessWidget {
                 // Top App Bar - Symmetrical Left/Right Targets & Centered Header
                 Padding(
                   padding: EdgeInsets.symmetric(
-
                     horizontal: isTablet ? 28 : 20,
                     vertical: AppSpacing.s2,
                   ),
@@ -586,7 +598,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                             },
                             child: Center(
                               child: Icon(
-                                Icons.keyboard_arrow_down_rounded, semanticLabel: context.l10n.close,
+                                Icons.keyboard_arrow_down_rounded,
+                                semanticLabel: context.l10n.close,
                                 size: isTablet ? 26 : 24,
                                 color: p.textPrimary,
                               ),
@@ -598,7 +611,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                       // Center: "PLAYING FROM" / Album Header
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -645,7 +659,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                                     .titleSmall
                                     ?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      fontSize: isTablet ? AppFontSize.body : AppFontSize.bodySmall,
+                                      fontSize: isTablet
+                                          ? AppFontSize.body
+                                          : AppFontSize.bodySmall,
                                       color: p.textPrimary,
                                     ),
                               ),
@@ -671,7 +687,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                             },
                             child: Center(
                               child: Icon(
-                                Icons.more_horiz_rounded, semanticLabel: context.l10n.songInfo,
+                                Icons.more_horiz_rounded,
+                                semanticLabel: context.l10n.songInfo,
                                 size: isTablet ? 24 : 22,
                                 color: p.textPrimary,
                               ),
@@ -703,21 +720,20 @@ class MinimalPlayerTheme extends StatelessWidget {
                       final double maxAllowed = isTablet ? 560.0 : 420.0;
                       final double rawSize =
                           math.min(availableWidth, availableHeight);
-                      final double minArtSize = rawSize <= 0
-                          ? 0.0
-                          : math.min(rawSize, maxAllowed);
+                      final double minArtSize =
+                          rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
 
                       return Center(
                         child: ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxWidth: (state.isLyricsVisible ||
-                                    state.isQueueVisible)
-                                ? (isTablet ? 560.0 : double.infinity)
-                                : minArtSize,
-                            maxHeight: (state.isLyricsVisible ||
-                                    state.isQueueVisible)
-                                ? double.infinity
-                                : minArtSize,
+                            maxWidth:
+                                (state.isLyricsVisible || state.isQueueVisible)
+                                    ? (isTablet ? 560.0 : double.infinity)
+                                    : minArtSize,
+                            maxHeight:
+                                (state.isLyricsVisible || state.isQueueVisible)
+                                    ? double.infinity
+                                    : minArtSize,
                           ),
                           child: centerDisplay,
                         ),
@@ -740,6 +756,4 @@ class MinimalPlayerTheme extends StatelessWidget {
       ),
     );
   }
-
 }
-

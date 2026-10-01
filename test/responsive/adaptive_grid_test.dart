@@ -4,7 +4,8 @@ import 'package:pulsr/core/responsive/adaptive_grid.dart';
 
 void main() {
   group('PulsrAdaptiveGrid', () {
-    testWidgets('Calculates columns for album grid correctly across tiers', (tester) async {
+    testWidgets('Calculates columns for album grid correctly across tiers',
+        (tester) async {
       int? compactCols;
       int? mediumCols;
       int? expandedCols;
@@ -15,7 +16,8 @@ void main() {
           data: const MediaQueryData(size: Size(390, 844)),
           child: Builder(
             builder: (context) {
-              compactCols = PulsrAdaptiveGrid.columns(context, type: GridType.albums);
+              compactCols =
+                  PulsrAdaptiveGrid.columns(context, type: GridType.albums);
               return const SizedBox.shrink();
             },
           ),
@@ -27,7 +29,8 @@ void main() {
           data: const MediaQueryData(size: Size(768, 1024)),
           child: Builder(
             builder: (context) {
-              mediumCols = PulsrAdaptiveGrid.columns(context, type: GridType.albums);
+              mediumCols =
+                  PulsrAdaptiveGrid.columns(context, type: GridType.albums);
               return const SizedBox.shrink();
             },
           ),
@@ -40,7 +43,8 @@ void main() {
           data: const MediaQueryData(size: Size(1024, 768)),
           child: Builder(
             builder: (context) {
-              expandedCols = PulsrAdaptiveGrid.columns(context, type: GridType.albums);
+              expandedCols =
+                  PulsrAdaptiveGrid.columns(context, type: GridType.albums);
               return const SizedBox.shrink();
             },
           ),
@@ -53,7 +57,8 @@ void main() {
           data: const MediaQueryData(size: Size(1440, 900)),
           child: Builder(
             builder: (context) {
-              largeCols = PulsrAdaptiveGrid.columns(context, type: GridType.albums);
+              largeCols =
+                  PulsrAdaptiveGrid.columns(context, type: GridType.albums);
               return const SizedBox.shrink();
             },
           ),
@@ -66,7 +71,9 @@ void main() {
       expect(largeCols, 8);
     });
 
-    testWidgets('songColumns scales from 1 (compact) to 2 (medium/expanded) to 3 (large)', (tester) async {
+    testWidgets(
+        'songColumns scales from 1 (compact) to 2 (medium/expanded) to 3 (large)',
+        (tester) async {
       int? compactCols;
       int? mediumCols;
       int? largeCols;

@@ -9,7 +9,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Pulsr UI/UX Audit Remediation Regression Tests', () {
-    test('H2: dspSheetRebuildGate detects changes in DspSlice and ignores position ticks', () {
+    test(
+        'H2: dspSheetRebuildGate detects changes in DspSlice and ignores position ticks',
+        () {
       const a = PlayerState();
       // 1. Position/tick changes are ignored (prevents hot path 10 Hz rebuilds)
       final tickState = a.copyWith(
@@ -30,7 +32,8 @@ void main() {
       expect(dspSheetRebuildGate(a, eqChangedState), isTrue);
     });
 
-    testWidgets('M7: Bottom nav bar gestures and drag feedback render cleanly', (tester) async {
+    testWidgets('M7: Bottom nav bar gestures and drag feedback render cleanly',
+        (tester) async {
       int swipeUpCalls = 0;
       int swipeDownCalls = 0;
 

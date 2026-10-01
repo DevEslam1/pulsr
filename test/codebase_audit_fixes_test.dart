@@ -39,7 +39,9 @@ void main() {
       expect(nullFallbackSortBy, equals('title'));
     });
 
-    test('USB streaming sample rate clamped to valid default when track rate is missing or invalid', () {
+    test(
+        'USB streaming sample rate clamped to valid default when track rate is missing or invalid',
+        () {
       int resolveSampleRate(int? trackRate) {
         int sampleRate = 48000;
         if (trackRate != null && trackRate > 0) {

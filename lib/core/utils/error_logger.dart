@@ -18,7 +18,8 @@ class ErrorLogger {
   /// Redacts PII including email addresses, auth tokens, and session cookies (BUG-027).
   static String redactPii(String input) {
     var sanitized = input;
-    sanitized = sanitized.replaceAllMapped(_emailRegex, (m) => '[REDACTED_EMAIL]');
+    sanitized =
+        sanitized.replaceAllMapped(_emailRegex, (m) => '[REDACTED_EMAIL]');
     sanitized = sanitized.replaceAllMapped(
         _cookieAuthRegex, (m) => '${m.group(1)}=[REDACTED_TOKEN]');
     sanitized = sanitized.replaceAllMapped(
@@ -107,8 +108,19 @@ class ErrorLogger {
   static void initialize() {
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
+      // Surface the framework's "relevant error-causing widget" diagnostic so
+      // render/layout failures can be traced to a concrete widget without
+      // re-running the app with a debugger.
+      final contextDescription = details.context?.toDescription();
+      final library = details.library;
+      final suffix = [
+        if (contextDescription != null && contextDescription.isNotEmpty)
+          contextDescription,
+        if (library != null && library.isNotEmpty) library,
+      ].join(' | ');
       log(
-        'Unhandled Flutter Error: ${details.exceptionAsString()}',
+        'Unhandled Flutter Error: ${details.exceptionAsString()}'
+        '${suffix.isEmpty ? '' : ' [$suffix]'}',
         error: details.exception,
         stackTrace: details.stack,
         category: 'FlutterError',

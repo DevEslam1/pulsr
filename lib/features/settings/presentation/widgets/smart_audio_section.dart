@@ -60,8 +60,8 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
           final lastLink = links.values.last;
           final repo = HeadphoneProfilesRepository();
           await repo.loadProfiles();
-          lastProfileName =
-              repo.getProfileById(lastLink.profileId)?.name ?? lastLink.deviceLabel;
+          lastProfileName = repo.getProfileById(lastLink.profileId)?.name ??
+              lastLink.deviceLabel;
         }
 
         final info = getIt.isRegistered<HiResAudioService>()

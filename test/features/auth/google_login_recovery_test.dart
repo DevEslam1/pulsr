@@ -5,8 +5,8 @@ import 'package:pulsr/features/auth/utils/google_login_recovery.dart';
 void main() {
   group('GoogleBlockRecovery', () {
     test('the ladder advances instead of oscillating between two rungs', () {
-      final recovery =
-          GoogleBlockRecovery(maxAttempts: 4, initialIdentity: BrowserIdentity.mobile);
+      final recovery = GoogleBlockRecovery(
+          maxAttempts: 4, initialIdentity: BrowserIdentity.mobile);
 
       // Picking "the first entry that differs from the current one" sent the
       // ladder mobile → safariMobile → mobile → safariMobile forever, so a
@@ -14,10 +14,12 @@ void main() {
       // block — was never presented.
       expect(recovery.onBlocked()!.nextIdentity,
           equals(BrowserIdentity.safariMobile));
-      expect(recovery.onBlocked()!.nextIdentity, equals(BrowserIdentity.desktop));
+      expect(
+          recovery.onBlocked()!.nextIdentity, equals(BrowserIdentity.desktop));
       expect(recovery.onBlocked()!.nextIdentity,
           equals(BrowserIdentity.chromeDesktop));
-      expect(recovery.onBlocked()!.nextIdentity, equals(BrowserIdentity.mobile));
+      expect(
+          recovery.onBlocked()!.nextIdentity, equals(BrowserIdentity.mobile));
     });
 
     test('never returns the identity it was already presenting', () {
@@ -42,8 +44,8 @@ void main() {
     });
 
     test('a manual retry re-arms the ladder from the current identity', () {
-      final recovery =
-          GoogleBlockRecovery(maxAttempts: 2, initialIdentity: BrowserIdentity.mobile);
+      final recovery = GoogleBlockRecovery(
+          maxAttempts: 2, initialIdentity: BrowserIdentity.mobile);
       recovery.onBlocked();
       recovery.onBlocked();
       expect(recovery.onBlocked(), isNull);

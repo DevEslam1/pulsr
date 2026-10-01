@@ -22,13 +22,21 @@ import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 
 class MockGetSongsUseCase extends Mock implements GetSongsUseCase {}
+
 class MockGetAlbumsUseCase extends Mock implements GetAlbumsUseCase {}
+
 class MockGetArtistsUseCase extends Mock implements GetArtistsUseCase {}
+
 class MockGetGenresUseCase extends Mock implements GetGenresUseCase {}
+
 class MockGetYearsUseCase extends Mock implements GetYearsUseCase {}
+
 class MockGetFavoritesUseCase extends Mock implements GetFavoritesUseCase {}
+
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
+
 class MockFolderUseCases extends Mock implements FolderUseCases {}
+
 class MockMusicRepository extends Mock implements IMusicRepository {}
 
 void main() {
@@ -61,38 +69,72 @@ void main() {
       expect(base.differsFromBeyondPosition(tickPosition), isFalse);
     });
 
-    test('PlayerState.differsFromBeyondPosition returns true for Playback and Queue non-position field changes', () {
+    test(
+        'PlayerState.differsFromBeyondPosition returns true for Playback and Queue non-position field changes',
+        () {
       const base = PlayerState();
 
       final mutations = <String, PlayerState>{
-        'currentSong': base.copyWith(playback: base.playback.copyWith(currentSong: testSongA)),
-        'isPlaying': base.copyWith(playback: base.playback.copyWith(isPlaying: true)),
-        'duration': base.copyWith(playback: base.playback.copyWith(duration: const Duration(minutes: 3))),
-        'isShuffle': base.copyWith(playback: base.playback.copyWith(isShuffle: true)),
-        'repeatMode': base.copyWith(playback: base.playback.copyWith(repeatMode: PlayerRepeatMode.one)),
-        'queue': base.copyWith(queueSlice: base.queueSlice.copyWith(queue: [testSongA])),
-        'currentIndex': base.copyWith(queueSlice: base.queueSlice.copyWith(currentIndex: 2)),
-        'isExpanded': base.copyWith(playback: base.playback.copyWith(isExpanded: true)),
-        'dominantColor': base.copyWith(playback: base.playback.copyWith(dominantColor: const Color(0xFF112233))),
-        'sleepTimerRemaining': base.copyWith(playback: base.playback.copyWith(sleepTimerRemaining: const Duration(minutes: 15))),
-        'activeQueueSlot': base.copyWith(queueSlice: base.queueSlice.copyWith(activeQueueSlot: 1)),
-        'playbackSpeed': base.copyWith(playback: base.playback.copyWith(playbackSpeed: 1.25)),
-        'playbackPitch': base.copyWith(playback: base.playback.copyWith(playbackPitch: 1.1)),
-        'audioSessionId': base.copyWith(playback: base.playback.copyWith(audioSessionId: 42)),
-        'errorMessage': base.copyWith(playback: base.playback.copyWith(errorMessage: 'Network glitch')),
-        'abLoopEnabled': base.copyWith(playback: base.playback.copyWith(abLoopEnabled: true)),
-        'abPointA': base.copyWith(playback: base.playback.copyWith(abPointA: const Duration(seconds: 5))),
-        'abPointB': base.copyWith(playback: base.playback.copyWith(abPointB: const Duration(seconds: 25))),
-        'trackDelayMs': base.copyWith(playback: base.playback.copyWith(trackDelayMs: 150)),
-        'bookmarkPosition': base.copyWith(playback: base.playback.copyWith(bookmarkPosition: const Duration(minutes: 1))),
-        'silenceSkipSensitivity': base.copyWith(playback: base.playback.copyWith(silenceSkipSensitivity: 4)),
-        'currentSongRating': base.copyWith(playback: base.playback.copyWith(currentSongRating: 5)),
-        'currentSongEqOverride': base.copyWith(playback: base.playback.copyWith(currentSongEqOverride: 'Warm')),
-        'currentSongVolumeOverrideDb': base.copyWith(playback: base.playback.copyWith(currentSongVolumeOverrideDb: 2.5)),
-        'cueChapters': base.copyWith(queueSlice: base.queueSlice.copyWith(cueChapters: [
+        'currentSong': base.copyWith(
+            playback: base.playback.copyWith(currentSong: testSongA)),
+        'isPlaying':
+            base.copyWith(playback: base.playback.copyWith(isPlaying: true)),
+        'duration': base.copyWith(
+            playback:
+                base.playback.copyWith(duration: const Duration(minutes: 3))),
+        'isShuffle':
+            base.copyWith(playback: base.playback.copyWith(isShuffle: true)),
+        'repeatMode': base.copyWith(
+            playback: base.playback.copyWith(repeatMode: PlayerRepeatMode.one)),
+        'queue': base.copyWith(
+            queueSlice: base.queueSlice.copyWith(queue: [testSongA])),
+        'currentIndex': base.copyWith(
+            queueSlice: base.queueSlice.copyWith(currentIndex: 2)),
+        'isExpanded':
+            base.copyWith(playback: base.playback.copyWith(isExpanded: true)),
+        'dominantColor': base.copyWith(
+            playback:
+                base.playback.copyWith(dominantColor: const Color(0xFF112233))),
+        'sleepTimerRemaining': base.copyWith(
+            playback: base.playback
+                .copyWith(sleepTimerRemaining: const Duration(minutes: 15))),
+        'activeQueueSlot': base.copyWith(
+            queueSlice: base.queueSlice.copyWith(activeQueueSlot: 1)),
+        'playbackSpeed': base.copyWith(
+            playback: base.playback.copyWith(playbackSpeed: 1.25)),
+        'playbackPitch':
+            base.copyWith(playback: base.playback.copyWith(playbackPitch: 1.1)),
+        'audioSessionId':
+            base.copyWith(playback: base.playback.copyWith(audioSessionId: 42)),
+        'errorMessage': base.copyWith(
+            playback: base.playback.copyWith(errorMessage: 'Network glitch')),
+        'abLoopEnabled': base.copyWith(
+            playback: base.playback.copyWith(abLoopEnabled: true)),
+        'abPointA': base.copyWith(
+            playback:
+                base.playback.copyWith(abPointA: const Duration(seconds: 5))),
+        'abPointB': base.copyWith(
+            playback:
+                base.playback.copyWith(abPointB: const Duration(seconds: 25))),
+        'trackDelayMs':
+            base.copyWith(playback: base.playback.copyWith(trackDelayMs: 150)),
+        'bookmarkPosition': base.copyWith(
+            playback: base.playback
+                .copyWith(bookmarkPosition: const Duration(minutes: 1))),
+        'silenceSkipSensitivity': base.copyWith(
+            playback: base.playback.copyWith(silenceSkipSensitivity: 4)),
+        'currentSongRating': base.copyWith(
+            playback: base.playback.copyWith(currentSongRating: 5)),
+        'currentSongEqOverride': base.copyWith(
+            playback: base.playback.copyWith(currentSongEqOverride: 'Warm')),
+        'currentSongVolumeOverrideDb': base.copyWith(
+            playback: base.playback.copyWith(currentSongVolumeOverrideDb: 2.5)),
+        'cueChapters': base.copyWith(
+            queueSlice: base.queueSlice.copyWith(cueChapters: [
           const ChapterInfo(index: 1, title: 'Chapter 1', start: Duration.zero)
         ])),
-        'currentCueIndex': base.copyWith(queueSlice: base.queueSlice.copyWith(currentCueIndex: 1)),
+        'currentCueIndex': base.copyWith(
+            queueSlice: base.queueSlice.copyWith(currentCueIndex: 1)),
       };
 
       for (final entry in mutations.entries) {
@@ -101,23 +143,32 @@ void main() {
         expect(
           base.differsFromBeyondPosition(mutatedState),
           isTrue,
-          reason: 'Field $fieldName change should be detected by differsFromBeyondPosition',
+          reason:
+              'Field $fieldName change should be detected by differsFromBeyondPosition',
         );
       }
     });
 
-    test('PlayerState slice decomposition preserves all 101 fields with exact parity', () {
+    test(
+        'PlayerState slice decomposition preserves all 101 fields with exact parity',
+        () {
       const playbackFieldCount = 22;
       const queueFieldCount = 5;
       const lyricsFieldCount = 5;
       const dspFieldCount = 69;
 
-      const totalSliceFields = playbackFieldCount + queueFieldCount + lyricsFieldCount + dspFieldCount;
+      const totalSliceFields = playbackFieldCount +
+          queueFieldCount +
+          lyricsFieldCount +
+          dspFieldCount;
       expect(totalSliceFields, equals(101),
-          reason: 'Every field in the old 101-field monolith must appear in exactly one slice');
+          reason:
+              'Every field in the old 101-field monolith must appear in exactly one slice');
     });
 
-    test('DownloadsState & DownloadStatus state machine transitions and predicates', () {
+    test(
+        'DownloadsState & DownloadStatus state machine transitions and predicates',
+        () {
       expect(DownloadStatus.queued.isActive, isTrue);
       expect(DownloadStatus.downloading.isActive, isTrue);
       expect(DownloadStatus.tagging.isActive, isTrue);
@@ -153,7 +204,9 @@ void main() {
       expect(completedState.completedCount, 1);
     });
 
-    test('SmartCriteria operator x field combinatorial matrix produces valid JSON', () {
+    test(
+        'SmartCriteria operator x field combinatorial matrix produces valid JSON',
+        () {
       for (final field in SmartRuleField.values) {
         for (final op in SmartOperator.values) {
           final rule = SmartRule(
@@ -161,7 +214,8 @@ void main() {
             operator: op,
             value: 'test_value',
           );
-          final criteria = SmartCriteria(rules: [rule], limit: 25, sortBy: 'playCount');
+          final criteria =
+              SmartCriteria(rules: [rule], limit: 25, sortBy: 'playCount');
           final jsonString = criteria.toJsonString();
           final decoded = SmartCriteria.fromJsonString(jsonString);
 
@@ -174,7 +228,8 @@ void main() {
       }
     });
 
-    test('Edge case: LibraryCubit.toggleFavorite is a no-op when closed', () async {
+    test('Edge case: LibraryCubit.toggleFavorite is a no-op when closed',
+        () async {
       final mockSongs = MockGetSongsUseCase();
       final mockAlbums = MockGetAlbumsUseCase();
       final mockArtists = MockGetArtistsUseCase();
@@ -184,16 +239,23 @@ void main() {
       final mockToggle = MockToggleFavoriteUseCase();
       final mockFolders = MockFolderUseCases();
 
-      when(() => mockSongs.watchSongs(limit: any(named: 'limit'), sortBy: any(named: 'sortBy'), ascending: any(named: 'ascending')))
+      when(() => mockSongs.watchSongs(
+              limit: any(named: 'limit'),
+              sortBy: any(named: 'sortBy'),
+              ascending: any(named: 'ascending')))
           .thenAnswer((_) => const Stream.empty());
       when(() => mockAlbums.watchAlbums())
           .thenAnswer((_) => const Stream.empty());
       when(() => mockArtists.watchArtists())
           .thenAnswer((_) => const Stream.empty());
-      when(() => mockGenres.watchGenres()).thenAnswer((_) => const Stream.empty());
-      when(() => mockYears.watchYears()).thenAnswer((_) => const Stream.empty());
-      when(() => mockFavorites.watchFavorites()).thenAnswer((_) => const Stream.empty());
-      when(() => mockFolders.getExcludedFolders()).thenAnswer((_) async => const Right([]));
+      when(() => mockGenres.watchGenres())
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockYears.watchYears())
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockFavorites.watchFavorites())
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockFolders.getExcludedFolders())
+          .thenAnswer((_) async => const Right([]));
 
       final cubit = LibraryCubit(
         getSongsUseCase: mockSongs,

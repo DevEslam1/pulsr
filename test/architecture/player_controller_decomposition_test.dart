@@ -13,6 +13,7 @@ import 'package:pulsr/features/player/cubit/managers/player_sponsorblock_manager
 import 'package:pulsr/features/player/cubit/player_state.dart';
 
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}
+
 class MockMusicRepository extends Mock implements IMusicRepository {}
 
 void main() {
@@ -46,12 +47,15 @@ void main() {
       mockRepository = MockMusicRepository();
       when(() => mockAudioHandler.play()).thenAnswer((_) async {});
       when(() => mockAudioHandler.pause()).thenAnswer((_) async {});
-      when(() => mockAudioHandler.setEqualizerEnabled(any())).thenAnswer((_) async {});
+      when(() => mockAudioHandler.setEqualizerEnabled(any()))
+          .thenAnswer((_) async {});
       when(() => mockAudioHandler.applyPreset(any())).thenAnswer((_) async {});
-      when(() => mockAudioHandler.addToQueueEnd(any())).thenAnswer((_) async {});
+      when(() => mockAudioHandler.addToQueueEnd(any()))
+          .thenAnswer((_) async {});
     });
 
-    test('PlayerTransportController delegates play and pause correctly', () async {
+    test('PlayerTransportController delegates play and pause correctly',
+        () async {
       var state = const PlayerState();
       final controller = PlayerTransportController(
         audioHandler: mockAudioHandler,
@@ -71,7 +75,9 @@ void main() {
       controller.dispose();
     });
 
-    test('PlayerQueueController bounds queue size to maxQueueSize and adds tracks', () async {
+    test(
+        'PlayerQueueController bounds queue size to maxQueueSize and adds tracks',
+        () async {
       var state = const PlayerState();
       final lookupCache = <int, SongsTableData>{};
       final queueSlots = <int, QueueSlotData>{};
@@ -99,14 +105,15 @@ void main() {
       expect(lookupCache[10], equals(testSong));
     });
 
-    test('PlayerDspController delegates equalizer and effects updates', () async {
+    test('PlayerDspController delegates equalizer and effects updates',
+        () async {
       var state = const PlayerState();
       final controller = PlayerDspController(
         audioHandler: mockAudioHandler,
         settingsCubit: null,
         getState: () => state,
         emit: (s) => state = s,
-        syncAudioEffects: () {},
+        syncAudioEffects: ({bool force = false}) {},
         isClosed: () => false,
       );
 
@@ -122,8 +129,10 @@ void main() {
       verify(() => mockAudioHandler.applyPreset(preset)).called(1);
     });
 
-    test('PlayerMetadataController executes cue chapters check cleanly', () async {
-      var state = const PlayerState(playback: PlaybackSlice(currentSong: testSong));
+    test('PlayerMetadataController executes cue chapters check cleanly',
+        () async {
+      var state =
+          const PlayerState(playback: PlaybackSlice(currentSong: testSong));
       final controller = PlayerMetadataController(
         lyricsManager: PlayerLyricsManager(),
         sponsorBlockManager: PlayerSponsorBlockManager(),
@@ -148,8 +157,12 @@ void main() {
         isClosed: () => false,
       );
 
-      expect(() => bridge.updateWidgetThrottled(const PlayerState(), queueVersion: 1), returnsNormally);
-      expect(() => bridge.updateProgressThrottled(const PlayerState()), returnsNormally);
+      expect(
+          () => bridge.updateWidgetThrottled(const PlayerState(),
+              queueVersion: 1),
+          returnsNormally);
+      expect(() => bridge.updateProgressThrottled(const PlayerState()),
+          returnsNormally);
       bridge.dispose();
     });
   });

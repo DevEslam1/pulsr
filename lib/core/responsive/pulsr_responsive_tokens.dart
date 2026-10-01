@@ -54,16 +54,23 @@ class PulsrViewport {
   });
 
   /// Factory resolving the viewport directly from the active [BuildContext].
-  factory PulsrViewport.fromContext(BuildContext context, [BoxConstraints? constraints]) {
+  factory PulsrViewport.fromContext(BuildContext context,
+      [BoxConstraints? constraints]) {
     final mq = MediaQuery.maybeOf(context);
     final width = mq?.size.width ??
-        (constraints?.maxWidth.isFinite == true ? constraints!.maxWidth : 390.0);
+        (constraints?.maxWidth.isFinite == true
+            ? constraints!.maxWidth
+            : 390.0);
     final height = mq?.size.height ??
-        (constraints?.maxHeight.isFinite == true ? constraints!.maxHeight : 844.0);
+        (constraints?.maxHeight.isFinite == true
+            ? constraints!.maxHeight
+            : 844.0);
 
-    final orientation = width > height ? Orientation.landscape : Orientation.portrait;
+    final orientation =
+        width > height ? Orientation.landscape : Orientation.portrait;
     final sizeClass = PulsrBreakpoint.fromWidth(width);
-    final isShortHeight = height < 500.0 && orientation == Orientation.landscape;
+    final isShortHeight =
+        height < 500.0 && orientation == Orientation.landscape;
     final isUltraWide = width >= 1200.0;
 
     final hinge = PulsrBreakpoint.hinge(context);
@@ -121,7 +128,8 @@ class PulsrViewport {
   }
 
   /// BoxConstraints applying [contentMaxWidth].
-  BoxConstraints get contentConstraints => BoxConstraints(maxWidth: contentMaxWidth);
+  BoxConstraints get contentConstraints =>
+      BoxConstraints(maxWidth: contentMaxWidth);
 
   /// Adaptive column count for media grids.
   int get gridColumns {
@@ -146,10 +154,12 @@ class PulsrViewport {
 
   /// Optimal navigation paradigm.
   PulsrNavMode get navMode {
-    if (deviceClass == PulsrDeviceClass.desktop || sizeClass == PulsrBreakpoint.large) {
+    if (deviceClass == PulsrDeviceClass.desktop ||
+        sizeClass == PulsrBreakpoint.large) {
       return PulsrNavMode.sideRailExtended;
     }
-    if (deviceClass == PulsrDeviceClass.tablet || sizeClass >= PulsrBreakpoint.expanded) {
+    if (deviceClass == PulsrDeviceClass.tablet ||
+        sizeClass >= PulsrBreakpoint.expanded) {
       return orientation == Orientation.landscape
           ? PulsrNavMode.sideRailExtended
           : PulsrNavMode.sideRail;
@@ -163,13 +173,17 @@ class PulsrViewport {
   /// Audio player layout mode.
   PulsrPlayerMode get playerMode {
     if (orientation == Orientation.landscape) return PulsrPlayerMode.splitPane;
-    if (deviceClass == PulsrDeviceClass.tablet && width >= 720.0 && width > height * 0.85) {
+    if (deviceClass == PulsrDeviceClass.tablet &&
+        width >= 720.0 &&
+        width > height * 0.85) {
       return PulsrPlayerMode.splitPane;
     }
     return PulsrPlayerMode.fullScreen;
   }
 
-  bool get isTablet => deviceClass == PulsrDeviceClass.tablet || deviceClass == PulsrDeviceClass.desktop;
+  bool get isTablet =>
+      deviceClass == PulsrDeviceClass.tablet ||
+      deviceClass == PulsrDeviceClass.desktop;
   bool get isPhone => deviceClass == PulsrDeviceClass.phone;
   bool get isPortrait => orientation == Orientation.portrait;
   bool get isLandscape => orientation == Orientation.landscape;
@@ -177,7 +191,8 @@ class PulsrViewport {
   /// Retrieves the cached [PulsrViewport] from [PulsrViewportScope], or falls back
   /// to creating one on-the-fly from the current [BuildContext].
   static PulsrViewport of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<PulsrViewportScope>();
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<PulsrViewportScope>();
     if (scope != null) return scope.viewport;
     return PulsrViewport.fromContext(context);
   }

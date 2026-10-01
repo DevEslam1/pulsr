@@ -129,8 +129,10 @@ class PrefsKeys {
   static const String dynamicBassXHigh = 'setting_dynamic_bass_x_high';
   static const String dynamicBassYLow = 'setting_dynamic_bass_y_low';
   static const String dynamicBassYHigh = 'setting_dynamic_bass_y_high';
-  static const String dynamicBassSideGainLow = 'setting_dynamic_bass_side_gain_low';
-  static const String dynamicBassSideGainHigh = 'setting_dynamic_bass_side_gain_high';
+  static const String dynamicBassSideGainLow =
+      'setting_dynamic_bass_side_gain_low';
+  static const String dynamicBassSideGainHigh =
+      'setting_dynamic_bass_side_gain_high';
   static const String dynamicBassPreset = 'setting_dynamic_bass_preset';
 
   // JamesDSP feature parity stages
@@ -152,8 +154,10 @@ class PrefsKeys {
 
   // FIX(B3): Cloud sync preferences keys
   static const String cloudSyncLastTimestamp = 'cloud_sync_last_timestamp';
-  static const String cloudSyncFavoritesEnabled = 'cloud_sync_favorites_enabled';
-  static const String cloudSyncPlaylistsEnabled = 'cloud_sync_playlists_enabled';
+  static const String cloudSyncFavoritesEnabled =
+      'cloud_sync_favorites_enabled';
+  static const String cloudSyncPlaylistsEnabled =
+      'cloud_sync_playlists_enabled';
   // Live store is 'cloud_sync_hashes_cache' (CloudSyncService._keySyncedHashes);
   // the '_doc_hashes_v1' value was a dead duplicate (orphan 20-01).
   static const String cloudSyncDocHashes = 'cloud_sync_hashes_cache';
@@ -176,7 +180,8 @@ class PrefsKeys {
   static const String scrobbleOfflineQueue = 'scrobbler_offline_queue';
 
   static const String systemEffectsPolicy = 'setting_system_effects_policy';
-  static const String bluetoothLatencyOffsetMs = 'setting_bluetooth_latency_offset_ms';
+  static const String bluetoothLatencyOffsetMs =
+      'setting_bluetooth_latency_offset_ms';
 
   // Aliases for backwards compatibility with tests and services
   static const String scrobblerLastSong = scrobblePendingSong;
@@ -212,7 +217,8 @@ class PrefsKeys {
   // F-27: manual loudness normalization toggle (read by PulsrAudioHandler).
   static const String audioNormalizationEnabled = 'audio_normalization_enabled';
 
-  static const String dspPreference = 'setting_dsp_preference'; // 'native' | 'oem' | 'auto'
+  static const String dspPreference =
+      'setting_dsp_preference'; // 'native' | 'oem' | 'auto'
   static const String ditherEnabled = 'setting_dither_enabled';
   static const String ditherTargetBitDepth = 'setting_dither_target_bit_depth';
   static const String mqaDecodingEnabled = 'setting_mqa_decoding_enabled';
@@ -252,10 +258,8 @@ class PrefsKeys {
   // through a native AAudio stream (EXCLUSIVE attempt, SHARED fallback) and
   // the DSP processor chain is bypassed for bit-perfect output.
   static const String aaudioOutputEnabled = 'setting_aaudio_output_enabled';
-  static const String aaudioPreferExclusive =
-      'setting_aaudio_prefer_exclusive';
-  static const String aaudioTargetBufferMs =
-      'setting_aaudio_target_buffer_ms';
+  static const String aaudioPreferExclusive = 'setting_aaudio_prefer_exclusive';
+  static const String aaudioTargetBufferMs = 'setting_aaudio_target_buffer_ms';
 
   // Resampler quality: 0 = Fast (linear), 1 = Standard (16-tap),
   // 2 = High (32-tap), 3 = Ultra (64-tap, default).
@@ -289,7 +293,8 @@ class PrefsKeys {
   // and track; 'manual' leaves the user's explicit choices untouched.
   static const String smartAudioMode = 'setting_smart_audio_mode';
   // Per-device AutoEQ matches remembered by device key (see DeviceProfileService).
-  static const String smartAudioAutoEqLinks = 'setting_smart_audio_autoeq_links';
+  static const String smartAudioAutoEqLinks =
+      'setting_smart_audio_autoeq_links';
 
   // UI complexity: 'normal' (default, curated) | 'professional' (full controls).
   static const String experienceMode = 'setting_experience_mode';
@@ -299,8 +304,7 @@ class PrefsKeys {
   // headset/BT route reconnects within [autoResumeTimeoutSec].
   static const String autoResumeOnReconnect =
       'setting_auto_resume_on_reconnect';
-  static const String autoResumeTimeoutSec =
-      'setting_auto_resume_timeout_sec';
+  static const String autoResumeTimeoutSec = 'setting_auto_resume_timeout_sec';
   // When true the media notification is kept after pause (requires app
   // restart: AudioServiceConfig is init-time only).
   static const String keepNotificationOnPause =

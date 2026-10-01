@@ -29,7 +29,8 @@ class GestureHintOverlay extends StatefulWidget {
     required this.message,
     this.icon = Icons.touch_app_rounded,
     this.alignment = Alignment.bottomCenter,
-    this.padding = const EdgeInsetsDirectional.only(bottom: 80, start: 16, end: 16),
+    this.padding =
+        const EdgeInsetsDirectional.only(bottom: 80, start: 16, end: 16),
     this.autoDismissDuration = const Duration(seconds: 7),
   });
 
@@ -109,7 +110,7 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
                     vertical: AppSpacing.xs,
                   ),
                   decoration: BoxDecoration(
-                    color: (p.isDark ? const Color(0xFF161824) : Colors.white)
+                    color: (p.isDark ? p.surfaceContainerHigh : p.surface)
                         .withValues(alpha: 0.94),
                     borderRadius: BorderRadius.circular(AppRadii.r20),
                     border: Border.all(
@@ -118,7 +119,8 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.15),
+                        color: Colors.black
+                            .withValues(alpha: p.isDark ? 0.45 : 0.15),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),

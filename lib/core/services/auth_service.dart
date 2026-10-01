@@ -66,8 +66,8 @@ class AuthService {
       }
 
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-      final authz =
-          await googleUser.authorizationClient.authorizationForScopes(['email']);
+      final authz = await googleUser.authorizationClient
+          .authorizationForScopes(['email']);
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: authz?.accessToken,
         idToken: googleAuth.idToken,

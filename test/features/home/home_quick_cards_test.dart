@@ -48,7 +48,9 @@ void main() {
     ),
   ];
 
-  testWidgets('QuickActionsRow in short height landscape (800x380) does not throw ParentDataWidget error', (tester) async {
+  testWidgets(
+      'QuickActionsRow in short height landscape (800x380) does not throw ParentDataWidget error',
+      (tester) async {
     tester.view.physicalSize = const Size(800, 380);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -70,7 +72,8 @@ void main() {
     expect(find.text('Focus Flow'), findsOneWidget);
   });
 
-  testWidgets('QuickActionsRow in narrow portrait (320x600) does not overflow', (tester) async {
+  testWidgets('QuickActionsRow in narrow portrait (320x600) does not overflow',
+      (tester) async {
     tester.view.physicalSize = const Size(320, 600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -92,7 +95,9 @@ void main() {
     expect(find.text('Focus Flow'), findsOneWidget);
   });
 
-  testWidgets('QuickActionsRow in standard portrait (390x844) does not overflow', (tester) async {
+  testWidgets(
+      'QuickActionsRow in standard portrait (390x844) does not overflow',
+      (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {

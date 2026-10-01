@@ -47,13 +47,16 @@ void main() {
   });
 
   group('Issue 2: AutomationRulesService default and delete', () {
-    test('getRules returns empty list when no rules saved (no phantom defaults)', () async {
+    test(
+        'getRules returns empty list when no rules saved (no phantom defaults)',
+        () async {
       final service = AutomationRulesService();
       final rules = await service.getRules();
       expect(rules, isEmpty);
     });
 
-    test('saveRule, getRules, and deleteRule correctly mutate persisted list', () async {
+    test('saveRule, getRules, and deleteRule correctly mutate persisted list',
+        () async {
       final service = AutomationRulesService();
       const rule1 = AutomationRule(
         id: 'rule_1',
@@ -81,7 +84,8 @@ void main() {
   });
 
   group('Issue 3: ThemeSchedulerService re-start after dispose', () {
-    test('startScheduler can be safely called after dispose without throwing', () async {
+    test('startScheduler can be safely called after dispose without throwing',
+        () async {
       final service = ThemeSchedulerService();
       bool changed = false;
       service.startScheduler((isNight) {
@@ -105,7 +109,8 @@ void main() {
   });
 
   group('Issue 4: PulsrCubit dual-closed-state race', () {
-    test('safeEmit and emitEffect do not throw when cubit is closing/closed', () async {
+    test('safeEmit and emitEffect do not throw when cubit is closing/closed',
+        () async {
       final cubit = _TestCubit();
       cubit.doSafeEmit(1);
       expect(cubit.state, equals(1));
@@ -115,14 +120,16 @@ void main() {
       expect(() => cubit.doSafeEmit(2), returnsNormally);
       expect(cubit.state, equals(1)); // Did not emit into closed cubit
 
-      expect(() => cubit.doEmitEffect(const ShowToastEffect('test')), returnsNormally);
+      expect(() => cubit.doEmitEffect(const ShowToastEffect('test')),
+          returnsNormally);
     });
   });
 
   group('Issue 6: ArtistBioService LRU caching & parallel calls', () {
     test('LRU cache evicts oldest and refreshes on hit', () async {
       final mockClient = MockClient((request) async {
-        return http.Response('{"data": [{"picture_xl": "https://img.test"}]}', 200);
+        return http.Response(
+            '{"data": [{"picture_xl": "https://img.test"}]}', 200);
       });
 
       final service = ArtistBioService(mockClient);
@@ -137,7 +144,8 @@ void main() {
   });
 
   group('Issue 7: BatteryOptimizationService nullable battery level', () {
-    test('getBatteryLevel returns null on test environment without throwing', () async {
+    test('getBatteryLevel returns null on test environment without throwing',
+        () async {
       final level = await BatteryOptimizationService.getBatteryLevel();
       // On non-Android / test environment, returns null rather than hardcoded 100
       expect(level, isNull);
@@ -148,7 +156,8 @@ void main() {
     test('getSegments caches and clearCache clears', () async {
       final mockClient = MockClient((request) async {
         return http.Response(
-            '[{"category": "sponsor", "segment": [10.0, 20.0], "UUID": "u1"}]', 200);
+            '[{"category": "sponsor", "segment": [10.0, 20.0], "UUID": "u1"}]',
+            200);
       });
 
       final service = SponsorBlockService(mockClient);

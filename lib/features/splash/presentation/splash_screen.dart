@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 borderRadius: BorderRadius.circular(AppRadii.r24),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF2940).withValues(alpha: 0.45),
+                    color: p.favorite.withValues(alpha: 0.45),
                     blurRadius: 36,
                     spreadRadius: 4,
                     offset: const Offset(0, 8),
@@ -120,8 +120,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     letterSpacing: AppTracking.medium,
                   ),
             ).animate().fadeIn(
-                delay: context.motionMs(500),
-                duration: context.motionMs(600)),
+                delay: context.motionMs(500), duration: context.motionMs(600)),
             if (_timedOut) ...[
               const SizedBox(height: AppSpacing.lg),
               FilledButton.icon(

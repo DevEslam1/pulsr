@@ -23,6 +23,7 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+
 class YtmWebLoginSheet extends StatefulWidget {
   // Use the modern Google accounts sign-in flow (v3 identifier endpoint).
   // The older ServiceLogin URL is more aggressively fingerprinted for
@@ -128,7 +129,8 @@ class YtmWebLoginSheet extends StatefulWidget {
     if (urlStr.startsWith('market://') ||
         urlStr.startsWith('intent://') ||
         urlStr.contains('play.google.com') ||
-        (urlStr.contains('google.com/url') && urlStr.contains('play.google.com'))) {
+        (urlStr.contains('google.com/url') &&
+            urlStr.contains('play.google.com'))) {
       return NavigationActionPolicy.CANCEL;
     }
 
@@ -405,19 +407,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// Music web player renders instead of Google Play redirects.
   static final UnmodifiableListView<UserScript> _antiFingerPrintScripts =
       UnmodifiableListView<UserScript>([
-        UserScript(
-          source: EmbeddedBrowserUa.antiFingerprint,
-          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-        ),
-        UserScript(
-          source: _ytmBrowseGuardJs,
-          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-        ),
-        UserScript(
-          source: _ytmViewportEnforceJs,
-          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_END,
-        ),
-      ]);
+    UserScript(
+      source: EmbeddedBrowserUa.antiFingerprint,
+      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+    ),
+    UserScript(
+      source: _ytmBrowseGuardJs,
+      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+    ),
+    UserScript(
+      source: _ytmViewportEnforceJs,
+      injectionTime: UserScriptInjectionTime.AT_DOCUMENT_END,
+    ),
+  ]);
 
   static const List<String> _blockPhrases = [
     "couldn't sign you in",
@@ -521,9 +523,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     super.initState();
     _currentUrl = widget.initialUrl != null
         ? _withGeoParams(widget.initialUrl!)
-        : (widget.isBrowseMode
-            ? YtmLocale.homeUrl()
-            : googleSignInUrl);
+        : (widget.isBrowseMode ? YtmLocale.homeUrl() : googleSignInUrl);
 
     // Pre-seed Egypt region preference cookie for YouTube domains
     try {
@@ -546,8 +546,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       // perfectly good, forcing a real re-login over something transient.
       accountService.validateSessionDetailed().then((verdict) {
         if (!mounted) return;
-        setState(() =>
-            _isLoggedIn = verdict != SessionValidationResult.invalid);
+        setState(
+            () => _isLoggedIn = verdict != SessionValidationResult.invalid);
         if (verdict == SessionValidationResult.invalid) {
           _clearCookiesAndReset(); // start the re-login with a CLEAN jar (fixes B6)
         }
@@ -586,7 +586,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       _settings = YtmWebLoginSheet.buildDefaultSettings(userAgent: initialUa);
 
       _hintTimer = Timer(const Duration(seconds: 30), () {
-        if (_disposed || !mounted || _webViewGone || _isLoggedIn || widget.isBrowseMode) return;
+        if (_disposed ||
+            !mounted ||
+            _webViewGone ||
+            _isLoggedIn ||
+            widget.isBrowseMode) {
+          return;
+        }
         setState(() => _showHint = true);
       });
 
@@ -594,8 +600,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       _scheduleNextAuthPoll();
       if (mounted) setState(() {});
     } catch (e, st) {
-      ErrorLogger.log('Failed to bootstrap WebView settings in _bootstrapSettings',
-          error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      ErrorLogger.log(
+          'Failed to bootstrap WebView settings in _bootstrapSettings',
+          error: e,
+          stackTrace: st,
+          category: 'YtmWebLoginSheet');
       if (!mounted) return;
       setState(() {
         _settings = YtmWebLoginSheet.buildDefaultSettings(
@@ -625,7 +634,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       debugPrint('[YtmWebLogin] Runtime WebView UA: $normalized');
       return normalized;
     } catch (e) {
-      debugPrint('[YtmWebLogin] getDefaultUserAgent failed, using fallback: $e');
+      debugPrint(
+          '[YtmWebLogin] getDefaultUserAgent failed, using fallback: $e');
       return EmbeddedBrowserUa.mobile;
     }
   }
@@ -638,7 +648,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   void _scheduleNextAuthPoll() {
     _authPollTimer?.cancel();
-    if (_disposed || !mounted || _isLoggedIn || _webViewGone || _pollState == _AuthPollState.dead || _pollState == _AuthPollState.done) return;
+    if (_disposed ||
+        !mounted ||
+        _isLoggedIn ||
+        _webViewGone ||
+        _pollState == _AuthPollState.dead ||
+        _pollState == _AuthPollState.done) {
+      return;
+    }
     if (_authPollAttempts >= _maxPollAttempts) {
       debugPrint('[YtmWebLogin] Max poll attempts reached, stopping.');
       _pollState = _AuthPollState.idle;
@@ -650,7 +667,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     _authPollTimer = Timer(Duration(seconds: _pollIntervalSeconds), () async {
       if (_disposed) return;
-      if (!mounted || _isLoggedIn || _webViewGone || generation != _pollGeneration || _pollState == _AuthPollState.dead) return;
+      if (!mounted ||
+          _isLoggedIn ||
+          _webViewGone ||
+          generation != _pollGeneration ||
+          _pollState == _AuthPollState.dead) {
+        return;
+      }
       if (_webViewController != null && !_isLoading) {
         final loggedIn = await _checkIfLoggedIn();
         if (_disposed || !mounted || generation != _pollGeneration) return;
@@ -658,7 +681,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           _pollState = _AuthPollState.done;
           return;
         }
-        if (_disposed || _webViewGone || _webViewController == null || generation != _pollGeneration) {
+        if (_disposed ||
+            _webViewGone ||
+            _webViewController == null ||
+            generation != _pollGeneration) {
           _pollState = _AuthPollState.dead;
           return;
         }
@@ -786,7 +812,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       unawaited(_navigateTo(target));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.cookiesCleared),
+          SnackBar(
+            content: Text(context.l10n.cookiesCleared),
             duration: Duration(seconds: 2),
           ),
         );
@@ -919,7 +946,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     // Already recovering or showing recovery options.
     if (_blockStatus != null || _blockExhausted) return;
 
-    debugPrint('[YtmWebLogin] Google block detected — presenting recovery options.');
+    debugPrint(
+        '[YtmWebLogin] Google block detected — presenting recovery options.');
     setState(() {
       _blockExhausted = true;
       _blockStatus = null;
@@ -954,7 +982,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _settings = base;
     await controller?.setSettings(settings: base);
   }
-
 
   /// Recovery card "Retry": manual full ladder — reset attempts, clean
   /// session, default identity selection, reload.
@@ -991,8 +1018,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     if (mounted && !_disposed) {
       setState(() {
         _blockExhausted = false;
-        _blockStatus =
-            'Reloading with ${identity.name} browser identity…';
+        _blockStatus = 'Reloading with ${identity.name} browser identity…';
       });
     }
     await _clearWebViewCookiesAndCache();
@@ -1037,9 +1063,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     // `loadUrl` on a dead handle throws asynchronously; unawaited, that became an
     // unhandled rejection rather than reaching _handleWebViewError.
     if (loadUrlFuture != null) {
-      unawaited(loadUrlFuture.catchError(
-          (Object e, StackTrace st) => _handleWebViewError(
-              '_navigateTo loadUrl failed', e, st)));
+      unawaited(loadUrlFuture.catchError((Object e, StackTrace st) =>
+          _handleWebViewError('_navigateTo loadUrl failed', e, st)));
     }
   }
 
@@ -1178,7 +1203,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           return true;
         }
       } catch (e, st) {
-        ErrorLogger.log('toString failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+        ErrorLogger.log('toString failed',
+            error: e, stackTrace: st, category: 'YtmWebLoginSheet');
       }
     }
 
@@ -1217,7 +1243,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               jar.entries.map((e) => '${e.key}=${e.value}').join('; '));
         }
       } catch (e, st) {
-        ErrorLogger.log('_forceSaveAndFinish failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+        ErrorLogger.log('_forceSaveAndFinish failed',
+            error: e, stackTrace: st, category: 'YtmWebLoginSheet');
       }
     }
 
@@ -1241,7 +1268,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           cookies = cookieStr;
         }
       } catch (e, st) {
-        ErrorLogger.log('toString failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+        ErrorLogger.log('toString failed',
+            error: e, stackTrace: st, category: 'YtmWebLoginSheet');
       }
     }
 
@@ -1267,7 +1295,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     if (mounted) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(context.l10n.completeSignInFirst),
+        SnackBar(
+          content: Text(context.l10n.completeSignInFirst),
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 2),
         ),
@@ -1286,8 +1315,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     // Expand height cleanly down to the bottom of the screen with proper status bar clearance
     final safeTop = topPadding > 0 ? topPadding : 24.0;
-    final targetHeight = (totalHeight - safeTop - (isBrowse ? 8 : 16))
-        .clamp(300.0, totalHeight);
+    final targetHeight =
+        (totalHeight - safeTop - (isBrowse ? 8 : 16)).clamp(300.0, totalHeight);
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -1298,13 +1327,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         ),
         child: AnimatedPadding(
           padding: EdgeInsets.only(bottom: bottomInset),
-            duration: context.motionMs(150),
+          duration: context.motionMs(150),
           child: Container(
             height: targetHeight,
             decoration: BoxDecoration(
               color: p.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(AppRadii.r24)),
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadii.r24)),
               border: Border.all(color: p.hairline),
               boxShadow: [
                 BoxShadow(
@@ -1321,7 +1350,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 children: [
                   // Top Drag Handle & Bar
                   Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.s10, AppSpacing.md, AppSpacing.s6),
+                    padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
+                        AppSpacing.s10, AppSpacing.md, AppSpacing.s6),
                     child: Column(
                       children: [
                         Center(
@@ -1368,11 +1398,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 child: Container(
                                   height: 36,
                                   padding: const EdgeInsets.symmetric(
-
                                       horizontal: AppSpacing.s10),
                                   decoration: BoxDecoration(
                                     color: p.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(AppRadii.r10),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r10),
                                     border: Border.all(color: p.hairline),
                                   ),
                                   child: Row(
@@ -1416,8 +1446,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             child: ListView(
                               scrollDirection: Axis.horizontal,
                               padding: const EdgeInsets.symmetric(
-
-                                  horizontal: AppSpacing.xxs, vertical: AppSpacing.s2),
+                                  horizontal: AppSpacing.xxs,
+                                  vertical: AppSpacing.s2),
                               children: [
                                 _navChip(
                                   label: context.l10n.browseHome,
@@ -1445,9 +1475,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 _navChip(
                                   label: context.l10n.likedMusic,
                                   icon: Icons.favorite_rounded,
-                                  url:
-                                      YtmLocale.withLocaleParams(
-                                          'https://music.youtube.com/playlist?list=LM'),
+                                  url: YtmLocale.withLocaleParams(
+                                      'https://music.youtube.com/playlist?list=LM'),
                                   p: p,
                                 ),
                                 const SizedBox(width: AppSpacing.s6),
@@ -1503,7 +1532,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   children: [
                                     Text(
                                       _isLoggedIn
-                                          ? context.l10n.browseLoggedInSuccessfully
+                                          ? context
+                                              .l10n.browseLoggedInSuccessfully
                                           : context.l10n.browseSignInToYtm,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1516,7 +1546,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     const SizedBox(height: AppSpacing.s2),
                                     Text(
                                       _isLoggedIn
-                                          ? context.l10n.browseAccountConnectedDone
+                                          ? context
+                                              .l10n.browseAccountConnectedDone
                                           : context.l10n.browseConnectToSync,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1543,7 +1574,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     size: 15,
                                     color: Colors.white,
                                   ),
-                                  label: Text(context.l10n.doneAction,
+                                  label: Text(
+                                    context.l10n.doneAction,
                                     style: TextStyle(
                                       fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w700,
@@ -1555,14 +1587,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     elevation: 2,
                                     visualDensity: VisualDensity.compact,
                                     padding: const EdgeInsets.symmetric(
-
                                       horizontal: AppSpacing.s10,
                                       vertical: AppSpacing.s6,
                                     ),
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.r8),
                                     ),
                                   ),
                                 ),
@@ -1575,18 +1608,20 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     elevation: 0,
                                     visualDensity: VisualDensity.compact,
                                     padding: const EdgeInsets.symmetric(
-
                                       horizontal: AppSpacing.s10,
                                       vertical: AppSpacing.s6,
                                     ),
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.r8),
                                       side: BorderSide(color: p.hairline),
                                     ),
                                   ),
-                                  child: Text(context.l10n.doneAction,
+                                  child: Text(
+                                    context.l10n.doneAction,
                                     style: TextStyle(
                                       fontSize: AppFontSize.label,
                                       fontWeight: FontWeight.w600,
@@ -1596,7 +1631,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 ),
                                 const SizedBox(width: AppSpacing.s2),
                                 IconButton(
-                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  icon: const Icon(Icons.refresh_rounded,
+                                      size: 18),
                                   tooltip: context.l10n.browseRefreshPage,
                                   padding: const EdgeInsets.all(AppSpacing.s6),
                                   constraints: const BoxConstraints(),
@@ -1604,14 +1640,16 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 ),
                                 const SizedBox(width: AppSpacing.s2),
                                 PopupMenuButton<String>(
-                                  icon: const Icon(Icons.more_vert_rounded, size: 18),
+                                  icon: const Icon(Icons.more_vert_rounded,
+                                      size: 18),
                                   tooltip: context.l10n.browseMoreOptions,
                                   padding: const EdgeInsets.all(AppSpacing.s6),
                                   constraints: const BoxConstraints(),
                                   onSelected: (action) {
                                     switch (action) {
                                       case 'ytm_web':
-                                        _navigateTo('https://music.youtube.com');
+                                        _navigateTo(
+                                            'https://music.youtube.com');
                                         break;
                                       case 'manual_cookies':
                                         _showManualCookieDialog(context);
@@ -1640,7 +1678,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                           Icon(Icons.vpn_key_rounded,
                                               size: 18, color: p.textSecondary),
                                           const SizedBox(width: AppSpacing.xs),
-                                          Text(context.l10n.importCookiesManual),
+                                          Text(
+                                              context.l10n.importCookiesManual),
                                         ],
                                       ),
                                     ),
@@ -1677,10 +1716,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   if (!isBrowse && _isLoggedIn)
                     Container(
                       margin: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.success.withValues(alpha: 0.15),
@@ -1694,7 +1731,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               size: 18, color: p.success),
                           const SizedBox(width: AppSpacing.xs),
                           Expanded(
-                            child: Text(context.l10n.loginDetected,
+                            child: Text(
+                              context.l10n.loginDetected,
                               style: TextStyle(
                                 fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w600,
@@ -1708,10 +1746,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   else if (!isBrowse && _showHint)
                     Container(
                       margin: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: Colors.amber.withValues(alpha: 0.15),
@@ -1725,9 +1761,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               size: 18, color: p.warning),
                           const SizedBox(width: AppSpacing.xs),
                           Expanded(
-                            child: Text(context.l10n.confirmAccount,
-                              style:
-                                  TextStyle(fontSize: AppFontSize.label, color: p.textPrimary),
+                            child: Text(
+                              context.l10n.confirmAccount,
+                              style: TextStyle(
+                                  fontSize: AppFontSize.label,
+                                  color: p.textPrimary),
                             ),
                           ),
                         ],
@@ -1738,10 +1776,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   if (!isBrowse && _blockStatus != null)
                     Container(
                       margin: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.12),
@@ -1751,7 +1787,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       ),
                       child: Row(
                         children: [
-                          SizedBox(width: AppSpacing.s14,
+                          SizedBox(
+                            width: AppSpacing.s14,
                             height: 14,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: p.accent),
@@ -1774,7 +1811,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   if (_isGeoBlocked)
                     Container(
                       margin: const EdgeInsets.symmetric(
-
                           horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                       padding: const EdgeInsets.all(AppSpacing.s10),
                       decoration: BoxDecoration(
@@ -1792,7 +1828,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   color: p.warning, size: 17),
                               const SizedBox(width: AppSpacing.xs),
                               Expanded(
-                                child: Text(context.l10n.ytmRestricted,
+                                child: Text(
+                                  context.l10n.ytmRestricted,
                                   style: TextStyle(
                                     fontSize: AppFontSize.label,
                                     fontWeight: FontWeight.w700,
@@ -1803,9 +1840,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             ],
                           ),
                           const SizedBox(height: AppSpacing.xxs),
-                          Text(context.l10n.ipOutsideYtm,
+                          Text(
+                            context.l10n.ipOutsideYtm,
                             style: TextStyle(
-                                fontSize: AppFontSize.caption, color: p.textSecondary),
+                                fontSize: AppFontSize.caption,
+                                color: p.textSecondary),
                           ),
                           const SizedBox(height: AppSpacing.xs),
                           Row(
@@ -1813,16 +1852,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               FilledButton.icon(
                                 onPressed: _forceEgRegionReload,
                                 icon: const Text('🇪🇬',
-                                    style: TextStyle(fontSize: AppFontSize.label)),
+                                    style:
+                                        TextStyle(fontSize: AppFontSize.label)),
                                 label: Text(context.l10n.forceEgypt,
-                                    style: TextStyle(fontSize: AppFontSize.caption)),
+                                    style: TextStyle(
+                                        fontSize: AppFontSize.caption)),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(
-
-                                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                                      horizontal: AppSpacing.s10,
+                                      vertical: AppSpacing.xxs),
                                   minimumSize: Size.zero,
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
@@ -1835,12 +1876,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 icon: const Icon(Icons.video_library_rounded,
                                     size: 13),
                                 label: Text(context.l10n.openYtWeb,
-                                    style: TextStyle(fontSize: AppFontSize.caption)),
+                                    style: TextStyle(
+                                        fontSize: AppFontSize.caption)),
                                 style: OutlinedButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
                                   padding: const EdgeInsets.symmetric(
-
-                                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                                      horizontal: AppSpacing.s10,
+                                      vertical: AppSpacing.xxs),
                                   minimumSize: Size.zero,
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
@@ -1861,7 +1903,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         }
                         return Semantics(
                           label: 'Page loading progress',
-                          value: _isLoading ? null : '${(progress * 100).round()}%',
+                          value: _isLoading
+                              ? null
+                              : '${(progress * 100).round()}%',
                           child: LinearProgressIndicator(
                             value: _isLoading ? null : progress,
                             backgroundColor: p.surfaceContainer,
@@ -1885,191 +1929,230 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           )
                         : (!isBrowse && _blockExhausted)
                             ? _buildBlockRecoveryCard(p)
-                            : (_webViewGone || _deadHandleHits >= _maxDeadHandleHits)
+                            : (_webViewGone ||
+                                    _deadHandleHits >= _maxDeadHandleHits)
                                 ? _buildDeadWebViewCard(p)
                                 : ClipRRect(
-                      child: InAppWebView(
-                        initialUrlRequest: URLRequest(
-                          url: WebUri(_currentUrl),
-                        ),
-                        initialSettings: _settings,
-                        initialUserScripts: _antiFingerPrintScripts,
-                        gestureRecognizers: const <Factory<
-                            OneSequenceGestureRecognizer>>{
-                          Factory<OneSequenceGestureRecognizer>(
-                            EagerGestureRecognizer.new,
-                          ),
-                        },
-                        onWebViewCreated: (controller) {
-                          _webViewController = controller;
-                          final wasGone = _webViewGone;
-                          _webViewGone = false;
-                          // A fresh native instance: check immediately if already logged in,
-                          // otherwise resume auth poll loop.
-                          if (wasGone) {
-                            _pollIntervalSeconds = 2;
-                            _authPollAttempts = 0;
-                          }
-                          unawaited(_checkIfLoggedIn().then((loggedIn) {
-                            if (!loggedIn && mounted && !_disposed && wasGone) {
-                              _scheduleNextAuthPoll();
-                            }
-                          }));
-                        },
-                        onCreateWindow: (controller, createWindowAction) async {
-                          final url = createWindowAction.request.url;
-                          if (url != null) {
-                            final urlStr = url.toString().toLowerCase();
-                            if (urlStr.startsWith('market://') ||
-                                urlStr.startsWith('intent://') ||
-                                urlStr.contains('play.google.com')) {
-                              return false;
-                            }
-                            await controller.loadUrl(
-                                urlRequest: URLRequest(url: url));
-                          }
-                          return true;
-                        },
-                        shouldOverrideUrlLoading:
-                            (controller, navigationAction) async {
-                          final uri = navigationAction.request.url;
-                          final policy = YtmWebLoginSheet.evaluateNavigation(uri);
-                          if (policy == NavigationActionPolicy.CANCEL) {
-                            if (uri != null) {
-                              final urlLower = uri.toString().toLowerCase();
-                              if (urlLower.startsWith('market://') ||
-                                  urlLower.startsWith('intent://') ||
-                                  urlLower.contains('play.google.com')) {
-                                if (!widget.isBrowseMode && !urlLower.contains('music')) {
-                                  unawaited(_navigateTo(googleSignInUrl));
-                                } else {
-                                  unawaited(_navigateTo('https://music.youtube.com'));
-                                }
-                              }
-                            }
-                            return NavigationActionPolicy.CANCEL;
-                          }
-                          return NavigationActionPolicy.ALLOW;
-                        },
-                        onLoadStart: (controller, url) async {
-                          if (mounted) setState(() => _isLoading = true);
-                          final urlStr = url?.toString() ?? '';
-                          final urlLower = urlStr.toLowerCase();
+                                    child: InAppWebView(
+                                      initialUrlRequest: URLRequest(
+                                        url: WebUri(_currentUrl),
+                                      ),
+                                      initialSettings: _settings,
+                                      initialUserScripts:
+                                          _antiFingerPrintScripts,
+                                      gestureRecognizers: const <Factory<
+                                          OneSequenceGestureRecognizer>>{
+                                        Factory<OneSequenceGestureRecognizer>(
+                                          EagerGestureRecognizer.new,
+                                        ),
+                                      },
+                                      onWebViewCreated: (controller) {
+                                        _webViewController = controller;
+                                        final wasGone = _webViewGone;
+                                        _webViewGone = false;
+                                        // A fresh native instance: check immediately if already logged in,
+                                        // otherwise resume auth poll loop.
+                                        if (wasGone) {
+                                          _pollIntervalSeconds = 2;
+                                          _authPollAttempts = 0;
+                                        }
+                                        unawaited(
+                                            _checkIfLoggedIn().then((loggedIn) {
+                                          if (!loggedIn &&
+                                              mounted &&
+                                              !_disposed &&
+                                              wasGone) {
+                                            _scheduleNextAuthPoll();
+                                          }
+                                        }));
+                                      },
+                                      onCreateWindow: (controller,
+                                          createWindowAction) async {
+                                        final url =
+                                            createWindowAction.request.url;
+                                        if (url != null) {
+                                          final urlStr =
+                                              url.toString().toLowerCase();
+                                          if (urlStr.startsWith('market://') ||
+                                              urlStr.startsWith('intent://') ||
+                                              urlStr.contains(
+                                                  'play.google.com')) {
+                                            return false;
+                                          }
+                                          await controller.loadUrl(
+                                              urlRequest: URLRequest(url: url));
+                                        }
+                                        return true;
+                                      },
+                                      shouldOverrideUrlLoading:
+                                          (controller, navigationAction) async {
+                                        final uri =
+                                            navigationAction.request.url;
+                                        final policy =
+                                            YtmWebLoginSheet.evaluateNavigation(
+                                                uri);
+                                        if (policy ==
+                                            NavigationActionPolicy.CANCEL) {
+                                          if (uri != null) {
+                                            final urlLower =
+                                                uri.toString().toLowerCase();
+                                            if (urlLower
+                                                    .startsWith('market://') ||
+                                                urlLower
+                                                    .startsWith('intent://') ||
+                                                urlLower.contains(
+                                                    'play.google.com')) {
+                                              if (!widget.isBrowseMode &&
+                                                  !urlLower.contains('music')) {
+                                                unawaited(_navigateTo(
+                                                    googleSignInUrl));
+                                              } else {
+                                                unawaited(_navigateTo(
+                                                    'https://music.youtube.com'));
+                                              }
+                                            }
+                                          }
+                                          return NavigationActionPolicy.CANCEL;
+                                        }
+                                        return NavigationActionPolicy.ALLOW;
+                                      },
+                                      onLoadStart: (controller, url) async {
+                                        if (mounted) {
+                                          setState(() => _isLoading = true);
+                                        }
+                                        final urlStr = url?.toString() ?? '';
+                                        final urlLower = urlStr.toLowerCase();
 
-                          // Fail-safe: if WebView started navigating to Google Play, stop and bounce to YTM
-                          if (urlLower.contains('play.google.com') ||
-                              urlLower.startsWith('market://') ||
-                              urlLower.startsWith('intent://')) {
-                            debugPrint(
-                                '[YtmWebLogin] onLoadStart caught Google Play link, returning to music.youtube.com');
-                            unawaited(controller.stopLoading());
-                            final fallback = widget.isBrowseMode
-                                ? 'https://music.youtube.com'
-                                : googleSignInUrl;
-                            unawaited(_navigateTo(fallback));
-                            return;
-                          }
-                        },
-                        onProgressChanged: (controller, progress) {
-                          if (_disposed) return;
-                          // F-17: no setState — progress ticks only rebuild
-                          // the ValueListenableBuilder bar above.
-                          _progressNotifier.value = progress / 100;
-                        },
-                        onLoadStop: (controller, url) async {
-                          if (mounted) setState(() => _isLoading = false);
-                          await _updateNavState();
-                          final urlStr = url?.toString() ?? '';
-                          final urlLower = urlStr.toLowerCase();
+                                        // Fail-safe: if WebView started navigating to Google Play, stop and bounce to YTM
+                                        if (urlLower
+                                                .contains('play.google.com') ||
+                                            urlLower.startsWith('market://') ||
+                                            urlLower.startsWith('intent://')) {
+                                          debugPrint(
+                                              '[YtmWebLogin] onLoadStart caught Google Play link, returning to music.youtube.com');
+                                          unawaited(controller.stopLoading());
+                                          final fallback = widget.isBrowseMode
+                                              ? 'https://music.youtube.com'
+                                              : googleSignInUrl;
+                                          unawaited(_navigateTo(fallback));
+                                          return;
+                                        }
+                                      },
+                                      onProgressChanged:
+                                          (controller, progress) {
+                                        if (_disposed) return;
+                                        // F-17: no setState — progress ticks only rebuild
+                                        // the ValueListenableBuilder bar above.
+                                        _progressNotifier.value =
+                                            progress / 100;
+                                      },
+                                      onLoadStop: (controller, url) async {
+                                        if (mounted) {
+                                          setState(() => _isLoading = false);
+                                        }
+                                        await _updateNavState();
+                                        final urlStr = url?.toString() ?? '';
+                                        final urlLower = urlStr.toLowerCase();
 
-                          // Fail-safe: if loaded page landed on Google Play, bounce back to YouTube Music
-                          if (urlLower.contains('play.google.com')) {
-                            debugPrint(
-                                '[YtmWebLogin] onLoadStop landed on play.google.com, bouncing to music.youtube.com');
-                            final fallback = widget.isBrowseMode
-                                ? 'https://music.youtube.com'
-                                : googleSignInUrl;
-                            unawaited(_navigateTo(fallback));
-                            return;
-                          }
+                                        // Fail-safe: if loaded page landed on Google Play, bounce back to YouTube Music
+                                        if (urlLower
+                                            .contains('play.google.com')) {
+                                          debugPrint(
+                                              '[YtmWebLogin] onLoadStop landed on play.google.com, bouncing to music.youtube.com');
+                                          final fallback = widget.isBrowseMode
+                                              ? 'https://music.youtube.com'
+                                              : googleSignInUrl;
+                                          unawaited(_navigateTo(fallback));
+                                          return;
+                                        }
 
-                          final parsedUrl = Uri.tryParse(urlStr);
-                          final host = parsedUrl?.host ?? '';
+                                        final parsedUrl = Uri.tryParse(urlStr);
+                                        final host = parsedUrl?.host ?? '';
 
-                          // Check for Geo-block ("not available in your area" / "not available in your country")
-                          if (urlLower.contains('music.youtube.com')) {
-                            final isGeoBlocked =
-                                await _scanPageForGeoBlock(controller);
-                            if (mounted && _isGeoBlocked != isGeoBlocked) {
-                              setState(() => _isGeoBlocked = isGeoBlocked);
-                            }
-                          } else {
-                            if (mounted && _isGeoBlocked) {
-                              setState(() => _isGeoBlocked = false);
-                            }
-                          }
+                                        // Check for Geo-block ("not available in your area" / "not available in your country")
+                                        if (urlLower
+                                            .contains('music.youtube.com')) {
+                                          final isGeoBlocked =
+                                              await _scanPageForGeoBlock(
+                                                  controller);
+                                          if (mounted &&
+                                              _isGeoBlocked != isGeoBlocked) {
+                                            setState(() =>
+                                                _isGeoBlocked = isGeoBlocked);
+                                          }
+                                        } else {
+                                          if (mounted && _isGeoBlocked) {
+                                            setState(
+                                                () => _isGeoBlocked = false);
+                                          }
+                                        }
 
-                          // --- Google block detection ("This browser or app
-                          // may not be secure") ---
-                          if (host == 'accounts.google.com' ||
-                              host == 'accounts.youtube.com') {
-                            final blockedByUrl = _matchesBlockedUrl(parsedUrl);
-                            final blockedByText = blockedByUrl
-                                ? false
-                                : (_shouldScanForBlockPage()
-                                    ? await _scanPageForBlockText(controller)
-                                    : false);
-                            if (blockedByUrl || blockedByText) {
-                              _handleGoogleBlock();
-                              return;
-                            }
-                          }
+                                        // --- Google block detection ("This browser or app
+                                        // may not be secure") ---
+                                        if (host == 'accounts.google.com' ||
+                                            host == 'accounts.youtube.com') {
+                                          final blockedByUrl =
+                                              _matchesBlockedUrl(parsedUrl);
+                                          final blockedByText = blockedByUrl
+                                              ? false
+                                              : (_shouldScanForBlockPage()
+                                                  ? await _scanPageForBlockText(
+                                                      controller)
+                                                  : false);
+                                          if (blockedByUrl || blockedByText) {
+                                            _handleGoogleBlock();
+                                            return;
+                                          }
+                                        }
 
-                          // Only bounce if Google navigated to an actual CookieMismatch or block error page.
-                          if (_isCookieMismatchUrl(urlStr)) {
-                            if (_isLoggedIn) {
-                              _isLoggedIn = false;
-                              _detectedCookies = null;
-                              if (mounted) setState(() {});
-                            }
-                            _handleCookieMismatch();
-                            return;
-                          }
+                                        // Only bounce if Google navigated to an actual CookieMismatch or block error page.
+                                        if (_isCookieMismatchUrl(urlStr)) {
+                                          if (_isLoggedIn) {
+                                            _isLoggedIn = false;
+                                            _detectedCookies = null;
+                                            if (mounted) setState(() {});
+                                          }
+                                          _handleCookieMismatch();
+                                          return;
+                                        }
 
-                          // Do not capture on Google Sign-In or EU consent screens before the user finishes
-                          if (_isAuthInProgressUrl(urlStr) ||
-                              host == 'consent.youtube.com' ||
-                              host == 'consent.google.com' ||
-                              host.startsWith('consent.')) {
-                            return;
-                          }
+                                        // Do not capture on Google Sign-In or EU consent screens before the user finishes
+                                        if (_isAuthInProgressUrl(urlStr) ||
+                                            host == 'consent.youtube.com' ||
+                                            host == 'consent.google.com' ||
+                                            host.startsWith('consent.')) {
+                                          return;
+                                        }
 
-                          if (host.endsWith('youtube.com') ||
-                              host == 'youtu.be') {
-                            _hadSuccessfulYtLoad = true;
-                            _pollIntervalSeconds = 2;
-                            _scheduleNextAuthPoll();
-                          }
-                          _mismatchAutoNavCount = 0;
-                          await _checkIfLoggedIn(urlStr);
-                        },
-                        onReceivedError: (controller, request, error) {
-                          debugPrint(
-                              '[YtmWebLogin] Web resource error: ${error.type} - ${error.description}');
-                          if (mounted) setState(() => _isLoading = false);
-                        },
-                        onUpdateVisitedHistory:
-                            (controller, url, isReload) async {
-                          await _updateNavState();
-                          final urlStr = url?.toString() ?? '';
-                          if (urlStr.isNotEmpty &&
-                              !_isCookieMismatchUrl(urlStr) &&
-                              !_isAuthInProgressUrl(urlStr)) {
-                            await _checkIfLoggedIn(urlStr);
-                          }
-                        },
-                      ),
-                    ),
+                                        if (host.endsWith('youtube.com') ||
+                                            host == 'youtu.be') {
+                                          _hadSuccessfulYtLoad = true;
+                                          _pollIntervalSeconds = 2;
+                                          _scheduleNextAuthPoll();
+                                        }
+                                        _mismatchAutoNavCount = 0;
+                                        await _checkIfLoggedIn(urlStr);
+                                      },
+                                      onReceivedError:
+                                          (controller, request, error) {
+                                        debugPrint(
+                                            '[YtmWebLogin] Web resource error: ${error.type} - ${error.description}');
+                                        if (mounted) {
+                                          setState(() => _isLoading = false);
+                                        }
+                                      },
+                                      onUpdateVisitedHistory:
+                                          (controller, url, isReload) async {
+                                        await _updateNavState();
+                                        final urlStr = url?.toString() ?? '';
+                                        if (urlStr.isNotEmpty &&
+                                            !_isCookieMismatchUrl(urlStr) &&
+                                            !_isAuthInProgressUrl(urlStr)) {
+                                          await _checkIfLoggedIn(urlStr);
+                                        }
+                                      },
+                                    ),
+                                  ),
                   ),
                 ],
               ),
@@ -2096,24 +2179,33 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     String identityLabel(BrowserIdentity id) {
       switch (id) {
-        case BrowserIdentity.chromeDesktop: return 'Chrome Desktop';
-        case BrowserIdentity.mobile: return 'Chrome Mobile';
-        case BrowserIdentity.safariMobile: return 'Safari Mobile';
-        case BrowserIdentity.desktop: return 'Firefox Desktop';
+        case BrowserIdentity.chromeDesktop:
+          return 'Chrome Desktop';
+        case BrowserIdentity.mobile:
+          return 'Chrome Mobile';
+        case BrowserIdentity.safariMobile:
+          return 'Safari Mobile';
+        case BrowserIdentity.desktop:
+          return 'Firefox Desktop';
       }
     }
 
     IconData identityIcon(BrowserIdentity id) {
       switch (id) {
-        case BrowserIdentity.chromeDesktop: return Icons.desktop_windows_rounded;
-        case BrowserIdentity.mobile: return Icons.smartphone_rounded;
-        case BrowserIdentity.safariMobile: return Icons.phone_iphone_rounded;
-        case BrowserIdentity.desktop: return Icons.laptop_windows_rounded;
+        case BrowserIdentity.chromeDesktop:
+          return Icons.desktop_windows_rounded;
+        case BrowserIdentity.mobile:
+          return Icons.smartphone_rounded;
+        case BrowserIdentity.safariMobile:
+          return Icons.phone_iphone_rounded;
+        case BrowserIdentity.desktop:
+          return Icons.laptop_windows_rounded;
       }
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s20, vertical: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2146,7 +2238,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 Text(
                   context.l10n.browseGoogleBlockingBody,
                   style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.label, height: 1.4),
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.label,
+                      height: 1.4),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
@@ -2194,8 +2288,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           OutlinedButton.icon(
             onPressed: () => _switchIdentityManually(otherIdentity),
             icon: Icon(identityIcon(otherIdentity), size: 18),
-            label: Text(
-                context.l10n.tryIdentity(identityLabel(otherIdentity)),
+            label: Text(context.l10n.tryIdentity(identityLabel(otherIdentity)),
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
@@ -2237,9 +2330,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             ),
           ),
           const SizedBox(height: AppSpacing.s10),
-          Text(context.l10n.googleBlockTip,
+          Text(
+            context.l10n.googleBlockTip,
             textAlign: TextAlign.center,
-            style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+            style:
+                TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
           ),
         ],
       ),
@@ -2310,7 +2405,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       onTap: () => _navigateTo(url),
       borderRadius: BorderRadius.circular(AppRadii.r8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: isCurrent ? p.accentContainer : p.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(AppRadii.r8),
@@ -2360,8 +2456,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               ),
               const SizedBox(width: AppSpacing.s10),
               Expanded(
-                child: Text(context.l10n.importCookiesManual,
-                  style: TextStyle(fontSize: AppFontSize.bodyLarge, fontWeight: FontWeight.w800),
+                child: Text(
+                  context.l10n.importCookiesManual,
+                  style: TextStyle(
+                      fontSize: AppFontSize.bodyLarge,
+                      fontWeight: FontWeight.w800),
                 ),
               ),
             ],
@@ -2371,18 +2470,26 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(context.l10n.googleBlockHelp,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label, height: 1.4),
+                Text(
+                  context.l10n.googleBlockHelp,
+                  style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.label,
+                      height: 1.4),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextField(
                   controller: textController,
                   maxLines: 4,
                   enabled: !busy,
-                  style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.label, fontFamily: 'monospace'),
+                  style: TextStyle(
+                      color: p.textPrimary,
+                      fontSize: AppFontSize.label,
+                      fontFamily: 'monospace'),
                   decoration: InputDecoration(
                     hintText: 'SAPISID=...; __Secure-3PSID=...; SID=...',
-                    hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+                    hintStyle: TextStyle(
+                        color: p.textTertiary, fontSize: AppFontSize.caption),
                     filled: true,
                     fillColor: p.surfaceContainer,
                     errorText: errorText,
@@ -2419,10 +2526,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       // `Cookie:` prefix and per-cookie attributes, and the shape
                       // check has to run on what will actually be sent. The old
                       // substring trim of `cookie:` left all of that in place.
-                      final cookieStr = YtmAccountService.normalizeCookieHeader(input);
-                      if (!YtmAccountService.looksLikeSignedInCookies(cookieStr)) {
-                        setDialogState(() =>
-                            errorText = l10n.browseMissingSessionCookies);
+                      final cookieStr =
+                          YtmAccountService.normalizeCookieHeader(input);
+                      if (!YtmAccountService.looksLikeSignedInCookies(
+                          cookieStr)) {
+                        setDialogState(
+                            () => errorText = l10n.browseMissingSessionCookies);
                         return;
                       }
                       // Snapshot the jar we may have to put back: saveSession

@@ -118,7 +118,8 @@ class YtDownloadService {
   /// download begun from there was an ordinary background task Android was free
   /// to kill the moment the app left the foreground.
   bool _foregroundServiceRunning = false;
-  bool _processing = false; // FIX-A03: Guard against re-entrant calls in _processQueue
+  bool _processing =
+      false; // FIX-A03: Guard against re-entrant calls in _processQueue
   /// FIX-A05/C05: track resolved stream duration.
   /// F12: bounded — it used to hold one entry per video id for the whole
   /// process lifetime, and nothing ever removed one.
@@ -358,7 +359,9 @@ class YtDownloadService {
   }
 
   void _processQueue() {
-    if (_processing) return; // FIX-A03: Guard against re-entrant calls with a _processing bool flag
+    if (_processing) {
+      return; // FIX-A03: Guard against re-entrant calls with a _processing bool flag
+    }
     _processing = true; // FIX-A03: Mark processing active
     try {
       while (_activeDownloads.length < _maxConcurrentDownloads &&
@@ -392,7 +395,8 @@ class YtDownloadService {
       }
       _stopForegroundServiceIfIdle();
     } finally {
-      _processing = false; // FIX-A03: Reset flag when queue processing turn completes
+      _processing =
+          false; // FIX-A03: Reset flag when queue processing turn completes
     }
   }
 
@@ -495,8 +499,8 @@ class YtDownloadService {
           }
         }
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
 
       var ext = safeExtension(stream.container);
       temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
@@ -576,11 +580,10 @@ class YtDownloadService {
           ext = sniffedExt;
           File? renamed;
           try {
-            renamed =
-                await temp.rename(p.join(dir.path, 'ytdl_$videoId.$ext'));
+            renamed = await temp.rename(p.join(dir.path, 'ytdl_$videoId.$ext'));
           } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
           if (renamed != null) temp = renamed;
         }
       }
@@ -588,7 +591,8 @@ class YtDownloadService {
       // 3. Tagging — artwork embed + tag standardization (TagEditorPlugin)
       if (ext == 'm4a') {
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
-        ErrorLogger.addBreadcrumb('Download tagging: $videoId', category: 'download');
+        ErrorLogger.addBreadcrumb('Download tagging: $videoId',
+            category: 'download');
         final artPath = artworkFuture != null ? await artworkFuture : null;
         await _tag(temp.path, song, artworkPath: artPath);
       }
@@ -622,7 +626,11 @@ class YtDownloadService {
           category: 'download', data: {'path': finalPath});
       final realBitrate = stream.bitrateKbps > 0
           ? stream.bitrateKbps
-          : (quality == 'low' ? 64 : quality == 'medium' ? 128 : 160);
+          : (quality == 'low'
+              ? 64
+              : quality == 'medium'
+                  ? 128
+                  : 160);
       final realCodec = mimeType.contains('webm') ||
               mimeType.contains('opus') ||
               ext == 'webm'
@@ -665,8 +673,10 @@ class YtDownloadService {
       return result;
     } on YtmException catch (e) {
       final classified = YtmErrorClassifier.classify(e);
-      ErrorLogger.log('YTM download YtmException: ${e.code} → ${classified.message}',
-          error: e, category: 'download');
+      ErrorLogger.log(
+          'YTM download YtmException: ${e.code} → ${classified.message}',
+          error: e,
+          category: 'download');
       if (e.isBotBlocked) {
         return Left(DownloadFailure(
           classified.message,
@@ -674,9 +684,7 @@ class YtDownloadService {
         ));
       }
       return Left(DownloadFailure(
-        e.isNetwork
-            ? 'No connection while downloading'
-            : classified.message,
+        e.isNetwork ? 'No connection while downloading' : classified.message,
         e,
       ));
     } on PlatformException catch (e) {
@@ -700,8 +708,8 @@ class YtDownloadService {
             }
           }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
       }
       if (temp != null) {
         try {
@@ -709,8 +717,8 @@ class YtDownloadService {
             await temp.delete();
           }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
       }
       if (tempArt != null) {
         try {
@@ -718,15 +726,15 @@ class YtDownloadService {
             await tempArt!.delete();
           }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
       }
       _lastForegroundPublishMs.remove(videoId);
     }
   }
 
-  Future<YtmStream> resolveDownloadStream(String videoId, [String quality = 'high',
-      bool forceRefresh = false]) async {
+  Future<YtmStream> resolveDownloadStream(String videoId,
+      [String quality = 'high', bool forceRefresh = false]) async {
     if (forceRefresh && getIt.isRegistered<YtmUrlCache>()) {
       // Nothing used to evict the entry, so the "transparent re-resolution"
       // after a 403 read the same dead URL straight back out of the cache and
@@ -740,7 +748,8 @@ class YtDownloadService {
     final native = await _ytmService.resolveStream(videoId,
         quality: quality, forceRefresh: forceRefresh, preferM4a: true);
     final resolved = native.withResolvedExpiry();
-    _resolvedStreams[videoId] = resolved; // FIX-A05/C05: Store resolved stream for duration lookup
+    _resolvedStreams[videoId] =
+        resolved; // FIX-A05/C05: Store resolved stream for duration lookup
     if (_resolvedStreams.length > _maxResolvedStreams) {
       // F12: drop the oldest ids rather than growing for the process lifetime.
       for (final id in _resolvedStreams.keys
@@ -753,7 +762,7 @@ class YtDownloadService {
   }
 
   Future<YtmStream> _resolveDownloadStream(String videoId, String quality,
-      {bool forceRefresh = false}) =>
+          {bool forceRefresh = false}) =>
       resolveDownloadStream(videoId, quality, forceRefresh);
 
   /// Downloads the audio into [dest], re-resolving when the URL is the problem.
@@ -785,8 +794,8 @@ class YtDownloadService {
         if (currentStream.isExpiringSoon(requiredLifetime(currentStream))) {
           debugPrint(
               '[YtDownloadService] Stream for $videoId cannot outlive the download, re-resolving...');
-          currentStream =
-              await _resolveDownloadStream(videoId, quality, forceRefresh: true);
+          currentStream = await _resolveDownloadStream(videoId, quality,
+              forceRefresh: true);
         }
 
         await _downloadFileResilient(
@@ -968,8 +977,8 @@ class YtDownloadService {
 
       if (probeResp.statusCode == HttpStatus.forbidden ||
           probeResp.statusCode == HttpStatus.unauthorized) {
-        throw YtmException('YTM_BOT_BLOCKED',
-            'HTTP ${probeResp.statusCode} on stream probe');
+        throw YtmException(
+            'YTM_BOT_BLOCKED', 'HTTP ${probeResp.statusCode} on stream probe');
       }
 
       rangesSupported = probeResp.statusCode == HttpStatus.partialContent &&
@@ -1038,276 +1047,287 @@ class YtDownloadService {
     var mergeCompleted = false;
     var keepParts = false;
 
-    try { // FIX-A02: Outer try to catch _RangeIgnored outside the inner try/finally
+    try {
+      // FIX-A02: Outer try to catch _RangeIgnored outside the inner try/finally
       try {
         try {
           final freeBytes =
-            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
-        // Peak usage is twice the body: the four parts all exist while the
-        // merged copy is being written. Checking against `total` alone let a
-        // download start with just enough room for the parts and hit ENOSPC
-        // halfway through the merge, which threw away the whole transfer.
-        if (freeBytes > 0 && freeBytes < total * 2) {
-          throw const DownloadFailure('Insufficient storage space');
+              await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+          // Peak usage is twice the body: the four parts all exist while the
+          // merged copy is being written. Checking against `total` alone let a
+          // download start with just enough room for the parts and hit ENOSPC
+          // halfway through the merge, which threw away the whole transfer.
+          if (freeBytes > 0 && freeBytes < total * 2) {
+            throw const DownloadFailure('Insufficient storage space');
+          }
+        } catch (e) {
+          if (e is DownloadFailure) rethrow;
         }
-      } catch (e) {
-        if (e is DownloadFailure) rethrow;
-      }
 
-      final futures = <Future<void>>[];
+        final futures = <Future<void>>[];
 
+        for (var i = 0; i < _concurrentChunks; i++) {
+          final chunkIndex = i;
+          final start = i * chunkSize;
+          final end = (i == _concurrentChunks - 1)
+              ? total - 1
+              : (start + chunkSize - 1);
+          if (start >= total) break;
 
-      for (var i = 0; i < _concurrentChunks; i++) {
-        final chunkIndex = i;
-        final start = i * chunkSize;
-        final end =
-            (i == _concurrentChunks - 1) ? total - 1 : (start + chunkSize - 1);
-        if (start >= total) break;
+          final partFile =
+              File(p.join(dir.path, '${p.basename(dest.path)}.part$i'));
+          tempParts.add(partFile);
 
-        final partFile =
-            File(p.join(dir.path, '${p.basename(dest.path)}.part$i'));
-        tempParts.add(partFile);
-
-        futures.add(() async {
-          final expectedSize = end - start + 1;
-          var have = 0;
-          try {
-            if (await partFile.exists()) {
-              have = resumable ? await partFile.length() : 0;
-              // Longer than its slot means the part was written for different
-              // boundaries; there is nothing safe to keep.
-              if (have > expectedSize) have = 0;
-              if (have == 0) await partFile.delete();
-            }
-          } catch (_) {
-            have = 0;
-          }
-          chunkReceived[chunkIndex] = have;
-          // Already complete from an earlier attempt. Asking anyway would send
-          // `bytes=${end + 1}-$end` and come back 416.
-          if (have == expectedSize) return;
-
-          if (task.isCanceled ||
-              _canceledVideoIds.contains(task.song.remoteId)) {
-            throw const DownloadFailure('Download canceled');
-          }
-
-          final req = await _http.getUrl(uri);
-          _applyStreamHeaders(req, userAgent,
-              cookies: cookies, range: 'bytes=${start + have}-$end');
-          final resp = await req.close().timeout(_stallTimeout);
-
-          if (resp.statusCode == 429) {
-            final retryAfter = resp.headers.value(HttpHeaders.retryAfterHeader);
-            final retrySec = int.tryParse(retryAfter ?? '');
-            await resp.drain<void>();
-            throw YtmException('YTM_429',
-                'HTTP 429 Rate limited${retrySec != null ? ' Retry-After: $retrySec' : ''}');
-          }
-          if (resp.statusCode == HttpStatus.forbidden ||
-              resp.statusCode == HttpStatus.unauthorized) {
-            await resp.drain<void>();
-            throw YtmException('YTM_BOT_BLOCKED',
-                'HTTP ${resp.statusCode} on chunk $chunkIndex');
-          }
-          // A 200 to a ranged request means the whole body is coming: written
-          // into this part it is neither the chunk that was asked for nor a
-          // resume, so the transfer goes to the sequential path instead of
-          // merging four copies of the same file.
-          if (resp.statusCode == HttpStatus.ok) {
-            await resp.drain<void>();
-            throw const _RangeIgnored();
-          }
-          if (resp.statusCode != HttpStatus.partialContent) {
-            await resp.drain<void>();
-            throw DownloadFailure(
-                'HTTP ${resp.statusCode} for chunk $chunkIndex');
-          }
-
-          final sink = partFile.openWrite(
-              mode: have > 0 ? FileMode.append : FileMode.write);
-          try {
-            // Per-event watchdog. A googlevideo edge that accepts the request
-            // and then stops sending used to hang the download until the OS
-            // gave up minutes later, with the notification frozen at whatever
-            // percentage it had reached and no retry ever attempted.
-            await for (final chunk in resp.timeout(_stallTimeout)) {
-              if (task.isCanceled ||
-                  _canceledVideoIds.contains(task.song.remoteId)) {
-                throw const DownloadFailure('Download canceled');
+          futures.add(() async {
+            final expectedSize = end - start + 1;
+            var have = 0;
+            try {
+              if (await partFile.exists()) {
+                have = resumable ? await partFile.length() : 0;
+                // Longer than its slot means the part was written for different
+                // boundaries; there is nothing safe to keep.
+                if (have > expectedSize) have = 0;
+                if (have == 0) await partFile.delete();
               }
-              try {
-                sink.add(chunk);
-              } on FileSystemException catch (e) {
-                final m = e.message.toLowerCase();
-                if (m.contains('no space') || m.contains('enospc') || e.osError?.errorCode == 28) {
-                  throw const StorageFailure('Storage full while writing chunk');
+            } catch (_) {
+              have = 0;
+            }
+            chunkReceived[chunkIndex] = have;
+            // Already complete from an earlier attempt. Asking anyway would send
+            // `bytes=${end + 1}-$end` and come back 416.
+            if (have == expectedSize) return;
+
+            if (task.isCanceled ||
+                _canceledVideoIds.contains(task.song.remoteId)) {
+              throw const DownloadFailure('Download canceled');
+            }
+
+            final req = await _http.getUrl(uri);
+            _applyStreamHeaders(req, userAgent,
+                cookies: cookies, range: 'bytes=${start + have}-$end');
+            final resp = await req.close().timeout(_stallTimeout);
+
+            if (resp.statusCode == 429) {
+              final retryAfter =
+                  resp.headers.value(HttpHeaders.retryAfterHeader);
+              final retrySec = int.tryParse(retryAfter ?? '');
+              await resp.drain<void>();
+              throw YtmException('YTM_429',
+                  'HTTP 429 Rate limited${retrySec != null ? ' Retry-After: $retrySec' : ''}');
+            }
+            if (resp.statusCode == HttpStatus.forbidden ||
+                resp.statusCode == HttpStatus.unauthorized) {
+              await resp.drain<void>();
+              throw YtmException('YTM_BOT_BLOCKED',
+                  'HTTP ${resp.statusCode} on chunk $chunkIndex');
+            }
+            // A 200 to a ranged request means the whole body is coming: written
+            // into this part it is neither the chunk that was asked for nor a
+            // resume, so the transfer goes to the sequential path instead of
+            // merging four copies of the same file.
+            if (resp.statusCode == HttpStatus.ok) {
+              await resp.drain<void>();
+              throw const _RangeIgnored();
+            }
+            if (resp.statusCode != HttpStatus.partialContent) {
+              await resp.drain<void>();
+              throw DownloadFailure(
+                  'HTTP ${resp.statusCode} for chunk $chunkIndex');
+            }
+
+            final sink = partFile.openWrite(
+                mode: have > 0 ? FileMode.append : FileMode.write);
+            try {
+              // Per-event watchdog. A googlevideo edge that accepts the request
+              // and then stops sending used to hang the download until the OS
+              // gave up minutes later, with the notification frozen at whatever
+              // percentage it had reached and no retry ever attempted.
+              await for (final chunk in resp.timeout(_stallTimeout)) {
+                if (task.isCanceled ||
+                    _canceledVideoIds.contains(task.song.remoteId)) {
+                  throw const DownloadFailure('Download canceled');
                 }
-                rethrow;
-              }
-              chunkReceived[chunkIndex] += chunk.length;
-              final totalReceived = chunkReceived.reduce((a, b) => a + b);
-              if (onProgress != null && total > 0) {
-                final now = DateTime.now().millisecondsSinceEpoch;
-                if (now - lastEmitTime > 80 || totalReceived >= total) {
-                  lastEmitTime = now;
-                  final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
-                  final speedKbps = elapsedSeconds > 0
-                      ? (totalReceived / elapsedSeconds) / 1024.0
-                      : 0.0;
-                  final fraction = (totalReceived / total).clamp(0.0, 1.0);
-                  final remainingBytes =
-                      (total - totalReceived).clamp(0, total);
-                  final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
-                      ? (remainingBytes / (speedKbps * 1024.0)).round()
-                      : null;
+                try {
+                  sink.add(chunk);
+                } on FileSystemException catch (e) {
+                  final m = e.message.toLowerCase();
+                  if (m.contains('no space') ||
+                      m.contains('enospc') ||
+                      e.osError?.errorCode == 28) {
+                    throw const StorageFailure(
+                        'Storage full while writing chunk');
+                  }
+                  rethrow;
+                }
+                chunkReceived[chunkIndex] += chunk.length;
+                final totalReceived = chunkReceived.reduce((a, b) => a + b);
+                if (onProgress != null && total > 0) {
+                  final now = DateTime.now().millisecondsSinceEpoch;
+                  if (now - lastEmitTime > 80 || totalReceived >= total) {
+                    lastEmitTime = now;
+                    final elapsedSeconds =
+                        stopwatch.elapsedMilliseconds / 1000.0;
+                    final speedKbps = elapsedSeconds > 0
+                        ? (totalReceived / elapsedSeconds) / 1024.0
+                        : 0.0;
+                    final fraction = (totalReceived / total).clamp(0.0, 1.0);
+                    final remainingBytes =
+                        (total - totalReceived).clamp(0, total);
+                    final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
+                        ? (remainingBytes / (speedKbps * 1024.0)).round()
+                        : null;
 
-                  onProgress(YtDownloadProgress(
-                    YtDownloadStage.downloading,
-                    fraction,
-                    speedKbps,
-                    etaSeconds,
-                  ));
+                    onProgress(YtDownloadProgress(
+                      YtDownloadStage.downloading,
+                      fraction,
+                      speedKbps,
+                      etaSeconds,
+                    ));
+                  }
                 }
               }
+              await sink.flush();
+              final totalBytes = chunkReceived.reduce((a, b) => a + b);
+              _sampleThroughput(totalBytes, stopwatch.elapsed);
+            } on FileSystemException catch (e) {
+              final m = e.message.toLowerCase();
+              if (m.contains('no space') ||
+                  m.contains('enospc') ||
+                  e.osError?.errorCode == 28) {
+                throw const StorageFailure('Storage full while writing chunk');
+              }
+              rethrow;
+            } finally {
+              await sink.close();
             }
-            await sink.flush();
-            final totalBytes = chunkReceived.reduce((a, b) => a + b);
-            _sampleThroughput(totalBytes, stopwatch.elapsed);
-          } on FileSystemException catch (e) {
-            final m = e.message.toLowerCase();
-            if (m.contains('no space') || m.contains('enospc') || e.osError?.errorCode == 28) {
-              throw const StorageFailure('Storage full while writing chunk');
-            }
-            rethrow;
-          } finally {
-            await sink.close();
-          }
-        }());
-      }
-
-      await Future.wait(futures);
-
-      // Check cancellation BEFORE merge to prevent corrupt file
-      if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
-        throw const DownloadFailure('Download canceled');
-      }
-
-      // Verify total received byte sum and chunk file integrity
-      if (total > 0) {
-        final totalReceivedBytes = chunkReceived.reduce((a, b) => a + b);
-        if (totalReceivedBytes != total) {
-          throw DownloadFailure(
-              'Parallel download byte mismatch: received $totalReceivedBytes, expected $total');
+          }());
         }
-        final chunkCount = tempParts.length;
-        for (int i = 0; i < chunkCount; i++) {
-          final part = tempParts[i];
-          if (!await part.exists()) {
-            throw DownloadFailure('Chunk $i file missing after download');
-          }
-          final partSize = await part.length();
-          final expectedSize = (i == chunkCount - 1)
-              ? total - (chunkSize * (chunkCount - 1))
-              : chunkSize;
-          if (partSize != expectedSize) {
+
+        await Future.wait(futures);
+
+        // Check cancellation BEFORE merge to prevent corrupt file
+        if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+          throw const DownloadFailure('Download canceled');
+        }
+
+        // Verify total received byte sum and chunk file integrity
+        if (total > 0) {
+          final totalReceivedBytes = chunkReceived.reduce((a, b) => a + b);
+          if (totalReceivedBytes != total) {
             throw DownloadFailure(
-                'Chunk $i incomplete: $partSize/$expectedSize bytes');
+                'Parallel download byte mismatch: received $totalReceivedBytes, expected $total');
+          }
+          final chunkCount = tempParts.length;
+          for (int i = 0; i < chunkCount; i++) {
+            final part = tempParts[i];
+            if (!await part.exists()) {
+              throw DownloadFailure('Chunk $i file missing after download');
+            }
+            final partSize = await part.length();
+            final expectedSize = (i == chunkCount - 1)
+                ? total - (chunkSize * (chunkCount - 1))
+                : chunkSize;
+            if (partSize != expectedSize) {
+              throw DownloadFailure(
+                  'Chunk $i incomplete: $partSize/$expectedSize bytes');
+            }
           }
         }
-      }
 
-      // Final cancellation check right before merge
-      if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
-        throw const DownloadFailure('Download canceled');
-      }
+        // Final cancellation check right before merge
+        if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+          throw const DownloadFailure('Download canceled');
+        }
 
-      final outPartFile = File('${dest.path}.part');
-      final outSink = outPartFile.openWrite();
-      try {
-        for (final part in tempParts) {
-          if (task.isCanceled ||
-              _canceledVideoIds.contains(task.song.remoteId)) {
-            throw const DownloadFailure('Download canceled');
-          }
-          if (await part.exists()) {
-            await outSink.addStream(part.openRead());
-          }
-        }
-        await outSink.flush();
-      } finally {
-        await outSink.close();
-      }
-
-      // Verify merged total size and atomically rename (BUG-014)
-      if (total > 0) {
-        final finalSize = await outPartFile.length();
-        if (finalSize != total) {
-          await outPartFile.delete().catchError((_) => outPartFile);
-          throw DownloadFailure('Merged file size mismatch: $finalSize/$total');
-        }
-      }
-      if (await outPartFile.exists()) {
-        if (await dest.exists()) {
-          await dest.delete();
-        }
-        await outPartFile.rename(dest.path);
-      }
-      mergeCompleted = true;
-    } catch (e) {
-      if (e is _RangeIgnored) rethrow; // FIX-A02: Bubble _RangeIgnored to outer catch
-      keepParts = _partsWorthKeeping(e);
-      rethrow;
-    } finally {
-      final outPartFile = File('${dest.path}.part');
-      try {
-        if (await outPartFile.exists()) {
-          await outPartFile.delete();
-        }
-      } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
-
-      // Parts used to be deleted unconditionally, so a cancel or a single
-      // dropped socket at 95% threw away every byte of all four chunks and the
-      // next attempt started from zero.
-      if (mergeCompleted || !keepParts) {
-        for (final part in tempParts) {
-          try {
+        final outPartFile = File('${dest.path}.part');
+        final outSink = outPartFile.openWrite();
+        try {
+          for (final part in tempParts) {
+            if (task.isCanceled ||
+                _canceledVideoIds.contains(task.song.remoteId)) {
+              throw const DownloadFailure('Download canceled');
+            }
             if (await part.exists()) {
-              await part.delete();
+              await outSink.addStream(part.openRead());
             }
-          } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
-        }
-        try {
-          if (await stamp.exists()) {
-            await stamp.delete();
           }
-        } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
-      }
+          await outSink.flush();
+        } finally {
+          await outSink.close();
+        }
 
-      if (!mergeCompleted) {
-        try {
+        // Verify merged total size and atomically rename (BUG-014)
+        if (total > 0) {
+          final finalSize = await outPartFile.length();
+          if (finalSize != total) {
+            await outPartFile.delete().catchError((_) => outPartFile);
+            throw DownloadFailure(
+                'Merged file size mismatch: $finalSize/$total');
+          }
+        }
+        if (await outPartFile.exists()) {
           if (await dest.exists()) {
             await dest.delete();
           }
+          await outPartFile.rename(dest.path);
+        }
+        mergeCompleted = true;
+      } catch (e) {
+        if (e is _RangeIgnored) {
+          rethrow; // FIX-A02: Bubble _RangeIgnored to outer catch
+        }
+        keepParts = _partsWorthKeeping(e);
+        rethrow;
+      } finally {
+        final outPartFile = File('${dest.path}.part');
+        try {
+          if (await outPartFile.exists()) {
+            await outPartFile.delete();
+          }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
+
+        // Parts used to be deleted unconditionally, so a cancel or a single
+        // dropped socket at 95% threw away every byte of all four chunks and the
+        // next attempt started from zero.
+        if (mergeCompleted || !keepParts) {
+          for (final part in tempParts) {
+            try {
+              if (await part.exists()) {
+                await part.delete();
+              }
+            } catch (_) {
+              // Best-effort: failure intentionally ignored on this non-critical path.
+            }
+          }
+          try {
+            if (await stamp.exists()) {
+              await stamp.delete();
+            }
+          } catch (_) {
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
+        }
+
+        if (!mergeCompleted) {
+          try {
+            if (await dest.exists()) {
+              await dest.delete();
+            }
+          } catch (_) {
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
+        }
       }
+    } on _RangeIgnored {
+      // Inner finally already cleaned up tempParts and stamp since keepParts is false.
+      debugPrint(
+          '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
+      await _downloadSequential(uri, dest, task, onProgress,
+          userAgent: userAgent, cookies: cookies, expectedBytes: total);
     }
-  } on _RangeIgnored {
-    // Inner finally already cleaned up tempParts and stamp since keepParts is false.
-    debugPrint(
-        '[YtDownloadService] Server ignored Range mid-transfer; retrying as a single request');
-    await _downloadSequential(uri, dest, task, onProgress,
-        userAgent: userAgent, cookies: cookies, expectedBytes: total);
   }
-}
 
   /// Whether the `.partN` files already on disk are worth keeping after [e].
   ///
@@ -1358,16 +1378,16 @@ class YtDownloadService {
                 resumeStampMatches(await stampFile.readAsString(), urlStamp);
           }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
         if (resumeOffset > 0 && !stampMatches) {
           // Written for a different URL, or by a build without the stamp:
           // nothing in it is known to line up, so start over.
           try {
             await partFile.delete();
           } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
           resumeOffset = 0;
         }
         // Keep resume only if meaningful (>64k) to avoid overhead for tiny partials
@@ -1375,16 +1395,16 @@ class YtDownloadService {
           try {
             await partFile.delete();
           } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+            // Best-effort: failure intentionally ignored on this non-critical path.
+          }
           resumeOffset = 0;
         }
       }
       try {
         await stampFile.writeAsString(urlStamp, flush: true);
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     } catch (_) {
       resumeOffset = 0;
     }
@@ -1422,8 +1442,8 @@ class YtDownloadService {
         try {
           await partFile.delete();
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
         // FIX-A01: On second occurrence, throw DownloadFailure('Server does not support resume')
         if (retryCount >= 1) {
           throw const DownloadFailure('Server does not support resume');
@@ -1489,9 +1509,11 @@ class YtDownloadService {
               (effectiveTotal > 0 && received >= effectiveTotal)) {
             lastEmitTime = now;
             final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
-            final speedKbps =
-                elapsedSeconds > 0 ? ((received - baseReceived) / elapsedSeconds) / 1024.0 : 0.0;
-            final remainingBytes = effectiveTotal > 0 ? effectiveTotal - received : 0;
+            final speedKbps = elapsedSeconds > 0
+                ? ((received - baseReceived) / elapsedSeconds) / 1024.0
+                : 0.0;
+            final remainingBytes =
+                effectiveTotal > 0 ? effectiveTotal - received : 0;
             final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
                 ? (remainingBytes / (speedKbps * 1024.0)).round()
                 : null;
@@ -1509,7 +1531,9 @@ class YtDownloadService {
       _sampleThroughput(received - baseReceived, stopwatch.elapsed);
     } on FileSystemException catch (e) {
       final msg = e.message.toLowerCase();
-      if (msg.contains('no space') || msg.contains('enospc') || e.osError?.errorCode == 28) {
+      if (msg.contains('no space') ||
+          msg.contains('enospc') ||
+          e.osError?.errorCode == 28) {
         throw const StorageFailure('Storage full while writing download');
       }
       rethrow;
@@ -1563,8 +1587,8 @@ class YtDownloadService {
         await raf.flush();
         await raf.close();
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
       if (await dest.exists()) {
         await dest.delete();
       }
@@ -1574,8 +1598,8 @@ class YtDownloadService {
           await stampFile.delete();
         }
       } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     }
   }
 
@@ -1615,8 +1639,7 @@ class YtDownloadService {
         if (!name.startsWith('ytdl_')) continue;
         if (activePartNames != null && activePartNames.contains(name)) continue;
         if (busy.any((id) =>
-            name.startsWith('ytdl_$id.') ||
-            name.startsWith('ytdl_art_$id.'))) {
+            name.startsWith('ytdl_$id.') || name.startsWith('ytdl_art_$id.'))) {
           continue;
         }
         try {
@@ -1626,8 +1649,8 @@ class YtDownloadService {
             await entity.delete();
           }
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
       }
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
@@ -1663,8 +1686,8 @@ class YtDownloadService {
         try {
           await entity.delete();
         } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
       }
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.

@@ -35,14 +35,20 @@ void main() {
       'Monokai Magenta': const Color(0xFFFF007F),
     };
 
-    test('WCAG 2.1 AA Contrast: lightTextSecondary against lightBackground >= 4.5:1 (BUG-024)', () {
-      final ratioBg = _contrastRatio(AppColors.lightTextSecondary, AppColors.lightBackground);
-      final ratioSurface = _contrastRatio(AppColors.lightTextSecondary, AppColors.lightSurface);
-      
+    test(
+        'WCAG 2.1 AA Contrast: lightTextSecondary against lightBackground >= 4.5:1 (BUG-024)',
+        () {
+      final ratioBg = _contrastRatio(
+          AppColors.lightTextSecondary, AppColors.lightBackground);
+      final ratioSurface =
+          _contrastRatio(AppColors.lightTextSecondary, AppColors.lightSurface);
+
       expect(ratioBg, greaterThanOrEqualTo(4.5),
-          reason: 'lightTextSecondary must meet WCAG AA normal text contrast (4.5:1) on lightBackground');
+          reason:
+              'lightTextSecondary must meet WCAG AA normal text contrast (4.5:1) on lightBackground');
       expect(ratioSurface, greaterThanOrEqualTo(4.5),
-          reason: 'lightTextSecondary must meet WCAG AA normal text contrast (4.5:1) on lightSurface');
+          reason:
+              'lightTextSecondary must meet WCAG AA normal text contrast (4.5:1) on lightSurface');
     });
 
     for (final entry in accents.entries) {

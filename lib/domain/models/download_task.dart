@@ -12,7 +12,8 @@ enum DownloadStatus {
   failed,
   complete;
 
-  bool get isTerminal => this == DownloadStatus.complete || this == DownloadStatus.failed;
+  bool get isTerminal =>
+      this == DownloadStatus.complete || this == DownloadStatus.failed;
   bool get isActive =>
       this == DownloadStatus.queued ||
       this == DownloadStatus.downloading ||
@@ -105,7 +106,9 @@ class DownloadTask {
       filePath: filePath ?? this.filePath,
       format: format ?? this.format,
       bitrate: bitrate ?? this.bitrate,
-      error: clearError ? null : (error ?? this.error), // FIX-A09: clear error if requested
+      error: clearError
+          ? null
+          : (error ?? this.error), // FIX-A09: clear error if requested
       createdAt: createdAt ?? this.createdAt,
       artworkUrl: artworkUrl ?? this.artworkUrl,
       sourceSongId: sourceSongId ?? this.sourceSongId,
@@ -179,8 +182,8 @@ class DownloadTask {
           fileSize == other.fileSize;
 
   @override
-  int get hashCode => Object.hash(
-      id, videoId, status, progress, filePath, error, sourceSongId, localSongId, fileSize);
+  int get hashCode => Object.hash(id, videoId, status, progress, filePath,
+      error, sourceSongId, localSongId, fileSize);
 }
 
 class StorageStats {
@@ -212,5 +215,6 @@ class StorageStats {
           downloadedSongsCount == other.downloadedSongsCount;
 
   @override
-  int get hashCode => Object.hash(usedBytes, freeBytes, totalBytes, downloadedSongsCount);
+  int get hashCode =>
+      Object.hash(usedBytes, freeBytes, totalBytes, downloadedSongsCount);
 }

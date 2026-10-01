@@ -139,7 +139,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(context.l10n.listeningStats,
+          title: Text(
+            context.l10n.listeningStats,
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
@@ -192,7 +193,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             final Map<String, int> artistTrackCounts = {};
             for (final s in songs) {
               final artistName = s.artist.trim();
-              if (artistName.isEmpty || artistName == 'Unknown Artist') continue;
+              if (artistName.isEmpty || artistName == 'Unknown Artist') {
+                continue;
+              }
               artistPlayCounts[artistName] =
                   (artistPlayCounts[artistName] ?? 0) + s.playCount;
               artistTrackCounts[artistName] =
@@ -204,15 +207,16 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
 
             // Recently played
             final recentSongs = List<SongsTableData>.from(songs)
-              ..sort((a, b) =>
-                  (b.lastPlayed ?? 0).compareTo(a.lastPlayed ?? 0));
+              ..sort(
+                  (a, b) => (b.lastPlayed ?? 0).compareTo(a.lastPlayed ?? 0));
             final recentlyPlayed = recentSongs
                 .where((s) => (s.lastPlayed ?? 0) > 0)
                 .take(5)
                 .toList();
 
             return ListView(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
               children: [
                 // BUG-15: surface a failed full-library load with a retry.
                 if (_loadError != null)
@@ -314,7 +318,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                           Icon(Icons.high_quality_rounded,
                               color: p.primary, size: 22),
                           const SizedBox(width: AppSpacing.xs),
-                          Text(context.l10n.audioQualityTiers,
+                          Text(
+                            context.l10n.audioQualityTiers,
                             style: TextStyle(
                               fontSize: AppFontSize.callout,
                               fontWeight: FontWeight.w700,
@@ -324,8 +329,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                           const Spacer(),
                           Text(
                             '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
-                            style:
-                                TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+                            style: TextStyle(
+                                fontSize: AppFontSize.label,
+                                color: p.textSecondary),
                           ),
                         ],
                       ),
@@ -339,7 +345,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                 flex: losslessCount > 0 ? losslessCount : 1,
                                 child: Container(
                                   height: 12,
-                                  color: const Color(0xFF64D2FF),
+                                  color: p.info,
                                 ),
                               ),
                               Expanded(
@@ -359,16 +365,17 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                         children: [
                           Text(
                             '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: AppFontSize.label,
-                              color: Color(0xFF64D2FF),
+                              color: p.info,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           Text(
                             '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
                             style: TextStyle(
-                                fontSize: AppFontSize.label, color: p.textSecondary),
+                                fontSize: AppFontSize.label,
+                                color: p.textSecondary),
                           ),
                         ],
                       ),
@@ -394,9 +401,12 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                       border: Border.all(color: p.hairline),
                     ),
                     child: Center(
-                      child: Text(context.l10n.noPlayHistory,
+                      child: Text(
+                        context.l10n.noPlayHistory,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+                        style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.bodySmall),
                       ),
                     ),
                   )
@@ -465,15 +475,17 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                               subtitle: Text(
                                 '$trackCount ${context.l10n.browseTracksInLibrary}',
                                 style: TextStyle(
-                                    color: p.textSecondary, fontSize: AppFontSize.label),
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label),
                               ),
                               trailing: Container(
                                 padding: const EdgeInsets.symmetric(
-
-                                    horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                                    horizontal: AppSpacing.s10,
+                                    vertical: AppSpacing.xxs),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r12),
                                 ),
                                 child: Text(
                                   '$plays ${context.l10n.browsePlays}',
@@ -559,7 +571,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
               ),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+                style: TextStyle(
+                    fontSize: AppFontSize.label, color: p.textSecondary),
               ),
             ],
           ),
@@ -573,9 +586,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
       case 1:
         return AppColors.dacGold; // Gold
       case 2:
-        return const Color(0xFFC0C0C0); // Silver
+        return p.textSecondary; // Silver
       case 3:
-        return const Color(0xFFCD7F32); // Bronze
+        return p.warning; // Bronze
       default:
         return p.accent;
     }
@@ -598,7 +611,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             context.read<PlayerCubit>().playSong(song, queue: queue);
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceCard,
               borderRadius: BorderRadius.circular(AppRadii.r14),
@@ -607,7 +621,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             child: Row(
               children: [
                 if (rank != null) ...[
-                  SizedBox(width: AppSpacing.s28,
+                  SizedBox(
+                    width: AppSpacing.s28,
                     child: Text(
                       '#$rank',
                       style: TextStyle(
@@ -624,7 +639,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   remoteUrl: song.remoteArtworkUrl,
                   type: ArtworkType.AUDIO,
                   size: 44,
-                  borderRadius: 10,
+                  borderRadius: AppRadii.r10,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -646,7 +661,9 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                         song.artist,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+                        style: TextStyle(
+                            fontSize: AppFontSize.label,
+                            color: p.textSecondary),
                       ),
                     ],
                   ),
@@ -655,7 +672,6 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   const SizedBox(width: AppSpacing.xs),
                   Container(
                     padding: const EdgeInsets.symmetric(
-
                         horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
@@ -719,7 +735,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
           ),
           Text(
             title,
-            style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+            style:
+                TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
           ),
         ],
       ),

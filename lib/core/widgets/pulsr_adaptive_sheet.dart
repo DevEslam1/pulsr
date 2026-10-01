@@ -80,8 +80,10 @@ class PulsrAdaptiveSheet extends StatelessWidget {
       );
     } else {
       // Centered dialog mode on landscape phones, tablet landscape, and desktop
-      final dialogWidth = maxWidth ?? (vp.isShortHeight ? 500.0 : (vp.isTablet ? 580.0 : 420.0));
-      final dialogHeight = maxHeight ?? (vp.height * (vp.isShortHeight ? 0.88 : 0.75));
+      final dialogWidth = maxWidth ??
+          (vp.isShortHeight ? 500.0 : (vp.isTablet ? 580.0 : 420.0));
+      final dialogHeight =
+          maxHeight ?? (vp.height * (vp.isShortHeight ? 0.88 : 0.75));
 
       return PulsrDialogHelper.showCustomDialog<T>(
         context,
@@ -144,7 +146,8 @@ class PulsrAdaptiveSheet extends StatelessWidget {
               width: AppSpacing.s38,
               height: 4.5,
               decoration: BoxDecoration(
-                color: (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.18),
+                color: (p.isDark ? Colors.white : Colors.black)
+                    .withValues(alpha: 0.18),
                 borderRadius: AppRadii.full,
               ),
             ),
@@ -189,9 +192,12 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                 if (trailing != null) trailing!,
                 if (isDialog && trailing == null)
                   IconButton(
-                    icon: Icon(Icons.close_rounded, size: 20, color: p.textSecondary),
-                    tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                    onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+                    icon: Icon(Icons.close_rounded,
+                        size: 20, color: p.textSecondary),
+                    tooltip:
+                        MaterialLocalizations.of(context).closeButtonTooltip,
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).pop(),
                   ),
               ],
             ),
@@ -221,7 +227,9 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         color: containerColor,
         borderRadius: isDialog
             ? AppRadii.dialogRadius
-            : (vp.isTablet ? BorderRadius.circular(AppRadii.r28) : AppRadii.bottomSheetRadius),
+            : (vp.isTablet
+                ? BorderRadius.circular(AppRadii.r28)
+                : AppRadii.bottomSheetRadius),
         border: Border.all(color: p.hairline, width: 1.0),
         boxShadow: [
           BoxShadow(

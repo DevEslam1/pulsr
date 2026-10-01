@@ -33,8 +33,8 @@ void main() {
     });
 
     test('accepts ARGB integer colors and defaults unknown shape to bars', () {
-      final p = VisualizerPreset.fromJsonString(
-          '{"shape":"nonsense","color":255}');
+      final p =
+          VisualizerPreset.fromJsonString('{"shape":"nonsense","color":255}');
       expect(p.shape, VisualizerShape.bars);
       expect(p.primaryColor, 0xFF0000FF);
       expect(p.name, 'Custom Preset');
@@ -43,8 +43,8 @@ void main() {
     test('throws on invalid JSON and non-object roots', () {
       expect(() => VisualizerPreset.fromJsonString('not json'),
           throwsFormatException);
-      expect(
-          () => VisualizerPreset.fromJsonString('[1,2,3]'), throwsFormatException);
+      expect(() => VisualizerPreset.fromJsonString('[1,2,3]'),
+          throwsFormatException);
     });
 
     test('round-trips through toJson', () {

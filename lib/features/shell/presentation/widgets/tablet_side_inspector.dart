@@ -104,226 +104,234 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
         children: [
           Column(
             children: [
-          // Header with Tabs & Close Button
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
-            child: Row(
-              children: [
-                // Segmented Selector
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedTabIndex = 0),
-                            child: Container(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: AppSpacing.s6),
-                              decoration: BoxDecoration(
-                                color: _selectedTabIndex == 0
-                                    ? p.accent
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(AppRadii.r8),
-                              ),
-                              alignment: Alignment.center,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.queue_music_rounded,
-                                    size: 15,
+              // Header with Tabs & Close Button
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+                child: Row(
+                  children: [
+                    // Segmented Selector
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () =>
+                                    setState(() => _selectedTabIndex = 0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: AppSpacing.s6),
+                                  decoration: BoxDecoration(
                                     color: _selectedTabIndex == 0
-                                        ? p.onAccent
-                                        : p.textSecondary,
+                                        ? p.accent
+                                        : Colors.transparent,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r8),
                                   ),
-                                  const SizedBox(width: AppSpacing.s6),
-                                  Flexible(
-                                    child: BlocSelector<PlayerCubit, PlayerState, int>(
-                                      selector: (state) => state.queue.length,
-                                      builder: (context, queueCount) => Text(
-                                        'Queue ($queueCount)',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: AppFontSize.label,
-                                          fontWeight: _selectedTabIndex == 0
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                          color: _selectedTabIndex == 0
-                                              ? p.onAccent
-                                              : p.textSecondary,
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.queue_music_rounded,
+                                        size: 15,
+                                        color: _selectedTabIndex == 0
+                                            ? p.onAccent
+                                            : p.textSecondary,
+                                      ),
+                                      const SizedBox(width: AppSpacing.s6),
+                                      Flexible(
+                                        child: BlocSelector<PlayerCubit,
+                                            PlayerState, int>(
+                                          selector: (state) =>
+                                              state.queue.length,
+                                          builder: (context, queueCount) =>
+                                              Text(
+                                            'Queue ($queueCount)',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: AppFontSize.label,
+                                              fontWeight: _selectedTabIndex == 0
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                              color: _selectedTabIndex == 0
+                                                  ? p.onAccent
+                                                  : p.textSecondary,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xxs),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedTabIndex = 1),
-                            child: Container(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: AppSpacing.s6),
-                              decoration: BoxDecoration(
-                                color: _selectedTabIndex == 1
-                                    ? p.accent
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(AppRadii.r8),
-                              ),
-                              alignment: Alignment.center,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.lyrics_rounded,
-                                    size: 15,
+                            const SizedBox(width: AppSpacing.xxs),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () =>
+                                    setState(() => _selectedTabIndex = 1),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: AppSpacing.s6),
+                                  decoration: BoxDecoration(
                                     color: _selectedTabIndex == 1
-                                        ? p.onAccent
-                                        : p.textSecondary,
+                                        ? p.accent
+                                        : Colors.transparent,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r8),
                                   ),
-                                  const SizedBox(width: AppSpacing.s6),
-                                  Flexible(
-                                    child: Text(
-                                      context.l10n.lyricsLabel,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.label,
-                                        fontWeight: _selectedTabIndex == 1
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.lyrics_rounded,
+                                        size: 15,
                                         color: _selectedTabIndex == 1
                                             ? p.onAccent
                                             : p.textSecondary,
                                       ),
-                                    ),
+                                      const SizedBox(width: AppSpacing.s6),
+                                      Flexible(
+                                        child: Text(
+                                          context.l10n.lyricsLabel,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.label,
+                                            fontWeight: _selectedTabIndex == 1
+                                                ? FontWeight.w800
+                                                : FontWeight.w600,
+                                            color: _selectedTabIndex == 1
+                                                ? p.onAccent
+                                                : p.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      tooltip: context.l10n.close,
+                      onPressed: widget.onClose,
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, thickness: 1, color: p.hairline),
+
+              // Content Area
+              Expanded(
+                child: _selectedTabIndex == 0
+                    ? const Padding(
+                        padding: EdgeInsets.all(AppSpacing.xs),
+                        child: NowPlayingQueueView(),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xs),
+                        child: BlocSelector<PlayerCubit, PlayerState,
+                            _TabletLyricsData>(
+                          selector: (state) => _TabletLyricsData(
+                            songId: state.currentSong?.id,
+                            remoteId: state.currentSong?.remoteId,
+                            lyricsSlice: state.lyricsSlice,
+                          ),
+                          builder: (context, lyricsData) => LyricsView(
+                            key: (lyricsData.songId != null ||
+                                    lyricsData.remoteId != null)
+                                ? ValueKey(
+                                    'lyrics_${lyricsData.songId}_${lyricsData.remoteId}')
+                                : const ValueKey('lyrics_empty'),
+                            lyrics: lyricsData.lyricsSlice.lyrics,
+                            isLoading: lyricsData.lyricsSlice.isLoadingLyrics,
+                            activeColor: activeColor,
+                            source: lyricsData.lyricsSlice.lyricsSource,
+                            onLineTapped: (pos) =>
+                                context.read<PlayerCubit>().seek(pos),
                           ),
                         ),
-                      ],
+                      ),
+              ),
+            ],
+          ),
+          // Left edge drag-to-resize handle
+          PositionedDirectional(
+            start: 0,
+            top: 0,
+            bottom: 0,
+            width: 14,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeLeftRight,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (_) {
+                  _dragDeltaAccumulator = 0.0;
+                  setState(() => _isDragging = true);
+                },
+                onHorizontalDragUpdate: (details) {
+                  final isRtl = Directionality.of(context) == TextDirection.rtl;
+                  final delta = isRtl ? details.delta.dx : -details.delta.dx;
+                  _dragDeltaAccumulator += delta;
+                  if (_dragDeltaAccumulator.abs() >= 1.0) {
+                    final current = _customWidth ?? defaultWidth;
+                    final newWidth =
+                        (current + _dragDeltaAccumulator).clamp(280.0, 400.0);
+                    _dragDeltaAccumulator = 0.0;
+                    if (newWidth != _customWidth) {
+                      setState(() {
+                        _customWidth = newWidth;
+                      });
+                    }
+                  }
+                },
+                onHorizontalDragEnd: (_) {
+                  _dragDeltaAccumulator = 0.0;
+                  setState(() => _isDragging = false);
+                },
+                onHorizontalDragCancel: () {
+                  _dragDeltaAccumulator = 0.0;
+                  setState(() => _isDragging = false);
+                },
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: context.motionMs(150),
+                    width: _isDragging ? 4 : 3,
+                    height: _isDragging ? 48 : 32,
+                    decoration: BoxDecoration(
+                      color: _isDragging
+                          ? p.accent
+                          : p.textTertiary.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(AppRadii.r4),
                     ),
                   ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 20),
-                  tooltip: context.l10n.close,
-                  onPressed: widget.onClose,
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, thickness: 1, color: p.hairline),
-
-          // Content Area
-          Expanded(
-            child: _selectedTabIndex == 0
-                ? const Padding(
-                    padding: EdgeInsets.all(AppSpacing.xs),
-                    child: NowPlayingQueueView(),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    child: BlocSelector<PlayerCubit, PlayerState, _TabletLyricsData>(
-                      selector: (state) => _TabletLyricsData(
-                        songId: state.currentSong?.id,
-                        remoteId: state.currentSong?.remoteId,
-                        lyricsSlice: state.lyricsSlice,
-                      ),
-                      builder: (context, lyricsData) => LyricsView(
-                        key: (lyricsData.songId != null || lyricsData.remoteId != null)
-                            ? ValueKey('lyrics_${lyricsData.songId}_${lyricsData.remoteId}')
-                            : const ValueKey('lyrics_empty'),
-                        lyrics: lyricsData.lyricsSlice.lyrics,
-                        isLoading: lyricsData.lyricsSlice.isLoadingLyrics,
-                        activeColor: activeColor,
-                        source: lyricsData.lyricsSlice.lyricsSource,
-                        onLineTapped: (pos) =>
-                            context.read<PlayerCubit>().seek(pos),
-                      ),
-                    ),
-                  ),
-          ),
-        ],
-      ),
-      // Left edge drag-to-resize handle
-      PositionedDirectional(
-        start: 0,
-        top: 0,
-        bottom: 0,
-        width: 14,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.resizeLeftRight,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: (_) {
-              _dragDeltaAccumulator = 0.0;
-              setState(() => _isDragging = true);
-            },
-            onHorizontalDragUpdate: (details) {
-              final isRtl = Directionality.of(context) == TextDirection.rtl;
-              final delta = isRtl ? details.delta.dx : -details.delta.dx;
-              _dragDeltaAccumulator += delta;
-              if (_dragDeltaAccumulator.abs() >= 1.0) {
-                final current = _customWidth ?? defaultWidth;
-                final newWidth =
-                    (current + _dragDeltaAccumulator).clamp(280.0, 400.0);
-                _dragDeltaAccumulator = 0.0;
-                if (newWidth != _customWidth) {
-                  setState(() {
-                    _customWidth = newWidth;
-                  });
-                }
-              }
-            },
-            onHorizontalDragEnd: (_) {
-              _dragDeltaAccumulator = 0.0;
-              setState(() => _isDragging = false);
-            },
-            onHorizontalDragCancel: () {
-              _dragDeltaAccumulator = 0.0;
-              setState(() => _isDragging = false);
-            },
-            child: Center(
-              child: AnimatedContainer(
-                duration: context.motionMs(150),
-                width: _isDragging ? 4 : 3,
-                height: _isDragging ? 48 : 32,
-                decoration: BoxDecoration(
-                  color: _isDragging
-                      ? p.accent
-                      : p.textTertiary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(AppRadii.r4),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
-  ),
-);
+    );
   }
 }

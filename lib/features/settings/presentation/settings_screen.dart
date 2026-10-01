@@ -188,7 +188,8 @@ class SettingsScreenState extends State<SettingsScreen>
             context.isLandscape && MediaQuery.sizeOf(context).height < 500;
         final isTabletView = !isLandscapePhone &&
             ((context.breakpoint >= PulsrBreakpoint.medium &&
-                    (context.isLandscape || Adaptive.widthOf(context) >= 700)) ||
+                    (context.isLandscape ||
+                        Adaptive.widthOf(context) >= 700)) ||
                 context.isTwoPane);
         // H6/M3: A selected category can disappear when Professional mode is
         // turned off (e.g. `profiles`). Normalise the persisted selection in the
@@ -597,7 +598,8 @@ class SettingsScreenState extends State<SettingsScreen>
           width: 1,
           color: p.hairline,
         ),
-        if (context.hasFoldableHinge && (context.foldableHinge?.bounds.width ?? 0) > 0)
+        if (context.hasFoldableHinge &&
+            (context.foldableHinge?.bounds.width ?? 0) > 0)
           SizedBox(width: context.foldableHinge!.bounds.width),
 
         // Right Detail Pane

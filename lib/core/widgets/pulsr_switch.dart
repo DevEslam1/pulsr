@@ -117,7 +117,8 @@ class _PulsrSwitchState extends State<PulsrSwitch>
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final activeFill = widget.activeTrackColor ?? widget.activeColor ?? p.accent;
+    final activeFill =
+        widget.activeTrackColor ?? widget.activeColor ?? p.accent;
     final inactiveFill = widget.inactiveTrackColor ??
         (p.isDark
             ? Colors.white.withValues(alpha: 0.10)
@@ -139,7 +140,8 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                 _toggle();
               }
             : null,
-        onTapCancel: isEnabled ? () => setState(() => _isPressed = false) : null,
+        onTapCancel:
+            isEnabled ? () => setState(() => _isPressed = false) : null,
         child: Opacity(
           opacity: isEnabled ? 1.0 : 0.45,
           child: AnimatedBuilder(
@@ -237,7 +239,8 @@ class PulsrSwitchListTile extends StatelessWidget {
       pressedScale: 0.985,
       child: Padding(
         padding: contentPadding ??
-            const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s10),
+            const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.s10),
         child: Row(
           children: [
             if (leading != null) ...[

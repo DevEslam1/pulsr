@@ -59,7 +59,8 @@ class SettingSliderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.sm, AppSpacing.s14),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.sm, AppSpacing.sm, AppSpacing.s14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -101,14 +102,16 @@ class SettingSliderRow extends StatelessWidget {
                     color: _isDefault || !enabled
                         ? p.textTertiary.withValues(alpha: 0.5)
                         : p.accent),
-                tooltip: context.l10n.settingsResetToDefaultValue(_fmt(defaultValue)),
+                tooltip: context.l10n
+                    .settingsResetToDefaultValue(_fmt(defaultValue)),
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(
                   minWidth: AppSpacing.minTouchTarget,
                   minHeight: AppSpacing.minTouchTarget,
                 ),
-                onPressed:
-                    _isDefault || !enabled ? null : () => onChanged(defaultValue),
+                onPressed: _isDefault || !enabled
+                    ? null
+                    : () => onChanged(defaultValue),
               ),
             ],
           ),

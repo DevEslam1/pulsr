@@ -106,13 +106,13 @@ void main() {
     ];
     final deleted = files
         .where((f) =>
-            f.startsWith('ytdl_$videoId.') || f.startsWith('ytdl_art_$videoId.'))
+            f.startsWith('ytdl_$videoId.') ||
+            f.startsWith('ytdl_art_$videoId.'))
         .toList();
     expect(deleted, ['ytdl_abc.m4a', 'ytdl_abc.m4a.part', 'ytdl_art_abc.jpg']);
     // What the old boundary-less predicate did instead: reached into another
     // download's files and still missed this one's artwork.
-    final oldSweep =
-        files.where((f) => f.contains('ytdl_$videoId')).toList();
+    final oldSweep = files.where((f) => f.contains('ytdl_$videoId')).toList();
     expect(oldSweep, contains('ytdl_abcdef.m4a'));
     expect(oldSweep, isNot(contains('ytdl_art_abc.jpg')));
   });

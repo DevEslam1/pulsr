@@ -43,7 +43,9 @@ void main() {
       isFavorite: false,
     );
 
-    testWidgets('identifies duplicates and allows auto-selecting lower quality version', (tester) async {
+    testWidgets(
+        'identifies duplicates and allows auto-selecting lower quality version',
+        (tester) async {
       List<SongsTableData>? deletedItems;
 
       await tester.pumpWidget(

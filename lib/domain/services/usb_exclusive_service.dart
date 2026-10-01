@@ -167,8 +167,8 @@ class UsbExclusiveService {
     if (!_isAndroid) return UsbExclusiveStatus.none;
     _ensureListening();
     try {
-      final Map<dynamic, dynamic>? res = await _methodChannel
-          .invokeMapMethod<dynamic, dynamic>('getStatus');
+      final Map<dynamic, dynamic>? res =
+          await _methodChannel.invokeMapMethod<dynamic, dynamic>('getStatus');
       if (res != null) {
         _last = UsbExclusiveStatus.fromMap(res);
         return _last;
@@ -205,13 +205,14 @@ class UsbExclusiveService {
     }
     if (enabled && !_last.exclusiveSupported && _last.attached) {
       // Still attempt: some DACs report support only after first claim.
-      ErrorLogger.addBreadcrumb('USB exclusive claim without advertised support',
+      ErrorLogger.addBreadcrumb(
+          'USB exclusive claim without advertised support',
           category: 'UsbExclusive');
     }
     try {
-      final dynamic res = await _methodChannel
-          .invokeMethod<dynamic>('setExclusive', {'enabled': enabled})
-          .timeout(const Duration(seconds: 8));
+      final dynamic res = await _methodChannel.invokeMethod<dynamic>(
+          'setExclusive',
+          {'enabled': enabled}).timeout(const Duration(seconds: 8));
       await getStatus();
       if (res is Map) return res['error'] == null;
       return res == true;
@@ -231,9 +232,9 @@ class UsbExclusiveService {
       clamped = db.clamp(min, max);
     }
     try {
-      final dynamic res = await _methodChannel
-          .invokeMethod<dynamic>('setHardwareVolume', {'db': clamped})
-          .timeout(const Duration(seconds: 5));
+      final dynamic res = await _methodChannel.invokeMethod<dynamic>(
+          'setHardwareVolume',
+          {'db': clamped}).timeout(const Duration(seconds: 5));
       if (res is Map && res['error'] != null) return false;
       await getStatus();
       return true;
@@ -245,10 +246,22 @@ class UsbExclusiveService {
   }
 
   /// Raw UAC2 isochronous streaming (experimental; unvalidated on hardware).
-  Future<UsbStreamResult> startStreaming({int sampleRate = 48000, int channels = 2}) async {
+  Future<UsbStreamResult> startStreaming(
+      {int sampleRate = 48000, int channels = 2}) async {
     if (!_isAndroid) return UsbStreamResult.invalidArgs;
-    const validRates = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000];
-    if (!validRates.contains(sampleRate)) return UsbStreamResult.rateUnsupported;
+    const validRates = [
+      44100,
+      48000,
+      88200,
+      96000,
+      176400,
+      192000,
+      352800,
+      384000
+    ];
+    if (!validRates.contains(sampleRate)) {
+      return UsbStreamResult.rateUnsupported;
+    }
     if (channels < 1 || channels > 8) return UsbStreamResult.invalidArgs;
     if (!_last.permitted || !_last.streamingSupported) {
       await getStatus();
@@ -256,8 +269,8 @@ class UsbExclusiveService {
       if (!_last.streamingSupported) return UsbStreamResult.invalidArgs;
     }
     try {
-      final dynamic res = await _methodChannel.invokeMethod<dynamic>(
-          'startStreaming', {
+      final dynamic res =
+          await _methodChannel.invokeMethod<dynamic>('startStreaming', {
         'sampleRate': sampleRate,
         'channels': channels,
       }).timeout(const Duration(seconds: 10));

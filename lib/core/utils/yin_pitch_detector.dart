@@ -47,12 +47,24 @@ class YinPitchDetector {
 
   /// Instance method wrapper for real-time streaming buffers.
   PitchResult? getPitch(List<double> buffer) {
-    final res = detectPitch(buffer, sampleRate: sampleRate, threshold: threshold);
+    final res =
+        detectPitch(buffer, sampleRate: sampleRate, threshold: threshold);
     return res.isVoiced ? res : null;
   }
 
   static const List<String> _noteNames = [
-    'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
+    'C',
+    'C#',
+    'D',
+    'D#',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'G#',
+    'A',
+    'A#',
+    'B'
   ];
 
   /// Detects the fundamental frequency of the given audio [buffer].

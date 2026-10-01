@@ -109,7 +109,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
     final now = _nowMs;
     // FIX-C12: Prune recently completed tasks past TTL
-    _recentlyCompleted.removeWhere((_, completedAt) => now - completedAt >= _recentlyCompletedTtlMs);
+    _recentlyCompleted.removeWhere(
+        (_, completedAt) => now - completedAt >= _recentlyCompletedTtlMs);
 
     // FIX-C12: Prune only IDs that are not in tasks AND are not in _recentlyCompleted
     _reconciledVideoIds.removeWhere((id) {
@@ -171,8 +172,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       case DownloadStatus.paused:
         return const YtDownloadItem(status: YtDownloadStatus.paused);
       case DownloadStatus.complete:
-        return const YtDownloadItem(
-            status: YtDownloadStatus.done, progress: 1);
+        return const YtDownloadItem(status: YtDownloadStatus.done, progress: 1);
       case DownloadStatus.failed:
         return YtDownloadItem(
             status: YtDownloadStatus.failed, error: task.error);
@@ -270,9 +270,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   int downloadAll(Iterable<SongsTableData> songs, {int maxBatch = 50}) =>
       downloadAllDetailed(songs, maxBatch: maxBatch).queued;
 
-  ({int queued, int skippedLocal, int alreadyActive, int capped}) downloadAllDetailed(
-      Iterable<SongsTableData> songs,
-      {int maxBatch = 50}) {
+  ({int queued, int skippedLocal, int alreadyActive, int capped})
+      downloadAllDetailed(Iterable<SongsTableData> songs, {int maxBatch = 50}) {
     final generation = ++_batchGeneration;
     var queuedCount = 0;
     var skippedLocal = 0;

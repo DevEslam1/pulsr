@@ -152,4 +152,3 @@ class PlayerWidgetCoordinator {
     _cachedNextIdsHash = null;
   }
 }
-

@@ -13,11 +13,13 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
 
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}
+
 class MockYtmService extends Mock implements YtmService {}
 
 void main() {
   group('Phase F: Lifecycle Disposal & Memory Safety Tests', () {
-    test('ArtworkLruCache caches large payloads (>512KB) using WeakReference', () {
+    test('ArtworkLruCache caches large payloads (>512KB) using WeakReference',
+        () {
       final cache = ArtworkLruCache.withCapacity(10);
       cache.clear();
 
@@ -40,7 +42,8 @@ void main() {
       expect(cache.get('large_artwork_1'), isNull);
     });
 
-    test('DynamicThemeCubit closes cleanly and cancels pending timers', () async {
+    test('DynamicThemeCubit closes cleanly and cancels pending timers',
+        () async {
       final cubit = DynamicThemeCubit();
       expect(cubit.isClosed, isFalse);
 
@@ -63,7 +66,9 @@ void main() {
       cubit.onQueryChanged('Another Query');
     });
 
-    test('PlayerTransportController disposes timers and cancels pending seeks safely', () {
+    test(
+        'PlayerTransportController disposes timers and cancels pending seeks safely',
+        () {
       final mockAudioHandler = MockAudioHandler();
       var state = const PlayerState();
       var isClosed = false;
@@ -80,7 +85,8 @@ void main() {
 
       // Further transport operations after disposal are no-ops
       expect(() => controller.play(), returnsNormally);
-      expect(() => controller.seek(const Duration(seconds: 10)), returnsNormally);
+      expect(
+          () => controller.seek(const Duration(seconds: 10)), returnsNormally);
     });
 
     test('PlayerWidgetBridge disposes coordinators safely', () {

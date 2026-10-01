@@ -71,7 +71,8 @@ void main() {
       );
     });
 
-    test('an attenuate-mode duck end does not request a resume (regression B-7)',
+    test(
+        'an attenuate-mode duck end does not request a resume (regression B-7)',
         () {
       final machine = InterruptionStateMachine();
       // Attenuate-mode ducks never begin() the interruption bookkeeping.

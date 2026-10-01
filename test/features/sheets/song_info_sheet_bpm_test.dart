@@ -12,6 +12,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -43,17 +44,21 @@ void main() {
 
     when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
-    when(() => mockPlayerCubit.setTrackBpm(any(), any())).thenAnswer((_) async {});
+    when(() => mockPlayerCubit.setTrackBpm(any(), any()))
+        .thenAnswer((_) async {});
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
   });
 
   setUpAll(() {
     registerFallbackValue(dummySong);
   });
 
-  testWidgets('[M-12] _showBpmDialog distinguishes null (cancel) from empty string (clear)', (tester) async {
+  testWidgets(
+      '[M-12] _showBpmDialog distinguishes null (cancel) from empty string (clear)',
+      (tester) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);

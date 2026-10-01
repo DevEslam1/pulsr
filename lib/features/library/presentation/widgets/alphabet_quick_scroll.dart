@@ -26,8 +26,32 @@ class AlphabetQuickScroll extends StatefulWidget {
     required this.onLetterSelected,
     this.availableLetters = const [
       '#',
-      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+      'F',
+      'G',
+      'H',
+      'I',
+      'J',
+      'K',
+      'L',
+      'M',
+      'N',
+      'O',
+      'P',
+      'Q',
+      'R',
+      'S',
+      'T',
+      'U',
+      'V',
+      'W',
+      'X',
+      'Y',
+      'Z'
     ],
     this.activeLetter,
   });
@@ -92,9 +116,10 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
     final letters = widget.availableLetters;
     final letterIndex =
         currentLetter == null ? -1 : letters.indexOf(currentLetter);
-    final increasedLetter = (letterIndex >= 0 && letterIndex + 1 < letters.length)
-        ? letters[letterIndex + 1]
-        : (currentLetter ?? '');
+    final increasedLetter =
+        (letterIndex >= 0 && letterIndex + 1 < letters.length)
+            ? letters[letterIndex + 1]
+            : (currentLetter ?? '');
     final decreasedLetter =
         letterIndex > 0 ? letters[letterIndex - 1] : (currentLetter ?? '');
 
@@ -145,52 +170,56 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                 onIncrease: () => _stepLetter(1),
                 onDecrease: () => _stepLetter(-1),
                 child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onVerticalDragDown: (details) =>
-                    _handleTouch(details.localPosition, constraints.maxHeight),
-                onVerticalDragStart: (details) =>
-                    _handleTouch(details.localPosition, constraints.maxHeight),
-                onVerticalDragUpdate: (details) =>
-                    _handleTouch(details.localPosition, constraints.maxHeight),
-                onVerticalDragEnd: (_) => _handleTouchEnd(),
-                onVerticalDragCancel: () => _handleTouchEnd(),
-                onTapDown: (details) =>
-                    _handleTouch(details.localPosition, constraints.maxHeight),
-                onTapUp: (_) => _handleTouchEnd(),
-                child: SizedBox(
-                  width: AppSpacing.s44,
-                  child: Container(
-                  width: 20,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: p.surfaceContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: widget.availableLetters.map((letter) {
-                      final isSelected = letter == currentLetter;
-                      return Expanded(
-                        child: Center(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              letter,
-                              style: TextStyle(
-                                fontSize: AppFontSize.tiny,
-                                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-                                color: isSelected ? p.accent : p.textTertiary,
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragDown: (details) => _handleTouch(
+                      details.localPosition, constraints.maxHeight),
+                  onVerticalDragStart: (details) => _handleTouch(
+                      details.localPosition, constraints.maxHeight),
+                  onVerticalDragUpdate: (details) => _handleTouch(
+                      details.localPosition, constraints.maxHeight),
+                  onVerticalDragEnd: (_) => _handleTouchEnd(),
+                  onVerticalDragCancel: () => _handleTouchEnd(),
+                  onTapDown: (details) => _handleTouch(
+                      details.localPosition, constraints.maxHeight),
+                  onTapUp: (_) => _handleTouchEnd(),
+                  child: SizedBox(
+                    width: AppSpacing.s44,
+                    child: Container(
+                      width: 20,
+                      alignment: Alignment.center,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: widget.availableLetters.map((letter) {
+                          final isSelected = letter == currentLetter;
+                          return Expanded(
+                            child: Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  letter,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.tiny,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w900
+                                        : FontWeight.w600,
+                                    color:
+                                        isSelected ? p.accent : p.textTertiary,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                    }).toList(growable: false),
+                          );
+                        }).toList(growable: false),
+                      ),
+                    ),
                   ),
                 ),
-                ),
-              ),
               );
             },
           ),

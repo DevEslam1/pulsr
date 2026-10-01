@@ -197,8 +197,7 @@ class PlaybackVolumeController {
           return;
         }
         stepIndex++;
-        final current =
-            (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
+        final current = (startVol + diff * (stepIndex / steps)).clamp(0.0, 1.0);
         if (_isDisposed || generation != _transitionGeneration) {
           timer.cancel();
           if (generation == _transitionGeneration) _transitionTimer = null;
@@ -237,8 +236,8 @@ class PlaybackVolumeController {
     _isDucked = ducked;
     final active = getActivePlayer?.call();
     if (active != null) {
-      final target = calculateTargetVolume(currentSong,
-          perSongOffsetDb: perSongOffsetDb);
+      final target =
+          calculateTargetVolume(currentSong, perSongOffsetDb: perSongOffsetDb);
       await applyVolume(active, target, smoothTransition: true);
     }
   }

@@ -50,7 +50,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
 
     final double maxBarWidth = isTablet ? 640.0 : 540.0;
     final double barHeight = widget.iconOnly ? 48.0 : (isTablet ? 68.0 : 64.0);
-    final navRadius = BorderRadius.circular(isTablet ? 28 : (widget.iconOnly ? 20 : 24));
+    final navRadius =
+        BorderRadius.circular(isTablet ? 28 : (widget.iconOnly ? 20 : 24));
 
     return SafeArea(
       top: false,
@@ -116,13 +117,15 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                     borderRadius: navRadius,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.12),
+                        color: Colors.black
+                            .withValues(alpha: p.isDark ? 0.40 : 0.12),
                         blurRadius: 24,
                         spreadRadius: 0,
                         offset: const Offset(0, 8),
                       ),
                       BoxShadow(
-                        color: p.accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
+                        color:
+                            p.accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
                         blurRadius: 18,
                         spreadRadius: -2,
                         offset: const Offset(0, 2),
@@ -142,61 +145,65 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                               colors: [
                                 GpuBudget.isGpuSaverActive
                                     ? p.surface
-                                    : p.surface
-                                        .withValues(alpha: p.isDark ? 0.78 : 0.88),
+                                    : p.surface.withValues(
+                                        alpha: p.isDark ? 0.78 : 0.88),
                                 GpuBudget.isGpuSaverActive
                                     ? p.surfaceContainer
-                                    : p.surfaceContainer
-                                        .withValues(alpha: p.isDark ? 0.72 : 0.84),
+                                    : p.surfaceContainer.withValues(
+                                        alpha: p.isDark ? 0.72 : 0.84),
                               ],
                             ),
-                          border: Border.all(
-                            color: p.isDark
-                                ? Colors.white.withValues(alpha: 0.14)
-                                : Colors.black.withValues(alpha: 0.08),
-                            width: 1.2,
+                            border: Border.all(
+                              color: p.isDark
+                                  ? Colors.white.withValues(alpha: 0.14)
+                                  : Colors.black.withValues(alpha: 0.08),
+                              width: 1.2,
+                            ),
                           ),
-                        ),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Align(
-                              alignment: Alignment.topCenter,
-                              child: Container(
-                                margin: const EdgeInsets.only(top: 2),
-                                width: 24,
-                                height: 2.5,
-                                decoration: BoxDecoration(
-                                  color: p.textTertiary.withValues(alpha: 0.25),
-                                  borderRadius: BorderRadius.circular(1.5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xs,
+                              vertical: AppSpacing.xxs),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Align(
+                                alignment: Alignment.topCenter,
+                                child: Container(
+                                  margin: const EdgeInsets.only(top: 2),
+                                  width: 24,
+                                  height: 2.5,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        p.textTertiary.withValues(alpha: 0.25),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r2),
+                                  ),
                                 ),
                               ),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                for (int i = 0; i < items.length; i++)
-                                  Expanded(
-                                    child: _NavTabItem(
-                                      item: items[i],
-                                      isSelected: widget.currentIndex == i,
-                                      p: p,
-                                      isTablet: isTablet,
-                                      iconOnly: widget.iconOnly,
-                                      onTap: () {
-                                        if (widget.currentIndex != i) {
-                                          widget.onTap(i);
-                                        }
-                                      },
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  for (int i = 0; i < items.length; i++)
+                                    Expanded(
+                                      child: _NavTabItem(
+                                        item: items[i],
+                                        isSelected: widget.currentIndex == i,
+                                        p: p,
+                                        isTablet: isTablet,
+                                        iconOnly: widget.iconOnly,
+                                        onTap: () {
+                                          if (widget.currentIndex != i) {
+                                            widget.onTap(i);
+                                          }
+                                        },
+                                      ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
 
                         if (GpuBudget.isGpuSaverActive) {
                           return navContainer;
@@ -253,122 +260,128 @@ class _NavTabItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,
-          child: AnimatedContainer(
-            duration: context.motionMs(250),
-            curve: context.motionCurve(Curves.easeOutCubic),
-            padding: EdgeInsets.symmetric(
-
-              horizontal: isTablet ? 10 : 6,
-              vertical: AppSpacing.xxs,
-            ),
-            decoration: BoxDecoration(
-              gradient: isSelected
-                  ? LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        p.accent.withValues(alpha: 0.22),
-                        p.accent.withValues(alpha: 0.08),
-                      ],
-                    )
-                  : null,
-              borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
-              border: isSelected
-                  ? Border.all(
-                      color: p.accent.withValues(alpha: 0.38),
-                      width: 1.2,
-                    )
-                  : Border.all(color: Colors.transparent, width: 1.2),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: p.accent.withValues(alpha: 0.22),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: iconOnly
-                ? Center(
-                    child: AnimatedScale(
-                      scale: isSelected ? 1.08 : 1.0,
-                      duration: context.motionMs(220),
-                      curve: context.motionCurve(Curves.easeOutBack),
-                      child: Icon(
-                        isSelected ? item.activeIcon : item.icon,
-                        size: iconSize,
-                        color: isSelected ? p.accent : p.textTertiary,
-                      ),
-                    ),
-                  )
-                : MediaQuery.withClampedTextScaling(
-                    minScaleFactor: 0.8,
-                    maxScaleFactor: 1.15,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Selection indicator capsule: grows and lights up when active.
-                  AnimatedContainer(
-                    duration: context.motionMs(220),
-                    curve: context.motionCurve(Curves.easeOutCubic),
-                    height: 2,
-                    width: isSelected ? 18 : 6,
-                    margin: const EdgeInsets.only(bottom: AppSpacing.s2),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? p.accent
-                          : p.textTertiary.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: p.accent.withValues(alpha: 0.55),
-                                blurRadius: 6,
-                              ),
-                            ]
-                          : null,
-                    ),
-                  ),
-                  AnimatedScale(
-                    scale: isSelected ? 1.08 : 1.0,
-                    duration: context.motionMs(220),
-                    curve: context.motionCurve(Curves.easeOutBack),
-                    child: Icon(
-                      isSelected ? item.activeIcon : item.icon,
-                      size: iconSize,
-                      color: isSelected ? p.accent : p.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  AnimatedDefaultTextStyle(
-                    duration: context.motionMs(200),
-                    style: TextStyle(
-                      fontSize: isTablet ? AppFontSize.label : AppFontSize.tiny,
-                      height: 1.1,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                      color: isSelected
-                          ? p.accent
-                          : p.textTertiary.withValues(alpha: 0.85),
-                      letterSpacing: AppTracking.label,
-                      fontFamily:
-                          Theme.of(context).textTheme.bodySmall?.fontFamily,
-                    ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        item.label,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ),
-                ],
+            child: AnimatedContainer(
+              duration: context.motionMs(250),
+              curve: context.motionCurve(Curves.easeOutCubic),
+              padding: EdgeInsets.symmetric(
+                horizontal: isTablet ? 10 : 6,
+                vertical: AppSpacing.xxs,
               ),
+              decoration: BoxDecoration(
+                gradient: isSelected
+                    ? LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          p.accent.withValues(alpha: 0.22),
+                          p.accent.withValues(alpha: 0.08),
+                        ],
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
+                border: isSelected
+                    ? Border.all(
+                        color: p.accent.withValues(alpha: 0.38),
+                        width: 1.2,
+                      )
+                    : Border.all(color: Colors.transparent, width: 1.2),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: p.accent.withValues(alpha: 0.22),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: iconOnly
+                  ? Center(
+                      child: AnimatedScale(
+                        scale: isSelected ? 1.08 : 1.0,
+                        duration: context.motionMs(220),
+                        curve: context.motionCurve(Curves.easeOutBack),
+                        child: Icon(
+                          isSelected ? item.activeIcon : item.icon,
+                          size: iconSize,
+                          color: isSelected ? p.accent : p.textTertiary,
+                        ),
+                      ),
+                    )
+                  : MediaQuery.withClampedTextScaling(
+                      minScaleFactor: 0.8,
+                      maxScaleFactor: 1.15,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Selection indicator capsule: grows and lights up when active.
+                          AnimatedContainer(
+                            duration: context.motionMs(220),
+                            curve: context.motionCurve(Curves.easeOutCubic),
+                            height: 2,
+                            width: isSelected ? 18 : 6,
+                            margin:
+                                const EdgeInsets.only(bottom: AppSpacing.s2),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? p.accent
+                                  : p.textTertiary.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(AppRadii.r2),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: p.accent.withValues(alpha: 0.55),
+                                        blurRadius: 6,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                          AnimatedScale(
+                            scale: isSelected ? 1.08 : 1.0,
+                            duration: context.motionMs(220),
+                            curve: context.motionCurve(Curves.easeOutBack),
+                            child: Icon(
+                              isSelected ? item.activeIcon : item.icon,
+                              size: iconSize,
+                              color: isSelected ? p.accent : p.textTertiary,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          AnimatedDefaultTextStyle(
+                            duration: context.motionMs(200),
+                            style: TextStyle(
+                              fontSize: isTablet
+                                  ? AppFontSize.label
+                                  : AppFontSize.tiny,
+                              height: 1.1,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? p.accent
+                                  : p.textTertiary.withValues(alpha: 0.85),
+                              letterSpacing: AppTracking.label,
+                              fontFamily: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.fontFamily,
+                            ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                item.label,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
             ),
           ),
         ),
-      ),
       ),
     );
   }

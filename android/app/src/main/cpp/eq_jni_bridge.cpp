@@ -3,6 +3,8 @@
 #include <android/log.h>
 #include <cmath>
 #include <cstring>
+#include <mutex>
+#include <shared_mutex>
 #include <vector>
 #include "AudioDspEngine.h"
 #include "UsbAudioSink.h"
@@ -10,6 +12,13 @@
 #define LOG_TAG "PulsrDSP"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+namespace {
+// Serialises engine teardown against in-flight calls that use the raw jlong
+// handle (which bypasses the registry). Shared for the hot process/reset paths,
+// unique for destroy, so `delete engine` can never race an active render.
+std::shared_mutex gEngineLifecycleMutex;
+}  // namespace
 
 extern "C" {
 
@@ -894,11 +903,14 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBitPerfectParams(
 JNIEXPORT jlong JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeCreateEngine(
         JNIEnv* /* env */, jclass /* clazz */) {
+    AudioDspEngine* engine = nullptr;
     try {
-        auto* engine = new AudioDspEngine();
+        engine = new AudioDspEngine();
         DspEngineRegistry::instance().registerEngine(engine);
         return reinterpret_cast<jlong>(engine);
     } catch (...) {
+        // Do not leak the engine if registration throws.
+        delete engine;
         return 0;
     }
 }
@@ -940,20 +952,24 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadViperDdc(
 
     // Parse off-thread and publish the prepared coefficient sets via the
     // snapshot so the audio-thread applyParams never parses/allocates.
-    std::vector<ViperDdcSection> s441;
-    std::vector<ViperDdcSection> s480;
-    const bool ok = ViperDdc::parseVdcContent(content, s441, s480);
-    if (ok) {
-        auto p441 = std::make_shared<const std::vector<ViperDdcSection>>(s441);
-        auto p480 = std::make_shared<const std::vector<ViperDdcSection>>(s480);
-        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-            snap.viperDdc.ddcContent = content;
-            snap.viperDdc.profileName = name;
-            snap.viperDdc.sections441 = p441;
-            snap.viperDdc.sections480 = p480;
-        });
+    try {
+        std::vector<ViperDdcSection> s441;
+        std::vector<ViperDdcSection> s480;
+        const bool ok = ViperDdc::parseVdcContent(content, s441, s480);
+        if (ok) {
+            auto p441 = std::make_shared<const std::vector<ViperDdcSection>>(s441);
+            auto p480 = std::make_shared<const std::vector<ViperDdcSection>>(s480);
+            AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+                snap.viperDdc.ddcContent = content;
+                snap.viperDdc.profileName = name;
+                snap.viperDdc.sections441 = p441;
+                snap.viperDdc.sections480 = p480;
+            });
+        }
+        return ok ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
     }
-    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
@@ -974,17 +990,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadArbitraryEq(
 
     // Parse off-thread and publish the parsed node list via the snapshot so the
     // audio-thread applyParams never parses/allocates (see DspParams.h).
-    std::vector<std::pair<double, double>> nodes;
-    const bool ok = ArbitraryResponseEq::parseGraphicEq(content, nodes);
-    if (ok) {
-        auto parsed = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
-        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-            snap.arbitraryEq.graphicEqString = content;
-            snap.arbitraryEq.linearPhase = linearPhase;
-            snap.arbitraryEq.parsedNodes = parsed;
-        });
+    try {
+        std::vector<std::pair<double, double>> nodes;
+        const bool ok = ArbitraryResponseEq::parseGraphicEq(content, nodes);
+        if (ok) {
+            auto parsed = std::make_shared<const std::vector<std::pair<double, double>>>(nodes);
+            AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+                snap.arbitraryEq.graphicEqString = content;
+                snap.arbitraryEq.linearPhase = linearPhase;
+                snap.arbitraryEq.parsedNodes = parsed;
+            });
+        }
+        return ok ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
     }
-    return ok ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
@@ -1005,17 +1025,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
 
     // Compile on a throwaway instance so the live bytecode is only rebuilt on
     // the audio thread from the prepared program; then package it off-thread.
-    LiveProg validator;
-    const bool ok = validator.loadCode(script);
-    if (ok) {
-        auto program = validator.buildProgram();
-        AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-            snap.liveProg.code = script;
-            snap.liveProg.program = program;
-        });
-        return env->NewStringUTF("OK");
-    } else {
-        return env->NewStringUTF(validator.getLastError().c_str());
+    try {
+        LiveProg validator;
+        const bool ok = validator.loadCode(script);
+        if (ok) {
+            auto program = validator.buildProgram();
+            AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+                snap.liveProg.code = script;
+                snap.liveProg.program = program;
+            });
+            return env->NewStringUTF("OK");
+        } else {
+            return env->NewStringUTF(validator.getLastError().c_str());
+        }
+    } catch (...) {
+        return env->NewStringUTF("LiveProg compilation failed");
     }
 }
 
@@ -1041,6 +1065,9 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
     if (engineHandle == 0) return;
     try {
+        // Unique lock: wait for any in-flight processInterleaved() on this
+        // handle (which holds the shared lock) before destroying the engine.
+        std::unique_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
         auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
         DspEngineRegistry::instance().unregisterEngine(engine);
         delete engine;
@@ -1050,6 +1077,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeDestroyEngine(
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResetEngine(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
     if (!engine) engine = &AudioDspEngine::instance();
     try {
@@ -1061,6 +1089,9 @@ JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
         JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
+    // A negative or unaligned offset would let `requiredBytes` under-count and
+    // address memory before the mapped region; reject it like the AAudio path.
+    if (offsetBytes < 0 || (offsetBytes % static_cast<jint>(sizeof(float))) != 0) return 0;
     void* addr = env->GetDirectBufferAddress(byteBuffer);
     if (!addr) return 0;
     // Validate buffer bounds to prevent overruns from untrusted offset/frameCount.
@@ -1069,6 +1100,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
         static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
     if (capacity < 0 || requiredBytes > capacity) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
+    std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
     if (!engine) engine = &AudioDspEngine::instance();
     try {
@@ -1091,6 +1123,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
 JNIEXPORT void JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle, jdouble sampleRate, jint channels) {
+    std::shared_lock<std::shared_mutex> lifeLock(gEngineLifecycleMutex);
     auto* engine = reinterpret_cast<AudioDspEngine*>(engineHandle);
     if (!engine) engine = &AudioDspEngine::instance();
     try {

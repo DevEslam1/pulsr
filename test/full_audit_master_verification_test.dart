@@ -9,7 +9,8 @@ import 'package:pulsr/domain/models/eq_preset.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   group('Full Master Audit Verification Tests', () {
-    test('Reorder queue destination index math handles forward drag correctly', () {
+    test('Reorder queue destination index math handles forward drag correctly',
+        () {
       int oldIndex = 1;
       int newIndex = 5;
       if (newIndex > oldIndex) newIndex -= 1;
@@ -22,7 +23,8 @@ void main() {
       expect(newIndex, equals(1));
     });
 
-    test('Equalizer gain arrays equality handles content comparison correctly', () {
+    test('Equalizer gain arrays equality handles content comparison correctly',
+        () {
       final presetA = EqPreset(name: 'Test', gains: [1.0, 2.0, 3.0]);
       final presetB = EqPreset(name: 'Test', gains: [1.0, 2.0, 3.0]);
       final presetC = EqPreset(name: 'Test', gains: [1.0, 2.0, 3.5]);
@@ -49,12 +51,16 @@ void main() {
         _MockBuildContext(),
         const FormatException('invalid json payload'),
       );
-      expect(formatError, contains('Encountered unexpected or corrupt data format'));
+      expect(formatError,
+          contains('Encountered unexpected or corrupt data format'));
     });
 
-    test('PulsrElevation produces valid shadows for dark and light palettes', () {
-      final darkTheme = AuraTheme.customTheme(Colors.blue, brightness: Brightness.dark);
-      final lightTheme = AuraTheme.customTheme(Colors.blue, brightness: Brightness.light);
+    test('PulsrElevation produces valid shadows for dark and light palettes',
+        () {
+      final darkTheme =
+          AuraTheme.customTheme(Colors.blue, brightness: Brightness.dark);
+      final lightTheme =
+          AuraTheme.customTheme(Colors.blue, brightness: Brightness.light);
       final darkPalette = darkTheme.extension<PulsrPalette>()!;
       final lightPalette = lightTheme.extension<PulsrPalette>()!;
 

@@ -81,8 +81,8 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        final computedMasterWidth = masterWidth ??
-            (totalWidth * listWidthRatio).clamp(280.0, 480.0);
+        final computedMasterWidth =
+            masterWidth ?? (totalWidth * listWidthRatio).clamp(280.0, 480.0);
 
         Widget body = Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,

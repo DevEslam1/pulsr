@@ -119,9 +119,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     return StreamBuilder<Result<List<SongsTableData>>>(
       stream: _songsStream,
       builder: (context, snapshot) {
-        final allSongs = snapshot.data
-                ?.fold((l) => <SongsTableData>[], (r) => r) ??
-            [];
+        final allSongs =
+            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
         final visibleSongs = _filterSongs(allSongs);
         final isAllSelected = visibleSongs.isNotEmpty &&
             visibleSongs.every((s) => _selectedSongIds.contains(s.id));
@@ -136,8 +135,11 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(context.l10n.managePlaylist,
-                    style: TextStyle(fontSize: AppFontSize.bodySmall, fontWeight: FontWeight.w500),
+                  Text(
+                    context.l10n.managePlaylist,
+                    style: TextStyle(
+                        fontSize: AppFontSize.bodySmall,
+                        fontWeight: FontWeight.w500),
                   ),
                   Text(
                     widget.playlist.name,
@@ -188,7 +190,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
               ],
             ),
             body: _isLoading
-                ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
+                ? const SkeletonList(
+                    padding: EdgeInsets.only(top: AppSpacing.xs))
                 : _loadError != null
                     ? EmptyStateWidget(
                         icon: Icons.error_outline_rounded,
@@ -204,157 +207,198 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                         },
                       )
                     : Column(
-                    children: [
-                      _buildSearchBar(p),
-                      _buildCountBanner(p),
-                      Expanded(
-                        child: visibleSongs.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.search_off_rounded,
-                                        size: 48, color: p.textTertiary),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Text(
-                                      _searchQuery.isEmpty
-                                          ? context.l10n.browseNoSongsInLibrary
-                                          : '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
-                                      style: TextStyle(
-                                        color: p.textSecondary,
-                                        fontSize: AppFontSize.body,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                addAutomaticKeepAlives: false,
-                                addRepaintBoundaries: true,
-                                padding: const EdgeInsetsDirectional.only(
-                                    top: AppSpacing.xs, bottom: 100, start: AppSpacing.sm, end: AppSpacing.sm),
-                                itemCount: visibleSongs.length,
-                                itemBuilder: (context, index) {
-                                  final song = visibleSongs[index];
-                          final isSelected =
-                              _selectedSongIds.contains(song.id);
-
-                          return StaggeredListItem(
-                            index: index,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: AppRadii.cardRadius,
-                                  onTap: () {
-                                    setState(() {
-                                      if (isSelected) {
-                                        _selectedSongIds.remove(song.id);
-                                      } else {
-                                        _selectedSongIds.add(song.id);
-                                      }
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-
-                                        horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
-                                    decoration: BoxDecoration(
-                                      borderRadius: AppRadii.cardRadius,
-                                      color: isSelected
-                                          ? p.accent.withValues(
-                                              alpha: p.isDark ? 0.12 : 0.08)
-                                          : Colors.transparent,
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? p.accent.withValues(alpha: 0.3)
-                                            : Colors.transparent,
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: Row(
+                        children: [
+                          _buildSearchBar(p),
+                          _buildCountBanner(p),
+                          Expanded(
+                            child: visibleSongs.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        // Checkbox
-                                        Checkbox(
-                                          value: isSelected,
-                                          activeColor: p.accent,
-                                          checkColor: p.onAccent,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(AppRadii.r6),
-                                          ),
-                                          onChanged: (val) {
-                                            setState(() {
-                                              if (val == true) {
-                                                _selectedSongIds.add(song.id);
-                                              } else {
-                                                _selectedSongIds.remove(song.id);
-                                              }
-                                            });
-                                          },
-                                        ),
-                                        const SizedBox(width: AppSpacing.s6),
-                                        // Artwork
-                                        CachedArtwork(
-                                          id: song.id,
-                                          remoteUrl: song.remoteArtworkUrl,
-                                          type: ArtworkType.AUDIO,
-                                          size: 44,
-                                          borderRadius: 10,
-                                        ),
-                                        const SizedBox(width: AppSpacing.sm),
-                                        // Track details
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                song.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: p.textPrimary,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: AppFontSize.body,
-                                                ),
-                                              ),
-                                              const SizedBox(height: AppSpacing.s2),
-                                              Text(
-                                                song.artist,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: p.textSecondary,
-                                                  fontSize: AppFontSize.label,
-                                                ),
-                                              ),
-                                            ],
+                                        Icon(Icons.search_off_rounded,
+                                            size: 48, color: p.textTertiary),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        Text(
+                                          _searchQuery.isEmpty
+                                              ? context
+                                                  .l10n.browseNoSongsInLibrary
+                                              : '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
+                                          style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: AppFontSize.body,
                                           ),
                                         ),
                                       ],
                                     ),
+                                  )
+                                : ListView.builder(
+                                    addAutomaticKeepAlives: false,
+                                    addRepaintBoundaries: true,
+                                    padding: const EdgeInsetsDirectional.only(
+                                        top: AppSpacing.xs,
+                                        bottom: 100,
+                                        start: AppSpacing.sm,
+                                        end: AppSpacing.sm),
+                                    itemCount: visibleSongs.length,
+                                    itemBuilder: (context, index) {
+                                      final song = visibleSongs[index];
+                                      final isSelected =
+                                          _selectedSongIds.contains(song.id);
+
+                                      return StaggeredListItem(
+                                        index: index,
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: AppSpacing.xxs),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius: AppRadii.cardRadius,
+                                              onTap: () {
+                                                setState(() {
+                                                  if (isSelected) {
+                                                    _selectedSongIds
+                                                        .remove(song.id);
+                                                  } else {
+                                                    _selectedSongIds
+                                                        .add(song.id);
+                                                  }
+                                                });
+                                              },
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal:
+                                                            AppSpacing.s10,
+                                                        vertical:
+                                                            AppSpacing.xs),
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      AppRadii.cardRadius,
+                                                  color: isSelected
+                                                      ? p.accent.withValues(
+                                                          alpha: p.isDark
+                                                              ? 0.12
+                                                              : 0.08)
+                                                      : Colors.transparent,
+                                                  border: Border.all(
+                                                    color: isSelected
+                                                        ? p.accent.withValues(
+                                                            alpha: 0.3)
+                                                        : Colors.transparent,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    // Checkbox
+                                                    Checkbox(
+                                                      value: isSelected,
+                                                      activeColor: p.accent,
+                                                      checkColor: p.onAccent,
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(
+                                                                    AppRadii
+                                                                        .r6),
+                                                      ),
+                                                      onChanged: (val) {
+                                                        setState(() {
+                                                          if (val == true) {
+                                                            _selectedSongIds
+                                                                .add(song.id);
+                                                          } else {
+                                                            _selectedSongIds
+                                                                .remove(
+                                                                    song.id);
+                                                          }
+                                                        });
+                                                      },
+                                                    ),
+                                                    const SizedBox(
+                                                        width: AppSpacing.s6),
+                                                    // Artwork
+                                                    CachedArtwork(
+                                                      id: song.id,
+                                                      remoteUrl:
+                                                          song.remoteArtworkUrl,
+                                                      type: ArtworkType.AUDIO,
+                                                      size: 44,
+                                                      borderRadius: 10,
+                                                    ),
+                                                    const SizedBox(
+                                                        width: AppSpacing.sm),
+                                                    // Track details
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            song.title,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                              color:
+                                                                  p.textPrimary,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              fontSize:
+                                                                  AppFontSize
+                                                                      .body,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              height: AppSpacing
+                                                                  .s2),
+                                                          Text(
+                                                            song.artist,
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                              color: p
+                                                                  .textSecondary,
+                                                              fontSize:
+                                                                  AppFontSize
+                                                                      .label,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
-              ),
-            ],
+            bottomNavigationBar: _buildBottomActionBar(p),
           ),
-          bottomNavigationBar: _buildBottomActionBar(p),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _buildSearchBar(PulsrPalette p) {
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
       child: GlassContainer(
         blur: 16,
         opacity: p.isDark ? 0.9 : 0.95,
@@ -371,24 +415,29 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                 controller: _searchController,
                 onChanged: (val) {
                   _searchDebounce?.cancel();
-                  _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                  _searchDebounce =
+                      Timer(const Duration(milliseconds: 300), () {
                     if (mounted) setState(() => _searchQuery = val);
                   });
                 },
-                style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+                style:
+                    TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
                 decoration: InputDecoration(
                   hintText: context.l10n.browseSearchSongsHint,
-                  hintStyle: TextStyle(color: p.textTertiary, fontSize: AppFontSize.bodySmall),
+                  hintStyle: TextStyle(
+                      color: p.textTertiary, fontSize: AppFontSize.bodySmall),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 ),
               ),
             ),
             if (_searchQuery.isNotEmpty)
-                IconButton(
-                  icon: Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
-                  tooltip: context.l10n.clear,
+              IconButton(
+                icon:
+                    Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
+                tooltip: context.l10n.clear,
                 onPressed: () {
                   _searchDebounce?.cancel();
                   _searchController.clear();
@@ -409,9 +458,11 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     if (!hasChanges) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.1),
           borderRadius: BorderRadius.circular(AppRadii.r12),
@@ -446,7 +497,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     final hasChanges = toAdd > 0 || toRemove > 0;
 
     return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.lg),
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(top: BorderSide(color: p.hairline, width: 1)),
@@ -476,7 +528,8 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
             hasChanges
                 ? '${context.l10n.browseApplyChanges} (+$toAdd / -$toRemove)'
                 : context.l10n.browseNoChangesToSave,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
           style: FilledButton.styleFrom(
             backgroundColor: hasChanges ? p.accent : p.surfaceContainerHigh,
@@ -502,15 +555,15 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
     String? failureMessage;
     try {
       if (toAdd.isNotEmpty) {
-        final res = await _playlistUseCases
-            .addSongsToPlaylist(widget.playlist.id, toAdd);
+        final res = await _playlistUseCases.addSongsToPlaylist(
+            widget.playlist.id, toAdd);
         failureMessage = res.fold<String?>((f) => f.message, (_) => null);
       }
 
       if (failureMessage == null) {
         for (final songId in toRemove) {
-          final res = await _playlistUseCases
-              .removeSongFromPlaylist(widget.playlist.id, songId);
+          final res = await _playlistUseCases.removeSongFromPlaylist(
+              widget.playlist.id, songId);
           failureMessage = res.fold<String?>((f) => f.message, (_) => null);
           if (failureMessage != null) break;
         }

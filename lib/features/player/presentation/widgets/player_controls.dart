@@ -9,6 +9,7 @@ import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class PlayerControls extends StatelessWidget {
   final bool isPlaying;
@@ -50,7 +51,7 @@ class PlayerControls extends StatelessWidget {
     final p = context.palette;
     final l10n = context.l10n;
     final onPrimaryColor = primaryColor.computeLuminance() > 0.5
-        ? const Color(0xFF101223)
+        ? AppColors.onBright
         : Colors.white;
 
     final shuffleLabel = isShuffle ? l10n.disableShuffle : l10n.enableShuffle;
@@ -66,10 +67,10 @@ class PlayerControls extends StatelessWidget {
         fit: BoxFit.scaleDown,
         alignment: Alignment.center,
         child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
             // Shuffle Button with active indicator
             Semantics(
               label: shuffleLabel,
@@ -320,46 +321,46 @@ class _ControlButton extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                AnimatedContainer(
-                  duration: context.motionMs(200),
-                  padding: const EdgeInsets.all(AppSpacing.s6),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isActive
-                        ? activeColor.withValues(alpha: 0.15)
-                        : Colors.transparent,
+                  AnimatedContainer(
+                    duration: context.motionMs(200),
+                    padding: const EdgeInsets.all(AppSpacing.s6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isActive
+                          ? activeColor.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isActive ? activeColor : inactiveColor,
+                      size: iconSize,
+                    ),
                   ),
-                  child: Icon(
-                    icon,
-                    color: isActive ? activeColor : inactiveColor,
-                    size: iconSize,
+                  const SizedBox(height: AppSpacing.s2),
+                  AnimatedContainer(
+                    duration: context.motionMs(200),
+                    width: isActive ? 4 : 0,
+                    height: isActive ? 4 : 0,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: activeColor,
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: activeColor.withValues(alpha: 0.6),
+                                blurRadius: 4,
+                                spreadRadius: 0.5,
+                              )
+                            ]
+                          : null,
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.s2),
-                AnimatedContainer(
-                  duration: context.motionMs(200),
-                  width: isActive ? 4 : 0,
-                  height: isActive ? 4 : 0,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: activeColor,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.6),
-                              blurRadius: 4,
-                              spreadRadius: 0.5,
-                            )
-                          ]
-                        : null,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 }

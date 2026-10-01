@@ -167,7 +167,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   Stream<double> get scanProgress => _scannerService.scanProgress;
 
   Future<String> getProxyPassword() async {
-    if (_proxyPasswordLoaded || _proxyPassword.isNotEmpty) return _proxyPassword;
+    if (_proxyPasswordLoaded || _proxyPassword.isNotEmpty) {
+      return _proxyPassword;
+    }
     if (_inFlightProxyPasswordRead != null) return _inFlightProxyPasswordRead!;
     final gen = _proxyPasswordGen;
     late final Future<String> future;
@@ -290,10 +292,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     await _loadPreferences();
   }
 
-
   // FIX-H01: Modularized preferences loaders with isolated try-catch blocks.
 
-  SettingsState _loadThemePrefs(SharedPreferences prefs, [SettingsState? baseState]) {
+  SettingsState _loadThemePrefs(SharedPreferences prefs,
+      [SettingsState? baseState]) {
     final current = baseState ?? state;
     final themeModeStr =
         prefs.getString(_keyThemeMode) ?? AppThemeMode.dark.name;
@@ -324,9 +326,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       orElse: () => MiniPlayerSwipeAction.next,
     );
 
-    final miniPlayerSwipeRightStr =
-        prefs.getString(_keyMiniPlayerSwipeRight) ??
-            MiniPlayerSwipeAction.prev.name;
+    final miniPlayerSwipeRightStr = prefs.getString(_keyMiniPlayerSwipeRight) ??
+        MiniPlayerSwipeAction.prev.name;
     final miniPlayerSwipeRight = MiniPlayerSwipeAction.values.firstWhere(
       (e) => e.name == miniPlayerSwipeRightStr,
       orElse: () => MiniPlayerSwipeAction.prev,
@@ -368,9 +369,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       autoThemeByTime:
           prefs.getBool(_keyAutoThemeByTime) ?? current.autoThemeByTime,
       highContrast: prefs.getBool(_keyHighContrast) ?? current.highContrast,
-      dimWhitePoint:
-          prefs.getBool(_keyDimWhitePoint) ?? current.dimWhitePoint,
-      reduceMotion: prefs.getBool('setting_reduce_motion') ?? current.reduceMotion,
+      dimWhitePoint: prefs.getBool(_keyDimWhitePoint) ?? current.dimWhitePoint,
+      reduceMotion:
+          prefs.getBool('setting_reduce_motion') ?? current.reduceMotion,
       liquidGlassTint:
           prefs.getDouble(_keyLiquidGlassTint) ?? current.liquidGlassTint,
       languageCode: prefs.getString(_keyLanguageCode) ?? current.languageCode,
@@ -410,18 +411,16 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final replayGainPreampWithRg = replayGainPreampWithRgRaw.isFinite
         ? replayGainPreampWithRgRaw.clamp(-12.0, 12.0)
         : 0.0;
-    final replayGainPreampWithoutRg =
-        replayGainPreampWithoutRgRaw.isFinite
-            ? replayGainPreampWithoutRgRaw.clamp(-12.0, 12.0)
-            : -3.0;
+    final replayGainPreampWithoutRg = replayGainPreampWithoutRgRaw.isFinite
+        ? replayGainPreampWithoutRgRaw.clamp(-12.0, 12.0)
+        : -3.0;
 
     final strictBitPerfectLoaded =
         prefs.getBool(PrefsKeys.strictBitPerfect) ?? false;
     final followTrackSampleRateLoaded =
         prefs.getBool(PrefsKeys.followTrackSampleRate) ?? true;
     final dsdOutputModeLoaded = DsdOutputMode.values.firstWhere(
-      (e) =>
-          e.name == (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm'),
+      (e) => e.name == (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm'),
       orElse: () => DsdOutputMode.pcm,
     );
     final experienceModeLoaded = ExperienceMode.fromName(
@@ -466,9 +465,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           : (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
               current.bypassDspOnBitPerfect),
       strictBitPerfect: strictBitPerfectLoaded,
-      followTrackSampleRate: strictBitPerfectLoaded
-          ? true
-          : followTrackSampleRateLoaded,
+      followTrackSampleRate:
+          strictBitPerfectLoaded ? true : followTrackSampleRateLoaded,
       dsdOutputMode: dsdOutputModeLoaded,
       experienceMode: experienceModeLoaded,
       currentOutputDevice:
@@ -521,23 +519,18 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.hedgedResolutionEnabled) ?? true,
       adaptiveQualityEnabled:
           prefs.getBool(PrefsKeys.adaptiveQualityEnabled) ?? true,
-      duckingMode:
-          prefs.getString(PrefsKeys.duckingMode) ?? 'duck',
-      duckingLevel:
-          prefs.getDouble(PrefsKeys.duckingLevel) ?? 0.3,
+      duckingMode: prefs.getString(PrefsKeys.duckingMode) ?? 'duck',
+      duckingLevel: prefs.getDouble(PrefsKeys.duckingLevel) ?? 0.3,
       multiOutputMode:
           prefs.getString(PrefsKeys.multiOutputMode) ?? 'systemDefault',
-      dspSnapshotEnabled:
-          prefs.getBool(PrefsKeys.dspSnapshotEnabled) ?? true,
+      dspSnapshotEnabled: prefs.getBool(PrefsKeys.dspSnapshotEnabled) ?? true,
       silenceSkipSensitivity:
           prefs.getInt(PrefsKeys.silenceSkipSensitivity) ?? 0,
       sessionLogEnabled:
           prefs.getBool(PrefsKeys.audioSessionLogEnabled) ?? true,
-      outputFormatNegotiationEnabled: prefs
-              .getBool(PrefsKeys.outputFormatNegotiationEnabled) ??
-          true,
-      floatOutputEnabled:
-          prefs.getBool(PrefsKeys.floatOutputEnabled) ?? true,
+      outputFormatNegotiationEnabled:
+          prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? true,
+      floatOutputEnabled: prefs.getBool(PrefsKeys.floatOutputEnabled) ?? true,
       aaudioOutputEnabled:
           prefs.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
       dvcEnabled: prefs.getBool(PrefsKeys.dvcEnabled) ?? false,
@@ -545,16 +538,15 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false,
       aaudioPreferExclusive:
           prefs.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
-      aaudioTargetBufferMs:
-          prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
-      sincResamplerQuality:
-          prefs.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
+      aaudioTargetBufferMs: prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
+      sincResamplerQuality: prefs.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
       bpmSyncCrossfadeEnabled:
           prefs.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false,
     );
   }
 
-  SettingsState _loadNetworkPrefs(SharedPreferences prefs, [SettingsState? baseState]) {
+  SettingsState _loadNetworkPrefs(SharedPreferences prefs,
+      [SettingsState? baseState]) {
     final current = baseState ?? state;
     final streamingQualityStr =
         prefs.getString(_keyStreamingQuality) ?? YtmAudioQuality.high.name;
@@ -741,176 +733,279 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         try {
           runningState = _loadThemePrefs(prefs, runningState);
         } catch (e, st) {
-        ErrorLogger.log(
-          'Failed to load theme preferences',
-          error: e,
-          stackTrace: st,
-          category: 'SettingsCubit',
-        );
-      }
-
-      final effectManager = getIt.isRegistered<EqualizerManager>()
-          ? getIt<EqualizerManager>()
-          : null;
-      try {
-        runningState = _loadAudioPrefs(prefs, effectManager, runningState);
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Failed to load audio preferences',
-          error: e,
-          stackTrace: st,
-          category: 'SettingsCubit',
-        );
-      }
-
-      try {
-        runningState = _loadNetworkPrefs(prefs, runningState);
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Failed to load network preferences',
-          error: e,
-          stackTrace: st,
-          category: 'SettingsCubit',
-        );
-      }
-
-      try {
-        final proxyLoaded =
-            await _loadProxyPrefs(prefs, proxyPassword, runningState);
-        runningState = proxyLoaded.state;
-        if (!_dirtyFields.contains('proxy')) {
-          _proxyPassword = proxyLoaded.proxyPassword;
-          _proxyPasswordLoaded = true;
+          ErrorLogger.log(
+            'Failed to load theme preferences',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
         }
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Failed to load proxy preferences',
-          error: e,
-          stackTrace: st,
-          category: 'SettingsCubit',
-        );
-      }
 
-      // FIX-H07: Edits made while this load was in flight must win over the
-      // on-disk snapshot, otherwise the user's changes silently revert.
-      final previous = state;
-      final reconciledDirty = Set<String>.from(_dirtyFields);
-      var loadedState = runningState;
-      if (reconciledDirty.contains('proxy')) {
-        loadedState = loadedState.copyWith(
-          proxyEnabled: previous.proxyEnabled,
-          proxyType: previous.proxyType,
-          proxyHost: previous.proxyHost,
-          proxyPort: previous.proxyPort,
-          proxyUsername: previous.proxyUsername,
-          hasProxyPassword: previous.hasProxyPassword,
-          proxyBypassHosts: previous.proxyBypassHosts,
-          proxyList: previous.proxyList,
-        );
-      }
-      if (reconciledDirty.contains('themeMode')) loadedState = loadedState.copyWith(themeMode: previous.themeMode);
-      if (reconciledDirty.contains('customAccentColorValue')) loadedState = loadedState.copyWith(customAccentColorValue: previous.customAccentColorValue);
-      if (reconciledDirty.contains('themeColorSource')) loadedState = loadedState.copyWith(themeColorSource: previous.themeColorSource);
-      if (reconciledDirty.contains('gaplessPlayback')) loadedState = loadedState.copyWith(gaplessPlayback: previous.gaplessPlayback);
-      if (reconciledDirty.contains('crossfadeSeconds')) loadedState = loadedState.copyWith(crossfadeSeconds: previous.crossfadeSeconds);
-      if (reconciledDirty.contains('minDurationSec')) loadedState = loadedState.copyWith(minDurationSec: previous.minDurationSec);
-      if (reconciledDirty.contains('autoHideSystemMedia')) loadedState = loadedState.copyWith(autoHideSystemMedia: previous.autoHideSystemMedia);
-      if (reconciledDirty.contains('resumeAfterInterruption')) loadedState = loadedState.copyWith(resumeAfterInterruption: previous.resumeAfterInterruption);
-      if (reconciledDirty.contains('waveformSeekBarEnabled')) loadedState = loadedState.copyWith(waveformSeekBarEnabled: previous.waveformSeekBarEnabled);
-      if (reconciledDirty.contains('autoThemeByTime')) loadedState = loadedState.copyWith(autoThemeByTime: previous.autoThemeByTime);
-      if (reconciledDirty.contains('highContrast')) loadedState = loadedState.copyWith(highContrast: previous.highContrast);
-      if (reconciledDirty.contains('dimWhitePoint')) loadedState = loadedState.copyWith(dimWhitePoint: previous.dimWhitePoint);
-      if (reconciledDirty.contains('reduceMotion')) loadedState = loadedState.copyWith(reduceMotion: previous.reduceMotion);
-      if (reconciledDirty.contains('liquidGlassTint')) loadedState = loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
-      if (reconciledDirty.contains('languageCode')) loadedState = loadedState.copyWith(languageCode: previous.languageCode);
-      if (reconciledDirty.contains('customThemeRadius')) loadedState = loadedState.copyWith(customThemeRadius: previous.customThemeRadius);
-      if (reconciledDirty.contains('customThemeGlow')) loadedState = loadedState.copyWith(customThemeGlow: previous.customThemeGlow);
-      if (reconciledDirty.contains('playerThemeMode')) loadedState = loadedState.copyWith(playerThemeMode: previous.playerThemeMode);
-      if (reconciledDirty.contains('visualizerStyle')) loadedState = loadedState.copyWith(visualizerStyle: previous.visualizerStyle);
-      if (reconciledDirty.contains('miniPlayerSwipeLeft')) loadedState = loadedState.copyWith(miniPlayerSwipeLeft: previous.miniPlayerSwipeLeft);
-      if (reconciledDirty.contains('miniPlayerSwipeRight')) loadedState = loadedState.copyWith(miniPlayerSwipeRight: previous.miniPlayerSwipeRight);
-      if (reconciledDirty.contains('nowPlayingDoubleTap')) loadedState = loadedState.copyWith(nowPlayingDoubleTap: previous.nowPlayingDoubleTap);
-      if (reconciledDirty.contains('nowPlayingArtworkSwipe')) loadedState = loadedState.copyWith(nowPlayingArtworkSwipe: previous.nowPlayingArtworkSwipe);
-      if (reconciledDirty.contains('streamingQuality')) loadedState = loadedState.copyWith(streamingQuality: previous.streamingQuality);
-      if (reconciledDirty.contains('downloadQuality')) loadedState = loadedState.copyWith(downloadQuality: previous.downloadQuality);
-      if (reconciledDirty.contains('wifiOnlyMode')) loadedState = loadedState.copyWith(wifiOnlyMode: previous.wifiOnlyMode);
-      if (reconciledDirty.contains('offlineOnlyMode')) loadedState = loadedState.copyWith(offlineOnlyMode: previous.offlineOnlyMode);
-      if (reconciledDirty.contains('experienceMode')) loadedState = loadedState.copyWith(experienceMode: previous.experienceMode);
-      if (reconciledDirty.contains('strictBitPerfect')) loadedState = loadedState.copyWith(strictBitPerfect: previous.strictBitPerfect);
-      if (reconciledDirty.contains('bitPerfectOutput')) loadedState = loadedState.copyWith(bitPerfectOutput: previous.bitPerfectOutput);
-      if (reconciledDirty.contains('bypassDspOnBitPerfect')) loadedState = loadedState.copyWith(bypassDspOnBitPerfect: previous.bypassDspOnBitPerfect);
-      if (reconciledDirty.contains('followTrackSampleRate')) loadedState = loadedState.copyWith(followTrackSampleRate: previous.followTrackSampleRate);
-      if (reconciledDirty.contains('dsdOutputMode')) loadedState = loadedState.copyWith(dsdOutputMode: previous.dsdOutputMode);
-      if (reconciledDirty.contains('multiOutputMode')) loadedState = loadedState.copyWith(multiOutputMode: previous.multiOutputMode);
+        final effectManager = getIt.isRegistered<EqualizerManager>()
+            ? getIt<EqualizerManager>()
+            : null;
+        try {
+          runningState = _loadAudioPrefs(prefs, effectManager, runningState);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to load audio preferences',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
+        }
 
-      // Emit before the platform round-trips below: main.dart drives themeMode,
-      // accent and locale from this state, so deferring it renders the default
-      // theme and locale for as long as the native calls take.
-      if (isClosed || gen != _loadPreferencesGen) {
-        _markPrefsLoaded();
-        return;
-      }
-      safeEmit(loadedState);
-      _dirtyFields.removeAll(reconciledDirty);
+        try {
+          runningState = _loadNetworkPrefs(prefs, runningState);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to load network preferences',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
+        }
 
-      if (getIt.isRegistered<EqualizerManager>()) {
-        await getIt<EqualizerManager>().setDspPreference(loadedState.dspPreference);
-      } else {
-        await AudioEffectsChannel().setDspPreference(loadedState.dspPreference);
-      }
-      try {
-        final status = await AudioEffectsChannel().setSystemEffectsPolicy(
-          loadedState.systemEffectsPolicy,
-          isHiResOrBitPerfect: loadedState.bitPerfectOutput,
-        );
-        safeEmit(state.copyWith(systemEffectsStatus: status));
-      } catch (_) {}
-      if (loadedState.bitPerfectOutput) {
-        await _hiResAudioService.setBitPerfectMode(true);
-      }
-      // MQA hook wiring (orphan 20-01): the decoder hook previously defaulted
-      // ON with no owner; the preference now owns it.
-      await loadMqaDecodingPreference();
-      if (loadedState.bitPerfectOutput && loadedState.bypassDspOnBitPerfect) {
-        // Re-assert the DSP-bypass policy at boot: without this the Kotlin
-        // effects plugin keeps its default (bypass off) after a restart and
-        // the saved bit-perfect conflict rule is not enforced this session.
+        try {
+          final proxyLoaded =
+              await _loadProxyPrefs(prefs, proxyPassword, runningState);
+          runningState = proxyLoaded.state;
+          if (!_dirtyFields.contains('proxy')) {
+            _proxyPassword = proxyLoaded.proxyPassword;
+            _proxyPasswordLoaded = true;
+          }
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Failed to load proxy preferences',
+            error: e,
+            stackTrace: st,
+            category: 'SettingsCubit',
+          );
+        }
+
+        // FIX-H07: Edits made while this load was in flight must win over the
+        // on-disk snapshot, otherwise the user's changes silently revert.
+        final previous = state;
+        final reconciledDirty = Set<String>.from(_dirtyFields);
+        var loadedState = runningState;
+        if (reconciledDirty.contains('proxy')) {
+          loadedState = loadedState.copyWith(
+            proxyEnabled: previous.proxyEnabled,
+            proxyType: previous.proxyType,
+            proxyHost: previous.proxyHost,
+            proxyPort: previous.proxyPort,
+            proxyUsername: previous.proxyUsername,
+            hasProxyPassword: previous.hasProxyPassword,
+            proxyBypassHosts: previous.proxyBypassHosts,
+            proxyList: previous.proxyList,
+          );
+        }
+        if (reconciledDirty.contains('themeMode')) {
+          loadedState = loadedState.copyWith(themeMode: previous.themeMode);
+        }
+        if (reconciledDirty.contains('customAccentColorValue')) {
+          loadedState = loadedState.copyWith(
+              customAccentColorValue: previous.customAccentColorValue);
+        }
+        if (reconciledDirty.contains('themeColorSource')) {
+          loadedState =
+              loadedState.copyWith(themeColorSource: previous.themeColorSource);
+        }
+        if (reconciledDirty.contains('gaplessPlayback')) {
+          loadedState =
+              loadedState.copyWith(gaplessPlayback: previous.gaplessPlayback);
+        }
+        if (reconciledDirty.contains('crossfadeSeconds')) {
+          loadedState =
+              loadedState.copyWith(crossfadeSeconds: previous.crossfadeSeconds);
+        }
+        if (reconciledDirty.contains('minDurationSec')) {
+          loadedState =
+              loadedState.copyWith(minDurationSec: previous.minDurationSec);
+        }
+        if (reconciledDirty.contains('autoHideSystemMedia')) {
+          loadedState = loadedState.copyWith(
+              autoHideSystemMedia: previous.autoHideSystemMedia);
+        }
+        if (reconciledDirty.contains('resumeAfterInterruption')) {
+          loadedState = loadedState.copyWith(
+              resumeAfterInterruption: previous.resumeAfterInterruption);
+        }
+        if (reconciledDirty.contains('waveformSeekBarEnabled')) {
+          loadedState = loadedState.copyWith(
+              waveformSeekBarEnabled: previous.waveformSeekBarEnabled);
+        }
+        if (reconciledDirty.contains('autoThemeByTime')) {
+          loadedState =
+              loadedState.copyWith(autoThemeByTime: previous.autoThemeByTime);
+        }
+        if (reconciledDirty.contains('highContrast')) {
+          loadedState =
+              loadedState.copyWith(highContrast: previous.highContrast);
+        }
+        if (reconciledDirty.contains('dimWhitePoint')) {
+          loadedState =
+              loadedState.copyWith(dimWhitePoint: previous.dimWhitePoint);
+        }
+        if (reconciledDirty.contains('reduceMotion')) {
+          loadedState =
+              loadedState.copyWith(reduceMotion: previous.reduceMotion);
+        }
+        if (reconciledDirty.contains('liquidGlassTint')) {
+          loadedState =
+              loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
+        }
+        if (reconciledDirty.contains('languageCode')) {
+          loadedState =
+              loadedState.copyWith(languageCode: previous.languageCode);
+        }
+        if (reconciledDirty.contains('customThemeRadius')) {
+          loadedState = loadedState.copyWith(
+              customThemeRadius: previous.customThemeRadius);
+        }
+        if (reconciledDirty.contains('customThemeGlow')) {
+          loadedState =
+              loadedState.copyWith(customThemeGlow: previous.customThemeGlow);
+        }
+        if (reconciledDirty.contains('playerThemeMode')) {
+          loadedState =
+              loadedState.copyWith(playerThemeMode: previous.playerThemeMode);
+        }
+        if (reconciledDirty.contains('visualizerStyle')) {
+          loadedState =
+              loadedState.copyWith(visualizerStyle: previous.visualizerStyle);
+        }
+        if (reconciledDirty.contains('miniPlayerSwipeLeft')) {
+          loadedState = loadedState.copyWith(
+              miniPlayerSwipeLeft: previous.miniPlayerSwipeLeft);
+        }
+        if (reconciledDirty.contains('miniPlayerSwipeRight')) {
+          loadedState = loadedState.copyWith(
+              miniPlayerSwipeRight: previous.miniPlayerSwipeRight);
+        }
+        if (reconciledDirty.contains('nowPlayingDoubleTap')) {
+          loadedState = loadedState.copyWith(
+              nowPlayingDoubleTap: previous.nowPlayingDoubleTap);
+        }
+        if (reconciledDirty.contains('nowPlayingArtworkSwipe')) {
+          loadedState = loadedState.copyWith(
+              nowPlayingArtworkSwipe: previous.nowPlayingArtworkSwipe);
+        }
+        if (reconciledDirty.contains('streamingQuality')) {
+          loadedState =
+              loadedState.copyWith(streamingQuality: previous.streamingQuality);
+        }
+        if (reconciledDirty.contains('downloadQuality')) {
+          loadedState =
+              loadedState.copyWith(downloadQuality: previous.downloadQuality);
+        }
+        if (reconciledDirty.contains('wifiOnlyMode')) {
+          loadedState =
+              loadedState.copyWith(wifiOnlyMode: previous.wifiOnlyMode);
+        }
+        if (reconciledDirty.contains('offlineOnlyMode')) {
+          loadedState =
+              loadedState.copyWith(offlineOnlyMode: previous.offlineOnlyMode);
+        }
+        if (reconciledDirty.contains('experienceMode')) {
+          loadedState =
+              loadedState.copyWith(experienceMode: previous.experienceMode);
+        }
+        if (reconciledDirty.contains('strictBitPerfect')) {
+          loadedState =
+              loadedState.copyWith(strictBitPerfect: previous.strictBitPerfect);
+        }
+        if (reconciledDirty.contains('bitPerfectOutput')) {
+          loadedState =
+              loadedState.copyWith(bitPerfectOutput: previous.bitPerfectOutput);
+        }
+        if (reconciledDirty.contains('bypassDspOnBitPerfect')) {
+          loadedState = loadedState.copyWith(
+              bypassDspOnBitPerfect: previous.bypassDspOnBitPerfect);
+        }
+        if (reconciledDirty.contains('followTrackSampleRate')) {
+          loadedState = loadedState.copyWith(
+              followTrackSampleRate: previous.followTrackSampleRate);
+        }
+        if (reconciledDirty.contains('dsdOutputMode')) {
+          loadedState =
+              loadedState.copyWith(dsdOutputMode: previous.dsdOutputMode);
+        }
+        if (reconciledDirty.contains('multiOutputMode')) {
+          loadedState =
+              loadedState.copyWith(multiOutputMode: previous.multiOutputMode);
+        }
+
+        // Emit before the platform round-trips below: main.dart drives themeMode,
+        // accent and locale from this state, so deferring it renders the default
+        // theme and locale for as long as the native calls take.
+        if (isClosed || gen != _loadPreferencesGen) {
+          _markPrefsLoaded();
+          return;
+        }
+        safeEmit(loadedState);
+        _dirtyFields.removeAll(reconciledDirty);
+
         if (getIt.isRegistered<EqualizerManager>()) {
-          await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
+          await getIt<EqualizerManager>()
+              .setDspPreference(loadedState.dspPreference);
         } else {
-          await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+          await AudioEffectsChannel()
+              .setDspPreference(loadedState.dspPreference);
         }
-      }
-      final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
-      final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
-      if (savedSampleRate > 0 || savedBitDepth > 0) {
-        await _hiResAudioService.setTargetOutputFormat(
-          sampleRate: savedSampleRate,
-          bitDepth: savedBitDepth,
-        );
-      }
-      await refreshOutputDevice();
-      // FIX-E01 / M8: Wrap _syncProxySettings in try/catch so native proxy failure doesn't abort settings load
-      try {
-        await _syncProxySettings(activeProxyConfig);
+        try {
+          final status = await AudioEffectsChannel().setSystemEffectsPolicy(
+            loadedState.systemEffectsPolicy,
+            isHiResOrBitPerfect: loadedState.bitPerfectOutput,
+          );
+          safeEmit(state.copyWith(systemEffectsStatus: status));
+        } catch (_) {}
+        if (loadedState.bitPerfectOutput) {
+          await _hiResAudioService.setBitPerfectMode(true);
+        }
+        // MQA hook wiring (orphan 20-01): the decoder hook previously defaulted
+        // ON with no owner; the preference now owns it.
+        await loadMqaDecodingPreference();
+        if (loadedState.bitPerfectOutput && loadedState.bypassDspOnBitPerfect) {
+          // Re-assert the DSP-bypass policy at boot: without this the Kotlin
+          // effects plugin keeps its default (bypass off) after a restart and
+          // the saved bit-perfect conflict rule is not enforced this session.
+          if (getIt.isRegistered<EqualizerManager>()) {
+            await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
+          } else {
+            await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+          }
+        }
+        final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
+        final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
+        if (savedSampleRate > 0 || savedBitDepth > 0) {
+          await _hiResAudioService.setTargetOutputFormat(
+            sampleRate: savedSampleRate,
+            bitDepth: savedBitDepth,
+          );
+        }
+        await refreshOutputDevice();
+        // FIX-E01 / M8: Wrap _syncProxySettings in try/catch so native proxy failure doesn't abort settings load
+        try {
+          await _syncProxySettings(activeProxyConfig);
+        } catch (e, st) {
+          ErrorLogger.log('Failed to sync proxy settings',
+              error: e, stackTrace: st, category: 'Settings');
+        }
+        // Resume scheduled theming across restarts only when the user opted in.
+        _themeScheduleController?.start();
       } catch (e, st) {
-        ErrorLogger.log('Failed to sync proxy settings',
-            error: e, stackTrace: st, category: 'Settings');
+        ErrorLogger.log(
+          'Failed to load settings preferences from SharedPreferences',
+          error: e,
+          stackTrace: st,
+          category: 'SettingsCubit',
+        );
+      } finally {
+        _markPrefsLoaded();
       }
-      // Resume scheduled theming across restarts only when the user opted in.
-      _themeScheduleController?.start();
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to load settings preferences from SharedPreferences',
-        error: e,
-        stackTrace: st,
-        category: 'SettingsCubit',
-      );
-    } finally {
-      _markPrefsLoaded();
-    }
-  });
-}
+    });
+  }
 
   @override
   Future<void> setGapless(bool value) async {
@@ -1103,8 +1198,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       final isLight = mode == AppThemeMode.light;
       SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            isLight ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isLight ? Brightness.dark : Brightness.light,
         statusBarBrightness: isLight ? Brightness.light : Brightness.dark,
         systemNavigationBarColor: isLight ? Colors.white : Colors.black,
         systemNavigationBarIconBrightness:
@@ -1192,9 +1286,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     await prefs.setString(_keyNowPlayingArtworkSwipe, action.name);
   }
 
-
   // --- Proxy Settings Actions ---
-
 
   /// Tests connectivity through the provided or current proxy config.
   Future<({bool success, int latencyMs, String? error})> testProxyConnection([
@@ -1203,7 +1295,6 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final configToTest = config ?? activeProxyConfig;
     return AppHttpOverrides.instance.testConnection(configToTest: configToTest);
   }
-
 
   Future<int> rescanLibrary() async {
     MediaScannerService.clearNomediaCache();
@@ -1274,7 +1365,6 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     }
   }
 
-
   /// MQA approximate-unfold toggle (orphan 20-01 wiring, tranche 5). Drives
   /// [MqaDecoderHelper.isMqaEnabled], which [FormatAwareDecoder] consults
   /// before running the approximate first-unfold. Defaults ON to preserve
@@ -1282,8 +1372,5 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static bool mqaEnabledCache = true;
   static bool get isMqaDecodingEnabled => mqaEnabledCache;
 
-
   // ── Bluetooth codec control ──────────────────────────────────────────────
-
-
 }

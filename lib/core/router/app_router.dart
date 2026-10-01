@@ -220,8 +220,7 @@ Page<dynamic> _buildAlbumRoute(
     fetchSingle: parsedId != null ? () => repo.getAlbumById(parsedId) : null,
     watch: () => repo.watchAlbums(),
     match: (a) => a.id.toString() == id,
-    builder: (context, a) =>
-        AlbumDetailScreen(album: a, heroTag: heroTag),
+    builder: (context, a) => AlbumDetailScreen(album: a, heroTag: heroTag),
     notFoundMessage: context.l10n.albumNotFoundHint,
   );
 }
@@ -231,9 +230,8 @@ Page<dynamic> _buildArtistRoute(
   GoRouterState state,
   IMusicRepository repo,
 ) {
-  final artist = state.extra is ArtistsTableData
-      ? state.extra as ArtistsTableData
-      : null;
+  final artist =
+      state.extra is ArtistsTableData ? state.extra as ArtistsTableData : null;
   if (artist != null) {
     return _buildPulsrPageRoute(
       key: state.pageKey,
@@ -258,7 +256,8 @@ Page<dynamic> _buildGenreRoute(
   GoRouterState state,
 ) {
   GenreItem? genre = state.extra is GenreItem ? state.extra as GenreItem : null;
-  final name = state.pathParameters['name'] ?? state.uri.queryParameters['name'];
+  final name =
+      state.pathParameters['name'] ?? state.uri.queryParameters['name'];
   if (genre == null && name != null && name.isNotEmpty) {
     genre = GenreItem(name: name, songCount: 0);
   }
@@ -282,7 +281,8 @@ Page<dynamic> _buildYearRoute(
   GoRouterState state,
 ) {
   YearItem? year = state.extra is YearItem ? state.extra as YearItem : null;
-  final yearParam = state.pathParameters['year'] ?? state.uri.queryParameters['year'];
+  final yearParam =
+      state.pathParameters['year'] ?? state.uri.queryParameters['year'];
   final parsedYear = int.tryParse(yearParam ?? '');
   if (year == null && parsedYear != null) {
     year = YearItem(year: parsedYear, songCount: 0);
@@ -329,7 +329,8 @@ Page<dynamic> _buildPlaylistRoute(
   );
 }
 
-GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? musicRepository]) {
+GoRouter createRouter(MediaScannerService scannerService,
+    [IMusicRepository? musicRepository]) {
   final repo = musicRepository ?? getIt<IMusicRepository>();
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -353,10 +354,10 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.music_off_outlined, size: 64, color: Colors.grey),
+            Icon(Icons.music_off_outlined,
+                size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: AppSpacing.md),
-            Text(
-                context.l10n.pageNotFoundMessage(state.uri.toString()),
+            Text(context.l10n.pageNotFoundMessage(state.uri.toString()),
                 style: const TextStyle(fontSize: AppFontSize.bodyLarge)),
             const SizedBox(height: AppSpacing.md),
             FilledButton(
@@ -499,7 +500,8 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
         path: '/artist',
         name: 'artist',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) => _buildArtistRoute(context, state, repo),
+        pageBuilder: (context, state) =>
+            _buildArtistRoute(context, state, repo),
       ),
       GoRoute(
         path: '/genre',
@@ -517,7 +519,8 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
         path: '/playlist',
         name: 'playlist',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) => _buildPlaylistRoute(context, state, repo),
+        pageBuilder: (context, state) =>
+            _buildPlaylistRoute(context, state, repo),
       ),
       GoRoute(
         path: '/playlist/manage',
@@ -563,8 +566,8 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
               ),
             );
           }
-          final id = state.uri.queryParameters['id'] ??
-              (extra is String ? extra : '');
+          final id =
+              state.uri.queryParameters['id'] ?? (extra is String ? extra : '');
           return OnlinePlaylistDetailScreen(
             args: OnlinePlaylistDetailArgs(playlistId: id),
           );
@@ -624,7 +627,8 @@ GoRouter createRouter(MediaScannerService scannerService, [IMusicRepository? mus
           }
           final song = extra is SongsTableData ? extra : null;
           if (song == null) {
-            return Scaffold(body: Center(child: Text(context.l10n.songNotFound)));
+            return Scaffold(
+                body: Center(child: Text(context.l10n.songNotFound)));
           }
           return TagEditorScreen(song: song);
         },

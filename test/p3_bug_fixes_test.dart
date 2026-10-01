@@ -56,7 +56,8 @@ void main() {
       expect(find.text('Module Recovered Successfully'), findsOneWidget);
     });
 
-    test('L1: PlayerThemeMetrics calculates correct ratios and responsive metrics',
+    test(
+        'L1: PlayerThemeMetrics calculates correct ratios and responsive metrics',
         () {
       final metricsPhone = PlayerThemeMetrics(
         constraints: const BoxConstraints(maxWidth: 380, maxHeight: 720),
@@ -97,7 +98,8 @@ void main() {
       expect(metricsTablet.pillBarWidth, 440.0);
     });
 
-    test('L3: PlayerDspController applyDspEffect updates state and recovers from error',
+    test(
+        'L3: PlayerDspController applyDspEffect updates state and recovers from error',
         () async {
       PlayerState state = const PlayerState();
       void emit(PlayerState s) => state = s;
@@ -109,7 +111,7 @@ void main() {
         settingsCubit: null,
         getState: () => state,
         emit: emit,
-        syncAudioEffects: () => syncCalled = true,
+        syncAudioEffects: ({bool force = false}) => syncCalled = true,
         isClosed: () => false,
       );
 
@@ -139,7 +141,8 @@ void main() {
       expect(syncCalled, isTrue);
       expect(
         state.playback.errorMessage,
-        contains('Failed to set spatializer: Exception: Native DSP engine unavailable'),
+        contains(
+            'Failed to set spatializer: Exception: Native DSP engine unavailable'),
       );
     });
   });

@@ -99,7 +99,8 @@ class SmartPreloadScheduler {
       final timeRemaining = duration - position;
       final isPastThreshold =
           position.inMilliseconds >= (duration.inMilliseconds * 0.7);
-      final shouldPreload = timeRemaining < const Duration(seconds: 60) || isPastThreshold;
+      final shouldPreload =
+          timeRemaining < const Duration(seconds: 60) || isPastThreshold;
       if (!shouldPreload) {
         return; // Too early to preload
       }
@@ -162,7 +163,8 @@ class SmartPreloadScheduler {
     }
 
     int effectiveCount = preloadCount.clamp(1, 5);
-    if (isMetered && networkPolicy == PreloadNetworkPolicy.conservativeOnMetered) {
+    if (isMetered &&
+        networkPolicy == PreloadNetworkPolicy.conservativeOnMetered) {
       // Metered connection: limit preload to at most 1 item.
       effectiveCount = 1;
     }

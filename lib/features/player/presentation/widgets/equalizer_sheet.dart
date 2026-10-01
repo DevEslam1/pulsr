@@ -1061,9 +1061,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(AppRadii.r4),
                 border: Border.all(
-                  color: active
-                      ? activeColor
-                      : Colors.grey.withValues(alpha: 0.35),
+                  color: active ? activeColor : context.palette.hairline,
                 ),
               ),
               child: Text(
@@ -1072,7 +1070,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   fontSize: AppFontSize.micro,
                   height: 1.0,
                   fontWeight: FontWeight.w800,
-                  color: active ? activeColor : Colors.grey,
+                  color: active ? activeColor : context.palette.textTertiary,
                 ),
               ),
             ),
@@ -1210,7 +1208,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
-                                  minWidth: 32, minHeight: 32),
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget),
                               onPressed: dspBlockedGlobal != null
                                   ? null
                                   : () => _resetAllDspDefaults(context, cubit),
@@ -2058,8 +2057,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           _buildMacroSliderRow(
             context: context,
             icon: Icons.speaker_rounded,
-            title: 'Bass & Punch',
-            subtitle: 'Sub-bass impact & warmth (31 Hz – 125 Hz)',
+            title: context.l10n.eqMacroBassTitle,
+            subtitle: context.l10n.eqMacroBassDesc,
             value: bassVal,
             accentColor: p.accent,
             p: p,
@@ -2070,8 +2069,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           _buildMacroSliderRow(
             context: context,
             icon: Icons.mic_rounded,
-            title: 'Vocal & Presence',
-            subtitle: 'Lead vocals & acoustic presence (500 Hz – 2 kHz)',
+            title: context.l10n.eqMacroMidTitle,
+            subtitle: context.l10n.eqMacroMidDesc,
             value: midVal,
             accentColor: AppColors.accentCyan,
             p: p,
@@ -2082,8 +2081,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           _buildMacroSliderRow(
             context: context,
             icon: Icons.auto_awesome_rounded,
-            title: 'Clarity & Air',
-            subtitle: 'Treble shimmer & spatial detail (4 kHz – 16 kHz)',
+            title: context.l10n.eqMacroTrebleTitle,
+            subtitle: context.l10n.eqMacroTrebleDesc,
             value: trebleVal,
             accentColor: AppColors.warning,
             p: p,
@@ -2378,8 +2377,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           size: 18, color: p.accent),
                       visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.all(AppSpacing.xxs),
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                     )
                   else
                     TextButton.icon(
@@ -2748,7 +2748,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ),
                         ),
                         Text(
-                          '${state.selectedHeadphoneProfile!.brand} Ã¢Â€Â¢ '
+                          '${state.selectedHeadphoneProfile!.brand} • '
                           '${context.l10n.preampLabel}: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(
                               fontSize: AppFontSize.tiny,
@@ -2857,7 +2857,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 color: _activeBandCount(state) == bandCount
                                     ? p.accent
                                     : Colors.transparent,
-                                borderRadius: BorderRadius.circular(AppRadii.r8),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r8),
                               ),
                               child: Text(
                                 '$bandCount',
@@ -2880,11 +2881,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       constraints: const BoxConstraints(maxWidth: 120),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: p.accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(AppRadii.r8),
-                          border: Border.all(color: p.accent.withValues(alpha: 0.25)),
+                          border: Border.all(
+                              color: p.accent.withValues(alpha: 0.25)),
                         ),
                         child: Text(
                           state.eqPreset.name,
@@ -2917,7 +2920,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 },
                           child: Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isWide ? AppSpacing.s8 : AppSpacing.s6,
+                              horizontal:
+                                  isWide ? AppSpacing.s8 : AppSpacing.s6,
                               vertical: AppSpacing.xs,
                             ),
                             decoration: BoxDecoration(
@@ -2962,13 +2966,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                 },
                           child: Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isWide ? AppSpacing.s8 : AppSpacing.s6,
+                              horizontal:
+                                  isWide ? AppSpacing.s8 : AppSpacing.s6,
                               vertical: AppSpacing.xs,
                             ),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(AppRadii.r8),
-                              border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color: p.accent.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -3244,34 +3250,36 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             ],
                           ),
                         ),
-                        if (currentPreamp > 6.0)
-                          Container(
-                            margin: const EdgeInsets.only(top: AppSpacing.xs),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                            decoration: BoxDecoration(
-                              color: p.error.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r10),
-                              border: Border.all(color: p.error.withValues(alpha: 0.4)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.hearing_disabled_rounded,
-                                    color: p.error, size: 18),
-                                const SizedBox(width: AppSpacing.xs),
-                                Expanded(
-                                  child: Text(
-                                    '${context.l10n.volume}: High volume boost (>+6dB) may cause audio distortion and permanent hearing damage.',
-                                    style: TextStyle(
-                                      color: p.error,
-                                      fontSize: AppFontSize.caption,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                      if (currentPreamp > 6.0)
+                        Container(
+                          margin: const EdgeInsets.only(top: AppSpacing.xs),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: p.error.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            border: Border.all(
+                                color: p.error.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.hearing_disabled_rounded,
+                                  color: p.error, size: 18),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                child: Text(
+                                  '${context.l10n.volume}: High volume boost (>+6dB) may cause audio distortion and permanent hearing damage.',
+                                  style: TextStyle(
+                                    color: p.error,
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+                        ),
                     ],
                   ),
                 );
@@ -3993,7 +4001,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       ),
                                       const SizedBox(height: AppSpacing.s2),
                                       Text(
-                                        '${profile.brand} Ã¢Â€Â¢ ${profile.category}',
+                                        '${profile.brand} • ${profile.category}',
                                         style: TextStyle(
                                             fontSize: AppFontSize.caption,
                                             color: p.textTertiary),
@@ -4814,8 +4822,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             ),
                           ),
                           TextButton.icon(
-                            icon: const Icon(Icons.headphones_rounded, size: 14),
-                            label: Text(context.l10n.gotIt.isNotEmpty ? 'Audition (5s)' : ''),
+                            icon:
+                                const Icon(Icons.headphones_rounded, size: 14),
+                            label: Text(context.l10n.gotIt.isNotEmpty
+                                ? context.l10n.eqAuditionFiveSeconds
+                                : ''),
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.symmetric(
@@ -4826,7 +4837,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               cubit.setCrossfeed(true);
                               PulsrToast.show(
                                 context,
-                                message: 'Auditioning crossfeed preset (5s)...',
+                                message: context.l10n.eqAuditioningCrossfeed,
                                 icon: Icons.headphones_rounded,
                               );
                               Timer(const Duration(seconds: 5), () {
@@ -5635,7 +5646,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       return ActionChip(
         avatar: Icon(Icons.file_upload_outlined,
             size: 14, color: isSelected ? p.accent : p.textSecondary),
-        label: Text(isSelected ? 'Custom (Loaded)' : 'Load WAV IR (≤25MB)...'),
+        label: Text(isSelected
+            ? context.l10n.eqIrCustomLoaded
+            : context.l10n.eqIrLoadWav),
         backgroundColor:
             isSelected ? p.accent.withValues(alpha: 0.22) : p.surface,
         side: BorderSide(color: isSelected ? p.accent : p.hairline),
@@ -6368,11 +6381,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           onChanged: (val) =>
               cubit.setDynamicEqBand(index, band.copyWith(enabled: val)),
         ),
-        trailing: IconButton(
-          icon: Icon(Icons.delete_outline, size: 18, color: p.error),
-          tooltip: context.l10n.delete,
-          onPressed: () => cubit.removeDynamicEqBand(index),
-        ),
+        // NOTE: No `trailing` override here — that would hide the default
+        // expand/collapse chevron. The delete action lives inside the expanded
+        // children instead.
         children: [
           Padding(
             padding: const EdgeInsets.all(AppSpacing.sm),
@@ -6562,6 +6573,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     onChanged: (val) => cubit.setDynamicEqBand(
                         index, band.copyWith(maxBoostDb: val)),
                   ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: Icon(Icons.delete_outline, size: 18, color: p.error),
+                    label: Text(context.l10n.delete,
+                        style: TextStyle(color: p.error)),
+                    onPressed: () => cubit.removeDynamicEqBand(index),
+                  ),
+                ),
               ],
             ),
           ),
@@ -6877,8 +6897,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   Widget _buildHardwareDeviceProfileBar(BuildContext context, PlayerCubit cubit,
       PlayerState state, PulsrPalette p) {
-    final output = context.select<SettingsCubit?, AudioOutputInfo?>(
-        (c) => c?.state.currentOutputDevice);
+    AudioOutputInfo? output;
+    try {
+      output = context.select<SettingsCubit?, AudioOutputInfo?>(
+          (c) => c?.state.currentOutputDevice);
+    } catch (_) {
+      output = null;
+    }
     final devType = output?.activeDeviceType.toLowerCase() ?? '';
     final devName = (output?.deviceName ?? '').toLowerCase();
 
@@ -7059,7 +7084,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(AudioFeatureRegistry.viperDdc.title,
+                          Text(
+                              AudioFeatureRegistry.viperDdc
+                                  .localized(context.l10n)
+                                  .title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: AppFontSize.body,
@@ -7069,7 +7097,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(
                             hasProfile
                                 ? state.viperDdcProfileName
-                                : AudioFeatureRegistry.viperDdc.subtitle,
+                                : AudioFeatureRegistry.viperDdc
+                                    .localized(context.l10n)
+                                    .subtitle,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 color: p.textTertiary),
@@ -7086,7 +7116,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
                 visualDensity: VisualDensity.compact,
-                tooltip: AudioFeatureRegistry.viperDdc.title,
+                tooltip:
+                    AudioFeatureRegistry.viperDdc.localized(context.l10n).title,
                 onPressed: () => _showFeatureInfo(
                   context,
                   AudioFeatureRegistry.viperDdc,
@@ -7199,7 +7230,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(AudioFeatureRegistry.arbitraryEq.title,
+                          Text(
+                              AudioFeatureRegistry.arbitraryEq
+                                  .localized(context.l10n)
+                                  .title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: AppFontSize.body,
@@ -7207,7 +7241,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(
-                            AudioFeatureRegistry.arbitraryEq.subtitle,
+                            AudioFeatureRegistry.arbitraryEq
+                                .localized(context.l10n)
+                                .subtitle,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 color: p.textTertiary),
@@ -7224,7 +7260,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
                 visualDensity: VisualDensity.compact,
-                tooltip: AudioFeatureRegistry.arbitraryEq.title,
+                tooltip: AudioFeatureRegistry.arbitraryEq
+                    .localized(context.l10n)
+                    .title,
                 onPressed: () => _showFeatureInfo(
                   context,
                   AudioFeatureRegistry.arbitraryEq,
@@ -7335,7 +7373,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(AudioFeatureRegistry.liveProg.title,
+                          Text(
+                              AudioFeatureRegistry.liveProg
+                                  .localized(context.l10n)
+                                  .title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: AppFontSize.body,
@@ -7345,7 +7386,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           Text(
                             state.liveProgStatus.isNotEmpty
                                 ? state.liveProgStatus
-                                : AudioFeatureRegistry.liveProg.subtitle,
+                                : AudioFeatureRegistry.liveProg
+                                    .localized(context.l10n)
+                                    .subtitle,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 color: p.textTertiary),
@@ -7362,7 +7405,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
                 visualDensity: VisualDensity.compact,
-                tooltip: AudioFeatureRegistry.liveProg.title,
+                tooltip:
+                    AudioFeatureRegistry.liveProg.localized(context.l10n).title,
                 onPressed: () => _showFeatureInfo(
                   context,
                   AudioFeatureRegistry.liveProg,
@@ -7473,7 +7517,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(AudioFeatureRegistry.dynamicBass.title,
+                          Text(
+                              AudioFeatureRegistry.dynamicBass
+                                  .localized(context.l10n)
+                                  .title,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: AppFontSize.body,
@@ -7481,7 +7528,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           Text(
-                            AudioFeatureRegistry.dynamicBass.subtitle,
+                            AudioFeatureRegistry.dynamicBass
+                                .localized(context.l10n)
+                                .subtitle,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 color: p.textTertiary),
@@ -7498,7 +7547,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
                 visualDensity: VisualDensity.compact,
-                tooltip: AudioFeatureRegistry.dynamicBass.title,
+                tooltip: AudioFeatureRegistry.dynamicBass
+                    .localized(context.l10n)
+                    .title,
                 onPressed: () => _showFeatureInfo(
                   context,
                   AudioFeatureRegistry.dynamicBass,
@@ -7743,6 +7794,12 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
+                // Tap-to-set: a deliberate tap on the track jumps the band to
+                // that gain, matching the horizontal DSP sliders.
+                onTapDown: (details) {
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
+                },
                 onVerticalDragStart: (details) {
                   setState(() => _isDragging = true);
                   _handlePointer(details.localPosition.dy, height,
@@ -7766,8 +7823,6 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                     _dragGain = null;
                   });
                 },
-                // BUG-19: no onTapDown — a bare tap must not change the gain;
-                // only a deliberate vertical drag edits the band.
                 child: CustomPaint(
                   size: Size(constraints.maxWidth, height),
                   painter: _VerticalSliderPainter(

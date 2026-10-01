@@ -49,7 +49,8 @@ class CloudSyncService {
     final prefs = await _getPrefs();
     var id = prefs.getString(_keyDeviceId);
     if (id == null || id.isEmpty) {
-      final seed = '${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}';
+      final seed =
+          '${DateTime.now().microsecondsSinceEpoch}_${identityHashCode(this)}';
       id = sha256.convert(utf8.encode(seed)).toString().substring(0, 16);
       await prefs.setString(_keyDeviceId, id);
     }
@@ -108,8 +109,10 @@ class CloudSyncService {
     if (cached != null && cached.isNotEmpty) {
       return cached;
     }
-    final raw = 'pl_${pl.id}_${pl.createdAt.millisecondsSinceEpoch}_${pl.name.trim().toLowerCase()}';
-    final generated = sha256.convert(utf8.encode(raw)).toString().substring(0, 24);
+    final raw =
+        'pl_${pl.id}_${pl.createdAt.millisecondsSinceEpoch}_${pl.name.trim().toLowerCase()}';
+    final generated =
+        sha256.convert(utf8.encode(raw)).toString().substring(0, 24);
     prefs?.setString('sync_pl_stable_id_${pl.id}', generated);
     return generated;
   }
@@ -143,8 +146,7 @@ class CloudSyncService {
 
   bool _syncInProgress = false;
 
-  Future<bool> syncAll(
-      {bool? syncFavorites, bool? syncPlaylists}) async {
+  Future<bool> syncAll({bool? syncFavorites, bool? syncPlaylists}) async {
     // Serialize syncs: concurrent runs would race on the shared synced-hash
     // map and the playlist stable-id prefs written by the merge step.
     if (_syncInProgress) return false;
@@ -291,7 +293,9 @@ class CloudSyncService {
         // Privacy: hash local file paths, keep remoteId for YTM (path is PII)
         final isLocalPath = song.path.startsWith('/') && song.remoteId == null;
         final sanitizedPath = isLocalPath ? null : song.path;
-        final pathHash = isLocalPath ? sha256.convert(utf8.encode(song.path)).toString() : null;
+        final pathHash = isLocalPath
+            ? sha256.convert(utf8.encode(song.path)).toString()
+            : null;
         currentBatch.set(
             ref,
             {
@@ -365,7 +369,8 @@ class CloudSyncService {
           final fullKey = '${plDocId}_$songDocId';
 
           if (_syncedDocHashes[fullKey] != sHash) {
-            final isLocalSongPath = song.path.startsWith('/') && song.remoteId == null;
+            final isLocalSongPath =
+                song.path.startsWith('/') && song.remoteId == null;
             currentBatch.set(
                 plDoc.collection('songs').doc(songDocId),
                 {
@@ -374,7 +379,9 @@ class CloudSyncService {
                   'artist': song.artist,
                   'album': song.album,
                   'path': isLocalSongPath ? null : song.path,
-                  'pathHash': isLocalSongPath ? sha256.convert(utf8.encode(song.path)).toString() : null,
+                  'pathHash': isLocalSongPath
+                      ? sha256.convert(utf8.encode(song.path)).toString()
+                      : null,
                   'remoteId': song.remoteId,
                   'remoteArtworkUrl': song.remoteArtworkUrl,
                   'durationMs': song.durationMs,
@@ -453,7 +460,8 @@ class CloudSyncService {
           if (remoteId != null && remoteId.isNotEmpty) {
             match = localByRemoteId[remoteId];
           }
-          match ??= localByTitleArtist[(title.toLowerCase(), artist.toLowerCase())];
+          match ??=
+              localByTitleArtist[(title.toLowerCase(), artist.toLowerCase())];
 
           if (match != null) {
             if (!match.isFavorite) {
@@ -518,7 +526,9 @@ class CloudSyncService {
 
           PlaylistsTableData? pl;
           if (mappedLocalId != null) {
-            pl = existingPlaylists.where((p) => p.id == mappedLocalId).firstOrNull;
+            pl = existingPlaylists
+                .where((p) => p.id == mappedLocalId)
+                .firstOrNull;
           }
           if (pl == null) {
             // Find candidates with the same name that are NOT mapped to a different cloud playlist

@@ -2244,6 +2244,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rcFittedEqGain => 'Fitted EQ Gain';
 
   @override
+  String get rcVerify => 'Verify correction';
+
+  @override
+  String get rcVerifyHint =>
+      'Re-measure with the correction active to confirm the room is flattened.';
+
+  @override
+  String get rcVerifying => 'Verifying correction - stay quiet...';
+
+  @override
+  String get rcVerification => 'Verification';
+
+  @override
+  String get rcConverged => 'Room flattened';
+
+  @override
+  String get rcNotConverged => 'Improvement limited';
+
+  @override
+  String get rcApplyAndVerify => 'Apply & verify';
+
+  @override
+  String get rcResidual => 'Residual variance';
+
+  @override
+  String get rcImprovement => 'Improvement';
+
+  @override
+  String get rcTargetGatePassed => 'Within ±0.5 dB target';
+
+  @override
+  String get rcTargetGateFailed => 'Outside ±0.5 dB target';
+
+  @override
   String get fetchMissingArtworkTitle => 'Fetch Missing Artwork?';
 
   @override
@@ -3250,6 +3284,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get refHpProfiles => 'Reference Headphone Profiles';
+
+  @override
+  String get dspViperDdcDemoTitle => 'Demo / Placeholder Profiles';
+
+  @override
+  String get dspViperDdcDemoNote =>
+      'Bundled profiles are illustrative. Load a real .vdc file for measured correction.';
 
   @override
   String get bookmarkLabel => 'Bookmark';
@@ -7230,9 +7271,664 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingGestureLongPressDesc => 'Opens the dock-style options';
 
   @override
+  String get headsetSectionTitle => 'Headset & background';
+
+  @override
+  String get headsetAutoResume => 'Auto-resume on reconnect';
+
+  @override
+  String headsetResumeWithinNotice(int seconds) {
+    return 'Resume within $seconds s when the headset reconnects.';
+  }
+
+  @override
+  String get headsetStayPausedDesc => 'Stay paused when headphones unplug.';
+
+  @override
+  String get headsetResumeWindow => 'Resume window';
+
+  @override
+  String get headsetKeepNotification => 'Keep notification when paused';
+
+  @override
+  String get headsetKeepNotificationOnDesc =>
+      'Controls stay in the shade after pause (restart required).';
+
+  @override
+  String get headsetKeepNotificationOffDesc =>
+      'Notification is removed on pause to save battery.';
+
+  @override
+  String get headsetSinglePress => 'Single press';
+
+  @override
+  String get headsetDoublePress => 'Double press';
+
+  @override
+  String get headsetTriplePress => 'Triple press';
+
+  @override
+  String get headsetMultiPressWindow => 'Multi-press window';
+
+  @override
+  String get headsetMultiPressWindowDesc =>
+      'How long presses are grouped into double/triple.';
+
+  @override
+  String get headsetSeekStep => 'Seek step';
+
+  @override
+  String get headsetSeekStepDesc =>
+      'Used when a press is mapped to seek forward/back.';
+
+  @override
+  String get headsetActionPlayPause => 'Play / pause';
+
+  @override
+  String get headsetActionNextTrack => 'Next track';
+
+  @override
+  String get headsetActionPreviousTrack => 'Previous track';
+
+  @override
+  String get headsetActionStop => 'Stop';
+
+  @override
+  String get headsetActionSeekForward => 'Seek forward';
+
+  @override
+  String get headsetActionSeekBack => 'Seek back';
+
+  @override
+  String get headsetActionNone => 'Do nothing';
+
+  @override
+  String get karaokePracticeMode => 'Practice Mode (Loop Current Line)';
+
+  @override
+  String get karaokePitchMeter => 'Vocal Pitch Meter (YIN Algorithm)';
+
+  @override
+  String get karaokeLyricsFontSize => 'Lyrics Font Size';
+
+  @override
+  String karaokeScore(int score) {
+    return 'Score: $score';
+  }
+
+  @override
+  String get karaokeTapRhythm => 'Tap Rhythm';
+
+  @override
+  String radioNoStationsMatch(String query) {
+    return 'No stations match \"$query\"';
+  }
+
+  @override
+  String get radioNoStationsMatchDesc =>
+      'Try searching by a different genre or station URL';
+
+  @override
+  String get radioErrorEnterUrl => 'Please enter a URL';
+
+  @override
+  String get radioErrorUrlScheme => 'URL must start with http:// or https://';
+
+  @override
+  String get radioErrorInvalidUrl => 'Invalid URL format';
+
+  @override
+  String get radioGenreLabel => 'Genre / Category (Optional)';
+
+  @override
+  String get radioGenreHint => 'e.g. Chill, Classical, Jazz, Quran...';
+
+  @override
+  String get storageBreakdown => 'Storage Breakdown';
+
+  @override
+  String storageLegendArtwork(String size) {
+    return 'Artwork: $size';
+  }
+
+  @override
+  String storageLegendStreams(String size) {
+    return 'Streams: $size';
+  }
+
+  @override
+  String storageLegendLyrics(String size) {
+    return 'Lyrics: $size';
+  }
+
+  @override
+  String storageLegendCacheDb(String size) {
+    return 'Cache / DB: $size';
+  }
+
+  @override
+  String developerLabel(String name) {
+    return 'Developer: $name';
+  }
+
+  @override
+  String get whatsNewInPulsr => 'What\'s New in Pulsr';
+
+  @override
+  String get whatsNewBitPerfectTitle => 'Bit-Perfect & Hi-Res Output';
+
+  @override
+  String get whatsNewBitPerfectDesc =>
+      'Direct USB DAC streaming, hardware volume control, and native DSD/DoP playback.';
+
+  @override
+  String get whatsNewProDspTitle => 'Pro Studio DSP Suite';
+
+  @override
+  String get whatsNewProDspDesc =>
+      'Arbitrary response parametric EQ, multiband compressor, lookahead limiter, and binaural crossfeed.';
+
+  @override
+  String get whatsNewThemesTitle => 'Adaptive Player Themes';
+
+  @override
+  String get whatsNewThemesDesc =>
+      '8 handcrafted player themes with full phone landscape, tablet two-pane, and AMOLED optimization.';
+
+  @override
+  String get whatsNewAccessibilityTitle => 'Accessibility & Fluid Gestures';
+
+  @override
+  String get whatsNewAccessibilityDesc =>
+      'WCAG 2.1 AA contrast compliance, dynamic type 2.0x support, and full screen-reader semantics.';
+
+  @override
+  String get proxyInvalidHostFormat => 'Invalid proxy host format';
+
+  @override
+  String get eqMacroBassTitle => 'Bass & Punch';
+
+  @override
+  String get eqMacroBassDesc => 'Sub-bass impact & warmth (31 Hz – 125 Hz)';
+
+  @override
+  String get eqMacroMidTitle => 'Vocal & Presence';
+
+  @override
+  String get eqMacroMidDesc =>
+      'Lead vocals & acoustic presence (500 Hz – 2 kHz)';
+
+  @override
+  String get eqMacroTrebleTitle => 'Clarity & Air';
+
+  @override
+  String get eqMacroTrebleDesc =>
+      'Treble shimmer & spatial detail (4 kHz – 16 kHz)';
+
+  @override
+  String get eqIrCustomLoaded => 'Custom (Loaded)';
+
+  @override
+  String get eqIrLoadWav => 'Load WAV IR (≤25MB)...';
+
+  @override
+  String get eqAuditionFiveSeconds => 'Audition (5s)';
+
+  @override
+  String get eqAuditioningCrossfeed => 'Auditioning crossfeed preset (5s)...';
+
+  @override
   String get onboardingPersonalizeTitle => 'Make it yours';
 
   @override
   String get onboardingPersonalizeDesc =>
       'Pick an accent now — you can change it anytime in Settings.';
+
+  @override
+  String get featureInfoBitPerfectTitle => 'Bit-Perfect USB Pass-Through';
+
+  @override
+  String get featureInfoBitPerfectSubtitle =>
+      'Direct hardware streaming to USB / wired DAC';
+
+  @override
+  String get featureInfoBitPerfectDescription =>
+      'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
+
+  @override
+  String get featureInfoBypassDspTitle => 'Bypass DSP in Bit-Perfect Mode';
+
+  @override
+  String get featureInfoBypassDspSubtitle => 'Uncolored, pure bitstream to DAC';
+
+  @override
+  String get featureInfoBypassDspDescription =>
+      'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).';
+
+  @override
+  String get featureInfoFollowTrackSampleRateTitle =>
+      'Follow Track Sample Rate';
+
+  @override
+  String get featureInfoFollowTrackSampleRateSubtitle =>
+      'Reconfigure the output to each track\'s native rate';
+
+  @override
+  String get featureInfoFollowTrackSampleRateDescription =>
+      'On every track change, requests the track\'s own sample rate from the output device so no software resampling is needed. De-duplicated so tracks that share a rate do not trigger redundant native reconfiguration. Skipped on Bluetooth, where the AVRCP/codec link owns the rate. The device may still cap the rate; the negotiated format is shown in Output Path Diagnostics.';
+
+  @override
+  String get featureInfoStrictBitPerfectTitle =>
+      'Strict Bit-Perfect (No Resample)';
+
+  @override
+  String get featureInfoStrictBitPerfectSubtitle =>
+      'Exact source bits, no resampler — DSP stages off';
+
+  @override
+  String get featureInfoStrictBitPerfectDescription =>
+      'Forces Bit-Perfect output and the DSP bypass, then follows each track\'s native sample rate so the DAC receives the exact source samples without resampling. Because it is strict, EQ, ReplayGain, Virtualizer/Dynamics and Crossfade cannot run: they would alter the bitstream. Requires a path that reports exclusive bit-perfect support (USB DAC on Android 14+); otherwise the toggle is disabled with the platform reason.';
+
+  @override
+  String get featureInfoEqualizerTitle => '10 / 32-Band Parametric EQ';
+
+  @override
+  String get featureInfoEqualizerSubtitle =>
+      '±15 dB per band, Q=1.414, flat by default';
+
+  @override
+  String get featureInfoEqualizerDescription =>
+      'Native C++ biquad cascade (32 bands max, 8 channels). Uses single bulk JNI hop (≈1 ms) with zero-cost bypass when disabled. Interpolates AutoEQ profiles log-frequency wise. Cannot be active with Bit-Perfect bypass (would re-sample and alter bits).';
+
+  @override
+  String get featureInfoBassBoostTitle => 'Bass Enhancer';
+
+  @override
+  String get featureInfoBassBoostSubtitle =>
+      'Shelving low-end gain (part of EQ engine)';
+
+  @override
+  String get featureInfoBassBoostDescription =>
+      'Adds a low-shelf lift below ~150 Hz via the native EQ biquad chain. Shares the same processing stage as the graphic EQ, so it is disabled while Bit-Perfect bypass is active. Keep moderate to avoid masking detail.';
+
+  @override
+  String get featureInfoCrossfeedTitle => 'Headphone Crossfeed';
+
+  @override
+  String get featureInfoCrossfeedSubtitle =>
+      '200–700 µs delay, –15 to –6 dB bleed';
+
+  @override
+  String get featureInfoCrossfeedDescription =>
+      'Chu Moy / Linkwitz blend that makes headphones sound like speakers (reduces hard L/R separation). Adds ~0.05 ms latency. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoLimiterTitle => 'Lookahead Brickwall Limiter';
+
+  @override
+  String get featureInfoLimiterSubtitle => 'True-peak, 0.5–20 ms lookahead';
+
+  @override
+  String get featureInfoLimiterDescription =>
+      'Adaptive true-peak limiter with 4× oversample. Protects against clipping when EQ boosts. Adds ~5 ms latency. Final stage before DAC. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoReverbTitle => 'Convolution Reverb';
+
+  @override
+  String get featureInfoReverbSubtitle =>
+      '8 rooms (RT60 0.35–5 s), cross-channel crosstalk, or custom IR';
+
+  @override
+  String get featureInfoReverbDescription =>
+      'Partitioned convolution (512-frame blocks) against a synthesized room impulse or custom impulse response you load. Features adjustable cross-channel crosstalk for authentic binaural IRS stereo spatialization. Zero heap allocations in audio loop. Needs the native DSP path; disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoPannerTitle => 'Stereo Balance & Mono Mix';
+
+  @override
+  String get featureInfoPannerSubtitle =>
+      '–1.0 Left … +1.0 Right, mono collapse';
+
+  @override
+  String get featureInfoPannerDescription =>
+      'Constant-power panner + mono downmix (L+R / 2). Useful for hearing asymmetry. Collapses soundstage when mono ON. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoResamplerTitle => 'Polyphase Sinc Resampler';
+
+  @override
+  String get featureInfoResamplerSubtitle =>
+      '32 phases × 32 taps (polyphase engine)';
+
+  @override
+  String get featureInfoResamplerDescription =>
+      'Polyphase sinc interpolation engine. The in-stream playback path keeps the source frame count, so track→device rate conversion is performed by the platform output (AudioTrack); the polyphase engine is applied internally by the convolution reverb wet path above 48 kHz. Disabled during Bit-Perfect (direct 1:1 stream).';
+
+  @override
+  String get featureInfoVirtualizerTitle => 'Soundstage Widening (Virtualizer)';
+
+  @override
+  String get featureInfoVirtualizerSubtitle =>
+      'Android Virtualizer stereo expansion';
+
+  @override
+  String get featureInfoVirtualizerDescription =>
+      'Expands stereo field via AudioEffect Virtualizer (0–1000 mB). On devices with Hardware Spatializer, Spatializer takes precedence and Virtualizer is bypassed. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoSpatializerTitle => 'Hardware Spatializer';
+
+  @override
+  String get featureInfoSpatializerSubtitle =>
+      'Android Spatializer API + head tracking';
+
+  @override
+  String get featureInfoSpatializerDescription =>
+      'Uses AudioManager.spatializer when available (Android 12L+). Provides true spatial audio if device supports it; otherwise emulates via Virtualizer. Mutually managed with Virtualizer.';
+
+  @override
+  String get featureInfoDynamicsTitle => 'Studio Dynamics & MBC';
+
+  @override
+  String get featureInfoDynamicsSubtitle => '3-band MBC + limiter presets';
+
+  @override
+  String get featureInfoDynamicsDescription =>
+      'DynamicsProcessing multiband compressor (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). Controls transients and loudness. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoRoomCorrectionTitle => 'Room Correction Wizard';
+
+  @override
+  String get featureInfoRoomCorrectionSubtitle =>
+      'Stepped-sine measurement + EQ fit';
+
+  @override
+  String get featureInfoRoomCorrectionDescription =>
+      'Plays a short tone sweep through your speakers, records it with the microphone and fits a Room Correction EQ preset that flattens the measured response (clamped to the +/-15 dB EQ range with adjacent-band smoothing). Applied through the normal EQ pipeline, so it participates in Bit-Perfect bypass like any EQ preset. Not a replacement for acoustic treatment.';
+
+  @override
+  String get featureInfoDsdNativeTitle => 'DSD (PCM Decode / DoP Output)';
+
+  @override
+  String get featureInfoDsdNativeSubtitle =>
+      'PCM by default — DoP only with a compatible USB DAC';
+
+  @override
+  String get featureInfoDsdNativeDescription =>
+      'DSD files (DSF/DFF) decode to PCM through the native DSD decoder by default and follow the normal DSP pipeline. When the user selects DoP output and a USB DAC that can carry it is connected, the raw DSD bitstream is framed as DSD over PCM (alternating 0x05/0xFA markers) at DSD rate / 16 (DSD64 → 176.4 kHz, DSD128 → 352.8 kHz, DSD256 → 705.6 kHz) so the DAC streams native DSD, in 24-bit or zero-padded 32-bit containers (selectable for DACs that require 32-bit USB frames). DoP is never enabled automatically and stays unavailable when no compatible USB DAC is detected. Direct native-DSD streaming that bypasses DoP is not implemented in this build, so native-DSD capability is never claimed beyond the detected USB DAC.';
+
+  @override
+  String get featureInfoMqaTitle => 'MQA (Master Quality Authenticated)';
+
+  @override
+  String get featureInfoMqaSubtitle =>
+      'Detected — core unfold only, no authenticated rendering';
+
+  @override
+  String get featureInfoMqaDescription =>
+      'MQA-encoded files are detected from their signature and labeled \"MQA\" in the quality sheet. Core unfold is handled by the in-app decoder; full authenticated/native MQA rendering is not available in this build, so MQA status is never silently reported as plain lossless and authenticated MQA output is never claimed.';
+
+  @override
+  String get featureInfoGaplessTitle => 'Gapless Playback';
+
+  @override
+  String get featureInfoGaplessSubtitle => 'ConcatenatingAudioSource, zero gap';
+
+  @override
+  String get featureInfoGaplessDescription =>
+      'Joins consecutive tracks sample-accurate with no silence. Ideal for live albums. Mutually exclusive with Crossfade — enabling one forces the other OFF.';
+
+  @override
+  String get featureInfoCrossfadeTitle => 'Crossfade';
+
+  @override
+  String get featureInfoCrossfadeSubtitle =>
+      '0–12 s overlapping dual-player fade';
+
+  @override
+  String get featureInfoCrossfadeDescription =>
+      'Fades out current track while fading in next via dual ExoPlayer. Requires disabling Gapless (cannot be gapless and crossfading simultaneously).';
+
+  @override
+  String get featureInfoReplayGainTitle => 'ReplayGain Normalization';
+
+  @override
+  String get featureInfoReplayGainSubtitle =>
+      'Track / album gain tags in native pre-gain';
+
+  @override
+  String get featureInfoReplayGainDescription =>
+      'Bit-transparent native pre-gain driven by Track/Album Gain tags (20 ms smoothing, 0.5 dB inter-sample headroom, clipping-safe). The Dart mixer then carries only user volume so the gain is never applied twice; DoP and non-Android fall back to Dart math. Conflicts with Bit-Perfect bypass (any gain would alter bits). Set to Off for true exclusive.';
+
+  @override
+  String get featureInfoOemTitle => 'OEM Audio Warning';
+
+  @override
+  String get featureInfoOemSubtitle =>
+      'Dolby / Dirac / SoundAlive double-processing';
+
+  @override
+  String get featureInfoOemDescription =>
+      'System-level effects (Dolby Atmos, Xiaomi Sound, Dirac) run outside the app. Running Pulsr DSP on top causes double-EQ and clipping. Use DSP Preference = Native or disable system effects for cleanest sound.';
+
+  @override
+  String get featureInfoVolumeBoostTitle => 'Volume Boost';
+
+  @override
+  String get featureInfoVolumeBoostSubtitle => 'LoudnessEnhancer +10 dB';
+
+  @override
+  String get featureInfoVolumeBoostDescription =>
+      'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).';
+
+  @override
+  String get featureInfoSaturationTitle => 'Harmonic Saturation / Exciter';
+
+  @override
+  String get featureInfoSaturationSubtitle =>
+      'Tape, Vacuum Tube (2nd harmonic), or Analog Class-A with 4× sinc oversampling';
+
+  @override
+  String get featureInfoSaturationDescription =>
+      'Generates rich analog warmth and harmonic density. Offers 3 selectable color profiles: Tape (smooth odd-order saturation), Vacuum Tube (asymmetric 6J1 triode with warm even 2nd harmonics), and Analog Class-A (full vintage transformer response). Features 4× polyphase sinc anti-aliasing and DC blocking. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoStereoWidthTitle => '3-Band Stereo Imager & Bass Mono';
+
+  @override
+  String get featureInfoStereoWidthSubtitle =>
+      'Multiband width + sub-bass mono phase protection';
+
+  @override
+  String get featureInfoStereoWidthDescription =>
+      'Mid/Side multiband stereo imager utilizing phase-linear Linkwitz-Riley crossovers. Features dedicated low (<160 Hz), mid (160 Hz–2.5 kHz), and high (>2.5 kHz) width controls. Sub-bass mono isolation eliminates stereo low-end phase cancellation and comb filtering. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoLoudnessContourTitle =>
+      'Loudness Contour (Fletcher–Munson)';
+
+  @override
+  String get featureInfoLoudnessContourSubtitle =>
+      'Volume-linked bass & treble compensation';
+
+  @override
+  String get featureInfoLoudnessContourDescription =>
+      'Equal-loudness approximation: as playback volume decreases, a gentle low-shelf (~100 Hz) and smaller high-shelf (~8 kHz) lift is applied, vanishing at full volume. Gain-domain but complementary to ReplayGain — ReplayGain levels tracks to a common target, while this contour adapts tone to the listening level; both can be ON together. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoSubCrossoverTitle =>
+      'Subwoofer Crossover (Bass Redirection)';
+
+  @override
+  String get featureInfoSubCrossoverSubtitle =>
+      '60–150 Hz Linkwitz-Riley, Bass Mono + Anti-Pop limiting';
+
+  @override
+  String get featureInfoSubCrossoverDescription =>
+      'Bass redirection for stereo rigs: a 4th-order Linkwitz-Riley low-pass mono sum is mixed into both channels. Features Bass Mono side-channel subtraction to keep sub-bass punchy and mono-centered, plus tanh anti-pop soft-limiting to eliminate clicks. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoDynamicEqTitle => 'Dynamic EQ (Cut & Boost)';
+
+  @override
+  String get featureInfoDynamicEqSubtitle =>
+      'Multi-mode dynamic filters (Peaking, Low-Shelf, High-Shelf)';
+
+  @override
+  String get featureInfoDynamicEqDescription =>
+      'Per-band dynamic equalization supporting both Cut (resonance taming) and Boost (transient expansion) modes. Selectable between Peaking biquad, Low-Shelf, and High-Shelf dynamic responses with smooth soft-knee detection. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoMultibandCompressorTitle =>
+      'Native 4-Band Multiband Compressor';
+
+  @override
+  String get featureInfoMultibandCompressorSubtitle =>
+      'Phase-aligned Linkwitz-Riley 4th order crossovers, zero-latency C++';
+
+  @override
+  String get featureInfoMultibandCompressorDescription =>
+      'Professional 4-band studio mastering compressor built directly into the C++ native DSP engine. Uses Linkwitz-Riley 4th order (LR4) crossovers for exact flat magnitude summation with zero phase distortion. Features independent threshold, ratio, attack, release, soft-knee, and makeup gain per band. Replaces fragile HAL compressor paths. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoDynamicBassTitle => 'Dynamic Bass (Dynamic System)';
+
+  @override
+  String get featureInfoDynamicBassSubtitle =>
+      'Envelope-adaptive sub-bass punch & headphone virtualization';
+
+  @override
+  String get featureInfoDynamicBassDescription =>
+      'Modeled on ViPER4Android’s famous Dynamic System. Restores physical weight and tactile punch for headphones by dynamically expanding quiet bass passages and soft-saturating loud peaks. Features Mid-Side sub-bass extraction, psychoacoustic harmonic synthesis, and 9 classic headphone device calibration presets. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoViperDdcTitle =>
+      'ViPER-DDC (Digital Dynamic Correction)';
+
+  @override
+  String get featureInfoViperDdcSubtitle =>
+      'Hardware headphone timbre & frequency linearization';
+
+  @override
+  String get featureInfoViperDdcDescription =>
+      'Loads authentic ViPER-DDC (.vdc) correction profiles. Implements high-order Second-Order Sections (SOS) Direct Form II stereo filtering with real-time sample rate adaptation (44.1 kHz / 48 kHz). Precisely neutralizes earphone-specific resonances. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoArbitraryEqTitle => 'Arbitrary Response EQ (GraphicEq)';
+
+  @override
+  String get featureInfoArbitraryEqSubtitle =>
+      'EqualizerAPO graphic response curve parser & 512-tap FIR filter';
+
+  @override
+  String get featureInfoArbitraryEqDescription =>
+      'Parses standard EqualizerAPO \"GraphicEq: <freq> <gain>; ...\" curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.';
+
+  @override
+  String get featureInfoLiveProgTitle =>
+      'Live Programmable DSP (EEL Scripting)';
+
+  @override
+  String get featureInfoLiveProgSubtitle =>
+      'Real-time custom audio DSP bytecode VM';
+
+  @override
+  String get featureInfoLiveProgDescription =>
+      'Write custom audio DSP algorithms in Jesusonic / EEL scripting syntax right on your phone. Code compiles directly to safe, zero-latency bytecode executed per-sample inside the high-priority native audio thread. Supports @init, @sample, sliders 1..8, and comprehensive transcendental math functions. Disabled during Bit-Perfect.';
+
+  @override
+  String get conflictWithAllDspBypassDsp => 'All DSP when “Bypass DSP” is ON';
+
+  @override
+  String get conflictWithBitPerfect => 'Bit-Perfect bypass';
+
+  @override
+  String get conflictWithEqReplayGainEffectsCrossfade =>
+      'EQ / ReplayGain / Effects / Crossfade';
+
+  @override
+  String get conflictWithCrossfade => 'Crossfade (>0 s)';
+
+  @override
+  String get conflictWithGapless => 'Gapless';
+
+  @override
+  String get conflictWithResampler => 'Bit-Perfect bypass / Direct';
+
+  @override
+  String get conflictWithVirtualizer =>
+      'Bit-Perfect bypass, Hardware Spatializer';
+
+  @override
+  String get conflictAaudioDirect =>
+      'Disabled: AAudio Direct is ON — it bypasses the ExoPlayer DSP chain (EQ, speed/pitch, silence skip, crossfade). Turn it off to re-enable DSP.';
+
+  @override
+  String get conflictDsdDop =>
+      'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
+
+  @override
+  String get conflictDspBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
+
+  @override
+  String get conflictBtBitPerfectUnsupported =>
+      'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
+
+  @override
+  String get conflictRequiresAndroid14 =>
+      'Requires Android 14+ for USB bit-perfect output.';
+
+  @override
+  String get conflictExclusiveRequiresUsbDac =>
+      'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
+
+  @override
+  String get conflictNoMixerAttributes =>
+      'This USB DAC does not advertise an exclusive mixer configuration.';
+
+  @override
+  String conflictGaplessNeedsZeroCrossfade(String crossfadeSeconds) {
+    return 'Disabled: Crossfade is $crossfadeSeconds s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
+  }
+
+  @override
+  String get conflictCrossfadeNeedsGaplessOff =>
+      'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
+
+  @override
+  String get conflictStrictBitPerfectActive =>
+      'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
+
+  @override
+  String get conflictCrossfadeBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
+
+  @override
+  String get conflictNoDeviceDetected =>
+      'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
+
+  @override
+  String get conflictNoExclusiveMixer =>
+      'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
+
+  @override
+  String get conflictAaudioDirectCrossfade =>
+      'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
+
+  @override
+  String get conflictOemDoubleProcessing =>
+      'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
+
+  @override
+  String conflictVolumeBoostClipping(
+      String preampDb, String boostDb, String totalDb) {
+    return 'Clipping risk: EQ preamp ($preampDb dB) + boost (+$boostDb dB) = +$totalDb dB > 6 dB headroom.';
+  }
+
+  @override
+  String get conflictHighBoostDistortion =>
+      'High boost may cause distortion or hearing fatigue.';
 }

@@ -141,7 +141,8 @@ void main() {
       expect(favorites.any((s) => s.id == 2), isTrue);
     });
 
-    test('Online tracks imported as favorites appear in getFavorites and watchFavorites',
+    test(
+        'Online tracks imported as favorites appear in getFavorites and watchFavorites',
         () async {
       // 1. Insert a local favorite song
       await db.into(db.songsTable).insert(
@@ -191,7 +192,8 @@ void main() {
       expect(streamFavs.any((s) => s.source == SongSource.youtube), isTrue);
 
       // 5. Test re-importing when an existing row was previously marked isMissing: true
-      await (db.update(db.songsTable)..where((t) => t.remoteId.equals('yt_vid_1')))
+      await (db.update(db.songsTable)
+            ..where((t) => t.remoteId.equals('yt_vid_1')))
           .write(const SongsTableCompanion(isMissing: Value(true)));
 
       final reimportRes =
@@ -415,7 +417,9 @@ void main() {
       expect((await db.select(db.songsTable).get()).length, equals(2));
     });
 
-    test('remap benchmark on large library completes rapidly and memory bounded', () async {
+    test(
+        'remap benchmark on large library completes rapidly and memory bounded',
+        () async {
       await db.batch((batch) {
         batch.insertAll(
           db.songsTable,
@@ -467,10 +471,8 @@ void main() {
                 path: '/music/skip${sep}two.mp3'),
           );
 
-      final result = await repository
-          .watchAllSongs(
-              searchQuery: 'track', excludedFolders: ['/music/skip'])
-          .first;
+      final result = await repository.watchAllSongs(
+          searchQuery: 'track', excludedFolders: ['/music/skip']).first;
 
       expect(result.isRight(), isTrue,
           reason: 'ESCAPE must be a single character or SQLite throws');
@@ -479,7 +481,9 @@ void main() {
       expect(songs.map((s) => s.title), isNot(contains('Track Two')));
     });
 
-    test('watchAllSongs applies default title ordering on unrecognized sortBy (B4)', () async {
+    test(
+        'watchAllSongs applies default title ordering on unrecognized sortBy (B4)',
+        () async {
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
                 id: const Value(10),

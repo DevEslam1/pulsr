@@ -117,8 +117,8 @@ void main() {
         dropouts: 1,
         endedAt: '2026-09-11T12:03:00.000Z',
       );
-      final restored =
-          AudioSessionRecord.fromJson(jsonDecode(jsonEncode(original.toJson())));
+      final restored = AudioSessionRecord.fromJson(
+          jsonDecode(jsonEncode(original.toJson())));
       expect(restored.sessionId, original.sessionId);
       expect(restored.routeType, AudioRouteType.wired);
       expect(restored.bitrateKbps, 320);
@@ -199,11 +199,15 @@ void main() {
       log = buildLog();
       await log.startSession(trackId: '1', trackTitle: 'One');
       await log.endSession();
-      expect(await File('${tempDir.path}/${AudioSessionLog.defaultFileName}')
-          .exists(), isTrue);
+      expect(
+          await File('${tempDir.path}/${AudioSessionLog.defaultFileName}')
+              .exists(),
+          isTrue);
       await log.clear();
-      expect(await File('${tempDir.path}/${AudioSessionLog.defaultFileName}')
-          .exists(), isFalse);
+      expect(
+          await File('${tempDir.path}/${AudioSessionLog.defaultFileName}')
+              .exists(),
+          isFalse);
     });
   });
 

@@ -27,8 +27,7 @@ class YtmSearchScreen extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
-        BlocProvider<YtmDownloadCubit>.value(
-            value: getIt<YtmDownloadCubit>()),
+        BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
       ],
       child: const _YtmSearchView(),
     );
@@ -114,61 +113,62 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
           leading: const PulsrBackButton(),
           title: Text(context.l10n.browseYouTubeMusic),
         ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: Adaptive.contentConstraints(context),
-            child: BlocListener<YtmSearchCubit, YtmSearchState>(
-              listenWhen: (prev, curr) =>
-                  prev.results != curr.results && curr.results.isNotEmpty,
-              listener: (_, __) => _refreshHistory(),
-              child: BlocBuilder<YtmSearchCubit, YtmSearchState>(
-              builder: (context, state) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsetsDirectional.fromSTEB(
-                          Adaptive.pagePadding(context),
-                          12,
-                          Adaptive.pagePadding(context),
-                          6),
-                      child: TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        textInputAction: TextInputAction.search,
-                        onChanged: cubit.onQueryChanged,
-                        decoration: InputDecoration(
-                          hintText: context.l10n.browseSongsOnYtm,
-                          prefixIcon:
-                              Icon(Icons.search_rounded, color: p.textTertiary),
-                          suffixIcon: state.query.isNotEmpty
-                                ? IconButton(
-                                    icon: Icon(Icons.clear_rounded,
-                                        color: p.textTertiary),
-                                    tooltip: context.l10n.clear,
-                                    onPressed: () {
-                                    _searchController.clear();
-                                    cubit.clearQuery();
-                                  },
-                                )
-                              : null,
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: Adaptive.contentConstraints(context),
+              child: BlocListener<YtmSearchCubit, YtmSearchState>(
+                listenWhen: (prev, curr) =>
+                    prev.results != curr.results && curr.results.isNotEmpty,
+                listener: (_, __) => _refreshHistory(),
+                child: BlocBuilder<YtmSearchCubit, YtmSearchState>(
+                  builder: (context, state) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                              Adaptive.pagePadding(context),
+                              12,
+                              Adaptive.pagePadding(context),
+                              6),
+                          child: TextField(
+                            controller: _searchController,
+                            autofocus: true,
+                            textInputAction: TextInputAction.search,
+                            onChanged: cubit.onQueryChanged,
+                            decoration: InputDecoration(
+                              hintText: context.l10n.browseSongsOnYtm,
+                              prefixIcon: Icon(Icons.search_rounded,
+                                  color: p.textTertiary),
+                              suffixIcon: state.query.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(Icons.clear_rounded,
+                                          color: p.textTertiary),
+                                      tooltip: context.l10n.clear,
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        cubit.clearQuery();
+                                      },
+                                    )
+                                  : null,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildBody(context, state, cubit, playerCubit, p),
-                    ),
-                  ],
-                );
-              },
+                        Expanded(
+                          child:
+                              _buildBody(context, state, cubit, playerCubit, p),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -188,13 +188,13 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             : context.l10n.searchYtm,
         subtitle: context.l10n.browseYtmSearchScreenDesc,
         primaryActionLabel: _historyLoadFailed ? context.l10n.tryAgain : null,
-        primaryActionIcon:
-            _historyLoadFailed ? Icons.refresh_rounded : null,
+        primaryActionIcon: _historyLoadFailed ? Icons.refresh_rounded : null,
         onPrimaryAction: _historyLoadFailed ? _refreshHistory : null,
       );
     }
     return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md, AppSpacing.xxs, AppSpacing.md, 160),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.xxs, AppSpacing.md, 160),
       children: [
         Row(
           children: [
@@ -223,8 +223,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
           children: [
             for (final h in _history)
               ActionChip(
-                label: Text(h,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                label: Text(h, maxLines: 1, overflow: TextOverflow.ellipsis),
                 avatar: Icon(Icons.history_rounded,
                     size: 16, color: p.textTertiary),
                 onPressed: () {
@@ -250,10 +249,9 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     PlayerCubit playerCubit,
     PulsrPalette p,
   ) {
-      if (state.isLoading && state.results.isEmpty) {
-        return const SkeletonList(
-            padding: EdgeInsets.only(top: AppSpacing.xs));
-      }
+    if (state.isLoading && state.results.isEmpty) {
+      return const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs));
+    }
 
     if (state.errorMessage != null) {
       return EmptyStateWidget(
@@ -287,9 +285,10 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
             if (status == null) return const SizedBox.shrink();
             return Container(
               width: double.infinity,
-              margin: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, AppSpacing.xxs, AppSpacing.sm, AppSpacing.xxs),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+              margin: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.sm, AppSpacing.xxs, AppSpacing.sm, AppSpacing.xxs),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: p.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadii.r10),
@@ -297,7 +296,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
               ),
               child: Text(
                 status,
-                style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+                style: TextStyle(
+                    fontSize: AppFontSize.label, color: p.textSecondary),
               ),
             );
           },
@@ -314,7 +314,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
               physics: const AlwaysScrollableScrollPhysics(),
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
-              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+              padding: const EdgeInsets.only(
+                  bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
               itemCount: songs.length,
               itemBuilder: (context, index) {
                 final song = songs[index];

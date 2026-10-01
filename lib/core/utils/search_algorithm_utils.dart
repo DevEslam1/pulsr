@@ -72,8 +72,9 @@ class SearchAlgorithmUtils {
   // LRU bounded cache to prevent unbounded retention. Keyed by raw metadata so
   // a retagged song is not served stale normalized text; the superseded entry
   // ages out through LRU eviction.
-  static final LinkedHashMap<String, ({String title, String artist, String album})>
-      _normCache = LinkedHashMap();
+  static final LinkedHashMap<String,
+          ({String title, String artist, String album})> _normCache =
+      LinkedHashMap();
 
   /// Test-only: drops every cached normalized metadata entry.
   static void clearCache() => _normCache.clear();
@@ -208,9 +209,8 @@ class SearchAlgorithmUtils {
 
       // C-04: format chips additionally constrain by codec while still
       // honouring the text query (format filters behave as "All" for fields).
-      final formatOk = _isFormatFilter(filter)
-          ? _formatMatches(song, filter)
-          : true;
+      final formatOk =
+          _isFormatFilter(filter) ? _formatMatches(song, filter) : true;
 
       if (matches && formatOk) {
         results.add(song);

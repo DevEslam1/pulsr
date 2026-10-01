@@ -199,7 +199,15 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       // back to "auto" for that dimension when the device reports a rate it
       // does not accept, rather than silently requesting nothing.
       const validRates = <int>{
-        44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 768000
+        44100,
+        48000,
+        88200,
+        96000,
+        176400,
+        192000,
+        352800,
+        384000,
+        768000
       };
       final rate =
           validRates.contains(decision.sampleRate) ? decision.sampleRate : 0;
@@ -219,11 +227,12 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   void _onBufferBucketChanged(BufferBucket bucket) {
     if (bucket == _currentBucket) return;
     _currentBucket = bucket;
-    _currentAudioLoadConfiguration = PulsrAudioHandler._loadConfigForBucket(bucket);
+    _currentAudioLoadConfiguration =
+        PulsrAudioHandler._loadConfigForBucket(bucket);
     debugPrint(
         '[AudioHandler] Buffer bucket transitioned to $bucket — applying load control');
-    unawaited(
-        _activePlayer.setAudioLoadConfiguration(_currentAudioLoadConfiguration));
+    unawaited(_activePlayer
+        .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
     unawaited(_inactivePlayer
         .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
     unawaited(_prefetchPlayer
@@ -238,8 +247,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     final song = currentSong;
     final remoteId = song?.remoteId;
     if (remoteId != null && remoteId.isNotEmpty) {
-      _streamCache.removeWhere((k, _) =>
-          k.startsWith('$remoteId:') || k.startsWith(remoteId));
+      _streamCache.removeWhere(
+          (k, _) => k.startsWith('$remoteId:') || k.startsWith(remoteId));
       _streamResolutionPipeline.invalidateCache(remoteId);
     }
     _resolveEpoch++;
@@ -281,7 +290,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       'Gapless stream resolution error on "${song.title}": $errorMessage ($error)',
       category: 'AudioHandler',
     );
-    _errorSubject.add(errorMessage);
 
     // Invalidate poToken only on a verdict that a fresh attestation can fix.
     // `contains('403')` matched the digits anywhere in the message — including
@@ -311,8 +319,15 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       return;
     }
 
+    // Only a failure on the track the user is actually on is worth surfacing.
+    // Background pre-fetches (online carousels, lookahead, gapless preloads)
+    // fail silently above; pushing them to `_errorSubject` spammed the app-level
+    // toast with "No connection" even when nothing was playing.
+    _errorSubject.add(errorMessage);
+
     if (!_activePlayer.playing) {
-      debugPrint('[AudioHandler] Resolution failed while paused — stopping loop.');
+      debugPrint(
+          '[AudioHandler] Resolution failed while paused — stopping loop.');
       return;
     }
     if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
@@ -507,8 +522,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
     // Fast-path: check if YouTube track is already cached in local disk stream cache
     if (song.remoteId != null && song.remoteId!.isNotEmpty) {
-      final cachedFile = await YtmCacheManager()
-          .getCachedAudioFile(song.remoteId!, quality: _currentStreamingQuality());
+      final cachedFile = await YtmCacheManager().getCachedAudioFile(
+          song.remoteId!,
+          quality: _currentStreamingQuality());
       if (cachedFile != null) {
         return AudioSource.file(cachedFile.path, tag: tag);
       }
@@ -599,7 +615,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // FIX-#12: Cancel any previous guard and store the new timer so it can
     // be disposed on onTaskRemoved / hot-restart.
     _fadeInGuardTimer?.cancel();
-    _fadeInGuardTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) async {
+    _fadeInGuardTimer =
+        Timer.periodic(const Duration(milliseconds: 250), (timer) async {
       attempts++;
       try {
         if (attempts > 8 ||
@@ -661,7 +678,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       await _playerB.setSkipSilenceEnabled(enabled);
       await silenceSkipController.persist();
     } catch (e, st) {
-      ErrorLogger.log('Failed to set skipSilence', error: e, stackTrace: st, category: 'AudioHandler');
+      ErrorLogger.log('Failed to set skipSilence',
+          error: e, stackTrace: st, category: 'AudioHandler');
     }
   }
 
@@ -690,7 +708,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   void _seedBpmOverride(SongsTableData song) {
     try {
       final trackId = song.id.toString();
-      final bpm = bpmOverrideStore.getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
+      final bpm =
+          bpmOverrideStore.getBpmForTrack(PulsrAudioHandler.trackKeyFor(song));
       final mgr = _crossfadeManager;
       if (bpm != null) {
         mgr.bpmOverrides[trackId] = bpm;
@@ -707,8 +726,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// Sets (or clears with null) the manual BPM override for [song].
   /// Returns false when out of the 40–240 range.
   Future<bool> setTrackBpm(SongsTableData song, double? bpm) async {
-    final ok =
-        await bpmOverrideStore.setBpmForTrack(PulsrAudioHandler.trackKeyFor(song), bpm);
+    final ok = await bpmOverrideStore.setBpmForTrack(
+        PulsrAudioHandler.trackKeyFor(song), bpm);
     if (ok) _seedBpmOverride(song);
     return ok;
   }
@@ -758,7 +777,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to set normalization', error: e, stackTrace: st, category: 'AudioHandler');
+      ErrorLogger.log('Failed to set normalization',
+          error: e, stackTrace: st, category: 'AudioHandler');
     }
   }
 
@@ -778,7 +798,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         videoId.isEmpty) {
       return;
     }
-    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) || videoId.startsWith('n_')) return;
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) ||
+        videoId.startsWith('n_')) {
+      return;
+    }
     // Skip prefetch if downloaded/local file exists
     if (!song.path.startsWith('ytmusic://') &&
         song.path.isNotEmpty &&
@@ -803,7 +826,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     final isBatteryConstrained =
         _batteryAwarePlayback.currentLevel != BatteryOptimizationLevel.normal;
-    if (!_memoryManager.canPreload(isBatteryConstrained: isBatteryConstrained)) {
+    if (!_memoryManager.canPreload(
+        isBatteryConstrained: isBatteryConstrained)) {
       return;
     }
     if (!_prefetching.add(prefetchKey)) {
@@ -811,7 +835,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     _memoryManager.registerPreload(
       prefetchKey,
-      AudioMemoryManager.calculateHeadSize(bitrateKbps: song.bitrateKbps ?? 256),
+      AudioMemoryManager.calculateHeadSize(
+          bitrateKbps: song.bitrateKbps ?? 256),
     );
     final currentGen = _prefetchGeneration;
     unawaited(() async {
@@ -849,7 +874,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   }
 
   void _smartPrefetch() {
-    if (_songs.isEmpty || _currentIndex < 0 || _consecutiveFailures >= 3) return;
+    if (_songs.isEmpty || _currentIndex < 0 || _consecutiveFailures >= 3) {
+      return;
+    }
     if (_batteryAwarePlayback.currentLevel ==
         BatteryOptimizationLevel.critical) {
       return;
@@ -858,9 +885,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // without this the same videoId is re-scheduled on every tick.
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final song = _songs[_currentIndex];
-    final stableId = (song.remoteId?.isNotEmpty ?? false)
-        ? song.remoteId!
-        : song.path;
+    final stableId =
+        (song.remoteId?.isNotEmpty ?? false) ? song.remoteId! : song.path;
     final key = '${_currentIndex}_$stableId';
     if (key == _lastSmartPrefetchKey && nowMs - _lastSmartPrefetchMs < 10000) {
       return;
@@ -881,453 +907,124 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     _smartPrefetch();
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // Requires: provided by the composing class (same library).
+  // Abstract contract supplied by the composing PulsrAudioHandler (same
+  // library). Declaring these here keeps the mixin stateless and lets the
+  // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  // Requires: provided by the composing class (same library).
   AdaptiveBufferEngine get _adaptiveBufferEngine;
 
-  // Requires: provided by the composing class (same library).
   BatteryAwarePlayback get _batteryAwarePlayback;
 
-  // Requires: provided by the composing class (same library).
   Future<void> _beginAudioSession(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   void _broadcastState(PlaybackEvent event);
 
-  // Requires: provided by the composing class (same library).
   SharedPreferences? get _cachedPrefs;
   set _cachedPrefs(SharedPreferences? value);
 
-  // Requires: provided by the composing class (same library).
   double _calculateReplayGainVolume(SongsTableData? song);
 
-  // Requires: provided by the composing class (same library).
   int get _consecutiveFailures;
   set _consecutiveFailures(int value);
 
-  // Requires: provided by the composing class (same library).
   CrossfadeManager get _crossfadeManager;
 
-  // Requires: provided by the composing class (same library).
   bool get _cueStartSeeked;
   set _cueStartSeeked(bool value);
 
-  // Requires: provided by the composing class (same library).
   AudioLoadConfiguration get _currentAudioLoadConfiguration;
   set _currentAudioLoadConfiguration(AudioLoadConfiguration value);
 
-  // Requires: provided by the composing class (same library).
   BufferBucket get _currentBucket;
   set _currentBucket(BufferBucket value);
 
-  // Requires: provided by the composing class (same library).
   int get _currentIndex;
 
-  // Requires: provided by the composing class (same library).
   Future<AudioOutputInfo?> _currentOutputInfo();
 
-  // Requires: provided by the composing class (same library).
   String _currentStreamingQuality();
 
-  // Requires: provided by the composing class (same library).
   bool get _duckActive;
 
-  // Requires: provided by the composing class (same library).
   EqualizerManager get _equalizerManager;
 
-  // Requires: provided by the composing class (same library).
   StreamController<String> get _errorSubject;
 
-  // Requires: provided by the composing class (same library).
   Timer? get _fadeInGuardTimer;
   set _fadeInGuardTimer(Timer? value);
 
-  // Requires: provided by the composing class (same library).
   FormatAwareDecoder get _formatDecoder;
 
-  // Requires: provided by the composing class (same library).
   dynamic get _inFlightResolves;
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _inactivePlayer;
 
-  // Requires: provided by the composing class (same library).
   SongsTableData? get _lastPlayedSong;
   set _lastPlayedSong(SongsTableData? value);
 
-  // Requires: provided by the composing class (same library).
   String? get _lastSmartPrefetchKey;
   set _lastSmartPrefetchKey(String? value);
 
-  // Requires: provided by the composing class (same library).
   int get _lastSmartPrefetchMs;
   set _lastSmartPrefetchMs(int value);
 
-  // Requires: provided by the composing class (same library).
   AudioMemoryManager get _memoryManager;
 
-  // Requires: provided by the composing class (same library).
   StreamController<SongsTableData> get _onTrackChangedSubject;
 
-  // Requires: provided by the composing class (same library).
   Map<String, bool> get _pathExistsCache;
 
-  // Requires: provided by the composing class (same library).
   int get _playGeneration;
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _playerA;
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _playerB;
 
-  // Requires: provided by the composing class (same library).
   int get _prefetchGeneration;
   set _prefetchGeneration(int value);
 
-  // Requires: provided by the composing class (same library).
   AudioPlayer get _prefetchPlayer;
 
-  // Requires: provided by the composing class (same library).
   Set<String> get _prefetching;
 
-  // Requires: provided by the composing class (same library).
   SmartPreloadScheduler get _preloadScheduler;
 
-  // Requires: provided by the composing class (same library).
   Future<void> _pushNativeReplayGain(SongsTableData? song);
 
-  // Requires: provided by the composing class (same library).
   int get _rapidGaplessChangeCount;
   set _rapidGaplessChangeCount(int value);
 
-  // Requires: provided by the composing class (same library).
   IMusicRepository get _repository;
 
-  // Requires: provided by the composing class (same library).
   int get _resolveEpoch;
   set _resolveEpoch(int value);
 
-  // Requires: provided by the composing class (same library).
-  Future<({String url, String? userAgent, String? cookies, String quality})> _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
+  Future<({String url, String? userAgent, String? cookies, String quality})>
+      _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
 
-  // Requires: provided by the composing class (same library).
   List<SongsTableData> get _songs;
 
-  // Requires: provided by the composing class (same library).
   dynamic get _streamCache;
 
-  // Requires: provided by the composing class (same library).
   StreamPreResolver get _streamPreResolver;
 
-  // Requires: provided by the composing class (same library).
   YtmService get _ytmService;
 
-  // Requires: provided by the composing class (same library).
   AbLoopManager get abLoopManager;
 
-  // Requires: provided by the composing class (same library).
   BpmOverrideStore get bpmOverrideStore;
 
-  // Requires: provided by the composing class (same library).
   SongsTableData? get currentSong;
 
-  // Requires: provided by the composing class (same library).
   dynamic get dspSnapshotStore;
 
-  // Requires: provided by the composing class (same library).
   Future<bool> recallDspSnapshotFor(SongsTableData song);
 
-  // Requires: provided by the composing class (same library).
   SilenceSkipController get silenceSkipController;
 
-  // Requires: provided by the composing class (same library).
   StreamResolutionPipeline get _streamResolutionPipeline;
 
-  // Requires: provided by the composing class (same library).
   PerSongPlaybackStore get perSongPlaybackStore;
   double get _pitch;
   Future<void> setPitch(double pitch);

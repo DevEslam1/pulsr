@@ -28,7 +28,8 @@ abstract class AppColors {
   static const Color netflixRed = Color(0xFFE50914); // curated online red
   static const Color studioGreen = Color(0xFF10B981); // DSP attached / studio
   static const Color ldacViolet = Color(0xFF7C4DFF); // LDAC / correction violet
-  static const Color accentCyan = Color(0xFF00E5FF); // cyan accent / calibration
+  static const Color accentCyan =
+      Color(0xFF00E5FF); // cyan accent / calibration
   static const Color skyBlue = Color(0xFF40C4FF);
   static const Color emeraldDeep = Color(0xFF2BB673);
   static const Color roseDeep = Color(0xFFB0316B);
@@ -95,6 +96,26 @@ abstract class AppColors {
   @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
   static const Color amoledOutline = Color(0xFF222222);
 
+  // Audio-quality badge identity tones (fixed, source-identifying).
+  static const Color qualityBadgeRose = Color(0xFFE11D48);
+  static const Color qualityBadgeCyan = Color(0xFF00F2FF);
+  static const Color qualityBadgeSky = Color(0xFF38BDF8);
+  static const Color qualityBadgeBlue = Color(0xFF60A5FA);
+  static const Color qualityBadgeSlate = Color(0xFF94A3B8);
+  static const Color qualityBadgeAmber = Color(0xFFF59E0B);
+  static const Color qualityBadgeIndigo = Color(0xFF818CF8);
+
+  // Cache-category identity + service brand tones.
+  static const Color cacheLyrics = Color(0xFF9C27B0);
+  static const Color spotifyGreen = Color(0xFF1ED760);
+  static const Color spotifyGreenDeep = Color(0xFF14833B);
+
+  // Onboarding theme-preview swatch tones.
+  static const Color swatchGreen = Color(0xFF00E676);
+  static const Color swatchAmber = Color(0xFFFF9100);
+  static const Color swatchPink = Color(0xFFFF4081);
+  static const Color swatchPurple = Color(0xFFD500F9);
+
   static const List<Color> customAccents = [
     Color(0xFF9B9EF5),
     Color(0xFF40C4FF),
@@ -105,4 +126,35 @@ abstract class AppColors {
     Color(0xFFFFD600),
     Color(0xFF1DE9B6),
   ];
+
+  // Physical-material greys for the skeuomorphic player themes (vinyl record,
+  // turntable hardware, cassette shell). Exact Material palette values so the
+  // analog render is unchanged; named by the material they represent.
+  static const Color discSilver = Color(0xFFBDBDBD); // material grey 400
+  static const Color discAluminum = Color(0xFF9E9E9E); // material grey 500
+  static const Color discSteel = Color(0xFF757575); // material grey 600
+  static const Color discGraphite = Color(0xFF616161); // material grey 700
+  static const Color discShadow = Color(0xFF424242); // material grey 800
+  static const Color surfaceGreyLight = Color(0xFFEEEEEE); // material grey 200
+  static const Color surfaceGreyDark = Color(0xFF212121); // material grey 900
+
+  // Pulsr logo neon vector tones (gradient backdrop).
+  static const Color logoNavy = Color(0xFF002288);
+  static const Color logoBlue = Color(0xFF0077FF);
+  static const Color logoMidnight = Color(0xFF001550);
+  static const Color logoInk = Color(0xFF0A0C12);
+
+  // Spinning mini vinyl-disc material tones.
+  static const Color vinylDiscBase = Color(0xFF0D0E12);
+  static const Color vinylDiscRim = Color(0xFF1E2028);
+  static const Color vinylSpindle = Color(0xFF090A0D);
+
+  // Room-correction multi-point legend swatches and their matching paint
+  // strokes (coupled so the legend and chart stay in sync).
+  static const Color roomPointCenter = Color(0xFF4FC3F7);
+  static const Color roomPointLeft = Color(0xFF81C784);
+  static const Color roomPointRight = Color(0xFFFFB74D);
+  static const Color roomPointCenterLine = Color(0xAA4FC3F7);
+  static const Color roomPointLeftLine = Color(0xAA81C784);
+  static const Color roomPointRightLine = Color(0xAAFFB74D);
 }

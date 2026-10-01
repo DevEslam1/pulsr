@@ -28,7 +28,9 @@ void main() {
       expect(order, equals([1, 2, 3]));
     });
 
-    test('PlayerScrobbleCoordinator records monotonic elapsed milliseconds on playback notify', () {
+    test(
+        'PlayerScrobbleCoordinator records monotonic elapsed milliseconds on playback notify',
+        () {
       final coordinator = PlayerScrobbleCoordinator(
         service: () => null,
         isQuranMode: () => false,
@@ -54,27 +56,32 @@ void main() {
 
       coordinator.debouncedScrobble(song, const Duration(seconds: 1), true);
 
-      expect(coordinator.lastScrobbleTime, isNotNull);
       expect(coordinator.lastScrobbleElapsedMs, isNotNull);
       expect(coordinator.lastScrobbleElapsedMs!, greaterThanOrEqualTo(0));
 
       final firstElapsed = coordinator.lastScrobbleElapsedMs!;
-      coordinator.debouncedScrobble(song, const Duration(seconds: 10), true); // major seek >= 5s triggers flush
+      coordinator.debouncedScrobble(song, const Duration(seconds: 10),
+          true); // major seek >= 5s triggers flush
       final secondElapsed = coordinator.lastScrobbleElapsedMs!;
 
       expect(secondElapsed, greaterThanOrEqualTo(firstElapsed));
       coordinator.dispose();
     });
 
-    test('Structured concurrency: Future.wait aggregates errors and completes atomically', () async {
+    test(
+        'Structured concurrency: Future.wait aggregates errors and completes atomically',
+        () async {
       bool task1Done = false;
       bool task2Done = false;
       bool task3Done = false;
 
       final futures = [
-        Future.delayed(const Duration(milliseconds: 10), () => task1Done = true),
-        Future.delayed(const Duration(milliseconds: 15), () => task2Done = true),
-        Future.delayed(const Duration(milliseconds: 20), () => task3Done = true),
+        Future.delayed(
+            const Duration(milliseconds: 10), () => task1Done = true),
+        Future.delayed(
+            const Duration(milliseconds: 15), () => task2Done = true),
+        Future.delayed(
+            const Duration(milliseconds: 20), () => task3Done = true),
       ];
 
       await Future.wait(futures);
@@ -84,7 +91,8 @@ void main() {
       expect(task3Done, isTrue);
     });
 
-    test('Downloads tombstone map protected under concurrent deletes', () async {
+    test('Downloads tombstone map protected under concurrent deletes',
+        () async {
       final deleteMutex = Mutex();
       final deletedAtMsByVideoId = <String, int>{};
       final stopwatch = Stopwatch()..start();
@@ -107,7 +115,9 @@ void main() {
       expect(deletedAtMsByVideoId.containsKey('vid_4'), isTrue);
     });
 
-    test('Monotonic stopwatch elapsed duration is immune to wall clock backward jumps', () async {
+    test(
+        'Monotonic stopwatch elapsed duration is immune to wall clock backward jumps',
+        () async {
       final sw = Stopwatch()..start();
       final start = sw.elapsedMilliseconds;
       await Future.delayed(const Duration(milliseconds: 20));

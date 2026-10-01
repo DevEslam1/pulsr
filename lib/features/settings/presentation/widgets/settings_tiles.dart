@@ -65,13 +65,13 @@ class SettingsNavTile extends StatelessWidget {
       child: PulsrPressable(
         pressedScale: 0.988,
         onTap: disabledReason != null && onTap == null
-            ? () => showAudioFeatureInfoDialog(context,
-                featureInfo ?? AudioFeatureRegistry.equalizer,
+            ? () => showAudioFeatureInfoDialog(
+                context, featureInfo ?? AudioFeatureRegistry.equalizer,
                 conflictReason: disabledReason)
             : onTap,
         child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.s2),
           leading: SettingsIconBox(icon),
           title: Row(
             children: [
@@ -173,8 +173,8 @@ class SettingsSwitchTile extends StatelessWidget {
                 : null)
             : () => onChanged(!value),
         child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.s2),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.s2),
           leading: SettingsIconBox(icon),
           title: Row(
             children: [
@@ -236,45 +236,45 @@ class SettingsSwitchTile extends StatelessWidget {
 }
 
 /// Feature info dialog (was `_showFeatureInfo`).
-void showAudioFeatureInfoDialog(
-    BuildContext context, AudioFeatureInfo info,
+void showAudioFeatureInfoDialog(BuildContext context, AudioFeatureInfo info,
     {String? conflictReason}) {
   final p = context.palette;
+  final loc = info.localized(context.l10n);
   PulsrDialogHelper.showPulsrDialog<void>(
     context,
     icon: Icon(Icons.info_outline_rounded, color: p.accent, size: 26),
-    title: Text(info.title),
+    title: Text(loc.title),
     content: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(info.subtitle,
+        Text(loc.subtitle,
             style: TextStyle(
                 color: p.textSecondary,
                 fontWeight: FontWeight.w600,
                 fontSize: AppFontSize.label)),
         const SizedBox(height: AppSpacing.s10),
-        Text(info.description,
-            style:
-                TextStyle(color: p.textPrimary, fontSize: AppFontSize.bodySmall, height: 1.4)),
-        if (info.conflictsWith != null) ...[
+        Text(loc.description,
+            style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.bodySmall,
+                height: 1.4)),
+        if (loc.conflictsWith != null) ...[
           const SizedBox(height: AppSpacing.sm),
           Container(
             padding: const EdgeInsets.all(AppSpacing.s10),
             decoration: BoxDecoration(
                 color: Colors.amber.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadii.r10),
-                border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.4))),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4))),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    color: p.warning, size: 18),
+                Icon(Icons.warning_amber_rounded, color: p.warning, size: 18),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                     child: Text(
-                        context.l10n.conflictsWith(info.conflictsWith ?? ''),
+                        context.l10n.conflictsWith(loc.conflictsWith ?? ''),
                         style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.caption,
@@ -290,8 +290,7 @@ void showAudioFeatureInfoDialog(
             decoration: BoxDecoration(
                 color: p.error.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadii.r10),
-                border: Border.all(
-                    color: p.error.withValues(alpha: 0.4))),
+                border: Border.all(color: p.error.withValues(alpha: 0.4))),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -311,8 +310,7 @@ void showAudioFeatureInfoDialog(
     ),
     actions: [
       FilledButton(
-        onPressed: () =>
-            Navigator.of(context, rootNavigator: true).pop(),
+        onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
         child: Text(context.l10n.gotIt),
       ),
     ],
@@ -348,14 +346,17 @@ class SettingsSectionCard extends StatelessWidget {
     );
 
     if (title == null || title!.isEmpty) {
-      return margin != null ? Padding(padding: margin!, child: content) : content;
+      return margin != null
+          ? Padding(padding: margin!, child: content)
+          : content;
     }
 
     final column = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s6, 0, 0, AppSpacing.xs),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s6, 0, 0, AppSpacing.xs),
           child: Text(
             title!,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -372,4 +373,3 @@ class SettingsSectionCard extends StatelessWidget {
     return margin != null ? Padding(padding: margin!, child: column) : column;
   }
 }
-

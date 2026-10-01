@@ -201,9 +201,9 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                             ? () {
                                 final shuffled =
                                     List<SongsTableData>.from(songs)..shuffle();
-                                context.read<PlayerCubit>().playSong(
-                                    shuffled.first,
-                                    queue: shuffled);
+                                context
+                                    .read<PlayerCubit>()
+                                    .playSong(shuffled.first, queue: shuffled);
                               }
                             : null,
                         icon: Icon(Icons.shuffle_rounded, color: p.accent),

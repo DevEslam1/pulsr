@@ -48,8 +48,8 @@ class PositionCrashGuard {
   static Future<File?> _getFile({bool tmp = false}) async {
     try {
       final dir = await getApplicationSupportDirectory();
-      return File(p.join(
-          dir.path, tmp ? 'crash_guard.json.tmp' : 'crash_guard.json'));
+      return File(
+          p.join(dir.path, tmp ? 'crash_guard.json.tmp' : 'crash_guard.json'));
     } catch (_) {
       try {
         final docDir = await getApplicationDocumentsDirectory();

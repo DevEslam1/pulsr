@@ -23,6 +23,7 @@ void main() {
     }
 
     expect(score('hello', 'hello'), lessThan(score('say hello', 'hello')));
-    expect(score('hello world', 'hello'), lessThan(score('say hello', 'hello')));
+    expect(
+        score('hello world', 'hello'), lessThan(score('say hello', 'hello')));
   });
 }

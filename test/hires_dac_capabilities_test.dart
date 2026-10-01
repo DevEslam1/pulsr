@@ -50,7 +50,9 @@ void main() {
         isBitPerfectActive: true,
         usbAudioClass: 2,
         usbDacLabel: 'Label',
-        directFormats: [AudioDirectFormat(encoding: '32', sampleRate: 192000, supported: true)],
+        directFormats: [
+          AudioDirectFormat(encoding: '32', sampleRate: 192000, supported: true)
+        ],
       );
       final toggled = base.copyWith(isBitPerfectActive: false);
       expect(toggled.isBitPerfectActive, isFalse);
@@ -69,7 +71,9 @@ void main() {
         isBitPerfectActive: false,
         usbAudioClass: 1,
         usbDacLabel: 'UAC1 Dongle',
-        directFormats: [AudioDirectFormat(encoding: '24', sampleRate: 96000, supported: true)],
+        directFormats: [
+          AudioDirectFormat(encoding: '24', sampleRate: 96000, supported: true)
+        ],
       );
       final restored = AudioOutputInfo.fromMap(base.toMap());
       expect(restored.usbAudioClass, 1);

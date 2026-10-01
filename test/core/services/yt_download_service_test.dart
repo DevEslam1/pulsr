@@ -90,10 +90,21 @@ void main() {
     });
 
     test('reads OggS, fLaC, ID3 and a bare MPEG frame sync', () {
-      expect(YtDownloadService.sniffContainerBytes(const [0x4F, 0x67, 0x67, 0x53])?.ext, 'ogg');
-      expect(YtDownloadService.sniffContainerBytes(const [0x66, 0x4C, 0x61, 0x43])?.ext, 'flac');
-      expect(YtDownloadService.sniffContainerBytes(const [0x49, 0x44, 0x33, 0x03])?.ext, 'mp3');
-      expect(YtDownloadService.sniffContainerBytes(const [0xFF, 0xFB, 0x90, 0x00])?.mime,
+      expect(
+          YtDownloadService.sniffContainerBytes(const [0x4F, 0x67, 0x67, 0x53])
+              ?.ext,
+          'ogg');
+      expect(
+          YtDownloadService.sniffContainerBytes(const [0x66, 0x4C, 0x61, 0x43])
+              ?.ext,
+          'flac');
+      expect(
+          YtDownloadService.sniffContainerBytes(const [0x49, 0x44, 0x33, 0x03])
+              ?.ext,
+          'mp3');
+      expect(
+          YtDownloadService.sniffContainerBytes(const [0xFF, 0xFB, 0x90, 0x00])
+              ?.mime,
           'audio/mpeg');
     });
 
@@ -113,7 +124,8 @@ void main() {
       // Every one of these is 3 bytes encoded, so a character-based cap would
       // sail past the filesystem's byte limit and MediaStore would refuse the
       // insert with an opaque failure.
-      final name = YtDownloadService.sanitizeFilename('　' * 200, '　' * 200, 'm4a');
+      final name =
+          YtDownloadService.sanitizeFilename('　' * 200, '　' * 200, 'm4a');
       final bytes = name.length; // ASCII suffix only after the check below
       expect(bytes, greaterThan(0));
       expect(name.endsWith('.m4a'), isTrue);

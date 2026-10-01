@@ -126,8 +126,7 @@ void main() {
       expect(switcherSize.width, greaterThanOrEqualTo(48.0));
       expect(switcherSize.height, greaterThanOrEqualTo(48.0));
 
-      final favSize =
-          tester.getSize(find.byType(PlayerAnimatedFavoriteButton));
+      final favSize = tester.getSize(find.byType(PlayerAnimatedFavoriteButton));
       expect(favSize.width, greaterThanOrEqualTo(48.0));
       expect(favSize.height, greaterThanOrEqualTo(48.0));
 
@@ -173,7 +172,8 @@ void main() {
       expect(vinylExclude, findsAtLeastNWidgets(1));
     });
 
-    testWidgets('4. Slider accessibility: WaveformSeekBar exposes full slider semantics',
+    testWidgets(
+        '4. Slider accessibility: WaveformSeekBar exposes full slider semantics',
         (tester) async {
       Duration? seekTarget;
 
@@ -275,7 +275,8 @@ void main() {
         (tester) async {
       final mockPlayerCubit = MockPlayerCubit();
       when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
-      when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
+      when(() => mockPlayerCubit.stream)
+          .thenAnswer((_) => const Stream.empty());
 
       bool songPlayed = false;
       bool addedToPlaylist = false;
@@ -330,7 +331,9 @@ void main() {
 
       // Flow 1: Play song via Semantics tap
       final songSemantics = find.byWidgetPredicate(
-        (w) => w is Semantics && w.properties.label == 'Masterpiece by Audiophile Maestro',
+        (w) =>
+            w is Semantics &&
+            w.properties.label == 'Masterpiece by Audiophile Maestro',
       );
       expect(songSemantics, findsOneWidget);
       await tester.tap(songSemantics);
@@ -346,7 +349,10 @@ void main() {
 
       // Flow 3: Adjust EQ slider via accessibility actions
       final eqSemantics = find.byWidgetPredicate(
-        (w) => w is Semantics && w.properties.slider == true && w.properties.label == '1kHz EQ Band',
+        (w) =>
+            w is Semantics &&
+            w.properties.slider == true &&
+            w.properties.label == '1kHz EQ Band',
       );
       expect(eqSemantics, findsOneWidget);
       final Semantics sliderWidget = tester.widget(eqSemantics);

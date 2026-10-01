@@ -238,9 +238,8 @@ class YtmResolvingSource extends StreamAudioSource {
       // resolve on re-request; network blips should still get a retry.
       if (_isFatalSignal(classified)) {
         final code = (classified.signal?.name ?? 'UNKNOWN').toUpperCase();
-        final fatalErr = err is YtmException
-            ? err
-            : YtmException(code, classified.message);
+        final fatalErr =
+            err is YtmException ? err : YtmException(code, classified.message);
         _permanentFailure = fatalErr;
         _permanentFailureAt = DateTime.now();
         onError?.call(fatalErr);
@@ -261,7 +260,6 @@ class YtmResolvingSource extends StreamAudioSource {
         info.signal == YtmBlockSignal.poTokenInvalid ||
         info.signal == YtmBlockSignal.geoBlocked;
   }
-
 
   /// Whether the stream URL itself is dead, as opposed to the connection to it.
   ///
@@ -410,7 +408,8 @@ class YtmResolvingSource extends StreamAudioSource {
     final isNativeClient = effectiveUa != null &&
         (effectiveUa.contains('com.google.android') ||
             effectiveUa.contains('com.google.ios') ||
-            (effectiveUa.contains('Android') && !effectiveUa.contains('Mozilla')));
+            (effectiveUa.contains('Android') &&
+                !effectiveUa.contains('Mozilla')));
 
     final headers = <String, String>{
       if (effectiveUa != null && effectiveUa.isNotEmpty)
@@ -429,8 +428,7 @@ class YtmResolvingSource extends StreamAudioSource {
       // Native clients (e.g. ANDROID_VR, IOS_MUSIC) stream from googlevideo CDN
       // without a web Referer. Sending 'https://music.youtube.com/' with a native
       // app User-Agent flags the request as spoofed to CDN edge nodes and causes HTTP 403.
-      if (!isNativeClient)
-        'Referer': 'https://music.youtube.com/',
+      if (!isNativeClient) 'Referer': 'https://music.youtube.com/',
     };
 
     // Serialize creation per cache path so two sources for the same videoId

@@ -34,15 +34,16 @@ class AudioQualityBadge extends StatelessWidget {
     // F-14: select only the two settings fields this badge consumes instead
     // of watching the whole SettingsCubit state (any settings mutation used
     // to rebuild every badge in every player theme).
-    final streamingQuality =
-        context.select<SettingsCubit, YtmAudioQuality>((c) => c.state.streamingQuality);
-    final output =
-        context.select<SettingsCubit, AudioOutputInfo?>((c) => c.state.currentOutputDevice);
+    final streamingQuality = context.select<SettingsCubit, YtmAudioQuality>(
+        (c) => c.state.streamingQuality);
+    final output = context.select<SettingsCubit, AudioOutputInfo?>(
+        (c) => c.state.currentOutputDevice);
     final info =
         AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
     final isUsb = output?.isUsbDac == true;
     final isBitPerfect = output?.isBitPerfectActive == true;
-    final isUsbStreaming = isUsb && UsbExclusiveService().lastStatus.streamingActive;
+    final isUsbStreaming =
+        isUsb && UsbExclusiveService().lastStatus.streamingActive;
 
     final outputRate = (output != null && output.targetSampleRate > 0)
         ? output.targetSampleRate ~/ 1000
@@ -137,7 +138,8 @@ class AudioQualityBadge extends StatelessWidget {
                             : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b'),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: compact ? AppFontSize.tiny : AppFontSize.caption,
+                      fontSize:
+                          compact ? AppFontSize.tiny : AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

@@ -78,6 +78,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     if (_isPopping) {
       _playerCubit.resetOverlayViews();
     }
+    // Leaving Now Playing must always hand the system chrome back to the app.
+    // Otherwise a landscape dwell leaves the app stuck in immersiveSticky.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+        systemStatusBarContrastEnforced: false,
+      ),
+    );
     super.dispose();
   }
 
@@ -130,17 +142,16 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
         final dynamicThemeConfig = context.select<
-            DynamicThemeCubit,
-            ({Color primaryColor, Color backgroundColor})>((c) => (
-              primaryColor: c.state.primaryColor,
-              backgroundColor: c.state.backgroundColor,
-            ));
+                DynamicThemeCubit, ({Color primaryColor, Color backgroundColor})>(
+            (c) => (
+                  primaryColor: c.state.primaryColor,
+                  backgroundColor: c.state.backgroundColor,
+                ));
 
         final activeColor = settingsConfig.dynamicThemingEnabled
             ? dynamicThemeConfig.primaryColor
             : settingsConfig.customAccentColor;
-        final isDark =
-            Theme.of(context).brightness == Brightness.dark;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         final bgColor = settingsConfig.dynamicThemingEnabled
             ? dynamicThemeConfig.backgroundColor
             : (isDark
@@ -154,7 +165,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           bgColor: bgColor,
         );
 
-        final themeWidget = ThemeRegistry.build(settingsConfig.playerThemeMode, props);
+        final themeWidget =
+            ThemeRegistry.build(settingsConfig.playerThemeMode, props);
 
         return PopScope(
           canPop: false,

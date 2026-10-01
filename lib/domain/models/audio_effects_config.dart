@@ -26,7 +26,6 @@ enum DynamicsPreset {
 // which carries threshold/ratio/attack/release/knee/makeup per band and is the
 // single source of truth for user-edited dynamics.
 
-
 class AudioEffectsConfig {
   final bool isVirtualizerEnabled;
   final double virtualizerStrength; // 0.0 to 1.0 (maps to 0 - 1000 in Android)
@@ -177,7 +176,8 @@ class AudioEffectsConfig {
           isLoudnessContourEnabled ?? this.isLoudnessContourEnabled,
       loudnessContourIntensity:
           loudnessContourIntensity ?? this.loudnessContourIntensity,
-      isSubCrossoverEnabled: isSubCrossoverEnabled ?? this.isSubCrossoverEnabled,
+      isSubCrossoverEnabled:
+          isSubCrossoverEnabled ?? this.isSubCrossoverEnabled,
       subCrossoverCornerHz: subCrossoverCornerHz ?? this.subCrossoverCornerHz,
       subCrossoverSlopeDbPerOct:
           subCrossoverSlopeDbPerOct ?? this.subCrossoverSlopeDbPerOct,
@@ -190,10 +190,8 @@ class AudioEffectsConfig {
           isMultibandCompressorEnabled ?? this.isMultibandCompressorEnabled,
       multibandCompressorBands:
           multibandCompressorBands ?? this.multibandCompressorBands,
-      isDynamicBassEnabled:
-          isDynamicBassEnabled ?? this.isDynamicBassEnabled,
-      dynamicBassStrength:
-          dynamicBassStrength ?? this.dynamicBassStrength,
+      isDynamicBassEnabled: isDynamicBassEnabled ?? this.isDynamicBassEnabled,
+      dynamicBassStrength: dynamicBassStrength ?? this.dynamicBassStrength,
       dynamicBassXLow: dynamicBassXLow ?? this.dynamicBassXLow,
       dynamicBassXHigh: dynamicBassXHigh ?? this.dynamicBassXHigh,
       dynamicBassYLow: dynamicBassYLow ?? this.dynamicBassYLow,
@@ -371,8 +369,8 @@ class MultibandCompressorBandConfig {
           enabled == other.enabled;
 
   @override
-  int get hashCode => Object.hash(thresholdDb, ratio, attackMs, releaseMs, kneeDb,
-      makeupGainDb, enabled);
+  int get hashCode => Object.hash(
+      thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, enabled);
 
   MultibandCompressorBandConfig copyWith({
     double? thresholdDb,
@@ -606,4 +604,3 @@ class DynamicBassPresetItem {
     required this.sideGainHigh,
   });
 }
-

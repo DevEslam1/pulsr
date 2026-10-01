@@ -9,6 +9,7 @@ import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}
+
 class MockMusicRepo extends Mock implements IMusicRepository {}
 
 void main() {
@@ -31,14 +32,18 @@ void main() {
       expect(state.lyrics, equals(state.lyricsSlice.lyrics));
 
       // differsFromBeyondPosition compares playback + queue without triggering on internal DSP parameter changes
-      final modifiedDsp = state.copyWith(dsp: state.dsp.copyWith(saturationDrive: 0.8));
+      final modifiedDsp =
+          state.copyWith(dsp: state.dsp.copyWith(saturationDrive: 0.8));
       expect(state.differsFromBeyondPosition(modifiedDsp), isFalse);
 
-      final modifiedQueue = state.copyWith(queueSlice: state.queueSlice.copyWith(currentIndex: 2));
+      final modifiedQueue = state.copyWith(
+          queueSlice: state.queueSlice.copyWith(currentIndex: 2));
       expect(state.differsFromBeyondPosition(modifiedQueue), isTrue);
     });
 
-    test('C3: playSong rollback invalidates guards and prevents stale queue re-apply', () async {
+    test(
+        'C3: playSong rollback invalidates guards and prevents stale queue re-apply',
+        () async {
       final mockHandler = MockAudioHandler();
       final mockRepo = MockMusicRepo();
       final queueMutex = Mutex();
@@ -95,7 +100,9 @@ void main() {
       expect(controller.lyricsGuard.isValid(lyricsGen), isFalse);
     });
 
-    test('C4: Tombstone boundary correctly ignores events within deletion window', () async {
+    test(
+        'C4: Tombstone boundary correctly ignores events within deletion window',
+        () async {
       final deleteMutex = Mutex();
       final deletedAtMsByVideoId = <String, int>{};
       const windowMs = 5000;
@@ -106,7 +113,8 @@ void main() {
       // At exactly timestamp 5999 (boundary - 1 ms), task is still within window
       final shouldIgnore1 = await deleteMutex.protect(() async {
         const now = 5999;
-        deletedAtMsByVideoId.removeWhere((_, deletedAt) => now - deletedAt >= windowMs);
+        deletedAtMsByVideoId
+            .removeWhere((_, deletedAt) => now - deletedAt >= windowMs);
         return deletedAtMsByVideoId.containsKey('video_123');
       });
       expect(shouldIgnore1, isTrue);
@@ -114,7 +122,8 @@ void main() {
       // At exactly timestamp 6000 (boundary), task window expires and is cleaned
       final shouldIgnore2 = await deleteMutex.protect(() async {
         const now = 6000;
-        deletedAtMsByVideoId.removeWhere((_, deletedAt) => now - deletedAt >= windowMs);
+        deletedAtMsByVideoId
+            .removeWhere((_, deletedAt) => now - deletedAt >= windowMs);
         return deletedAtMsByVideoId.containsKey('video_123');
       });
       expect(shouldIgnore2, isFalse);

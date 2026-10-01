@@ -67,8 +67,14 @@ void main() {
       expect(QueueSlotCodec.decodeDocument([]), isNull);
       expect(QueueSlotCodec.decodeDocument({'a': 1}), isNotNull);
       expect(
-        QueueSlotCodec.decodeDocument(
-            {'0': 1, '1': 1, '2': 1, 'activeSlot': 1, 'schemaVersion': 1, 'extra': 1}),
+        QueueSlotCodec.decodeDocument({
+          '0': 1,
+          '1': 1,
+          '2': 1,
+          'activeSlot': 1,
+          'schemaVersion': 1,
+          'extra': 1
+        }),
         isNull,
       );
       // Rejects incompatible schema version
@@ -107,7 +113,9 @@ void main() {
       expect(docV1!['schemaVersion'], 1);
     });
 
-    test('[M-23] migrateDocument validates upper bound and rejects future versions', () {
+    test(
+        '[M-23] migrateDocument validates upper bound and rejects future versions',
+        () {
       expect(
         () => QueueSlotCodec.migrateDocument({'schemaVersion': 999}),
         throwsArgumentError,
@@ -130,7 +138,9 @@ void main() {
 
     test('decodeSlot rejects oversized and id-less payloads', () {
       expect(
-        QueueSlotCodec.decodeSlot({'songIds': [1, 2]}, 500),
+        QueueSlotCodec.decodeSlot({
+          'songIds': [1, 2]
+        }, 500),
         isNotNull,
       );
       // Over the queue cap.
@@ -140,11 +150,17 @@ void main() {
         isNull,
       );
       // No usable ids.
-      expect(QueueSlotCodec.decodeSlot({'songIds': ['a', 1.5]}, 500), isNull);
+      expect(
+          QueueSlotCodec.decodeSlot({
+            'songIds': ['a', 1.5]
+          }, 500),
+          isNull);
       expect(QueueSlotCodec.decodeSlot({}, 500), isNull);
     });
 
-    test('[H-17] decodeSlot rejects orphan or corrupted negative IDs not in onlineSongs', () {
+    test(
+        '[H-17] decodeSlot rejects orphan or corrupted negative IDs not in onlineSongs',
+        () {
       // 1. Negative ID with no matching online song is dropped
       final withCorruptNegative = QueueSlotCodec.decodeSlot({
         'songIds': [10, -999, 20],

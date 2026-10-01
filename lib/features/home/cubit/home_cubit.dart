@@ -45,7 +45,8 @@ class HomeCubit extends PulsrCubit<HomeState> {
   static const Duration categoryTtl = Duration(minutes: 10);
 
   // FIX-L03: Single source of truth for categories, queries, and login requirements
-  static const List<(String name, String query, bool requiresLogin)> _allCategories = [
+  static const List<(String name, String query, bool requiresLogin)>
+      _allCategories = [
     ('Recommended For You', 'recommended music', true),
     ('Trending Egypt', 'أغاني مصرية جديدة تريند', false),
     ('Mahraganat', 'مهرجانات مصرية جديدة', false),
@@ -115,7 +116,8 @@ class HomeCubit extends PulsrCubit<HomeState> {
           .where((e) => !_inFlightCategories.contains(e.key))
           .toList()
         ..sort((a, b) => a.value.compareTo(b.value));
-      for (final e in evictable.take(_categoryFutures.length - _maxCachedCategories + 1)) {
+      for (final e in evictable
+          .take(_categoryFutures.length - _maxCachedCategories + 1)) {
         _categoryFutures.remove(e.key);
         _categoryFetchTimestamps.remove(e.key);
       }
@@ -128,7 +130,8 @@ class HomeCubit extends PulsrCubit<HomeState> {
     future = () async {
       try {
         if (!await ConnectivityGuard.hasConnection()) {
-          ErrorLogger.log('Skipping category $category fetch: no network connectivity',
+          ErrorLogger.log(
+              'Skipping category $category fetch: no network connectivity',
               category: 'HomeCubit');
           return <YtmTrack>[];
         }

@@ -184,11 +184,10 @@ class _DownloadQualityPickerSheetState
           ...options.map((opt) {
             final isSelected = opt.quality == _selectedQuality;
             final bitrate = _bitrateFor(opt.quality);
-            final estBytes = DownloadQualityPickerSheet.estimateBytes(
-                durationMs, bitrate);
-            final estString = estBytes > 0
-                ? Formatters.formatBytes(estBytes)
-                : null;
+            final estBytes =
+                DownloadQualityPickerSheet.estimateBytes(durationMs, bitrate);
+            final estString =
+                estBytes > 0 ? Formatters.formatBytes(estBytes) : null;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -229,9 +228,8 @@ class _DownloadQualityPickerSheetState
                                     style: TextStyle(
                                       fontSize: AppFontSize.body,
                                       fontWeight: FontWeight.w700,
-                                      color: isSelected
-                                          ? p.accent
-                                          : p.textPrimary,
+                                      color:
+                                          isSelected ? p.accent : p.textPrimary,
                                     ),
                                   ),
                                   const SizedBox(width: AppSpacing.xs),
@@ -277,9 +275,7 @@ class _DownloadQualityPickerSheetState
                             style: TextStyle(
                               fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? p.accent
-                                  : p.textSecondary,
+                              color: isSelected ? p.accent : p.textSecondary,
                             ),
                           ),
                         const SizedBox(width: AppSpacing.sm),

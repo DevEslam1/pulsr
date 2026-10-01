@@ -23,7 +23,6 @@ part 'app_database.g.dart';
   ExcludedFoldersTable,
 ])
 class AppDatabase extends _$AppDatabase {
-
   /// Set true when the FTS rebuild during migration failed, so the
   /// search index may be incomplete and tracks can be unfindable.
   /// Surfaced instead of only printed (defect 08-04 / 05-01).
@@ -102,6 +101,7 @@ class AppDatabase extends _$AppDatabase {
     ftsRebuildFailed = true;
     return false;
   }
+
   @factoryMethod
   AppDatabase() : super(driftDatabase(name: 'pulsr_music_db'));
 
@@ -178,7 +178,8 @@ class AppDatabase extends _$AppDatabase {
   /// app-side read-then-insert race (dup paths, dup playlist members).
   /// Wrapped in a SAVEPOINT transaction for atomic migration safety (C-04).
   static Future<void> _createV11Constraints(
-      Future<void> Function(String) executeSql, {AppDatabase? db}) async {
+      Future<void> Function(String) executeSql,
+      {AppDatabase? db}) async {
     // Add index on lower(path) first to make dedup queries orders of magnitude faster
     await executeSql(
       "CREATE INDEX IF NOT EXISTS idx_songs_lower_path ON songs (lower(path)) WHERE source = 'local' AND path != '';",
@@ -226,8 +227,7 @@ class AppDatabase extends _$AppDatabase {
       );
       // Duplicate memberships are the pre-v11 read-then-insert race; keep the
       // lowest id so the UNIQUE index can be created.
-      await executeSql(
-          'DELETE FROM playlist_entries WHERE id NOT IN ('
+      await executeSql('DELETE FROM playlist_entries WHERE id NOT IN ('
           'SELECT MIN(id) FROM playlist_entries GROUP BY playlist_id, song_id);');
       await executeSql(
           'DELETE FROM playlist_entries WHERE song_id NOT IN (SELECT id FROM songs);');

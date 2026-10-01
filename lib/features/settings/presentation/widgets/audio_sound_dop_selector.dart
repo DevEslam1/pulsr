@@ -52,28 +52,31 @@ class _DopContainerSelectorState extends State<_DopContainerSelector> {
         Expanded(
           child: Text(
             context.l10n.dopContainer,
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+            style:
+                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
           ),
         ),
         SegmentedButton<int>(
           showSelectedIcon: false,
           style: const ButtonStyle(
             visualDensity: VisualDensity.compact,
-            padding:
-                WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.xs)),
+            padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: AppSpacing.xs)),
           ),
           segments: const [
             ButtonSegment(
               value: 24,
               label: Text("24-bit",
-                  style:
-                      TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700)),
             ),
             ButtonSegment(
               value: 32,
               label: Text("32-bit",
-                  style:
-                      TextStyle(fontSize: AppFontSize.caption, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700)),
             ),
           ],
           selected: {_bits},

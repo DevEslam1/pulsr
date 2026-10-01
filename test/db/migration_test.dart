@@ -207,23 +207,22 @@ void main() {
             ..where((t) => t.id.equals(77)))
           .getSingle();
 
-      expect(await songIndexNames(),
+      expect(
+          await songIndexNames(),
           containsAll([
             'idx_songs_path_cue',
             'idx_songs_uri',
             'idx_songs_cue',
             'idx_songs_pending_dl',
           ]));
-      final plIdx = await upgraded!
-          .customSelect('PRAGMA index_list("playlists");')
-          .get();
+      final plIdx =
+          await upgraded!.customSelect('PRAGMA index_list("playlists");').get();
       expect(plIdx.map((r) => r.read<String>('name')),
           contains('idx_playlists_name'));
       final peIdx = await upgraded!
           .customSelect('PRAGMA index_list("playlist_entries");')
           .get();
-      expect(
-          peIdx.map((r) => r.read<String>('name')),
+      expect(peIdx.map((r) => r.read<String>('name')),
           contains('idx_playlist_entries_unique'));
 
       // FTS backfill must index the legacy row.

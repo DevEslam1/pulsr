@@ -40,4 +40,3 @@ class PulsrBackButton extends StatelessWidget {
     );
   }
 }
-

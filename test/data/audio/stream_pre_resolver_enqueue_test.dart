@@ -6,7 +6,8 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
 void main() {
-  SongsTableData makeSong(int id, String? remoteId, {String source = SongSource.youtube}) {
+  SongsTableData makeSong(int id, String? remoteId,
+      {String source = SongSource.youtube}) {
     return SongsTableData(
       id: id,
       remoteId: remoteId,
@@ -58,7 +59,9 @@ void main() {
       preResolver.dispose();
     });
 
-    test('onTrackEnqueuedOrTapped immediately pre-resolves YouTube track into URL cache', () async {
+    test(
+        'onTrackEnqueuedOrTapped immediately pre-resolves YouTube track into URL cache',
+        () async {
       final song = makeSong(1, 'tap_vid_1');
 
       expect(urlCache.contains('tap_vid_1', quality: 'high'), isFalse);
@@ -73,7 +76,8 @@ void main() {
 
     test('onTrackEnqueuedOrTapped skips tracks already cached', () async {
       final song = makeSong(2, 'cached_vid_2');
-      urlCache.put('cached_vid_2', 'https://googlevideo.com/cached.m4a', quality: 'high');
+      urlCache.put('cached_vid_2', 'https://googlevideo.com/cached.m4a',
+          quality: 'high');
 
       preResolver.onTrackEnqueuedOrTapped(song);
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -90,7 +94,8 @@ void main() {
       expect(resolvedVideoIds, isEmpty);
     });
 
-    test('onTrackEnqueuedOrTapped does not duplicate if already in flight', () async {
+    test('onTrackEnqueuedOrTapped does not duplicate if already in flight',
+        () async {
       final song = makeSong(4, 'in_flight_vid_4');
 
       preResolver.onTrackEnqueuedOrTapped(song);
@@ -98,7 +103,8 @@ void main() {
 
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
-      expect(resolvedVideoIds.where((id) => id == 'in_flight_vid_4').length, equals(1));
+      expect(resolvedVideoIds.where((id) => id == 'in_flight_vid_4').length,
+          equals(1));
     });
   });
 }

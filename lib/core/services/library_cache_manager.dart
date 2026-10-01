@@ -49,8 +49,7 @@ class LibrarySnapshot {
 
 @singleton
 class LibraryCacheManager {
-  static final LibraryCacheManager _instance =
-      LibraryCacheManager._internal();
+  static final LibraryCacheManager _instance = LibraryCacheManager._internal();
   factory LibraryCacheManager() => _instance;
   LibraryCacheManager._internal();
 

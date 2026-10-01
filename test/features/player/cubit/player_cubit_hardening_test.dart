@@ -288,9 +288,34 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> removeQueueItemAt(int index) async {}
 
+  /// When set, [loadQueue] throws this to exercise rollback paths.
+  Object? loadQueueError;
+
   @override
   Future<void> loadQueue(List<SongsTableData> songs,
-      {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true}) async {}
+      {int initialIndex = 0,
+      Duration? initialPosition,
+      bool autoPlay = true}) async {
+    final err = loadQueueError;
+    if (err != null) throw err;
+  }
+
+  /// When set, [pause] throws this to exercise isPlaying reconciliation.
+  Object? pauseError;
+
+  @override
+  Future<void> pause() async {
+    final err = pauseError;
+    if (err != null) throw err;
+  }
+
+  /// Records app->handler favorite syncs (media notification control state).
+  final List<(int, bool)> favoriteUpdates = <(int, bool)>[];
+
+  @override
+  void updateFavorite(int songId, bool isFavorite) {
+    favoriteUpdates.add((songId, isFavorite));
+  }
 
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
@@ -504,18 +529,23 @@ void main() {
       await cubit.close();
     });
 
-    test('Fix #1: PlayerTransportController wires slot cache, debounced persist, and widget updater on favorite toggle', () async {
+    test(
+        'Fix #1: PlayerTransportController wires slot cache, debounced persist, and widget updater on favorite toggle',
+        () async {
       final slotCache = <int, SongsTableData>{
         1: sampleSong1.copyWith(isFavorite: false),
       };
       var debouncedPersistCalled = false;
       var updateWidgetCalled = false;
 
-      when(() => mockToggleFavorite(1)).thenAnswer((_) async => const Right(true));
+      when(() => mockToggleFavorite(1))
+          .thenAnswer((_) async => const Right(true));
 
       var state = PlayerState(
-        playback: const PlaybackSlice().copyWith(currentSong: sampleSong1.copyWith(isFavorite: false)),
-        queueSlice: QueueSlice(queue: [sampleSong1.copyWith(isFavorite: false)], currentIndex: 0),
+        playback: const PlaybackSlice()
+            .copyWith(currentSong: sampleSong1.copyWith(isFavorite: false)),
+        queueSlice: QueueSlice(
+            queue: [sampleSong1.copyWith(isFavorite: false)], currentIndex: 0),
       );
 
       final controller = PlayerTransportController(
@@ -526,7 +556,8 @@ void main() {
         toggleFavoriteUseCase: mockToggleFavorite,
         slotLookupCache: slotCache,
         debouncedPersistQueueSlots: () => debouncedPersistCalled = true,
-        updateWidgetThrottled: ({bool force = false}) => updateWidgetCalled = true,
+        updateWidgetThrottled: ({bool force = false}) =>
+            updateWidgetCalled = true,
       );
 
       await controller.toggleFavoriteById(1);
@@ -539,9 +570,13 @@ void main() {
       expect(updateWidgetCalled, isTrue);
       // Verify state was updated
       expect(state.currentSong?.isFavorite, isTrue);
+      // Verify the handler (media notification) was synced too
+      expect(testAudioHandler.favoriteUpdates, contains((1, true)));
     });
 
-    test('Fix #3: Lyrics negative cache freshness respects TTL and prevents refetching', () async {
+    test(
+        'Fix #3: Lyrics negative cache freshness respects TTL and prevents refetching',
+        () async {
       LrcParser.invalidateCache(songId: sampleSong1.id, path: sampleSong1.path);
       final lyricsManager = PlayerLyricsManager();
 
@@ -558,16 +593,24 @@ void main() {
 
       // Positive cache overrides negative
       final positiveResult = LyricsResult(
-        lines: [LyricsLine(timestamp: Duration.zero, text: 'Hello', source: LyricsSource.embedded)],
+        lines: [
+          LyricsLine(
+              timestamp: Duration.zero,
+              text: 'Hello',
+              source: LyricsSource.embedded)
+        ],
         source: LyricsSource.embedded,
       );
-      LrcParser.cacheLyricsResult(positiveResult, songId: sampleSong1.id, path: sampleSong1.path);
+      LrcParser.cacheLyricsResult(positiveResult,
+          songId: sampleSong1.id, path: sampleSong1.path);
 
       expect(lyricsManager.hasFreshNegativeCache(sampleSong1), isFalse);
       expect(lyricsManager.getCachedLyrics(sampleSong1), isNotNull);
     });
 
-    test('Fix #4: restoreQueueSlots continues remaining slots when one slot lookup fails', () async {
+    test(
+        'Fix #4: restoreQueueSlots continues remaining slots when one slot lookup fails',
+        () async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.queueSlots: '''{
           "schemaVersion": 1,
@@ -593,7 +636,8 @@ void main() {
       );
 
       // Slot 0 throws an exception
-      when(() => mockRepository.getSongsByIds([1])).thenThrow(Exception('DB error'));
+      when(() => mockRepository.getSongsByIds([1]))
+          .thenThrow(Exception('DB error'));
       // Slot 1 succeeds with matching id 2
       when(() => mockRepository.getSongsByIds([2]))
           .thenAnswer((_) async => right([song2]));
@@ -622,7 +666,9 @@ void main() {
       expect(slots[1]?.songIds.first, equals(2));
     });
 
-    test('Fix #6: maybeFollowTrackSampleRate defaults bitDepth to 16 when track lacks bitDepth', () async {
+    test(
+        'Fix #6: maybeFollowTrackSampleRate defaults bitDepth to 16 when track lacks bitDepth',
+        () async {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
       when(() => mockSettings.state).thenReturn(
@@ -670,7 +716,9 @@ void main() {
           )).called(1);
     });
 
-    test('[H-18] maybeFollowTrackSampleRate serializes concurrent calls without race condition', () async {
+    test(
+        '[H-18] maybeFollowTrackSampleRate serializes concurrent calls without race condition',
+        () async {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
       when(() => mockSettings.state).thenReturn(
@@ -753,7 +801,8 @@ void main() {
       expect(appliedRates, equals([44100, 96000]));
     });
 
-    test('Fix #10: PlayerCubit.close() isolates controller disposal failures', () async {
+    test('Fix #10: PlayerCubit.close() isolates controller disposal failures',
+        () async {
       SharedPreferences.setMockInitialValues({});
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
@@ -767,7 +816,9 @@ void main() {
       expect(cubit.isClosed, isTrue);
     });
 
-    test('Fix #1 & #4 (Round 2): applyDspEffect rolls back dsp state on audioHandler failure', () async {
+    test(
+        'Fix #1 & #4 (Round 2): applyDspEffect rolls back dsp state on audioHandler failure',
+        () async {
       final mockSettings = MockSettingsCubit();
       when(() => mockSettings.state).thenReturn(const SettingsState());
       var state = const PlayerState();
@@ -785,15 +836,19 @@ void main() {
       await dspController.applyDspEffect(
         featureName: 'Equalizer',
         updateDsp: (dsp) => dsp.copyWith(isEqEnabled: true),
-        applyAudioHandler: () async => throw Exception('Native DSP engine failure'),
+        applyAudioHandler: () async =>
+            throw Exception('Native DSP engine failure'),
       );
 
       // Must rollback to false and populate errorMessage
       expect(state.dsp.isEqEnabled, isFalse);
-      expect(state.playback.errorMessage, contains('Native DSP engine failure'));
+      expect(
+          state.playback.errorMessage, contains('Native DSP engine failure'));
     });
 
-    test('Fix #2 & #8 (Round 2): Scrobble coordinator differentiates true restart from backward seek', () {
+    test(
+        'Fix #2 & #8 (Round 2): Scrobble coordinator differentiates true restart from backward seek',
+        () {
       final mockScrobbler = MockScrobblerService();
       when(() => mockScrobbler.notifyPlaybackState(
             id: any(named: 'id'),
@@ -842,7 +897,9 @@ void main() {
       coordinator.dispose();
     });
 
-    test('Fix #9 (Round 2): PlayerQueueController.playNext delegates to addToQueue when queue is empty', () async {
+    test(
+        'Fix #9 (Round 2): PlayerQueueController.playNext delegates to addToQueue when queue is empty',
+        () async {
       var state = const PlayerState();
       final slots = <int, QueueSlotData>{};
       final controller = PlayerQueueController(
@@ -881,6 +938,108 @@ void main() {
       // Track should be cleanly appended to queue via addToQueue
       expect(state.queue.length, equals(1));
       expect(state.queue.first.id, equals(42));
+    });
+
+    test('restoreQueue with an empty previous queue is a safe no-op', () {
+      var state = const PlayerState();
+      final controller = PlayerQueueController(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false,
+        queueMutex: Mutex(),
+        slotLookupCache: <int, SongsTableData>{},
+        queueSlots: <int, QueueSlotData>{},
+        updateWidgetThrottled: ({bool force = false}) {},
+        loadLyrics: (_) {},
+        bumpQueueVersion: () {},
+        isSameTrack: (a, b) => a?.id == b?.id,
+      );
+
+      // Would previously throw ArgumentError from clamp(0, -1).
+      expect(() => controller.restoreQueue(const [], 3), returnsNormally);
+    });
+
+    test('switchQueueSlot rolls back UI state when the engine load fails',
+        () async {
+      final song2 = SongsTableData(
+        id: 2,
+        title: 'Track 2',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 100000,
+        path: '/path/2.mp3',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      var state = PlayerState(
+        playback: const PlaybackSlice().copyWith(
+            currentSong: sampleSong1, position: const Duration(seconds: 10)),
+        queueSlice: const QueueSlice().copyWith(
+            queue: [sampleSong1], currentIndex: 0, activeQueueSlot: 0),
+      );
+
+      final controller = PlayerQueueController(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false,
+        queueMutex: Mutex(),
+        slotLookupCache: <int, SongsTableData>{},
+        queueSlots: <int, QueueSlotData>{},
+        updateWidgetThrottled: ({bool force = false}) {},
+        loadLyrics: (_) {},
+        bumpQueueVersion: () {},
+        isSameTrack: (a, b) => a?.id == b?.id,
+      );
+      controller.setQueueSlot(
+        1,
+        songs: [song2],
+        currentIndex: 0,
+        position: Duration.zero,
+        speed: 1.0,
+      );
+
+      testAudioHandler.loadQueueError = Exception('engine load failed');
+      await controller.switchQueueSlot(1);
+
+      // Must be back on slot 0 with the original queue/song/position and an error.
+      expect(state.activeQueueSlot, equals(0));
+      expect(state.queue.length, equals(1));
+      expect(state.queue.first.id, equals(1));
+      expect(state.currentSong?.id, equals(1));
+      expect(state.position, equals(const Duration(seconds: 10)));
+      expect(state.errorMessage, equals('Failed to switch queue slot'));
+    });
+
+    test('pause() reconciles isPlaying with the engine when pause throws',
+        () async {
+      var state = PlayerState(
+        playback: const PlaybackSlice()
+            .copyWith(currentSong: sampleSong1, isPlaying: true),
+      );
+      testAudioHandler.playbackState.add(PlaybackState(playing: true));
+      testAudioHandler.pauseError = Exception('pause failed');
+
+      final controller = PlayerTransportController(
+        audioHandler: testAudioHandler,
+        getState: () => state,
+        emit: (s) => state = s,
+        isClosed: () => false,
+      );
+
+      await controller.pause();
+
+      // Audio is still running, so the optimistic `paused` must be reconciled.
+      expect(state.isPlaying, isTrue);
+      expect(state.errorMessage, equals('Failed to pause playback'));
     });
   });
 }

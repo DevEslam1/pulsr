@@ -28,7 +28,9 @@ abstract class YtmSearchState with _$YtmSearchState {
   bool get hasSearched => query.trim().isNotEmpty;
 
   SearchPhase get phase {
-    if (errorMessage != null && errorMessage!.isNotEmpty) return SearchPhase.error;
+    if (errorMessage != null && errorMessage!.isNotEmpty) {
+      return SearchPhase.error;
+    }
     if (isLoading) return SearchPhase.fetching;
     if (results.isNotEmpty) return SearchPhase.displaying;
     if (query.trim().isNotEmpty) return SearchPhase.debouncing;

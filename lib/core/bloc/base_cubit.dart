@@ -54,7 +54,9 @@ abstract class PulsrCubit<S> extends Cubit<S> {
   /// asserts this reaches 0 after [close].
   @visibleForTesting
   int get activeResourceCount =>
-      activeSubscriptionCount + activeTimerCount + (_effectController.isClosed ? 0 : 1);
+      activeSubscriptionCount +
+      activeTimerCount +
+      (_effectController.isClosed ? 0 : 1);
 
   /// One-shot transient UI events. Consumed via a single subscription in the
   /// owning widget; closes with the cubit.

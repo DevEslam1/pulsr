@@ -13,11 +13,15 @@ import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/audio/collaborators/stream_resolution_pipeline.dart';
 
 class MockAudioPlayer extends Mock implements AudioPlayer {}
+
 class MockSmartPreloadScheduler extends Mock implements SmartPreloadScheduler {}
+
 class MockStreamPreResolver extends Mock implements StreamPreResolver {}
+
 class MockYtmService extends Mock implements YtmService {}
 
-SongsTableData _createMockSong(int id, {
+SongsTableData _createMockSong(
+  int id, {
   double? rgTrack,
   double? rgAlbum,
   double? rgTrackPeak,
@@ -110,13 +114,15 @@ void main() {
         preampWithRg: 0.0,
       );
       final song = _createMockSong(1, rgTrack: -2.0, rgAlbum: -6.0);
-      
+
       // Without album context -> track gain (-2dB -> ~0.794)
-      final trackVol = controller.calculateTargetVolume(song, albumContext: false);
+      final trackVol =
+          controller.calculateTargetVolume(song, albumContext: false);
       expect(trackVol, closeTo(0.794, 0.01));
 
       // With album context -> album gain (-6dB -> ~0.501)
-      final albumVol = controller.calculateTargetVolume(song, albumContext: true);
+      final albumVol =
+          controller.calculateTargetVolume(song, albumContext: true);
       expect(albumVol, closeTo(0.501, 0.01));
     });
 
@@ -128,12 +134,15 @@ void main() {
     test('Smooth 500ms volume transition reaches target volume', () async {
       when(() => activePlayer.volume).thenReturn(0.0);
       await controller.applyVolume(activePlayer, 1.0, smoothTransition: true);
-      verify(() => activePlayer.setVolume(any())).called(greaterThanOrEqualTo(1));
+      verify(() => activePlayer.setVolume(any()))
+          .called(greaterThanOrEqualTo(1));
     });
 
-    test('dispose cancels active transition timers and nulls player references', () async {
+    test('dispose cancels active transition timers and nulls player references',
+        () async {
       when(() => activePlayer.volume).thenReturn(0.0);
-      final future = controller.applyVolume(activePlayer, 1.0, smoothTransition: true);
+      final future =
+          controller.applyVolume(activePlayer, 1.0, smoothTransition: true);
       expect(controller.hasActiveTransitionTimer, isTrue);
 
       controller.dispose();
@@ -145,7 +154,9 @@ void main() {
       await future;
     });
 
-    test('Calculate target volume across DoP, nativeRG, DVC, ducking, and per-song offset', () {
+    test(
+        'Calculate target volume across DoP, nativeRG, DVC, ducking, and per-song offset',
+        () {
       final song = _createMockSong(1, rgTrack: -3.0, rgTrackPeak: 1.0);
 
       // 1. DoP active: strictly unity gain
@@ -154,7 +165,8 @@ void main() {
         isDopActive: true,
         replayGainMode: 'track',
       );
-      expect(controller.calculateTargetVolume(song, perSongOffsetDb: 2.0), equals(1.0));
+      expect(controller.calculateTargetVolume(song, perSongOffsetDb: 2.0),
+          equals(1.0));
 
       // 2. Native RG active: mixer carries base volume, RG handled natively
       controller.updateSettings(
@@ -174,7 +186,8 @@ void main() {
 
       // 4. Native RG + DVC with per-song offset: multiplier applied to 1.0
       // +3dB -> ~1.412 clamped to 1.0, -3dB -> ~0.7079
-      expect(controller.calculateTargetVolume(song, perSongOffsetDb: -3.0), closeTo(0.7079, 0.01));
+      expect(controller.calculateTargetVolume(song, perSongOffsetDb: -3.0),
+          closeTo(0.7079, 0.01));
 
       // 5. Ducked state with DVC
       controller.updateSettings(
@@ -193,7 +206,8 @@ void main() {
         userVolume: 0.9,
         replayGainMode: 'track',
       );
-      expect(controller.calculateTargetVolume(untaggedSong), closeTo(0.9, 0.001));
+      expect(
+          controller.calculateTargetVolume(untaggedSong), closeTo(0.9, 0.001));
     });
   });
 
@@ -258,22 +272,22 @@ void main() {
       preResolver = MockStreamPreResolver();
 
       when(() => preResolver.onTrackStarted(
-        queue: any(named: 'queue'),
-        currentIndex: any(named: 'currentIndex'),
-        isShuffle: any(named: 'isShuffle'),
-        shuffleIndices: any(named: 'shuffleIndices'),
-        position: any(named: 'position'),
-        duration: any(named: 'duration'),
-      )).thenReturn(null);
+            queue: any(named: 'queue'),
+            currentIndex: any(named: 'currentIndex'),
+            isShuffle: any(named: 'isShuffle'),
+            shuffleIndices: any(named: 'shuffleIndices'),
+            position: any(named: 'position'),
+            duration: any(named: 'duration'),
+          )).thenReturn(null);
 
       when(() => preResolver.onQueueMutated(
-        queue: any(named: 'queue'),
-        currentIndex: any(named: 'currentIndex'),
-        isShuffle: any(named: 'isShuffle'),
-        shuffleIndices: any(named: 'shuffleIndices'),
-        position: any(named: 'position'),
-        duration: any(named: 'duration'),
-      )).thenReturn(null);
+            queue: any(named: 'queue'),
+            currentIndex: any(named: 'currentIndex'),
+            isShuffle: any(named: 'isShuffle'),
+            shuffleIndices: any(named: 'shuffleIndices'),
+            position: any(named: 'position'),
+            duration: any(named: 'duration'),
+          )).thenReturn(null);
 
       orchestrator = PlaybackPreloadOrchestrator(
         scheduler: scheduler,
@@ -290,13 +304,13 @@ void main() {
       );
 
       verify(() => preResolver.onTrackStarted(
-        queue: queue,
-        currentIndex: 0,
-        isShuffle: false,
-        shuffleIndices: null,
-        position: null,
-        duration: null,
-      )).called(1);
+            queue: queue,
+            currentIndex: 0,
+            isShuffle: false,
+            shuffleIndices: null,
+            position: null,
+            duration: null,
+          )).called(1);
     });
 
     test('Forwards onQueueMutated to preResolver', () {
@@ -308,18 +322,19 @@ void main() {
       );
 
       verify(() => preResolver.onQueueMutated(
-        queue: queue,
-        currentIndex: 0,
-        isShuffle: false,
-        shuffleIndices: null,
-        position: null,
-        duration: null,
-      )).called(1);
+            queue: queue,
+            currentIndex: 0,
+            isShuffle: false,
+            shuffleIndices: null,
+            position: null,
+            duration: null,
+          )).called(1);
     });
   });
 
   group('StreamResolutionPipeline LRU Eviction Tests', () {
-    test('Evicts oldest-inserted entry first when exceeding maxCacheEntries', () {
+    test('Evicts oldest-inserted entry first when exceeding maxCacheEntries',
+        () {
       final pipeline = StreamResolutionPipeline(
         ytmService: MockYtmService(),
       );

@@ -56,7 +56,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('AudioVisualizer renders playing state without requesting microphone permission', (tester) async {
+  testWidgets(
+      'AudioVisualizer renders playing state without requesting microphone permission',
+      (tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: Scaffold(
         body: AudioVisualizer(

@@ -104,15 +104,20 @@ class ChainOfCustodyService {
     // 2. Query native custody report from audio effects engine
     final nativeReport = await _effectsChannel.getChainOfCustodyReport();
 
-    final outputSampleRate = (nativeReport['sampleRate'] as num?)?.toInt() ?? sourceSampleRate;
+    final outputSampleRate =
+        (nativeReport['sampleRate'] as num?)?.toInt() ?? sourceSampleRate;
     final bufferSize = (nativeReport['bufferSize'] as num?)?.toInt() ?? 512;
     final activeStagesRaw = nativeReport['activeStages'] as List<dynamic>?;
-    final activeDspStages = activeStagesRaw?.map((e) => e.toString()).toList() ?? <String>[];
-    final isBitExact = nativeReport['isBitExactChain'] as bool? ?? (activeDspStages.isEmpty);
+    final activeDspStages =
+        activeStagesRaw?.map((e) => e.toString()).toList() ?? <String>[];
+    final isBitExact =
+        nativeReport['isBitExactChain'] as bool? ?? (activeDspStages.isEmpty);
     final isBitPerfect = nativeReport['isBitPerfectActive'] as bool? ?? false;
-    final isBypassCompare = nativeReport['isBypassCompareActive'] as bool? ?? false;
+    final isBypassCompare =
+        nativeReport['isBypassCompareActive'] as bool? ?? false;
     final rtf = (nativeReport['rollingRtf'] as num?)?.toDouble() ?? 0.0;
-    final latency = (nativeReport['estimatedLatencyMs'] as num?)?.toDouble() ?? 0.0;
+    final latency =
+        (nativeReport['estimatedLatencyMs'] as num?)?.toDouble() ?? 0.0;
     final thermal = (nativeReport['thermalStatus'] as num?)?.toInt() ?? 0;
 
     return ChainOfCustodyReport(

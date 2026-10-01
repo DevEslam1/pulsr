@@ -39,8 +39,7 @@ void main() {
     });
 
     test('returns null for a URL with no stamp', () {
-      expect(
-          YtmStream.expiryFromUrl('https://example.com/audio.m4a'), isNull);
+      expect(YtmStream.expiryFromUrl('https://example.com/audio.m4a'), isNull);
     });
   });
 

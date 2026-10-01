@@ -5,12 +5,14 @@ import 'package:pulsr/features/settings/presentation/widgets/room_correction_she
 
 void main() {
   group('M-19: RoomCorrectionSheet SNR calculation', () {
-    test('calculateSnr returns 0.0 for empty PCM instead of misleading 20.0', () {
+    test('calculateSnr returns 0.0 for empty PCM instead of misleading 20.0',
+        () {
       final pcm = Int16List(0);
       expect(RoomCorrectionSheet.calculateSnr(pcm), equals(0.0));
     });
 
-    test('calculateSnr returns 0.0 for PCM shorter than window size (1024)', () {
+    test('calculateSnr returns 0.0 for PCM shorter than window size (1024)',
+        () {
       final pcm = Int16List(500);
       for (int i = 0; i < pcm.length; i++) {
         pcm[i] = 1000;
@@ -23,7 +25,9 @@ void main() {
       expect(RoomCorrectionSheet.calculateSnr(pcm), equals(0.0));
     });
 
-    test('calculateSnr correctly calculates positive SNR for valid signal with noise floor', () {
+    test(
+        'calculateSnr correctly calculates positive SNR for valid signal with noise floor',
+        () {
       // 2 windows: first window is quiet noise (~100 RMS), second window is loud signal (~10000 RMS)
       final pcm = Int16List(2048);
       // Window 1: low noise

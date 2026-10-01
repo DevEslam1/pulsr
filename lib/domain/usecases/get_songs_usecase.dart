@@ -46,8 +46,7 @@ class GetSongsUseCase {
   }
 
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int? limit = 20}) {
-    final validatedLimit =
-        (limit != null && limit < 0) ? 0 : limit;
+    final validatedLimit = (limit != null && limit < 0) ? 0 : limit;
     return _repository.watchRecentlyAdded(limit: validatedLimit);
   }
 

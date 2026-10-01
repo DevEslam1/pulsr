@@ -10,7 +10,8 @@ import 'package:pulsr/data/db/app_database.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   group('DSD -> PCM Playback Pipeline Wiring (P0-3)', () {
-    test('buildWavContainer creates valid 44-byte PCM WAV header and samples', () {
+    test('buildWavContainer creates valid 44-byte PCM WAV header and samples',
+        () {
       final floatSamples = [0.0, 0.5, -0.5, 1.0]; // 2 stereo frames
       final wav = DsdDecoderHelper.buildWavContainer(
         pcmFloatSamples: floatSamples,
@@ -29,16 +30,20 @@ void main() {
       expect(String.fromCharCodes(wav.sublist(36, 40)), equals('data'));
 
       final byteData = ByteData.sublistView(wav);
-      expect(byteData.getUint16(20, Endian.little), equals(1)); // AudioFormat = 1 (PCM)
+      expect(byteData.getUint16(20, Endian.little),
+          equals(1)); // AudioFormat = 1 (PCM)
       expect(byteData.getUint16(22, Endian.little), equals(2)); // Channels = 2
-      expect(byteData.getUint32(24, Endian.little), equals(176400)); // SampleRate
-      expect(byteData.getUint16(34, Endian.little), equals(24)); // BitsPerSample = 24
+      expect(
+          byteData.getUint32(24, Endian.little), equals(176400)); // SampleRate
+      expect(byteData.getUint16(34, Endian.little),
+          equals(24)); // BitsPerSample = 24
     });
 
     test('FormatAwareDecoder routes .dsf and .dff to decodeDsdToPcm', () async {
       bool dsdDecoderCalled = false;
       final decoder = FormatAwareDecoder(
-        resolveYtmStream: (song, tag) async => AudioSource.uri(Uri.parse('https://example.com')),
+        resolveYtmStream: (song, tag) async =>
+            AudioSource.uri(Uri.parse('https://example.com')),
         decodeDsdToPcm: (song, tag) async {
           dsdDecoderCalled = true;
           return AudioSource.uri(Uri.parse(song.path), tag: tag);
@@ -60,12 +65,15 @@ void main() {
         isDownloaded: false,
       );
 
-      final source = await decoder.decodeForFormat(dsfSong, MediaItem(id: '101', title: 'Hi-Res DSF'));
+      final source = await decoder.decodeForFormat(
+          dsfSong, MediaItem(id: '101', title: 'Hi-Res DSF'));
       expect(dsdDecoderCalled, isTrue);
       expect(source, isNotNull);
     });
 
-    test('DsdDecoderHelper.decodeDsdFile decodes sample DSF file with testDecoder', () async {
+    test(
+        'DsdDecoderHelper.decodeDsdFile decodes sample DSF file with testDecoder',
+        () async {
       final tempDir = await Directory.systemTemp.createTemp('dsd_test');
       final tempFile = File('${tempDir.path}/test_track.dsf');
 
@@ -87,10 +95,12 @@ void main() {
       fmtHeader.setUint32(12, 0, Endian.little); // format ID
       fmtHeader.setUint32(16, 2, Endian.little); // channel type (stereo)
       fmtHeader.setUint32(20, 2, Endian.little); // channel count
-      fmtHeader.setUint32(24, 2822400, Endian.little); // sample rate 2.8224 MHz (DSD64)
+      fmtHeader.setUint32(
+          24, 2822400, Endian.little); // sample rate 2.8224 MHz (DSD64)
       fmtHeader.setUint32(28, 1, Endian.little); // bits per sample
       fmtHeader.setUint64(32, 1000, Endian.little); // sample count
-      fmtHeader.setUint32(40, 16, Endian.little); // block size per channel = 16 bytes
+      fmtHeader.setUint32(
+          40, 16, Endian.little); // block size per channel = 16 bytes
       fmtHeader.setUint32(44, 0, Endian.little); // reserved
       builder.add(fmtHeader.buffer.asUint8List());
 
@@ -104,7 +114,8 @@ void main() {
       await tempFile.writeAsBytes(builder.takeBytes());
 
       // Inject test decoder
-      DsdDecoderHelper.testDecoder = (dsdL, dsdR, {dsdRate = 64, targetSampleRate = 176400, bitOrder = 0}) async {
+      DsdDecoderHelper.testDecoder = (dsdL, dsdR,
+          {dsdRate = 64, targetSampleRate = 176400, bitOrder = 0}) async {
         expect(dsdL.length, equals(16));
         expect(dsdR.length, equals(16));
         expect(dsdRate, equals(64));
@@ -138,7 +149,9 @@ void main() {
       await tempDir.delete(recursive: true);
     });
 
-    test('DsdDecoderHelper throws DsdUnsupportedException if native decoder returns null', () async {
+    test(
+        'DsdDecoderHelper throws DsdUnsupportedException if native decoder returns null',
+        () async {
       final tempDir = await Directory.systemTemp.createTemp('dsd_null_test');
       final tempFile = File('${tempDir.path}/test_null.dsf');
       final builder = BytesBuilder();
@@ -166,7 +179,9 @@ void main() {
       builder.add(Uint8List(8));
       await tempFile.writeAsBytes(builder.takeBytes());
 
-      DsdDecoderHelper.testDecoder = (dsdL, dsdR, {dsdRate = 64, targetSampleRate = 176400, bitOrder = 0}) async => null;
+      DsdDecoderHelper.testDecoder = (dsdL, dsdR,
+              {dsdRate = 64, targetSampleRate = 176400, bitOrder = 0}) async =>
+          null;
 
       final song = SongsTableData(
         id: 303,
@@ -184,7 +199,8 @@ void main() {
       );
 
       await expectLater(
-        DsdDecoderHelper.decodeDsdFile(song, MediaItem(id: '303', title: 'Null DSD')),
+        DsdDecoderHelper.decodeDsdFile(
+            song, MediaItem(id: '303', title: 'Null DSD')),
         throwsA(isA<DsdUnsupportedException>()),
       );
 

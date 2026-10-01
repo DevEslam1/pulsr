@@ -63,8 +63,7 @@ class YtmCacheManager {
 
   /// Returns the cached audio file for [videoId] at [quality] if it exists on
   /// disk and is non-empty (>100KB).
-  Future<File?> getCachedAudioFile(String videoId,
-      {String quality = 'high'}) =>
+  Future<File?> getCachedAudioFile(String videoId, {String quality = 'high'}) =>
       _fileMutex.run(() async {
         try {
           final dir = await getCacheDirectory();
@@ -87,8 +86,11 @@ class YtmCacheManager {
             }
           }
         } on FileSystemException catch (e, st) {
-          ErrorLogger.log('FileSystemException checking cached audio for $videoId',
-              error: e, stackTrace: st, category: 'YtmCacheManager');
+          ErrorLogger.log(
+              'FileSystemException checking cached audio for $videoId',
+              error: e,
+              stackTrace: st,
+              category: 'YtmCacheManager');
         } catch (e, st) {
           ErrorLogger.log('Error checking cached audio for $videoId',
               error: e, stackTrace: st, category: 'YtmCacheManager');
@@ -141,13 +143,15 @@ class YtmCacheManager {
   Future<void> pruneIfExceedsLimit() => _fileMutex.run(() async {
         try {
           final prefs = await SharedPreferences.getInstance();
-          final maxMb = prefs.getInt(keyMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
+          final maxMb =
+              prefs.getInt(keyMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
           final maxBytes = maxMb * 1024 * 1024;
 
           final dir = await getCacheDirectory();
           if (!await dir.exists()) return;
 
-          final entities = (await dir.list().toList()).whereType<File>().toList();
+          final entities =
+              (await dir.list().toList()).whereType<File>().toList();
           int totalSize = 0;
           final fileList = <({File file, int size, DateTime modified})>[];
           for (final f in entities) {

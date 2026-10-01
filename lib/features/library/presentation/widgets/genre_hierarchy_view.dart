@@ -58,7 +58,8 @@ class GenreHierarchyView extends StatefulWidget {
 }
 
 class _GenreHierarchyViewState extends State<GenreHierarchyView> {
-  static final Set<_GenreHierarchyViewState> _activeInstances = <_GenreHierarchyViewState>{};
+  static final Set<_GenreHierarchyViewState> _activeInstances =
+      <_GenreHierarchyViewState>{};
   static Timer? _cacheClearTimer;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';

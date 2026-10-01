@@ -213,13 +213,15 @@ void main() {
 
       await cubit.close();
     });
-    test('long query is not silently truncated to its first 20 characters (08-02)',
+    test(
+        'long query is not silently truncated to its first 20 characters (08-02)',
         () async {
       // Regression for defect 08-02. The fuzzy post-filter used to truncate the
       // needle to 20 characters while the FTS query was bounded to 64. A
       // 30-character query therefore matched any title containing only its
       // first 20 characters - a FALSE POSITIVE, not a dropped match.
-      const partialTitle = 'abcdefghijklmnopqrst'; // 20 chars, first of the query
+      const partialTitle =
+          'abcdefghijklmnopqrst'; // 20 chars, first of the query
       const longQuery = 'abcdefghijklmnopqrstuvwxyz0123'; // 30 chars
       expect(partialTitle.length, equals(20));
       expect(longQuery.length, equals(30));
@@ -295,7 +297,9 @@ void main() {
       await cubit.close();
     });
 
-    test('H-05: new query cancels previous debounce and invalidates in-flight search stream', () async {
+    test(
+        'H-05: new query cancels previous debounce and invalidates in-flight search stream',
+        () async {
       final controllerA = StreamController<Result<List<SongsTableData>>>();
       final controllerB = StreamController<Result<List<SongsTableData>>>();
 
@@ -371,7 +375,9 @@ void main() {
       await cubit.close();
     });
 
-    test('[M-08] historyReady completes and prevents race conditions with early history access', () async {
+    test(
+        '[M-08] historyReady completes and prevents race conditions with early history access',
+        () async {
       SharedPreferences.setMockInitialValues({
         'search_history': ['Flutter', 'Dart', 'Audio'],
       });
@@ -388,7 +394,8 @@ void main() {
       expect(cubit.isHistoryLoaded, isTrue);
       expect(cubit.state.history, equals(['Flutter', 'Audio']));
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getStringList('search_history'), equals(['Flutter', 'Audio']));
+      expect(
+          prefs.getStringList('search_history'), equals(['Flutter', 'Audio']));
 
       await cubit.close();
     });

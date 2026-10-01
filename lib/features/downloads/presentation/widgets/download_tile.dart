@@ -195,41 +195,42 @@ class DownloadTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-                // FIX-A12: Direct cancel button during active download or queued state
-                if (task.status == DownloadStatus.downloading ||
-                    task.status == DownloadStatus.tagging ||
-                    task.status == DownloadStatus.queued)
-                  IconButton(
-                    icon: Icon(Icons.close_rounded,
-                        color: p.textSecondary, size: 20),
-                    tooltip: l10n.cancel,
-                    constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget,
-                    ),
-                    onPressed: () {
-                      final title = task.title.isNotEmpty ? task.title : task.videoId;
-                      cubit.cancelDownload(task.videoId);
-                      PulsrToast.show(
-                        context,
-                        message: '$title ${l10n.statusCancelled.toLowerCase()}',
-                        icon: Icons.cancel_outlined,
-                        actionLabel: l10n.retry,
-                        onActionPressed: () => cubit.retryDownload(task.videoId),
-                      );
-                    },
+              // FIX-A12: Direct cancel button during active download or queued state
+              if (task.status == DownloadStatus.downloading ||
+                  task.status == DownloadStatus.tagging ||
+                  task.status == DownloadStatus.queued)
+                IconButton(
+                  icon: Icon(Icons.close_rounded,
+                      color: p.textSecondary, size: 20),
+                  tooltip: l10n.cancel,
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
                   ),
-                Semantics(
-                  label: '${l10n.browseDownloadActionsFor} ${task.title}',
-                  button: true,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget,
-                    ),
-                    child: PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert_rounded,
-                          color: p.textSecondary, size: 20),
+                  onPressed: () {
+                    final title =
+                        task.title.isNotEmpty ? task.title : task.videoId;
+                    cubit.cancelDownload(task.videoId);
+                    PulsrToast.show(
+                      context,
+                      message: '$title ${l10n.statusCancelled.toLowerCase()}',
+                      icon: Icons.cancel_outlined,
+                      actionLabel: l10n.retry,
+                      onActionPressed: () => cubit.retryDownload(task.videoId),
+                    );
+                  },
+                ),
+              Semantics(
+                label: '${l10n.browseDownloadActionsFor} ${task.title}',
+                button: true,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert_rounded,
+                        color: p.textSecondary, size: 20),
                     color: p.surfaceContainerHigh,
                     onSelected: (action) {
                       switch (action) {
@@ -246,7 +247,8 @@ class DownloadTile extends StatelessWidget {
                           cubit.deleteDownload(task.videoId);
                           PulsrToast.show(
                             context,
-                            message: '${task.title.isNotEmpty ? task.title : task.videoId} ${l10n.delete.toLowerCase()}',
+                            message:
+                                '${task.title.isNotEmpty ? task.title : task.videoId} ${l10n.delete.toLowerCase()}',
                             icon: Icons.delete_outline_rounded,
                             actionLabel: l10n.undo,
                             onActionPressed: () => cubit.queueDownload(task),
@@ -308,76 +310,79 @@ class DownloadTile extends StatelessWidget {
               ),
             ],
           ),
-            if (task.status == DownloadStatus.downloading ||
-                task.status == DownloadStatus.tagging) ...[
-              const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.r4),
-                child: TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  tween: Tween<double>(
-                    begin: 0.0,
-                    end: task.progress.clamp(0.0, 1.0),
-                  ),
-                  builder: (context, animatedProgress, _) {
-                    return LinearProgressIndicator(
-                      value: task.status == DownloadStatus.tagging
-                          ? null
-                          : (animatedProgress > 0 ? animatedProgress : null),
-                      backgroundColor: p.surfaceContainerHigh,
-                      valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                      minHeight: 6,
-                    );
-                  },
+          if (task.status == DownloadStatus.downloading ||
+              task.status == DownloadStatus.tagging) ...[
+            const SizedBox(height: AppSpacing.sm),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadii.r4),
+              child: TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                tween: Tween<double>(
+                  begin: 0.0,
+                  end: task.progress.clamp(0.0, 1.0),
                 ),
+                builder: (context, animatedProgress, _) {
+                  return LinearProgressIndicator(
+                    value: task.status == DownloadStatus.tagging
+                        ? null
+                        : (animatedProgress > 0 ? animatedProgress : null),
+                    backgroundColor: p.surfaceContainerHigh,
+                    valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                    minHeight: 6,
+                  );
+                },
               ),
-              if (task.status == DownloadStatus.downloading) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${(task.progress * 100).toStringAsFixed(0)}%',
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (task.speedKbps != null && task.speedKbps! > 0)
-                      Text(
-                        '${task.speedKbps!.toStringAsFixed(0)} KB/s',
-                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
-                      ),
-                    if (task.etaSeconds != null && task.etaSeconds! > 0)
-                      Text(
-                        '${l10n.browseEta} ${task.etaSeconds}s',
-                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.label),
-                      ),
-                  ],
-                ),
-              ],
-            ],
-            if (task.error != null && task.error!.isNotEmpty) ...[
+            ),
+            if (task.status == DownloadStatus.downloading) ...[
               const SizedBox(height: AppSpacing.xs),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.warning_amber_rounded, size: 14, color: p.error),
-                  const SizedBox(width: AppSpacing.s6),
-                  Expanded(
-                    child: Text(
-                      resolveUiErrorMessage(context, task.error!),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: p.error, fontSize: AppFontSize.label),
+                  Text(
+                    '${(task.progress * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  if (task.speedKbps != null && task.speedKbps! > 0)
+                    Text(
+                      '${task.speedKbps!.toStringAsFixed(0)} KB/s',
+                      style: TextStyle(
+                          color: p.textTertiary, fontSize: AppFontSize.label),
+                    ),
+                  if (task.etaSeconds != null && task.etaSeconds! > 0)
+                    Text(
+                      '${l10n.browseEta} ${task.etaSeconds}s',
+                      style: TextStyle(
+                          color: p.textTertiary, fontSize: AppFontSize.label),
+                    ),
                 ],
               ),
             ],
           ],
-        ),
-      );
+          if (task.error != null && task.error!.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: p.error),
+                const SizedBox(width: AppSpacing.s6),
+                Expanded(
+                  child: Text(
+                    resolveUiErrorMessage(context, task.error!),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        TextStyle(color: p.error, fontSize: AppFontSize.label),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

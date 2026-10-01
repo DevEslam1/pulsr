@@ -24,7 +24,8 @@ class StorageStatsHeader extends StatelessWidget {
     final freeStr = Formatters.formatBytes(stats.freeBytes);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,

@@ -18,7 +18,8 @@ void main() {
       expect(netError.userMessage, contains('connection failed'));
     });
 
-    test('PlatformException with permission denial resolves to PermissionError', () {
+    test('PlatformException with permission denial resolves to PermissionError',
+        () {
       final permEx = PlatformException(
         code: 'permission_DENIED_storage',
         message: 'Storage permission permanently denied',
@@ -33,7 +34,8 @@ void main() {
     });
 
     test('FileSystemException resolves to StorageError and preserves path', () {
-      final fsEx = const FileSystemException('Failed to write file', '/sdcard/music/test.flac');
+      final fsEx = const FileSystemException(
+          'Failed to write file', '/sdcard/music/test.flac');
       final error = resolveAppError(fsEx);
 
       expect(error, isA<StorageError>());
@@ -53,7 +55,8 @@ void main() {
       expect(ytmError.userMessage, contains('bot check triggered'));
     });
 
-    test('Timeout exception resolves to NetworkError with isTimeout = true', () {
+    test('Timeout exception resolves to NetworkError with isTimeout = true',
+        () {
       final ex = Exception('HTTP request timeout on endpoint');
       final error = resolveAppError(ex);
 
@@ -64,7 +67,9 @@ void main() {
       expect(netError.userMessage, contains('timed out'));
     });
 
-    test('Unrecognized exception resolves to GenericAppError with intact message', () {
+    test(
+        'Unrecognized exception resolves to GenericAppError with intact message',
+        () {
       final ex = Exception('Arbitrary unknown domain failure');
       final error = resolveAppError(ex);
 

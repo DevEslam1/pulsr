@@ -35,8 +35,7 @@ class FormatAwareDecoder {
 
     final cleanPath = song.path.split('?').first;
     final dot = cleanPath.lastIndexOf('.');
-    final ext =
-        dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
+    final ext = dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
 
     // Formats recognized in the native tier have no platform decoder in this
     // build. Fail honestly instead of handing a bogus file URI to ExoPlayer.

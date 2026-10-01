@@ -21,7 +21,8 @@ class DownloadSettings {
   static const _kLocation = 'setting_download_location';
 
   static Future<DownloadSettings> load() async {
-    try { // FIX-A10: Wrap load body in try/catch
+    try {
+      // FIX-A10: Wrap load body in try/catch
       final prefs = await SharedPreferences.getInstance();
       return DownloadSettings(
         wifiOnly: prefs.getBool(_kWifi) ?? false,
@@ -35,8 +36,10 @@ class DownloadSettings {
         maxConcurrent: prefs.getInt(_kConcurrency) ?? 3,
         downloadLocation: prefs.getString(_kLocation),
       );
-    } catch (e, st) { // FIX-A10: Log via ErrorLogger and return default settings
-      ErrorLogger.log('DownloadSettings.load failed', error: e, stackTrace: st, category: 'DownloadSettings');
+    } catch (e, st) {
+      // FIX-A10: Log via ErrorLogger and return default settings
+      ErrorLogger.log('DownloadSettings.load failed',
+          error: e, stackTrace: st, category: 'DownloadSettings');
       return const DownloadSettings();
     }
   }

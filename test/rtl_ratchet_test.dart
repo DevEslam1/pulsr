@@ -9,10 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('non-directional positioning stays at zero (28-02 ratchet)', () {
     const baseline = 0;
-    final positioned =
-        RegExp(r'Positioned\s*\(\s*[^)]*\b(left|right)\s*:');
-    final insets =
-        RegExp(r'EdgeInsets\.only\s*\([^)]*\b(left|right)\s*:');
+    final positioned = RegExp(r'Positioned\s*\(\s*[^)]*\b(left|right)\s*:');
+    final insets = RegExp(r'EdgeInsets\.only\s*\([^)]*\b(left|right)\s*:');
     final fromLtrb = RegExp(r'EdgeInsets\.fromLTRB\s*\(');
     var count = 0;
     final offenders = <String>[];

@@ -49,10 +49,12 @@ class CrossfadeManager {
   Duration duration = Duration.zero;
   CrossfadeCurve curve = CrossfadeCurve.equalPower;
   bool isCrossfading = false;
+
   /// BPM-synced crossfade: when true and a BPM value is available for the
   /// incoming track, the configured duration is aligned to the nearest
   /// 2/4/8/16/32 beats via [calculateBpmAlignedDuration].
   bool bpmSyncEnabled = false;
+
   /// Per-track BPM overrides (track id -> bpm). BPM sources: tag metadata or
   /// manual entry; tracks without an override fall back to the base duration.
   final Map<String, double> bpmOverrides = <String, double>{};
@@ -361,7 +363,8 @@ class CrossfadeManager {
 
     final completer = Completer<void>();
     _activeFadeCompleters.add(completer);
-    completer.future.whenComplete(() => _activeFadeCompleters.remove(completer));
+    completer.future
+        .whenComplete(() => _activeFadeCompleters.remove(completer));
     final stopwatch = clock.stopwatch()..start();
 
     // --- Native sample-accurate path (Pulsr Android fork) ---
@@ -504,7 +507,8 @@ class CrossfadeManager {
     }
     final completer = Completer<void>();
     _activeFadeCompleters.add(completer);
-    completer.future.whenComplete(() => _activeFadeCompleters.remove(completer));
+    completer.future
+        .whenComplete(() => _activeFadeCompleters.remove(completer));
     final stopwatch = clock.stopwatch()..start();
 
     // Only the OUTGOING player may use the native per-sample gain ramp. The
@@ -523,8 +527,8 @@ class CrossfadeManager {
     final points = _curvePointCount(totalMs);
     final segmentMs = (totalMs / (points - 1)).ceil().clamp(1, 1000);
     final oldCurve = List<double>.generate(points, (i) {
-      final (o, _) = evaluateSumSafeGainPair(i / (points - 1),
-          isRepeatOne: isRepeatOne);
+      final (o, _) =
+          evaluateSumSafeGainPair(i / (points - 1), isRepeatOne: isRepeatOne);
       return o;
     });
     final oldArmed = await _armNativeCurve(active, oldCurve, segmentMs);
@@ -559,8 +563,8 @@ class CrossfadeManager {
       }
       lastFraction = fraction;
 
-      final (oldGain, newGain) = evaluateSumSafeGainPair(fraction,
-          isRepeatOne: isRepeatOne);
+      final (oldGain, newGain) =
+          evaluateSumSafeGainPair(fraction, isRepeatOne: isRepeatOne);
       try {
         // The outgoing player uses its native sink curve when armed; otherwise
         // it is stepped here. The incoming player is ALWAYS stepped (never
@@ -639,8 +643,10 @@ class CrossfadeManager {
     _nativeCurveArmedOnOutgoing = false;
     _nativeCurveArmedOnIncoming = false;
 
-    final hadActiveFade =
-        isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null || _activeFadeCompleters.isNotEmpty;
+    final hadActiveFade = isCrossfading ||
+        _activeTimers.isNotEmpty ||
+        _fadeTimer != null ||
+        _activeFadeCompleters.isNotEmpty;
     if (!hadActiveFade) return;
 
     _fadeId++; // Invalidate any in-progress fade timers

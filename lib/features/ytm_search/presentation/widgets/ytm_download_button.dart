@@ -59,7 +59,8 @@ class YtmDownloadButton extends StatelessWidget {
         final isAlreadyLocal = song.source == SongSource.local &&
             (song.remoteId != null && song.remoteId!.isNotEmpty);
         if (isAlreadyLocal || item.status == YtDownloadStatus.done) {
-          return SizedBox(width: AppSpacing.s40,
+          return SizedBox(
+            width: AppSpacing.s40,
             height: 40,
             child: Icon(Icons.download_done_rounded,
                 size: iconSize, color: tintColor),
@@ -69,7 +70,8 @@ class YtmDownloadButton extends StatelessWidget {
         switch (item.status) {
           case YtDownloadStatus.queued:
           case YtDownloadStatus.running:
-            return SizedBox(width: AppSpacing.s40,
+            return SizedBox(
+              width: AppSpacing.s40,
               height: 40,
               child: Center(
                 child: SizedBox(
@@ -86,7 +88,8 @@ class YtmDownloadButton extends StatelessWidget {
               ),
             );
           case YtDownloadStatus.done:
-            return SizedBox(width: AppSpacing.s40,
+            return SizedBox(
+              width: AppSpacing.s40,
               height: 40,
               child: Icon(Icons.download_done_rounded,
                   size: iconSize, color: tintColor),

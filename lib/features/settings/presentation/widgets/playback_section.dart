@@ -149,7 +149,9 @@ class PlaybackSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        state.isProfessional ? _buildProfessional(context) : _buildNormal(context),
+        state.isProfessional
+            ? _buildProfessional(context)
+            : _buildNormal(context),
         const HeadsetControlsSection(),
       ],
     );
@@ -211,8 +213,8 @@ class PlaybackSection extends StatelessWidget {
           divisions: 24,
           defaultValue: 0.0,
           formatValue: (v) => '${v.toStringAsFixed(1)}s',
-          onInfo: () => showAudioFeatureInfoDialog(context,
-              AudioFeatureRegistry.crossfade,
+          onInfo: () => showAudioFeatureInfoDialog(
+              context, AudioFeatureRegistry.crossfade,
               conflictReason: state.gaplessPlayback
                   ? AudioConflicts.crossfadeBlockedByGapless(
                       state.gaplessPlayback)
@@ -239,8 +241,8 @@ class PlaybackSection extends StatelessWidget {
             resolveLabel: state.crossfadeSeconds > 0.01
                 ? context.l10n.settingsTurnOffGaplessEnableCrossfade
                 : context.l10n.settingsTurnOffGapless,
-            onResolve: () =>
-                _resolveCrossfadeConflict(context, cubit, state.crossfadeSeconds),
+            onResolve: () => _resolveCrossfadeConflict(
+                context, cubit, state.crossfadeSeconds),
           ),
         settingsCardDivider(p),
         // F3: hedged stream resolution (race 2 clients, take first).
@@ -271,8 +273,7 @@ class PlaybackSection extends StatelessWidget {
           max: 100,
           divisions: 20,
           defaultValue: 0.0,
-          formatValue: (v) =>
-              v < 0.5 ? context.l10n.rgOff : '${v.round()}%',
+          formatValue: (v) => v < 0.5 ? context.l10n.rgOff : '${v.round()}%',
           onChanged: (v) => cubit.setSilenceSkipSensitivity(v.round()),
         ),
         settingsCardDivider(p),
@@ -303,8 +304,8 @@ class PlaybackSection extends StatelessWidget {
           context.l10n.settingsSpeakerBluetooth,
           context.l10n.settingsSpeakerBluetoothSubtitle,
           value: state.multiOutputMode == 'speakerAndBluetooth',
-          onChanged: (v) => cubit.setMultiOutputMode(
-              v ? 'speakerAndBluetooth' : 'systemDefault'),
+          onChanged: (v) => cubit
+              .setMultiOutputMode(v ? 'speakerAndBluetooth' : 'systemDefault'),
         ),
         settingsCardDivider(p),
         // F9: per-album DSP snapshots.
@@ -322,7 +323,8 @@ class PlaybackSection extends StatelessWidget {
           context,
           Icons.bluetooth_searching_outlined,
           context.l10n.settingsCalibrateBtLatency,
-          context.l10n.settingsCalibrateBtLatencySubtitle(state.bluetoothLatencyOffsetMs),
+          context.l10n.settingsCalibrateBtLatencySubtitle(
+              state.bluetoothLatencyOffsetMs),
           onTap: () async {
             final ms = await cubit.autoCalibrateBluetoothLatency();
             if (!context.mounted) return;
@@ -347,14 +349,13 @@ class PlaybackSection extends StatelessWidget {
     );
   }
 
-  Widget _navTile(BuildContext context, IconData icon, String title,
-          String subtitle,
+  Widget _navTile(
+          BuildContext context, IconData icon, String title, String subtitle,
           {Widget? trailing, VoidCallback? onTap}) =>
-      SettingsNavTile(icon, title, subtitle,
-          trailing: trailing, onTap: onTap);
+      SettingsNavTile(icon, title, subtitle, trailing: trailing, onTap: onTap);
 
-  Widget _switchTile(BuildContext context, IconData icon, String title,
-          String subtitle,
+  Widget _switchTile(
+          BuildContext context, IconData icon, String title, String subtitle,
           {required bool value,
           required ValueChanged<bool> onChanged,
           AudioFeatureInfo? featureInfo,
@@ -377,22 +378,21 @@ class _SponsorBlockSettingTile extends StatefulWidget {
 
 class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
   Map<String, String> _labels(BuildContext context) => {
-    'sponsor': context.l10n.settingsSponsorLabel,
-    'selfpromo': context.l10n.settingsSelfPromoLabel,
-    'interaction': context.l10n.settingsInteractionLabel,
-    'intro': context.l10n.settingsIntroLabel,
-    'outro': context.l10n.settingsOutroLabel,
-    'music_offtopic': context.l10n.settingsNonMusicLabel,
-  };
+        'sponsor': context.l10n.settingsSponsorLabel,
+        'selfpromo': context.l10n.settingsSelfPromoLabel,
+        'interaction': context.l10n.settingsInteractionLabel,
+        'intro': context.l10n.settingsIntroLabel,
+        'outro': context.l10n.settingsOutroLabel,
+        'music_offtopic': context.l10n.settingsNonMusicLabel,
+      };
 
   bool _enabled = true;
   Set<String> _categories = {};
   bool _loadingCategories = true;
 
-  SponsorBlockService get _service =>
-      getIt.isRegistered<SponsorBlockService>()
-          ? getIt<SponsorBlockService>()
-          : SponsorBlockService.instance;
+  SponsorBlockService get _service => getIt.isRegistered<SponsorBlockService>()
+      ? getIt<SponsorBlockService>()
+      : SponsorBlockService.instance;
 
   @override
   void initState() {
@@ -425,14 +425,17 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) => SafeArea(
             child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.s20),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.sm, AppSpacing.sm, AppSpacing.sm, AppSpacing.s20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                    child: Text(context.l10n.sponsorBlockCategoriesLabel,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    child: Text(
+                      context.l10n.sponsorBlockCategoriesLabel,
                       style: TextStyle(
                         color: p.textPrimary,
                         fontSize: AppFontSize.bodyLarge,
@@ -448,7 +451,8 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                       value: selected.contains(category),
                       title: Text(
                         _labels(context)[category] ?? category,
-                        style: TextStyle(color: p.textPrimary, fontSize: AppFontSize.body),
+                        style: TextStyle(
+                            color: p.textPrimary, fontSize: AppFontSize.body),
                       ),
                       onChanged: (checked) {
                         setSheetState(() {
@@ -466,8 +470,7 @@ class _SponsorBlockSettingTileState extends State<_SponsorBlockSettingTile> {
                     alignment: AlignmentDirectional.centerEnd,
                     child: FilledButton(
                       style: FilledButton.styleFrom(backgroundColor: p.accent),
-                      onPressed: () =>
-                          Navigator.of(sheetContext).pop(selected),
+                      onPressed: () => Navigator.of(sheetContext).pop(selected),
                       child: Text(context.l10n.doneAction),
                     ),
                   ),
@@ -596,8 +599,7 @@ class _AudioNormalizationSettingTileState
       }
       if (!value) {
         final prefs = await SharedPreferences.getInstance();
-        value =
-            prefs.getBool(PrefsKeys.audioNormalizationEnabled) ?? false;
+        value = prefs.getBool(PrefsKeys.audioNormalizationEnabled) ?? false;
       }
     } catch (_) {}
     if (!mounted) return;
@@ -608,8 +610,7 @@ class _AudioNormalizationSettingTileState
     setState(() => _value = value);
     try {
       if (getIt.isRegistered<PulsrAudioHandler>()) {
-        await getIt<PulsrAudioHandler>()
-            .setAudioNormalizationEnabled(value);
+        await getIt<PulsrAudioHandler>().setAudioNormalizationEnabled(value);
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(PrefsKeys.audioNormalizationEnabled, value);
@@ -641,8 +642,8 @@ class _PlaybackPresetsTile extends StatelessWidget {
     final state = context.watch<SettingsCubit>().state;
 
     final isMaxQuality = state.bitPerfectOutput && state.gaplessPlayback;
-    final isSmooth = !state.bitPerfectOutput &&
-        (state.crossfadeSeconds - 4.0).abs() < 0.2;
+    final isSmooth =
+        !state.bitPerfectOutput && (state.crossfadeSeconds - 4.0).abs() < 0.2;
     final isDataSaver = !state.gaplessPlayback &&
         state.crossfadeSeconds < 0.1 &&
         state.streamingQuality == YtmAudioQuality.low;

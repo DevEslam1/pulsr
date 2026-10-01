@@ -11,6 +11,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -160,7 +161,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Storage Breakdown",
+                context.l10n.storageBreakdown,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: AppFontSize.body,
@@ -199,7 +200,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
                         if (_lyricsCacheSizeBytes > 0)
                           Expanded(
                             flex: _lyricsCacheSizeBytes,
-                            child: Container(color: const Color(0xFF9C27B0)),
+                            child: Container(color: AppColors.cacheLyrics),
                           ),
                         if (_tempCacheSizeBytes > 0)
                           Expanded(
@@ -217,23 +218,27 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
             children: [
               _buildLegendItem(
                 color: p.accent,
-                label: 'Artwork: ${_formatSize(_artCacheSizeBytes)}',
+                label: context.l10n
+                    .storageLegendArtwork(_formatSize(_artCacheSizeBytes)),
                 context: context,
               ),
               if (AppConfig.ytmEnabled && _streamCacheSizeBytes > 0)
                 _buildLegendItem(
                   color: p.error,
-                  label: 'Streams: ${_formatSize(_streamCacheSizeBytes)}',
+                  label: context.l10n
+                      .storageLegendStreams(_formatSize(_streamCacheSizeBytes)),
                   context: context,
                 ),
               _buildLegendItem(
-                color: const Color(0xFF9C27B0),
-                label: 'Lyrics: ${_formatSize(_lyricsCacheSizeBytes)}',
+                color: AppColors.cacheLyrics,
+                label: context.l10n
+                    .storageLegendLyrics(_formatSize(_lyricsCacheSizeBytes)),
                 context: context,
               ),
               _buildLegendItem(
                 color: p.textTertiary,
-                label: 'Cache / DB: ${_formatSize(_tempCacheSizeBytes)}',
+                label: context.l10n
+                    .storageLegendCacheDb(_formatSize(_tempCacheSizeBytes)),
                 context: context,
               ),
             ],
@@ -253,8 +258,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
       children: [
         _buildBreakdownBar(context),
         ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
           leading: Container(
             width: 38,
             height: 38,
@@ -267,14 +272,16 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
           ),
           title: Text(
             context.l10n.artworkCache,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
           subtitle: Text(
             _isLoading
                 ? context.l10n.calculating
-                : context.l10n.cacheUsedOfMax(
-                    _formatSize(_artCacheSizeBytes), maxMb),
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+                : context.l10n
+                    .cacheUsedOfMax(_formatSize(_artCacheSizeBytes), maxMb),
+            style:
+                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: TextButton.icon(
             style: TextButton.styleFrom(
@@ -307,8 +314,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
         Divider(height: 1, indent: 68, color: p.hairline),
         if (AppConfig.ytmEnabled) ...[
           ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
             leading: Container(
               width: 38,
               height: 38,
@@ -316,19 +323,21 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
                 color: p.error.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(AppRadii.r12),
               ),
-              child: Icon(Icons.cloud_download_rounded,
-                  color: p.error, size: 20),
+              child:
+                  Icon(Icons.cloud_download_rounded, color: p.error, size: 20),
             ),
             title: Text(
               context.l10n.youtubeStreamDiskCache,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
             ),
             subtitle: Text(
               _isLoading
                   ? context.l10n.calculating
                   : context.l10n.streamCacheCachedForReplay(
                       _formatSize(_streamCacheSizeBytes)),
-              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+              style: TextStyle(
+                  color: p.textSecondary, fontSize: AppFontSize.label),
             ),
             trailing: TextButton.icon(
               style: TextButton.styleFrom(
@@ -363,8 +372,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
           Divider(height: 1, indent: 68, color: p.hairline),
         ],
         ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
           leading: Container(
             width: 38,
             height: 38,
@@ -377,11 +386,13 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
           ),
           title: Text(
             context.l10n.maximumArtworkCacheLimit,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+            style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
           ),
           subtitle: Text(
             context.l10n.maxMbAutoEvicts(maxMb),
-            style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+            style:
+                TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: Icon(Icons.chevron_right_rounded,
               size: 20, color: p.textTertiary),
@@ -407,7 +418,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                   child: Text(
                     context.l10n.maximumArtworkCacheLimit,
                     style: TextStyle(

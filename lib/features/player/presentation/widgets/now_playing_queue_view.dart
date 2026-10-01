@@ -26,6 +26,14 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
   final ScrollController _scrollController = ScrollController();
   int _lastScrolledIndex = -1;
 
+  /// Attached to the currently-playing tile so we can scroll the *measured*
+  /// row into view instead of assuming a fixed pixel height.
+  GlobalKey? _activeTileKey;
+
+  /// Fallback row height used only when the active tile has not been built yet
+  /// (e.g. auto-advance to a row that is still off-screen and virtualized).
+  static const double _fallbackItemExtent = 72.0;
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -36,8 +44,25 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
     if (index == _lastScrolledIndex || index < 0) return;
     _lastScrolledIndex = index;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      final targetOffset = (index * 68.0 - 100.0).clamp(
+      if (!mounted) return;
+
+      // Preferred path: the active tile is laid out — scroll it into view with
+      // its real, measured extent.
+      final activeContext = _activeTileKey?.currentContext;
+      if (activeContext != null) {
+        Scrollable.ensureVisible(
+          activeContext,
+          alignment: 0.35,
+          duration: context.motionMs(300),
+          curve: context.motionCurve(Curves.easeOutCubic),
+        );
+        return;
+      }
+
+      // Fallback: the tile is virtualized/off-screen, estimate from the row
+      // extent until it is built.
+      if (!_scrollController.hasClients) return;
+      final targetOffset = (index * _fallbackItemExtent - 100.0).clamp(
         0.0,
         _scrollController.position.maxScrollExtent,
       );
@@ -270,11 +295,14 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                           minHeight: AppSpacing.minTouchTarget),
                                       onPressed: () {
                                         final prevQueue =
-                                            List<SongsTableData>.from(state.queue);
+                                            List<SongsTableData>.from(
+                                                state.queue);
                                         final prevIndex = state.currentIndex;
                                         cubit.removeQueueItem(index);
-                                        ScaffoldMessenger.of(context).clearSnackBars();
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(context)
+                                            .clearSnackBars();
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               song.title,
@@ -316,7 +344,10 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                           if (isCurrent) {
                             return KeyedSubtree(
                               key: slotKeys[index],
-                              child: itemTile,
+                              child: KeyedSubtree(
+                                key: _activeTileKey ??= GlobalKey(),
+                                child: itemTile,
+                              ),
                             );
                           }
 

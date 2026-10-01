@@ -192,8 +192,8 @@ abstract class SettingsState with _$SettingsState {
   // FIX-L3: Cache Color object for customAccentColorValue to avoid re-instantiating on every getter call
   static final Map<int, Color> _colorCache = {};
 
-  Color get customAccentColor =>
-      _colorCache.putIfAbsent(customAccentColorValue, () => Color(customAccentColorValue));
+  Color get customAccentColor => _colorCache.putIfAbsent(
+      customAccentColorValue, () => Color(customAccentColorValue));
 
   /// True when the full professional control surface should be shown.
   bool get isProfessional => experienceMode == ExperienceMode.professional;

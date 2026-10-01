@@ -7,7 +7,8 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 void main() {
   group('Crossfade Seek Bar Tests', () {
-    testWidgets('WaveformSeekBar renders crossfade region without error', (tester) async {
+    testWidgets('WaveformSeekBar renders crossfade region without error',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: const [

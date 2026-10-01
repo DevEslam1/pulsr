@@ -21,11 +21,14 @@ void main() {
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
     when(() => mockPlayerCubit.sleepTimerRemainingTracks).thenReturn(null);
     when(() => mockPlayerCubit.isEndOfQueueSleepTimer).thenReturn(false);
-    when(() => mockPlayerCubit.sleepTimerMode).thenReturn(SleepTimerMode.duration);
+    when(() => mockPlayerCubit.sleepTimerMode)
+        .thenReturn(SleepTimerMode.duration);
     when(() => mockPlayerCubit.startSleepTimer(any())).thenReturn(null);
   });
 
-  testWidgets('[H-19] custom minutes dialog safely disposes controller without error during pop transition', (tester) async {
+  testWidgets(
+      '[H-19] custom minutes dialog safely disposes controller without error during pop transition',
+      (tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -83,12 +86,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('[M-10] ChoiceChip for end-of-track is selected when sleepTimerMode is endOfTrack', (tester) async {
+  testWidgets(
+      '[M-10] ChoiceChip for end-of-track is selected when sleepTimerMode is endOfTrack',
+      (tester) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    when(() => mockPlayerCubit.sleepTimerMode).thenReturn(SleepTimerMode.endOfTrack);
+    when(() => mockPlayerCubit.sleepTimerMode)
+        .thenReturn(SleepTimerMode.endOfTrack);
     when(() => mockPlayerCubit.sleepTimerRemainingTracks).thenReturn(1);
     when(() => mockPlayerCubit.state).thenReturn(const PlayerState(
       playback: PlaybackSlice(sleepTimerRemaining: null),
@@ -119,7 +125,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify End of Track ChoiceChip is selected even when sleepTimerRemaining is null
-    final endOfTrackChipFinder = find.widgetWithText(ChoiceChip, 'End of track');
+    final endOfTrackChipFinder =
+        find.widgetWithText(ChoiceChip, 'End of track');
     expect(endOfTrackChipFinder, findsOneWidget);
     final chip = tester.widget<ChoiceChip>(endOfTrackChipFinder);
     expect(chip.selected, isTrue);

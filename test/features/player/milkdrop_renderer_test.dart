@@ -17,7 +17,8 @@ void main() {
       warp: 0.1,
     );
 
-    testWidgets('renders Canvas fallback when shader is null without error', (tester) async {
+    testWidgets('renders Canvas fallback when shader is null without error',
+        (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -56,7 +57,9 @@ void main() {
       expect(renderer.isFallback, isTrue);
     });
 
-    test('MilkdropCanvasPainter shouldRepaint always returns true for animation', () {
+    test(
+        'MilkdropCanvasPainter shouldRepaint always returns true for animation',
+        () {
       final painter = MilkdropCanvasPainter(
         data: const [0.5, 0.5],
         color: Colors.blue,

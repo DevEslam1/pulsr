@@ -27,7 +27,8 @@ void main() {
     await cubit.close();
   });
 
-  test('a successful poll after failures resumes normal emission (B3)', () async {
+  test('a successful poll after failures resumes normal emission (B3)',
+      () async {
     final channel = MockAudioEffectsChannel();
     var calls = 0;
     when(() => channel.getTelemetry()).thenAnswer((_) async {
@@ -58,7 +59,9 @@ void main() {
     await cubit.close();
   });
 
-  test('H-12: automatically recovers via retry timer after consecutive polling failures', () async {
+  test(
+      'H-12: automatically recovers via retry timer after consecutive polling failures',
+      () async {
     final channel = MockAudioEffectsChannel();
     var calls = 0;
     when(() => channel.getTelemetry()).thenAnswer((_) async {
@@ -102,9 +105,12 @@ void main() {
     await cubit.close();
   });
 
-  test('M-25: listenerCount never drops below 0 and excess unsubscribes are idempotent', () async {
+  test(
+      'M-25: listenerCount never drops below 0 and excess unsubscribes are idempotent',
+      () async {
     final channel = MockAudioEffectsChannel();
-    when(() => channel.getTelemetry()).thenAnswer((_) async => const DspTelemetry.zero());
+    when(() => channel.getTelemetry())
+        .thenAnswer((_) async => const DspTelemetry.zero());
 
     final cubit = DspTelemetryCubit(
       channel: channel,

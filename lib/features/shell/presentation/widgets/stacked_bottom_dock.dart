@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
@@ -116,7 +117,10 @@ class StackedBottomDockState extends State<StackedBottomDock> {
   bool _pendingUpdate = false;
 
   void _maybeUpdateDock({required double height, required bool miniPlayer}) {
-    if (_lastReportedHeight == height && _lastReportedMiniPlayer == miniPlayer) return;
+    if (_lastReportedHeight == height &&
+        _lastReportedMiniPlayer == miniPlayer) {
+      return;
+    }
     _targetDockHeight = height;
     _targetMiniPlayer = miniPlayer;
 
@@ -315,8 +319,10 @@ class StackedBottomDockState extends State<StackedBottomDock> {
 
     return _ModalGate(
       child: BlocListener<PlayerCubit, PlayerState>(
-        listenWhen: (prev, curr) => (prev.currentSong != null) != (curr.currentSong != null),
-        listener: (context, state) => _syncDock(hasSong: state.currentSong != null),
+        listenWhen: (prev, curr) =>
+            (prev.currentSong != null) != (curr.currentSong != null),
+        listener: (context, state) =>
+            _syncDock(hasSong: state.currentSong != null),
         child: BlocSelector<PlayerCubit, PlayerState, bool>(
           selector: (state) => state.currentSong != null,
           builder: (context, hasSong) {
@@ -330,31 +336,32 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 right: false,
                 bottom: true,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 860, maxHeight: 56),
+                      constraints:
+                          const BoxConstraints(maxWidth: 860, maxHeight: 56),
                       child: Container(
                         height: 56,
                         decoration: BoxDecoration(
                           color: p.surface.withValues(alpha: 0.88),
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(AppRadii.r24),
                           border: Border.all(
-                            color: p.isDark
-                                ? Colors.white.withValues(alpha: 0.14)
-                                : Colors.black.withValues(alpha: 0.08),
+                            color: p.hairline,
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.12),
+                              color: Colors.black
+                                  .withValues(alpha: p.isDark ? 0.35 : 0.12),
                               blurRadius: 18,
                               offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(AppRadii.r24),
                           child: Row(
                             children: [
                               if (hasSong) ...[
@@ -407,259 +414,260 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               );
             }
 
-          final mode = widget.mode;
-          final isStacked = mode != DockStackMode.defaultLayout;
-          final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
+            final mode = widget.mode;
+            final isStacked = mode != DockStackMode.defaultLayout;
+            final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
 
-          // Size the stack to whichever card sits highest. In navBarOnTop the
-          // mini player peeks above the nav bar, so its top is
-          // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
-          // which clipped it).
-          final double dockHeight = computeDockHeight(
-            hasSong: true,
-            mode: mode,
-            navBarTotalHeight: navBarTotalHeight,
-          );
+            // Size the stack to whichever card sits highest. In navBarOnTop the
+            // mini player peeks above the nav bar, so its top is
+            // _peekOffset + _miniPlayerHeight (not navBarTotalHeight + _peekOffset,
+            // which clipped it).
+            final double dockHeight = computeDockHeight(
+              hasSong: true,
+              mode: mode,
+              navBarTotalHeight: navBarTotalHeight,
+            );
 
-        // Calculate card bottom offsets, scales, and opacities
-        final double miniPlayerBottom;
-        final double miniPlayerScale;
-        final double miniPlayerOpacity;
+            // Calculate card bottom offsets, scales, and opacities
+            final double miniPlayerBottom;
+            final double miniPlayerScale;
+            final double miniPlayerOpacity;
 
-        final double navBarBottom;
-        final double navBarScale;
-        final double navBarOpacity;
+            final double navBarBottom;
+            final double navBarScale;
+            final double navBarOpacity;
 
-        switch (mode) {
-          case DockStackMode.defaultLayout:
-            miniPlayerBottom = navBarTotalHeight + _dockPillGap;
-            miniPlayerScale = 1.0;
-            miniPlayerOpacity = 1.0;
-            navBarBottom = 0.0;
-            navBarScale = 1.0;
-            navBarOpacity = 1.0;
-            break;
-          case DockStackMode.system:
-            miniPlayerBottom = navBarTotalHeight + 4.0;
-            miniPlayerScale = 0.98;
-            miniPlayerOpacity = 1.0;
-            navBarBottom = 0.0;
-            navBarScale = 1.0;
-            navBarOpacity = 1.0;
-            break;
-          case DockStackMode.miniPlayerOnTop:
-            miniPlayerBottom = 0.0;
-            miniPlayerScale = 1.0;
-            miniPlayerOpacity = 1.0;
-            navBarBottom = _peekOffset;
-            navBarScale = 0.95;
-            navBarOpacity = 0.70;
-            break;
-          case DockStackMode.navBarOnTop:
-            miniPlayerBottom = _peekOffset;
-            miniPlayerScale = 0.95;
-            miniPlayerOpacity = 0.70;
-            navBarBottom = 0.0;
-            navBarScale = 1.0;
-            navBarOpacity = 1.0;
-            break;
-        }
+            switch (mode) {
+              case DockStackMode.defaultLayout:
+                miniPlayerBottom = navBarTotalHeight + _dockPillGap;
+                miniPlayerScale = 1.0;
+                miniPlayerOpacity = 1.0;
+                navBarBottom = 0.0;
+                navBarScale = 1.0;
+                navBarOpacity = 1.0;
+                break;
+              case DockStackMode.system:
+                miniPlayerBottom = navBarTotalHeight + 4.0;
+                miniPlayerScale = 0.98;
+                miniPlayerOpacity = 1.0;
+                navBarBottom = 0.0;
+                navBarScale = 1.0;
+                navBarOpacity = 1.0;
+                break;
+              case DockStackMode.miniPlayerOnTop:
+                miniPlayerBottom = 0.0;
+                miniPlayerScale = 1.0;
+                miniPlayerOpacity = 1.0;
+                navBarBottom = _peekOffset;
+                navBarScale = 0.95;
+                navBarOpacity = 0.70;
+                break;
+              case DockStackMode.navBarOnTop:
+                miniPlayerBottom = _peekOffset;
+                miniPlayerScale = 0.95;
+                miniPlayerOpacity = 0.70;
+                navBarBottom = 0.0;
+                navBarScale = 1.0;
+                navBarOpacity = 1.0;
+                break;
+            }
 
-        final List<BoxShadow> stackedElevationShadow = [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.20),
-            blurRadius: 18,
-            spreadRadius: 0,
-            offset: const Offset(0, -4),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.30 : 0.12),
-            blurRadius: 12,
-            spreadRadius: -1,
-            offset: const Offset(0, 4),
-          ),
-        ];
+            final List<BoxShadow> stackedElevationShadow = [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.20),
+                blurRadius: 18,
+                spreadRadius: 0,
+                offset: const Offset(0, -4),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: p.isDark ? 0.30 : 0.12),
+                blurRadius: 12,
+                spreadRadius: -1,
+                offset: const Offset(0, 4),
+              ),
+            ];
 
-        // â”€â”€ Card 1: Mini Player Card â”€â”€
-        final bool isMiniBehind = isStacked && isNavBarOnTop;
-        Widget miniPlayerWidget = MiniPlayer(
-          onTap: widget.onOpenNowPlaying,
-          onSwipeDown: _handleSwipeDown,
-          onSwipeUp: _handleSwipeUp,
-          onLongPress: _showDockStylePicker,
-        );
+            // ── Card 1: Mini Player Card ──
+            final bool isMiniBehind = isStacked && isNavBarOnTop;
+            Widget miniPlayerWidget = MiniPlayer(
+              onTap: widget.onOpenNowPlaying,
+              onSwipeDown: _handleSwipeDown,
+              onSwipeUp: _handleSwipeUp,
+              onLongPress: _showDockStylePicker,
+            );
 
-        if (isStacked && !isMiniBehind) {
-          // Add drop shadow when mini player is the top stacked card
-          miniPlayerWidget = DecoratedBox(
-            decoration: BoxDecoration(
-              boxShadow: stackedElevationShadow,
-            ),
-            child: miniPlayerWidget,
-          );
-        }
-
-        Widget wrapBehindCard(Widget child, DockStackMode targetMode, {required bool isMini}) {
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _setMode(targetMode),
-            onVerticalDragStart: (_) {
-              if (isMini) {
-                _behindMiniDragDy = 0;
-              } else {
-                _behindNavDragDy = 0;
-              }
-            },
-            onVerticalDragUpdate: (d) {
-              if (isMini) {
-                _behindMiniDragDy += d.delta.dy;
-              } else {
-                _behindNavDragDy += d.delta.dy;
-              }
-            },
-            onVerticalDragEnd: (d) {
-              final v = d.primaryVelocity ?? 0;
-              final dragDy = isMini ? _behindMiniDragDy : _behindNavDragDy;
-              if (dragDy > 40 || v > 120) {
-                _handleSwipeDown();
-              } else if (dragDy < -40 || v < -120) {
-                _handleSwipeUp();
-              }
-              if (isMini) {
-                _behindMiniDragDy = 0;
-              } else {
-                _behindNavDragDy = 0;
-              }
-            },
-            onVerticalDragCancel: () {
-              if (isMini) {
-                _behindMiniDragDy = 0;
-              } else {
-                _behindNavDragDy = 0;
-              }
-            },
-            child: AbsorbPointer(child: child),
-          );
-        }
-
-        if (isMiniBehind) {
-          miniPlayerWidget = wrapBehindCard(
-            miniPlayerWidget,
-            DockStackMode.miniPlayerOnTop,
-            isMini: true,
-          );
-        }
-
-        final Widget miniPlayerCard = AnimatedPositioned(
-          key: const ValueKey('dock_mini_player_positioned'),
-          duration: animDuration,
-          curve: animCurve,
-          left: 0,
-          right: 0,
-          bottom: miniPlayerBottom,
-          child: _AnimatedCardTransform(
-            duration: animDuration,
-            curve: animCurve,
-            scale: miniPlayerScale,
-            opacity: miniPlayerOpacity,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxDockWidth),
+            if (isStacked && !isMiniBehind) {
+              // Add drop shadow when mini player is the top stacked card
+              miniPlayerWidget = DecoratedBox(
+                decoration: BoxDecoration(
+                  boxShadow: stackedElevationShadow,
+                ),
                 child: miniPlayerWidget,
-              ),
-            ),
-          ),
-        );
+              );
+            }
 
-        // â”€â”€ Card 2: Bottom Navigation Bar Card â”€â”€
-        final bool isBarBehind = isStacked && !isNavBarOnTop;
-        Widget navBarWidget = PulsrBottomNavBar(
-          currentIndex: widget.currentIndex,
-          onTap: widget.onTapNav,
-          onSwipeDown: _handleSwipeDown,
-          onSwipeUp: _handleSwipeUp,
-          includeSafeArea: false,
-        );
+            Widget wrapBehindCard(Widget child, DockStackMode targetMode,
+                {required bool isMini}) {
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _setMode(targetMode),
+                onVerticalDragStart: (_) {
+                  if (isMini) {
+                    _behindMiniDragDy = 0;
+                  } else {
+                    _behindNavDragDy = 0;
+                  }
+                },
+                onVerticalDragUpdate: (d) {
+                  if (isMini) {
+                    _behindMiniDragDy += d.delta.dy;
+                  } else {
+                    _behindNavDragDy += d.delta.dy;
+                  }
+                },
+                onVerticalDragEnd: (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  final dragDy = isMini ? _behindMiniDragDy : _behindNavDragDy;
+                  if (dragDy > 40 || v > 120) {
+                    _handleSwipeDown();
+                  } else if (dragDy < -40 || v < -120) {
+                    _handleSwipeUp();
+                  }
+                  if (isMini) {
+                    _behindMiniDragDy = 0;
+                  } else {
+                    _behindNavDragDy = 0;
+                  }
+                },
+                onVerticalDragCancel: () {
+                  if (isMini) {
+                    _behindMiniDragDy = 0;
+                  } else {
+                    _behindNavDragDy = 0;
+                  }
+                },
+                child: AbsorbPointer(child: child),
+              );
+            }
 
-        if (isStacked && isNavBarOnTop) {
-          // Add drop shadow when nav bar is the top stacked card
-          navBarWidget = DecoratedBox(
-            decoration: BoxDecoration(
-              boxShadow: stackedElevationShadow,
-            ),
-            child: navBarWidget,
-          );
-        }
+            if (isMiniBehind) {
+              miniPlayerWidget = wrapBehindCard(
+                miniPlayerWidget,
+                DockStackMode.miniPlayerOnTop,
+                isMini: true,
+              );
+            }
 
-        if (isBarBehind) {
-          navBarWidget = wrapBehindCard(
-            navBarWidget,
-            DockStackMode.navBarOnTop,
-            isMini: false,
-          );
-        }
-
-        final Widget navBarCard = AnimatedPositioned(
-          key: const ValueKey('dock_nav_bar_positioned'),
-          duration: animDuration,
-          curve: animCurve,
-          left: 0,
-          right: 0,
-          bottom: navBarBottom,
-          child: _AnimatedCardTransform(
-            duration: animDuration,
-            curve: animCurve,
-            scale: navBarScale,
-            opacity: navBarOpacity,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxDockWidth),
-                child: navBarWidget,
-              ),
-            ),
-          ),
-        );
-
-        // Z-order: The top card must be rendered second in the Stack.
-        final List<Widget> stackChildren = isNavBarOnTop
-            ? [miniPlayerCard, navBarCard]
-            : [navBarCard, miniPlayerCard];
-
-        return SafeArea(
-          top: false,
-          left: false,
-          right: false,
-          bottom: true,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: (_) => _dockDragDy = 0,
-            onVerticalDragUpdate: (d) => _dockDragDy += d.delta.dy,
-            onVerticalDragEnd: (d) {
-              final v = d.primaryVelocity ?? 0;
-              if (_dockDragDy > 40 || v > 120) {
-                _handleSwipeDown();
-              } else if (_dockDragDy < -40 || v < -120) {
-                _handleSwipeUp();
-              }
-              _dockDragDy = 0;
-            },
-            onVerticalDragCancel: () => _dockDragDy = 0,
-            child: AnimatedContainer(
+            final Widget miniPlayerCard = AnimatedPositioned(
+              key: const ValueKey('dock_mini_player_positioned'),
               duration: animDuration,
               curve: animCurve,
-              height: dockHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.bottomCenter,
-                children: stackChildren,
+              left: 0,
+              right: 0,
+              bottom: miniPlayerBottom,
+              child: _AnimatedCardTransform(
+                duration: animDuration,
+                curve: animCurve,
+                scale: miniPlayerScale,
+                opacity: miniPlayerOpacity,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxDockWidth),
+                    child: miniPlayerWidget,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      },
-    ),
-  ),
-);
+            );
+
+            // ── Card 2: Bottom Navigation Bar Card ──
+            final bool isBarBehind = isStacked && !isNavBarOnTop;
+            Widget navBarWidget = PulsrBottomNavBar(
+              currentIndex: widget.currentIndex,
+              onTap: widget.onTapNav,
+              onSwipeDown: _handleSwipeDown,
+              onSwipeUp: _handleSwipeUp,
+              includeSafeArea: false,
+            );
+
+            if (isStacked && isNavBarOnTop) {
+              // Add drop shadow when nav bar is the top stacked card
+              navBarWidget = DecoratedBox(
+                decoration: BoxDecoration(
+                  boxShadow: stackedElevationShadow,
+                ),
+                child: navBarWidget,
+              );
+            }
+
+            if (isBarBehind) {
+              navBarWidget = wrapBehindCard(
+                navBarWidget,
+                DockStackMode.navBarOnTop,
+                isMini: false,
+              );
+            }
+
+            final Widget navBarCard = AnimatedPositioned(
+              key: const ValueKey('dock_nav_bar_positioned'),
+              duration: animDuration,
+              curve: animCurve,
+              left: 0,
+              right: 0,
+              bottom: navBarBottom,
+              child: _AnimatedCardTransform(
+                duration: animDuration,
+                curve: animCurve,
+                scale: navBarScale,
+                opacity: navBarOpacity,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxDockWidth),
+                    child: navBarWidget,
+                  ),
+                ),
+              ),
+            );
+
+            // Z-order: The top card must be rendered second in the Stack.
+            final List<Widget> stackChildren = isNavBarOnTop
+                ? [miniPlayerCard, navBarCard]
+                : [navBarCard, miniPlayerCard];
+
+            return SafeArea(
+              top: false,
+              left: false,
+              right: false,
+              bottom: true,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onVerticalDragStart: (_) => _dockDragDy = 0,
+                onVerticalDragUpdate: (d) => _dockDragDy += d.delta.dy,
+                onVerticalDragEnd: (d) {
+                  final v = d.primaryVelocity ?? 0;
+                  if (_dockDragDy > 40 || v > 120) {
+                    _handleSwipeDown();
+                  } else if (_dockDragDy < -40 || v < -120) {
+                    _handleSwipeUp();
+                  }
+                  _dockDragDy = 0;
+                },
+                onVerticalDragCancel: () => _dockDragDy = 0,
+                child: AnimatedContainer(
+                  duration: animDuration,
+                  curve: animCurve,
+                  height: dockHeight,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.bottomCenter,
+                    children: stackChildren,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 

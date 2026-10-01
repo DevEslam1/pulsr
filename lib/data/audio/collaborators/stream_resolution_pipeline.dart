@@ -20,7 +20,8 @@ class CachedStreamUrl {
 /// dangling (and can be pruned once complete).
 class _InFlightResolve {
   _InFlightResolve(this.future);
-  final Future<({String url, String? userAgent, String? cookies, String quality})>
+  final Future<
+          ({String url, String? userAgent, String? cookies, String quality})>
       future;
   bool done = false;
 }
@@ -30,6 +31,7 @@ class _InFlightResolve {
 class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
+
   /// Retained for call-site compatibility. Hedging now lives entirely in the
   /// native extractor, which races its top two clients and bounds each call;
   /// racing a second Dart-level chain here only doubled native load.
@@ -89,7 +91,8 @@ class StreamResolutionPipeline {
     }
   }
 
-  Future<({String url, String? userAgent, String? cookies, String quality})> resolveStreamUrl(
+  Future<({String url, String? userAgent, String? cookies, String quality})>
+      resolveStreamUrl(
     SongsTableData song, {
     bool forceRefresh = false,
     required SharedPreferences prefs,
@@ -102,19 +105,22 @@ class StreamResolutionPipeline {
     if (videoId == null || videoId.isEmpty) {
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
     }
-    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) || videoId.startsWith('n_')) {
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) ||
+        videoId.startsWith('n_')) {
       throw const YtmException('YTM_UNAVAILABLE', 'Invalid video id');
     }
 
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
-      throw const YtmException('OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
+      throw const YtmException(
+          'OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
     }
     final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
     if (wifiOnly) {
       final isWifi = await ytmService.isWifiConnected();
       if (!isWifi) {
-        throw const YtmException('WIFI_ONLY', 'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
+        throw const YtmException('WIFI_ONLY',
+            'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
       }
     }
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
@@ -150,14 +156,15 @@ class StreamResolutionPipeline {
         getLatencyTracker?.call()?.markStage(PlaybackStage.clientRequestSent);
       } catch (_) {}
 
-      Future<YtmStream> doResolve() =>
-          ytmService.resolveStream(videoId, quality: quality, forceRefresh: forceRefresh);
+      Future<YtmStream> doResolve() => ytmService.resolveStream(videoId,
+          quality: quality, forceRefresh: forceRefresh);
       // The native extractor already hedges its top two clients and bounds each
       // call, so racing a second independent chain here only doubled native
       // load for no tail-latency gain. One chain; the extractor owns the hedge.
       final YtmStream stream = await doResolve();
       if (stream.url.trim().isEmpty) {
-        throw const YtmException('YTM_UNAVAILABLE', 'Resolved stream URL is empty');
+        throw const YtmException(
+            'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
       }
 
       // F4: one expiry parser, not a second one. `int.parse` on a malformed or
@@ -170,7 +177,8 @@ class StreamResolutionPipeline {
           ? DateTime.fromMillisecondsSinceEpoch(stamp)
           : DateTime.now().add(const Duration(hours: 5));
 
-      if (_resolveEpoch == resolveEpoch && (_videoIdEpochs[videoId] ?? 0) == videoEpoch) {
+      if (_resolveEpoch == resolveEpoch &&
+          (_videoIdEpochs[videoId] ?? 0) == videoEpoch) {
         _streamCache[cacheKey] = CachedStreamUrl(
           stream.url,
           expires,
@@ -219,7 +227,8 @@ class StreamResolutionPipeline {
         }
       }
 
-      unawaited(future.then<void>((_) => settle(), onError: (_, __) => settle()));
+      unawaited(
+          future.then<void>((_) => settle(), onError: (_, __) => settle()));
     }
     try {
       return await future;
@@ -237,7 +246,8 @@ class StreamResolutionPipeline {
     _inFlightResolves.removeWhere((_, v) => v.done);
   }
 
-  Future<void> warmStreamCache(SongsTableData song, SharedPreferences prefs) async {
+  Future<void> warmStreamCache(
+      SongsTableData song, SharedPreferences prefs) async {
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) return;
     try {

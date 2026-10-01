@@ -42,14 +42,16 @@ class VisualizerPresetStore {
         allowedExtensions: const ['json'],
       );
       if (file == null) return null;
-      final ioFile = SafeFilePath.validate(file.path, allowedExtensions: const ['json']);
+      final ioFile =
+          SafeFilePath.validate(file.path, allowedExtensions: const ['json']);
       if (ioFile == null) return null;
       final content = await ioFile.readAsString();
       final preset = VisualizerPreset.fromJsonString(content);
       await save(preset);
       return preset;
     } catch (e, st) {
-      ErrorLogger.log('VisualizerPresetStore importFromFile failed', error: e, stackTrace: st, category: 'VisualizerPresetStore');
+      ErrorLogger.log('VisualizerPresetStore importFromFile failed',
+          error: e, stackTrace: st, category: 'VisualizerPresetStore');
       return null;
     }
   }

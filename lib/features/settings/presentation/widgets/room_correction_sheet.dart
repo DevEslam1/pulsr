@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:just_audio/just_audio.dart' hide PlayerState;
@@ -15,6 +16,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -46,7 +48,21 @@ class _SweepSource extends StreamAudioSource {
   }
 }
 
-enum _RcPhase { idle, measuring, analyzing, nextPointPrompt, result }
+enum _RcPhase {
+  idle,
+  measuring,
+  analyzing,
+  nextPointPrompt,
+  result,
+  verifying,
+  verified
+}
+
+/// Thrown internally when a capture run is superseded or cancelled, so callers
+/// can unwind silently instead of surfacing a spurious error.
+class _CaptureCancelled implements Exception {
+  const _CaptureCancelled();
+}
 
 /// Phase 5: room-correction wizard. Plays a stepped-sine sweep through the
 /// active output device, records it with the mic, fits a Room Correction EQ
@@ -91,6 +107,12 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   final List<List<double>> _pointResponses = [];
   final List<double> _snrValues = [];
   double? _snrDb;
+  RoomVerification? _verification;
+  List<double>? _postVerificationResponse;
+
+  /// Incremented on every start/cancel so an in-flight capture can detect that
+  /// it was superseded and unwind without touching state or the error banner.
+  int _runToken = 0;
 
   static const List<String> _pointNames = [
     'Listening Position (Center)',
@@ -101,8 +123,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   Color get _snrColor {
     final snr = _snrDb ?? 20.0;
     if (snr >= 25) return AppColors.emeraldDeep;
-    if (snr >= 16) return Colors.teal;
-    return Colors.amber;
+    if (snr >= 16) return context.palette.success;
+    return context.palette.warning;
   }
 
   String get _snrLabel {
@@ -130,6 +152,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   }
 
   Future<void> _cancelSweep() async {
+    _runToken++;
     _progressTimer?.cancel();
     _progressTimer = null;
     try {
@@ -147,6 +170,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
         _currentPoint = 0;
         _pointResponses.clear();
         _snrValues.clear();
+        _verification = null;
+        _postVerificationResponse = null;
       });
     }
   }
@@ -169,7 +194,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     }
 
     if (maxWindowRms <= 0.0) return 0.0;
-    if (minWindowRms <= 0 || minWindowRms == double.infinity) minWindowRms = 1.0;
+    if (minWindowRms <= 0 || minWindowRms == double.infinity) {
+      minWindowRms = 1.0;
+    }
     if (maxWindowRms <= minWindowRms) return 0.0;
 
     final snr = 20 * (math.log(maxWindowRms / minWindowRms) / math.ln10);
@@ -180,10 +207,123 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
   static double calculateSnr(Int16List pcm) => _calculateSnr(pcm);
 
   Future<void> _start() async {
+    _runToken++;
     _currentPoint = 0;
     _pointResponses.clear();
     _snrValues.clear();
+    _verification = null;
+    _postVerificationResponse = null;
     await _measureCurrentPoint();
+  }
+
+  /// Plays the measurement sweep and records it, returning the analyzed
+  /// per-tone response and capture SNR. Throws [_CaptureCancelled] when the run
+  /// is superseded/cancelled (so callers can exit silently) and other exceptions
+  /// on genuine capture/permission failure. Owns the sweep [AudioPlayer] and mic
+  /// capture for the duration of the measurement.
+  Future<({List<double> response, double snr, Int16List pcm})>
+      _captureSweepResponse() async {
+    final tones = RoomCorrectionService.tonePlan();
+    final wav = RoomCorrectionService.synthSweepWav(tones);
+    final token = _runToken;
+    bool captureActive = false;
+    StreamSubscription<dynamic>? stateSub;
+    final finished = Completer<void>();
+    try {
+      captureActive = await _service.startCapture();
+      if (!captureActive) {
+        throw StateError('capture unavailable');
+      }
+      if (token != _runToken) throw const _CaptureCancelled();
+
+      await _player?.stop();
+      await _player?.dispose();
+      _player = null;
+
+      try {
+        if (mounted) {
+          final playerCubit = context.read<PlayerCubit?>();
+          if (playerCubit?.state.isPlaying == true) {
+            playerCubit?.pause();
+          }
+        }
+      } catch (_) {}
+
+      final player = AudioPlayer();
+      _player = player;
+      await player.setAudioSource(_SweepSource(wav));
+
+      // Complete on end-of-stream OR stream close/error. Using firstWhere here
+      // would throw "No element" when a cancel disposes the player mid-wait.
+      stateSub = player.playerStateStream.listen(
+        (s) {
+          if (s.processingState == ProcessingState.completed &&
+              !finished.isCompleted) {
+            finished.complete();
+          }
+        },
+        onError: (Object e, StackTrace st) {
+          if (!finished.isCompleted) finished.completeError(e, st);
+        },
+        onDone: () {
+          if (!finished.isCompleted) finished.complete();
+        },
+      );
+
+      await player.play();
+
+      // Progress: playback position vs sweep duration.
+      final durationMs = (tones.length * 350).clamp(1000, 60000);
+      _progressTimer?.cancel();
+      _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+        if (!mounted ||
+            (_phase != _RcPhase.measuring && _phase != _RcPhase.verifying)) {
+          t.cancel();
+          return;
+        }
+        final posMs = player.position.inMilliseconds;
+        if (posMs >= durationMs) {
+          t.cancel();
+          return;
+        }
+        if (mounted) {
+          setState(() => _progress = (posMs / durationMs).clamp(0.0, 1.0));
+        }
+      });
+
+      // Wait until playback finishes (or the run is cancelled).
+      await finished.future;
+      _progressTimer?.cancel();
+      _progressTimer = null;
+      if (token != _runToken) throw const _CaptureCancelled();
+
+      // Tail margin so the last tone's window is fully captured.
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (token != _runToken) throw const _CaptureCancelled();
+
+      final pcm = await _service.stopCapture();
+      captureActive = false;
+      final response = RoomCorrectionService.analyzeResponse(
+          pcm, RoomCorrectionService.captureSampleRate, tones);
+      if (response.length < tones.length ~/ 2) {
+        throw StateError('capture too short');
+      }
+      return (response: response, snr: _calculateSnr(pcm), pcm: pcm);
+    } finally {
+      await stateSub?.cancel();
+      _progressTimer?.cancel();
+      _progressTimer = null;
+      try {
+        await _player?.stop();
+        await _player?.dispose();
+      } catch (_) {}
+      _player = null;
+      if (captureActive || _service.isCapturing) {
+        try {
+          await _service.stopCapture();
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _measureCurrentPoint() async {
@@ -203,129 +343,33 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       return;
     }
 
-    bool captureActive = false;
     try {
-      final tones = RoomCorrectionService.tonePlan();
-      final wav = RoomCorrectionService.synthSweepWav(tones);
-
-      try {
-        captureActive = await _service.startCapture();
-      } catch (err) {
-        if (mounted) {
-          setState(() {
-            _phase = _RcPhase.idle;
-            _error = '${context.l10n.rcMicNeeded} ($err)';
-          });
-        }
-        return;
-      }
-      if (!captureActive || !mounted) {
-        if (captureActive) {
-          try {
-            await _service.stopCapture();
-          } catch (_) {}
-          captureActive = false;
-        }
-        if (mounted) {
-          setState(() {
-            _phase = _RcPhase.idle;
-            _error = context.l10n.rcMicNeeded;
-          });
-        }
-        return;
-      }
-
-      await _player?.stop();
-      await _player?.dispose();
-      _player = null;
-
-      if (mounted) {
-        try {
-          final playerCubit = context.read<PlayerCubit?>();
-          if (playerCubit?.state.isPlaying == true) {
-            playerCubit?.pause();
-          }
-        } catch (_) {}
-      }
-
-      final player = AudioPlayer();
-      _player = player;
-      await player.setAudioSource(_SweepSource(wav));
-      await player.play();
-
-      // Progress: playback position vs sweep duration.
-      final durationMs = (tones.length * 350).clamp(1000, 60000);
-      _progressTimer?.cancel();
-      _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
-        if (!mounted || _phase != _RcPhase.measuring) {
-          t.cancel();
-          return;
-        }
-        final posMs = player.position.inMilliseconds;
-        if (posMs >= durationMs) {
-          t.cancel();
-          return;
-        }
-        if (mounted) {
-          setState(() => _progress = (posMs / durationMs).clamp(0.0, 1.0));
-        }
-      });
-
-      // Wait until playback finishes or user cancels.
-      await player.playerStateStream.firstWhere(
-        (s) =>
-            s.processingState == ProcessingState.completed ||
-            _phase != _RcPhase.measuring,
-      );
-      _progressTimer?.cancel();
-      _progressTimer = null;
-
-      // Tail margin so the last tone's window is fully captured.
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      if (!mounted) {
-        return;
-      }
-
+      // Stay in `measuring` for the whole capture so the sweep-wait and progress
+      // timer recognise the run; `analyzing` is entered only once PCM is back.
+      final result = await _captureSweepResponse();
+      if (!mounted) return;
       setState(() => _phase = _RcPhase.analyzing);
-      final pcm = await _service.stopCapture();
-      captureActive = false;
-      final response =
-          RoomCorrectionService.analyzeResponse(pcm, RoomCorrectionService.captureSampleRate, tones);
-      if (response.length < tones.length ~/ 2) {
-        throw StateError('capture too short');
-      }
-
-      final snr = _calculateSnr(pcm);
-      _snrValues.add(snr);
-      _pointResponses.add(response);
+      _snrValues.add(result.snr);
+      _pointResponses.add(result.response);
 
       if (_multiPointMode && _currentPoint < 2) {
         _currentPoint++;
         if (!mounted) return;
         setState(() => _phase = _RcPhase.nextPointPrompt);
       } else {
-        _finishMeasurements(tones);
+        _finishMeasurements(RoomCorrectionService.tonePlan());
       }
+    } on _CaptureCancelled {
+      // _cancelSweep already restored the idle UI; nothing to surface.
+      return;
     } catch (e, st) {
-      ErrorLogger.log('Room correction failed', error: e, stackTrace: st, category: 'RoomCorrection');
+      ErrorLogger.log('Room correction failed',
+          error: e, stackTrace: st, category: 'RoomCorrection');
       if (mounted) {
         setState(() {
           _phase = _RcPhase.idle;
           _error = e.toString();
         });
-      }
-    } finally {
-      _progressTimer?.cancel();
-      _progressTimer = null;
-      try {
-        await _player?.stop();
-        await _player?.dispose();
-      } catch (_) {}
-      _player = null;
-      if (captureActive || _service.isCapturing) {
-        try {
-          await _service.stopCapture();
-        } catch (_) {}
       }
     }
   }
@@ -361,8 +405,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     });
   }
 
-  Future<void> _apply() async {
-    if (_gains == null) return;
+  /// Applies the fitted correction through the guarded preset path and returns
+  /// the effective gains that were applied (for verification reference).
+  Future<List<double>> _applyCorrection() async {
     final cubit = context.read<PlayerCubit>();
     final effectiveGains = _mergeWithHeadphone
         ? cubit.mergeRoomCorrectionWithHeadphoneCurve(_gains!)
@@ -370,6 +415,16 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     final preset = RoomCorrectionService.buildPreset(effectiveGains);
     await cubit.setEqualizerEnabled(true);
     await cubit.applyPreset(preset);
+    // Always write the preamp (including 0 dB) so stale headroom from a prior
+    // correction or headphone profile is cleared instead of lingering.
+    final safePreamp = RoomCorrectionService.computeSafePreamp(effectiveGains);
+    await cubit.setPreamp(safePreamp);
+    return effectiveGains;
+  }
+
+  Future<void> _apply() async {
+    if (_gains == null) return;
+    await _applyCorrection();
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(content: Text(context.l10n.rcApplied)),
@@ -377,6 +432,187 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
+  }
+
+  /// Applies the correction, then reports the closed-loop verification
+  /// (pre→post convergence + flatness gate).
+  ///
+  /// The post-correction response is *predicted* from the exact curve that was
+  /// applied rather than re-acoustically measured: the measurement sweep runs
+  /// through a standalone player, so a second capture would only contain the
+  /// correction when the active DSP owner is the in-stream native engine — never
+  /// when the session-bound HAL chain owns the EQ. Predicting from the applied
+  /// gains is deterministic and device-independent, so the verdict is never
+  /// based on an uncorrected signal.
+  Future<void> _applyAndVerify() async {
+    if (_gains == null) return;
+    try {
+      final effectiveGains = await _applyCorrection();
+      if (!mounted) return;
+      setState(() {
+        _error = null;
+        _phase = _RcPhase.verifying;
+        _progress = 0.0;
+      });
+      final pre = _responseDb;
+      if (pre == null) {
+        throw StateError('no reference response');
+      }
+      final post = RoomCorrectionService.predictCorrectedResponse(
+        preResponseDb: pre,
+        tones: RoomCorrectionService.tonePlan(),
+        gains: effectiveGains,
+      );
+      final verification = RoomCorrectionService.verify(
+        preResponseDb: pre,
+        postResponseDb: post,
+      );
+      if (!mounted) return;
+      setState(() {
+        _verification = verification;
+        _postVerificationResponse = post;
+        _phase = _RcPhase.verified;
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Room-correction verification failed',
+          error: e, stackTrace: st, category: 'RoomCorrection');
+      if (mounted) {
+        setState(() {
+          _phase = _RcPhase.result;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  /// Result card shown after a closed-loop verification: convergence score,
+  /// residual variance, improvement percentage and the ±gate verdict.
+  Widget _verificationCard(
+    PulsrPalette p,
+    AppLocalizations l10n,
+    RoomVerification v,
+  ) {
+    final ok = v.passed;
+    final accent = ok ? AppColors.emeraldDeep : p.warning;
+    final c = v.convergence;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadii.r12),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(ok ? Icons.verified_rounded : Icons.info_outline_rounded,
+                  color: accent, size: 18),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                l10n.rcVerification,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: AppFontSize.bodySmall,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                ok ? l10n.rcConverged : l10n.rcNotConverged,
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                  fontSize: AppFontSize.label,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.r4),
+            child: LinearProgressIndicator(
+              value: (v.convergence.score / 100.0).clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: p.hairline,
+              color: accent,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: _verificationMetric(
+                  p,
+                  l10n.rcImprovement,
+                  '${c.score.toStringAsFixed(1)}%',
+                ),
+              ),
+              Expanded(
+                child: _verificationMetric(
+                  p,
+                  l10n.rcResidual,
+                  '${c.residualVarianceDb.toStringAsFixed(2)} dB',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Row(
+            children: [
+              Icon(
+                v.loopback.isWithinGate
+                    ? Icons.check_circle_rounded
+                    : Icons.error_outline_rounded,
+                color:
+                    v.loopback.isWithinGate ? AppColors.emeraldDeep : p.warning,
+                size: 14,
+              ),
+              const SizedBox(width: AppSpacing.xxs),
+              Text(
+                v.loopback.isWithinGate
+                    ? l10n.rcTargetGatePassed
+                    : l10n.rcTargetGateFailed,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.caption,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'max ${v.loopback.maxDeviationDb.toStringAsFixed(2)} dB',
+                style: TextStyle(
+                  color: p.textTertiary,
+                  fontSize: AppFontSize.caption,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _verificationMetric(PulsrPalette p, String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: p.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: AppFontSize.bodySmall,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -405,7 +641,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           ),
           child: Material(
             color: p.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
             clipBehavior: Clip.antiAlias,
             child: SafeArea(
               top: false,
@@ -471,8 +708,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close_rounded,
-                              color: p.textSecondary),
+                          icon:
+                              Icon(Icons.close_rounded, color: p.textSecondary),
                           tooltip: context.l10n.close,
                           visualDensity: VisualDensity.compact,
                           onPressed: () => Navigator.of(context).pop(),
@@ -501,7 +738,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                               Expanded(
                                 child: Text(_error!,
                                     style: TextStyle(
-                                        color: p.error, fontSize: AppFontSize.label)),
+                                        color: p.error,
+                                        fontSize: AppFontSize.label)),
                               ),
                             ],
                           ),
@@ -510,7 +748,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(AppSpacing.sm),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
+                          color: p.surfaceContainer,
                           borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: p.hairline),
                         ),
@@ -535,15 +773,17 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.04),
+                          color: p.surfaceContainer,
                           borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.spatial_audio_off_rounded, color: p.accent, size: 20),
+                            Icon(Icons.spatial_audio_off_rounded,
+                                color: p.accent, size: 20),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Column(
@@ -570,7 +810,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             Switch.adaptive(
                               value: _multiPointMode,
                               activeTrackColor: p.accent,
-                              onChanged: (v) => setState(() => _multiPointMode = v),
+                              onChanged: (v) =>
+                                  setState(() => _multiPointMode = v),
                             ),
                           ],
                         ),
@@ -593,28 +834,33 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 ? 'Start 3-Point Calibration'
                                 : l10n.rcStart,
                             style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: AppFontSize.callout),
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppFontSize.callout),
                           ),
                           onPressed: _start,
                         ),
                       ),
                     ] else if (_phase == _RcPhase.measuring ||
-                        _phase == _RcPhase.analyzing) ...[
+                        _phase == _RcPhase.analyzing ||
+                        _phase == _RcPhase.verifying) ...[
                       Center(
                         child: Column(
                           children: [
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              _multiPointMode
-                                  ? 'Measuring ${_pointNames[_currentPoint]}'
-                                  : l10n.rcMeasuring,
+                              _phase == _RcPhase.verifying
+                                  ? l10n.rcVerifying
+                                  : (_multiPointMode
+                                      ? 'Measuring ${_pointNames[_currentPoint]}'
+                                      : l10n.rcMeasuring),
                               style: TextStyle(
                                 color: p.textPrimary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: AppFontSize.body,
                               ),
                             ),
-                            if (_multiPointMode) ...[
+                            if (_multiPointMode &&
+                                _phase != _RcPhase.verifying) ...[
                               const SizedBox(height: AppSpacing.xxs),
                               Text(
                                 'Point ${_currentPoint + 1} of 3',
@@ -629,7 +875,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(AppRadii.r6),
                               child: LinearProgressIndicator(
-                                value: _phase == _RcPhase.measuring
+                                value: (_phase == _RcPhase.measuring ||
+                                        _phase == _RcPhase.verifying)
                                     ? _progress
                                     : null,
                                 backgroundColor: p.hairline,
@@ -658,7 +905,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 color: p.accentContainer,
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(Icons.arrow_forward_rounded, color: p.accent, size: 24),
+                              child: Icon(Icons.arrow_forward_rounded,
+                                  color: p.accent, size: 24),
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
@@ -687,11 +935,14 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r14),
                                   ),
                                 ),
-                                icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                                label: Text('Measure Position ${_currentPoint + 1}'),
+                                icon: const Icon(Icons.play_arrow_rounded,
+                                    size: 20),
+                                label: Text(
+                                    'Measure Position ${_currentPoint + 1}'),
                                 onPressed: _measureCurrentPoint,
                               ),
                             ),
@@ -701,7 +952,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                 final tones = RoomCorrectionService.tonePlan();
                                 _finishMeasurements(tones);
                               },
-                              child: Text('Finish with current measurements (${_pointResponses.length}/3)'),
+                              child: Text(
+                                  'Finish with current measurements (${_pointResponses.length}/3)'),
                             ),
                           ],
                         ),
@@ -720,16 +972,20 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           ),
                           if (_snrDb != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: _snrColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(AppRadii.r8),
-                                border: Border.all(color: _snrColor.withValues(alpha: 0.3)),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r8),
+                                border: Border.all(
+                                    color: _snrColor.withValues(alpha: 0.3)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check_circle_outline_rounded, size: 14, color: _snrColor),
+                                  Icon(Icons.check_circle_outline_rounded,
+                                      size: 14, color: _snrColor),
                                   const SizedBox(width: 4),
                                   Text(
                                     'SNR: ${_snrDb!.toStringAsFixed(1)} dB ($_snrLabel)',
@@ -749,7 +1005,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         height: 130,
                         padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.03),
+                          color: p.surfaceContainer,
                           borderRadius: BorderRadius.circular(AppRadii.r12),
                           border: Border.all(color: p.hairline),
                         ),
@@ -759,6 +1015,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             response: _responseDb ?? const [],
                             gains: _gains ?? const [],
                             pointResponses: _pointResponses,
+                            postResponse: _postVerificationResponse ?? const [],
                           ),
                         ),
                       ),
@@ -767,17 +1024,35 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Container(width: 10, height: 3, color: const Color(0xFF4FC3F7)),
+                            Container(
+                                width: 10,
+                                height: 3,
+                                color: AppColors.roomPointCenter),
                             const SizedBox(width: 4),
-                            Text(context.l10n.roomPositionCenter, style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            Text(context.l10n.roomPositionCenter,
+                                style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.tiny)),
                             const SizedBox(width: 8),
-                            Container(width: 10, height: 3, color: const Color(0xFF81C784)),
+                            Container(
+                                width: 10,
+                                height: 3,
+                                color: AppColors.roomPointLeft),
                             const SizedBox(width: 4),
-                            Text(context.l10n.roomPositionLeft, style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            Text(context.l10n.roomPositionLeft,
+                                style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.tiny)),
                             const SizedBox(width: 8),
-                            Container(width: 10, height: 3, color: const Color(0xFFFFB74D)),
+                            Container(
+                                width: 10,
+                                height: 3,
+                                color: AppColors.roomPointRight),
                             const SizedBox(width: 4),
-                            Text(context.l10n.roomPositionRight, style: TextStyle(color: p.textTertiary, fontSize: 10)),
+                            Text(context.l10n.roomPositionRight,
+                                style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.tiny)),
                           ],
                         ),
                         const SizedBox(height: 2),
@@ -792,7 +1067,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           const SizedBox(width: AppSpacing.s6),
                           Text(l10n.rcMeasuredResponse,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: AppFontSize.caption)),
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption)),
                           const SizedBox(width: AppSpacing.md),
                           Container(
                               width: 10,
@@ -801,13 +1077,16 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           const SizedBox(width: AppSpacing.s6),
                           Text(l10n.rcFittedEqGain,
                               style: TextStyle(
-                                  color: p.textSecondary, fontSize: AppFontSize.caption)),
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.caption)),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         l10n.rcKeepPlayerPaused,
-                        style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+                        style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: AppFontSize.caption),
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       CheckboxListTile(
@@ -816,20 +1095,26 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         controlAffinity: ListTileControlAffinity.leading,
                         value: _mergeWithHeadphone,
                         activeColor: p.accent,
-                        onChanged: (v) => setState(
-                            () => _mergeWithHeadphone = v ?? false),
+                        onChanged: (v) =>
+                            setState(() => _mergeWithHeadphone = v ?? false),
                         title: Text(
                           l10n.rcStackWithHeadphoneEq,
                           style: TextStyle(
-                              color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.bodySmall),
                         ),
                         subtitle: Text(
                           l10n.rcStackWithHeadphoneEqSubtitle,
                           style: TextStyle(
-                              color: p.textSecondary, fontSize: AppFontSize.caption),
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
+                      if (_verification != null) ...[
+                        _verificationCard(p, l10n, _verification!),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
                       Row(
                         children: [
                           Expanded(
@@ -840,7 +1125,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   foregroundColor: p.textSecondary,
                                   side: BorderSide(color: p.hairline),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r12),
                                   ),
                                 ),
                                 onPressed: () => Navigator.of(context).pop(),
@@ -857,22 +1143,36 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r12),
                                   ),
                                 ),
-                                icon:
-                                    const Icon(Icons.check_rounded, size: 18),
+                                icon: const Icon(Icons.verified_rounded,
+                                    size: 18),
                                 label: Text(
-                                  l10n.rcApply,
+                                  _verification == null
+                                      ? l10n.rcApplyAndVerify
+                                      : l10n.rcApply,
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w700),
                                 ),
-                                onPressed: _apply,
+                                onPressed: _verification == null
+                                    ? _applyAndVerify
+                                    : _apply,
                               ),
                             ),
                           ),
                         ],
                       ),
+                      if (_verification == null) ...[
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          l10n.rcVerifyHint,
+                          style: TextStyle(
+                              color: p.textTertiary,
+                              fontSize: AppFontSize.caption),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: AppSpacing.xs),
                   ],
@@ -892,11 +1192,13 @@ class _ResponsePainter extends CustomPainter {
   final List<double> response;
   final List<double> gains;
   final List<List<double>> pointResponses;
+  final List<double> postResponse;
 
   _ResponsePainter({
     required this.response,
     required this.gains,
     this.pointResponses = const [],
+    this.postResponse = const [],
   });
 
   @override
@@ -914,9 +1216,9 @@ class _ResponsePainter extends CustomPainter {
     // If multi-point measurements exist, draw individual point curves
     if (pointResponses.length > 1) {
       final pointColors = [
-        const Color(0xAA4FC3F7), // Center: light blue
-        const Color(0xAA81C784), // Left: light green
-        const Color(0xAAFFB74D), // Right: light amber
+        AppColors.roomPointCenterLine, // Center: light blue
+        AppColors.roomPointLeftLine, // Left: light green
+        AppColors.roomPointRightLine, // Right: light amber
       ];
       for (int pIdx = 0; pIdx < pointResponses.length; pIdx++) {
         final pts = pointResponses[pIdx];
@@ -958,11 +1260,44 @@ class _ResponsePainter extends CustomPainter {
         Paint()..color = AppColors.emeraldDeep,
       );
     }
+
+    // Draw the post-correction (verified) response as a bright line so the
+    // flattening is visible directly against the pre-correction bars.
+    if (postResponse.length >= 2) {
+      final postPaint = Paint()
+        ..color = AppColors.emeraldDeep
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+      final postPath = Path();
+      for (var i = 0; i < postResponse.length; i++) {
+        final x = i * barW + barW / 2;
+        final r = (postResponse[i] / maxAbs).clamp(-1.0, 1.0);
+        final y = mid - (r * (size.height / 2 - 6));
+        if (i == 0) {
+          postPath.moveTo(x, y);
+        } else {
+          postPath.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(postPath, postPaint);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _ResponsePainter old) =>
-      old.response != response ||
-      old.gains != gains ||
-      old.pointResponses != pointResponses;
+      !listEquals(old.response, response) ||
+      !listEquals(old.gains, gains) ||
+      !_nestedListEquals(old.pointResponses, pointResponses) ||
+      !listEquals(old.postResponse, postResponse);
+
+  /// [_pointResponses] is mutated in place, so reference equality would miss
+  /// updates; compare the nested values instead.
+  static bool _nestedListEquals(List<List<double>> a, List<List<double>> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!listEquals(a[i], b[i])) return false;
+    }
+    return true;
+  }
 }

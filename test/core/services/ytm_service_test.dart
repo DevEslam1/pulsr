@@ -60,8 +60,7 @@ void main() {
       // one turned up in a queue. It routes to auth recovery instead.
       expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isBotBlocked,
           isFalse);
-      expect(
-          const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isAuth, isTrue);
+      expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isAuth, isTrue);
       // Throttling is its own verdict: minting a fresh token and retrying at
       // once is the worst possible response to a 429.
       expect(const YtmException('RATE_LIMITED').isBotBlocked, isFalse);
@@ -265,7 +264,8 @@ void main() {
       await expectLater(
           service.resolveStream('dQw4w9WgXcQ'), throwsA(isA<YtmException>()));
       expect(resolveCalls, equals(1),
-          reason: 'second resolve must short-circuit to backend, not burn another full chain');
+          reason:
+              'second resolve must short-circuit to backend, not burn another full chain');
     });
 
     test('resolveStream forwards quality parameter to platform channel',
@@ -391,12 +391,13 @@ void main() {
       await cubit.close();
     });
 
-    test('a settled search warms the top three hit stream URLs, capped at three',
+    test(
+        'a settled search warms the top three hit stream URLs, capped at three',
         () async {
       YtmTrack hit(String id) =>
           YtmTrack.fromChannel(_resultRow(videoId: id, title: id))!;
-      when(() => service.searchWithFallback(any())).thenAnswer((_) async =>
-          [hit('hit1'), hit('hit2'), hit('hit3'), hit('hit4')]);
+      when(() => service.searchWithFallback(any())).thenAnswer(
+          (_) async => [hit('hit1'), hit('hit2'), hit('hit3'), hit('hit4')]);
       when(() => service.isBotCoolingDown).thenReturn(false);
       when(() => service.resolveStream(any())).thenAnswer((_) async =>
           const YtmStream(
