@@ -636,7 +636,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                 ],
                 CachedArtwork(
                   id: song.id,
-                  remoteUrl: song.remoteArtworkUrl,
+                  remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                  albumId: song.albumId,
                   type: ArtworkType.AUDIO,
                   size: 44,
                   borderRadius: AppRadii.r10,

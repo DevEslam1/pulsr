@@ -95,7 +95,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         Positioned.fill(
                           child: CachedArtwork(
                             id: song.id,
-                            remoteUrl: song.remoteArtworkUrl,
+                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                            albumId: song.albumId,
                             type: ArtworkType.AUDIO,
                             size: double.infinity,
                             borderRadius: 18,

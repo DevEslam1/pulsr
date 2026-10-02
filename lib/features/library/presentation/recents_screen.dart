@@ -331,7 +331,8 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                           // Artwork
                                           CachedArtwork(
                                             id: song.id,
-                                            remoteUrl: song.remoteArtworkUrl,
+                                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                                            albumId: song.albumId,
                                             type: ArtworkType.AUDIO,
                                             size: 46,
                                             borderRadius: 12,
