@@ -78,4 +78,23 @@ void main() {
       expect(cache.get('memory_only_key'), equals(bytes));
     });
   });
+
+  group('CachedArtwork.invalidate', () {
+    test('drops every quality tier for the target id and bumps revision',
+        () async {
+      final cache = ArtworkLruCache();
+      cache.put('AUDIO_42', Uint8List.fromList([1]));
+      cache.put('AUDIO_42_hq', Uint8List.fromList([2]));
+      cache.put('AUDIO_43', Uint8List.fromList([3]));
+
+      final before = ArtworkInvalidationBus.revision.value;
+      await CachedArtwork.invalidate(id: 42);
+
+      expect(cache.containsKey('AUDIO_42'), isFalse);
+      expect(cache.containsKey('AUDIO_42_hq'), isFalse);
+      expect(cache.containsKey('AUDIO_43'), isTrue,
+          reason: 'unrelated artwork must survive');
+      expect(ArtworkInvalidationBus.revision.value, greaterThan(before));
+    });
+  });
 }

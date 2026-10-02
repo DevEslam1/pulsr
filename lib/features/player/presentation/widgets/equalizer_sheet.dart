@@ -1,5 +1,6 @@
 // lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1179,644 +1180,880 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             alignment: Alignment.bottomCenter,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+                maxWidth: context.isLandscape
+                    ? math.min(MediaQuery.sizeOf(context).width * 0.94, 760.0)
+                    : Adaptive.sheetConstraints(context).maxWidth,
                 maxHeight: MediaQuery.sizeOf(context).height *
                     (context.isLandscape ? 0.95 : 0.84),
               ),
               child: Material(
                 color: p.surface,
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppRadii.r28)),
+                borderRadius: context.isLandscape
+                    ? BorderRadius.circular(AppRadii.r24)
+                    : const BorderRadius.vertical(
+                        top: Radius.circular(AppRadii.r28)),
                 clipBehavior: Clip.antiAlias,
                 child: SafeArea(
                   top: false,
-                  child: Column(
-                    children: [
-                      // Top Handle & Inspector Bar
-                      Padding(
-                        padding: const EdgeInsetsDirectional.fromSTEB(
-                            AppSpacing.md,
-                            AppSpacing.s10,
-                            AppSpacing.md,
-                            AppSpacing.xxs),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              tooltip: context.l10n.dspResetAllEqTooltip,
-                              icon: Icon(Icons.restart_alt_rounded,
-                                  color: dspBlockedGlobal != null
-                                      ? p.textTertiary.withValues(alpha: 0.4)
-                                      : p.accent,
-                                  size: 20),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                  minWidth: AppSpacing.minTouchTarget,
-                                  minHeight: AppSpacing.minTouchTarget),
-                              onPressed: dspBlockedGlobal != null
-                                  ? null
-                                  : () => _resetAllDspDefaults(context, cubit),
-                            ),
-                            const Spacer(),
-                            Container(
-                              width: 40,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: p.hairline,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r2),
-                              ),
-                            ),
-                            const Spacer(),
-                            PopupMenuButton<String>(
-                              tooltip: context.l10n.dspPresetOptions,
-                              icon: Icon(Icons.more_vert_rounded,
-                                  color: p.accent, size: 20),
-                              color: p.surfaceContainer,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r16)),
-                              onSelected: (value) {
-                                switch (value) {
-                                  case 'save':
-                                    _showSaveCustomPresetDialog(cubit, state);
-                                    break;
-                                  case 'export':
-                                    _exportCurrentPreset(context, cubit);
-                                    break;
-                                  case 'import':
-                                    _importPresetDialog(context, cubit);
-                                    break;
-                                  case 'inspector':
-                                    DspInspectorSheet.show(context);
-                                    break;
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'save',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.save_rounded,
-                                          size: 18, color: p.textPrimary),
-                                      const SizedBox(width: AppSpacing.s10),
-                                      Text(context.l10n.saveCustomEqPreset,
-                                          style: TextStyle(
-                                              color: p.textPrimary,
-                                              fontSize: AppFontSize.bodySmall)),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'export',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.upload_rounded,
-                                          size: 18, color: p.textPrimary),
-                                      const SizedBox(width: AppSpacing.s10),
-                                      Text(context.l10n.exportPresetJson,
-                                          style: TextStyle(
-                                              color: p.textPrimary,
-                                              fontSize: AppFontSize.bodySmall)),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'import',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.download_rounded,
-                                          size: 18, color: p.textPrimary),
-                                      const SizedBox(width: AppSpacing.s10),
-                                      Text(context.l10n.importPresetJson,
-                                          style: TextStyle(
-                                              color: p.textPrimary,
-                                              fontSize: AppFontSize.bodySmall)),
-                                    ],
-                                  ),
-                                ),
-                                const PopupMenuDivider(),
-                                PopupMenuItem(
-                                  value: 'inspector',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.sensors_rounded,
-                                          size: 18, color: p.accent),
-                                      const SizedBox(width: AppSpacing.s10),
-                                      Text(context.l10n.dspInspector,
-                                          style: TextStyle(
-                                              color: p.accent,
-                                              fontSize: AppFontSize.bodySmall)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.s6),
-
-                      // Essential vs Studio Mode Switcher
-                      _buildModeSwitcher(context, p, isStudio),
-                      const SizedBox(height: AppSpacing.s6),
-
-                      if (!isStudio)
-                        Expanded(
-                          child: _buildEssentialView(
-                            context,
-                            cubit,
-                            state,
-                            p,
-                            dspBlockedGlobal,
-                          ),
+                  child: context.isLandscape
+                      ? _buildLandscapeLayout(
+                          context,
+                          cubit,
+                          state,
+                          p,
+                          dspBlockedGlobal,
+                          isStudio,
                         )
-                      else ...[
-                        // Separated EQ and DSP Master Toggles
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md),
-                          child: LayoutBuilder(
-                            builder: (context, cardConstraints) {
-                              final isWide = cardConstraints.maxWidth >= 560;
-                              // 1. Equalizer (EQ) Toggle Card
-                              final eqCard = Material(
-                                color: Colors.transparent,
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    color: state.isEqEnabled
-                                        ? p.accent.withValues(alpha: 0.08)
-                                        : p.surfaceContainer,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
-                                    border: Border.all(
-                                      color: state.isEqEnabled
-                                          ? p.accent.withValues(alpha: 0.35)
-                                          : p.hairline,
-                                    ),
-                                  ),
-                                  child: InkWell(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
-                                    onTap: dspBlockedGlobal != null &&
-                                            !state.isEqEnabled
-                                        ? null
-                                        : () {
-                                            cubit.setEqualizerEnabled(
-                                                !state.isEqEnabled);
-                                            _tabController.animateTo(0);
-                                          },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.sm,
-                                          vertical: AppSpacing.xs),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(
-                                                AppSpacing.s6),
-                                            decoration: BoxDecoration(
-                                              color: state.isEqEnabled
-                                                  ? p.accent
-                                                      .withValues(alpha: 0.2)
-                                                  : p.surfaceContainerHigh,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      AppRadii.r8),
-                                            ),
-                                            child: Icon(
-                                              Icons.graphic_eq_rounded,
-                                              color: state.isEqEnabled
-                                                  ? p.accent
-                                                  : p.textSecondary,
-                                              size: 18,
-                                            ),
-                                          ),
-                                          const SizedBox(width: AppSpacing.s10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      context
-                                                          .l10n.equalizerTitle,
-                                                      style: TextStyle(
-                                                        fontSize: AppFontSize
-                                                            .bodySmall,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: p.textPrimary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(
-                                                        width: AppSpacing.s6),
-                                                    Container(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal:
-                                                              AppSpacing.s6,
-                                                          vertical:
-                                                              AppSpacing.s2),
-                                                      decoration: BoxDecoration(
-                                                        color: state.isEqEnabled
-                                                            ? (dspBlockedGlobal !=
-                                                                    null
-                                                                ? p.error
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.15)
-                                                                : p.accent
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.2))
-                                                            : p.surfaceContainerHigh,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(
-                                                                    AppRadii
-                                                                        .r4),
-                                                      ),
-                                                      child: Text(
-                                                        dspBlockedGlobal != null
-                                                            ? context
-                                                                .l10n.dspBlocked
-                                                            : (state.isEqEnabled
-                                                                ? context.l10n
-                                                                    .dspStatOn
-                                                                : context.l10n
-                                                                    .dspStatOff),
-                                                        style: TextStyle(
-                                                          fontSize:
-                                                              AppFontSize.tiny,
-                                                          fontWeight:
-                                                              FontWeight.w800,
-                                                          color: dspBlockedGlobal !=
-                                                                  null
-                                                              ? p.error
-                                                              : (state.isEqEnabled
-                                                                  ? p.accent
-                                                                  : p.textTertiary),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(
-                                                    height: AppSpacing.s2),
-                                                Text(
-                                                  dspBlockedGlobal != null
-                                                      ? context.l10n
-                                                          .dspBlockedBitPerfect
-                                                      : (state.isEqEnabled
-                                                          ? (state.selectedHeadphoneProfile !=
-                                                                  null
-                                                              ? '${context.l10n.dspTunedFor} ${state.selectedHeadphoneProfile!.name}'
-                                                              : '${context.l10n.dspPresetLabel} ${state.eqPreset.name}')
-                                                          : context.l10n
-                                                              .dspEqCurvesBypassed),
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        AppFontSize.caption,
-                                                    color:
-                                                        dspBlockedGlobal != null
-                                                            ? p.error
-                                                            : p.textTertiary,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                                Icons.info_outline_rounded,
-                                                size: 16,
-                                                color: p.textTertiary),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            tooltip:
-                                                context.l10n.dspAboutEqualizer,
-                                            onPressed: () => _showFeatureInfo(
-                                              context,
-                                              AudioFeatureRegistry.equalizer,
-                                              conflictReason: dspBlockedGlobal,
-                                            ),
-                                          ),
-                                          Opacity(
-                                            opacity: dspBlockedGlobal != null &&
-                                                    !state.isEqEnabled
-                                                ? 0.45
-                                                : 1.0,
-                                            child: Switch.adaptive(
-                                              value: dspBlockedGlobal == null &&
-                                                  state.isEqEnabled,
-                                              activeTrackColor: p.accent,
-                                              activeThumbColor: p.onAccent,
-                                              onChanged: dspBlockedGlobal !=
-                                                          null &&
-                                                      !state.isEqEnabled
-                                                  ? null
-                                                  : (val) => cubit
-                                                      .setEqualizerEnabled(val),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-
-                              // 2. DSP & Spatial Effects Toggle Card
-                              final dspCard = Material(
-                                color: Colors.transparent,
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    color: state.isDspEffectsActive
-                                        ? p.accent.withValues(alpha: 0.08)
-                                        : p.surfaceContainer,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
-                                    border: Border.all(
-                                      color: state.isDspEffectsActive
-                                          ? p.accent.withValues(alpha: 0.35)
-                                          : p.hairline,
-                                    ),
-                                  ),
-                                  child: InkWell(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
-                                    onTap: dspBlockedGlobal != null &&
-                                            !state.isDspEffectsActive
-                                        ? null
-                                        : () {
-                                            cubit.setDspEffectsEnabled(
-                                                !state.isDspEffectsActive);
-                                            _tabController.animateTo(2);
-                                          },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.sm,
-                                          vertical: AppSpacing.xs),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(
-                                                AppSpacing.s6),
-                                            decoration: BoxDecoration(
-                                              color: state.isDspEffectsActive
-                                                  ? p.accent
-                                                      .withValues(alpha: 0.2)
-                                                  : p.surfaceContainerHigh,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      AppRadii.r8),
-                                            ),
-                                            child: Icon(
-                                              Icons.multitrack_audio_rounded,
-                                              color: state.isDspEffectsActive
-                                                  ? p.accent
-                                                  : p.textSecondary,
-                                              size: 18,
-                                            ),
-                                          ),
-                                          const SizedBox(width: AppSpacing.s10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      context
-                                                          .l10n.dspSpatialTitle,
-                                                      style: TextStyle(
-                                                        fontSize: AppFontSize
-                                                            .bodySmall,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: p.textPrimary,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(
-                                                        width: AppSpacing.s6),
-                                                    Container(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal:
-                                                              AppSpacing.s6,
-                                                          vertical:
-                                                              AppSpacing.s2),
-                                                      decoration: BoxDecoration(
-                                                        color: state
-                                                                .isDspEffectsActive
-                                                            ? (dspBlockedGlobal !=
-                                                                    null
-                                                                ? p.error
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.15)
-                                                                : p.accent
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.2))
-                                                            : p.surfaceContainerHigh,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(
-                                                                    AppRadii
-                                                                        .r4),
-                                                      ),
-                                                      child: Text(
-                                                        dspBlockedGlobal != null
-                                                            ? context
-                                                                .l10n.dspBlocked
-                                                            : (state.isDspEffectsActive
-                                                                ? context.l10n
-                                                                    .dspStatOn
-                                                                : context.l10n
-                                                                    .dspStatOff),
-                                                        style: TextStyle(
-                                                          fontSize:
-                                                              AppFontSize.tiny,
-                                                          fontWeight:
-                                                              FontWeight.w800,
-                                                          color: dspBlockedGlobal !=
-                                                                  null
-                                                              ? p.error
-                                                              : (state.isDspEffectsActive
-                                                                  ? p.accent
-                                                                  : p.textTertiary),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(
-                                                    height: AppSpacing.s2),
-                                                Text(
-                                                  dspBlockedGlobal != null
-                                                      ? context.l10n
-                                                          .dspBlockedBitPerfect
-                                                      : (state.isDspEffectsActive
-                                                          ? '${state.activeDspEffectStagesCount} ${context.l10n.dspActiveEffects}'
-                                                          : context.l10n
-                                                              .dspAllEffectsBypassed),
-                                                  style: TextStyle(
-                                                    fontSize:
-                                                        AppFontSize.caption,
-                                                    color:
-                                                        dspBlockedGlobal != null
-                                                            ? p.error
-                                                            : p.textTertiary,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: Icon(
-                                                Icons.info_outline_rounded,
-                                                size: 16,
-                                                color: p.textTertiary),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            tooltip:
-                                                context.l10n.dspAboutDspEngine,
-                                            onPressed: () => _showFeatureInfo(
-                                              context,
-                                              AudioFeatureRegistry.spatializer,
-                                              conflictReason: dspBlockedGlobal,
-                                            ),
-                                          ),
-                                          Opacity(
-                                            opacity: dspBlockedGlobal != null &&
-                                                    !state.isDspEffectsActive
-                                                ? 0.45
-                                                : 1.0,
-                                            child: Switch.adaptive(
-                                              value: state.isDspEffectsActive,
-                                              activeTrackColor: p.accent,
-                                              activeThumbColor: p.onAccent,
-                                              onChanged: dspBlockedGlobal !=
-                                                          null &&
-                                                      !state.isDspEffectsActive
-                                                  ? null
-                                                  : (val) => cubit
-                                                      .setDspEffectsEnabled(
-                                                          val),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-
-                              if (isWide) {
-                                return Row(
-                                  children: [
-                                    Expanded(child: eqCard),
-                                    const SizedBox(width: AppSpacing.s8),
-                                    Expanded(child: dspCard),
-                                  ],
-                                );
-                              }
-                              return Column(
-                                children: [
-                                  eqCard,
-                                  const SizedBox(height: AppSpacing.s6),
-                                  dspCard,
-                                ],
-                              );
-                            },
-                          ),
+                      : _buildPortraitLayout(
+                          context,
+                          cubit,
+                          state,
+                          p,
+                          dspBlockedGlobal,
+                          isStudio,
                         ),
-                        const SizedBox(height: AppSpacing.s6),
-
-                        // Top Hardware Device Profile Bar (JamesDSP parity)
-                        _buildHardwareDeviceProfileBar(
-                            context, cubit, state, p),
-                        const SizedBox(height: AppSpacing.xs),
-
-                        // The AutoEq and Spatial & DSP tabs are intentionally not
-                        // exposed in the Equalizer dialog. Headphone correction is
-                        // applied automatically by Smart Audio and the advanced DSP
-                        // stages live in Settings (Professional mode).
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.md),
-                                child: Container(
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: p.surfaceContainer,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r20),
-                                    border: Border.all(color: p.hairline),
-                                  ),
-                                  child: TabBar(
-                                    controller: _tabController,
-                                    tabAlignment: TabAlignment.fill,
-                                    indicator: BoxDecoration(
-                                      color: p.accent,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r20),
-                                    ),
-                                    indicatorSize: TabBarIndicatorSize.tab,
-                                    labelColor: p.onAccent,
-                                    unselectedLabelColor: p.textSecondary,
-                                    labelStyle: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: AppFontSize.label),
-                                    dividerColor: Colors.transparent,
-                                    tabs: [
-                                      Tab(text: context.l10n.equalizer),
-                                      Tab(text: 'AutoEq'),
-                                      Tab(text: context.l10n.dspSpatialTab),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Expanded(
-                                child: TabBarView(
-                                  controller: _tabController,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  children: [
-                                    _buildEqualizerTab(
-                                        context, cubit, state, p),
-                                    _buildAutoEqTab(context, cubit, state, p),
-                                    _buildSpatialDynamicsTab(
-                                        context, cubit, state, p),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Portrait & Landscape Layout Builders
+  // ---------------------------------------------------------------------------
+  Widget _buildPortraitLayout(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlockedGlobal,
+    bool isStudio,
+  ) {
+    return Column(
+      children: [
+        _buildTopBar(context, cubit, state, p, dspBlockedGlobal),
+        const SizedBox(height: AppSpacing.s6),
+        _buildModeSwitcher(context, p, isStudio),
+        const SizedBox(height: AppSpacing.s6),
+        if (!isStudio)
+          Expanded(
+            child: _buildEssentialView(
+              context,
+              cubit,
+              state,
+              p,
+              dspBlockedGlobal,
+            ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: LayoutBuilder(
+              builder: (context, cardConstraints) {
+                final isWide = cardConstraints.maxWidth >= 440;
+                final eqCard = _buildEqualizerToggleCard(
+                    context, cubit, state, p, dspBlockedGlobal);
+                final dspCard = _buildDspToggleCard(
+                    context, cubit, state, p, dspBlockedGlobal);
+                if (isWide) {
+                  return Row(
+                    children: [
+                      Expanded(child: eqCard),
+                      const SizedBox(width: AppSpacing.s8),
+                      Expanded(child: dspCard),
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    eqCard,
+                    const SizedBox(height: AppSpacing.s6),
+                    dspCard,
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s6),
+          _buildHardwareDeviceProfileBar(context, cubit, state, p),
+          const SizedBox(height: AppSpacing.xs),
+          Expanded(
+            child: Column(
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.r20),
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      tabAlignment: TabAlignment.fill,
+                      indicator: BoxDecoration(
+                        color: p.accent,
+                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelColor: p.onAccent,
+                      unselectedLabelColor: p.textSecondary,
+                      labelStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.label),
+                      dividerColor: Colors.transparent,
+                      tabs: [
+                        Tab(text: context.l10n.equalizer),
+                        Tab(text: 'AutoEq'),
+                        Tab(text: context.l10n.dspSpatialTab),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildEqualizerTab(context, cubit, state, p),
+                      _buildAutoEqTab(context, cubit, state, p),
+                      _buildSpatialDynamicsTab(context, cubit, state, p),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLandscapeLayout(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlockedGlobal,
+    bool isStudio,
+  ) {
+    return Column(
+      children: [
+        _buildTopBar(context, cubit, state, p, dspBlockedGlobal),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left control rack
+              SizedBox(
+                width: 270,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.md, 0, AppSpacing.sm, AppSpacing.sm),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildModeSwitcher(context, p, isStudio),
+                      const SizedBox(height: AppSpacing.xs),
+                      if (isStudio) ...[
+                        _buildEqualizerToggleCard(
+                            context, cubit, state, p, dspBlockedGlobal),
+                        const SizedBox(height: AppSpacing.xs),
+                        _buildDspToggleCard(
+                            context, cubit, state, p, dspBlockedGlobal),
+                        const SizedBox(height: AppSpacing.xs),
+                        _buildHardwareDeviceProfileBar(
+                            context, cubit, state, p,
+                            compact: true),
+                      ] else ...[
+                        _buildEssentialControlsPane(
+                            context, cubit, state, p, dspBlockedGlobal),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: p.hairline,
+              ),
+              // Right workspace (tabs + active panel)
+              Expanded(
+                child: isStudio
+                    ? Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm,
+                                vertical: AppSpacing.xxs),
+                            child: Container(
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: p.surfaceContainer,
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r20),
+                                border: Border.all(color: p.hairline),
+                              ),
+                              child: TabBar(
+                                controller: _tabController,
+                                tabAlignment: TabAlignment.fill,
+                                indicator: BoxDecoration(
+                                  color: p.accent,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r20),
+                                ),
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                labelColor: p.onAccent,
+                                unselectedLabelColor: p.textSecondary,
+                                labelStyle: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: AppFontSize.label),
+                                dividerColor: Colors.transparent,
+                                tabs: [
+                                  Tab(text: context.l10n.equalizer),
+                                  Tab(text: 'AutoEq'),
+                                  Tab(text: context.l10n.dspSpatialTab),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              controller: _tabController,
+                              physics: const NeverScrollableScrollPhysics(),
+                              children: [
+                                _buildEqualizerTab(context, cubit, state, p),
+                                _buildAutoEqTab(context, cubit, state, p),
+                                _buildSpatialDynamicsTab(
+                                    context, cubit, state, p),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : _buildEssentialSlidersPane(
+                        context, cubit, state, p, dspBlockedGlobal),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Modular Top Bar & Toggle Cards
+  // ---------------------------------------------------------------------------
+  Widget _buildTopBar(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlockedGlobal,
+  ) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          AppSpacing.md, AppSpacing.s8, AppSpacing.md, AppSpacing.xxs),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: context.l10n.dspResetAllEqTooltip,
+            icon: Icon(Icons.restart_alt_rounded,
+                color: dspBlockedGlobal != null
+                    ? p.textTertiary.withValues(alpha: 0.4)
+                    : p.accent,
+                size: 20),
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
+            onPressed: dspBlockedGlobal != null
+                ? null
+                : () => _resetAllDspDefaults(context, cubit),
+          ),
+          const Spacer(),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: p.hairline,
+              borderRadius: BorderRadius.circular(AppRadii.r2),
+            ),
+          ),
+          const Spacer(),
+          PopupMenuButton<String>(
+            tooltip: context.l10n.dspPresetOptions,
+            icon: Icon(Icons.more_vert_rounded, color: p.accent, size: 20),
+            color: p.surfaceContainer,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.r16)),
+            onSelected: (value) {
+              switch (value) {
+                case 'save':
+                  _showSaveCustomPresetDialog(cubit, state);
+                  break;
+                case 'export':
+                  _exportCurrentPreset(context, cubit);
+                  break;
+                case 'import':
+                  _importPresetDialog(context, cubit);
+                  break;
+                case 'inspector':
+                  DspInspectorSheet.show(context);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'save',
+                child: Row(
+                  children: [
+                    Icon(Icons.save_rounded, size: 18, color: p.textPrimary),
+                    const SizedBox(width: AppSpacing.s10),
+                    Text(context.l10n.saveCustomEqPreset,
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(Icons.upload_rounded, size: 18, color: p.textPrimary),
+                    const SizedBox(width: AppSpacing.s10),
+                    Text(context.l10n.exportPresetJson,
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'import',
+                child: Row(
+                  children: [
+                    Icon(Icons.download_rounded,
+                        size: 18, color: p.textPrimary),
+                    const SizedBox(width: AppSpacing.s10),
+                    Text(context.l10n.importPresetJson,
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall)),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'inspector',
+                child: Row(
+                  children: [
+                    Icon(Icons.sensors_rounded, size: 18, color: p.accent),
+                    const SizedBox(width: AppSpacing.s10),
+                    Text(context.l10n.dspInspector,
+                        style: TextStyle(
+                            color: p.accent, fontSize: AppFontSize.bodySmall)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEqualizerToggleCard(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlockedGlobal,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: state.isEqEnabled
+              ? p.accent.withValues(alpha: 0.08)
+              : p.surfaceContainer,
+          borderRadius: BorderRadius.circular(AppRadii.r12),
+          border: Border.all(
+            color: state.isEqEnabled
+                ? p.accent.withValues(alpha: 0.35)
+                : p.hairline,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.r12),
+          onTap: dspBlockedGlobal != null && !state.isEqEnabled
+              ? null
+              : () {
+                  cubit.setEqualizerEnabled(!state.isEqEnabled);
+                  _tabController.animateTo(0);
+                },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s6),
+                  decoration: BoxDecoration(
+                    color: state.isEqEnabled
+                        ? p.accent.withValues(alpha: 0.2)
+                        : p.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                  ),
+                  child: Icon(
+                    Icons.graphic_eq_rounded,
+                    color: state.isEqEnabled ? p.accent : p.textSecondary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              context.l10n.equalizerTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSize.bodySmall,
+                                fontWeight: FontWeight.w700,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.s6,
+                                vertical: AppSpacing.s2),
+                            decoration: BoxDecoration(
+                              color: state.isEqEnabled
+                                  ? (dspBlockedGlobal != null
+                                      ? p.error.withValues(alpha: 0.15)
+                                      : p.accent.withValues(alpha: 0.2))
+                                  : p.surfaceContainerHigh,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadii.r4),
+                            ),
+                            child: Text(
+                              dspBlockedGlobal != null
+                                  ? context.l10n.dspBlocked
+                                  : (state.isEqEnabled
+                                      ? context.l10n.dspStatOn
+                                      : context.l10n.dspStatOff),
+                              style: TextStyle(
+                                fontSize: AppFontSize.tiny,
+                                fontWeight: FontWeight.w800,
+                                color: dspBlockedGlobal != null
+                                    ? p.error
+                                    : (state.isEqEnabled
+                                        ? p.accent
+                                        : p.textTertiary),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s2),
+                      Text(
+                        dspBlockedGlobal != null
+                            ? context.l10n.dspBlockedBitPerfect
+                            : (state.isEqEnabled
+                                ? (state.selectedHeadphoneProfile != null
+                                    ? '${context.l10n.dspTunedFor} ${state.selectedHeadphoneProfile!.name}'
+                                    : '${context.l10n.dspPresetLabel} ${state.eqPreset.name}')
+                                : context.l10n.dspEqCurvesBypassed),
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          color: dspBlockedGlobal != null
+                              ? p.error
+                              : p.textTertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: context.l10n.dspAboutEqualizer,
+                  onPressed: () => _showFeatureInfo(
+                    context,
+                    AudioFeatureRegistry.equalizer,
+                    conflictReason: dspBlockedGlobal,
+                  ),
+                ),
+                Opacity(
+                  opacity: dspBlockedGlobal != null && !state.isEqEnabled
+                      ? 0.45
+                      : 1.0,
+                  child: Switch.adaptive(
+                    value: dspBlockedGlobal == null && state.isEqEnabled,
+                    activeTrackColor: p.accent,
+                    activeThumbColor: p.onAccent,
+                    onChanged: dspBlockedGlobal != null && !state.isEqEnabled
+                        ? null
+                        : (val) => cubit.setEqualizerEnabled(val),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDspToggleCard(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlockedGlobal,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: state.isDspEffectsActive
+              ? p.accent.withValues(alpha: 0.08)
+              : p.surfaceContainer,
+          borderRadius: BorderRadius.circular(AppRadii.r12),
+          border: Border.all(
+            color: state.isDspEffectsActive
+                ? p.accent.withValues(alpha: 0.35)
+                : p.hairline,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.r12),
+          onTap: dspBlockedGlobal != null && !state.isDspEffectsActive
+              ? null
+              : () {
+                  cubit.setDspEffectsEnabled(!state.isDspEffectsActive);
+                  _tabController.animateTo(2);
+                },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s6),
+                  decoration: BoxDecoration(
+                    color: state.isDspEffectsActive
+                        ? p.accent.withValues(alpha: 0.2)
+                        : p.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                  ),
+                  child: Icon(
+                    Icons.multitrack_audio_rounded,
+                    color: state.isDspEffectsActive
+                        ? p.accent
+                        : p.textSecondary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              context.l10n.dspSpatialTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSize.bodySmall,
+                                fontWeight: FontWeight.w700,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.s6,
+                                vertical: AppSpacing.s2),
+                            decoration: BoxDecoration(
+                              color: state.isDspEffectsActive
+                                  ? (dspBlockedGlobal != null
+                                      ? p.error.withValues(alpha: 0.15)
+                                      : p.accent.withValues(alpha: 0.2))
+                                  : p.surfaceContainerHigh,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadii.r4),
+                            ),
+                            child: Text(
+                              dspBlockedGlobal != null
+                                  ? context.l10n.dspBlocked
+                                  : (state.isDspEffectsActive
+                                      ? context.l10n.dspStatOn
+                                      : context.l10n.dspStatOff),
+                              style: TextStyle(
+                                fontSize: AppFontSize.tiny,
+                                fontWeight: FontWeight.w800,
+                                color: dspBlockedGlobal != null
+                                    ? p.error
+                                    : (state.isDspEffectsActive
+                                        ? p.accent
+                                        : p.textTertiary),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s2),
+                      Text(
+                        dspBlockedGlobal != null
+                            ? context.l10n.dspBlockedBitPerfect
+                            : (state.isDspEffectsActive
+                                ? '${state.activeDspEffectStagesCount} ${context.l10n.dspActiveEffects}'
+                                : context.l10n.dspAllEffectsBypassed),
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          color: dspBlockedGlobal != null
+                              ? p.error
+                              : p.textTertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: context.l10n.dspAboutDspEngine,
+                  onPressed: () => _showFeatureInfo(
+                    context,
+                    AudioFeatureRegistry.spatializer,
+                    conflictReason: dspBlockedGlobal,
+                  ),
+                ),
+                Opacity(
+                  opacity: dspBlockedGlobal != null &&
+                          !state.isDspEffectsActive
+                      ? 0.45
+                      : 1.0,
+                  child: Switch.adaptive(
+                    value: state.isDspEffectsActive,
+                    activeTrackColor: p.accent,
+                    activeThumbColor: p.onAccent,
+                    onChanged: dspBlockedGlobal != null &&
+                            !state.isDspEffectsActive
+                        ? null
+                        : (val) => cubit.setDspEffectsEnabled(val),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEssentialControlsPane(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlocked,
+  ) {
+    final preset = state.eqPreset;
+    final simplifiedPresets = <(String, EqPreset)>[
+      ('Flat', EqPreset.defaultPresets.firstWhere((p) => p.name == 'Flat')),
+      (
+        'Bass Boost',
+        EqPreset.defaultPresets.firstWhere((p) => p.name == 'Bass Boost')
+      ),
+      (
+        'Vocal',
+        EqPreset.defaultPresets.firstWhere((p) => p.name == 'Vocal Boost',
+            orElse: () => EqPreset.defaultPresets.first)
+      ),
+      (
+        'Treble',
+        const EqPreset(
+            name: 'Treble',
+            gains: [-1, -0.5, 0, 0, 1, 2, 3.5, 5, 6, 6.5],
+            bassBoost: 0.0)
+      ),
+      ('Custom', EqPreset(name: 'Custom', gains: List.filled(10, 0.0))),
+    ];
+    final isStandardPreset =
+        ['Flat', 'Bass Boost', 'Vocal Boost', 'Treble'].contains(preset.name);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (dspBlocked != null) ...[
+          _conflictBanner(dspBlocked, p),
+          const SizedBox(height: AppSpacing.xs),
+        ],
+        Text(
+          context.l10n.eqSoundProfiles,
+          style: TextStyle(
+            fontSize: AppFontSize.tiny,
+            fontWeight: FontWeight.w800,
+            letterSpacing: AppTracking.wide,
+            color: p.textTertiary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: simplifiedPresets.map((entry) {
+            final label = entry.$1;
+            final itemPreset = entry.$2;
+            final bool isSelected = label == 'Custom'
+                ? !isStandardPreset
+                : (preset.name == itemPreset.name ||
+                    (label == 'Vocal' && preset.name == 'Vocal Boost'));
+
+            return ChoiceChip(
+              label: Text(label),
+              selected: isSelected,
+              selectedColor: p.accent.withValues(alpha: 0.22),
+              backgroundColor: p.surfaceContainer,
+              side: BorderSide(
+                color: isSelected
+                    ? p.accent.withValues(alpha: 0.5)
+                    : p.hairline,
+              ),
+              labelStyle: TextStyle(
+                color: isSelected ? p.accent : p.textSecondary,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: AppFontSize.label,
+              ),
+              onSelected: dspBlocked != null
+                  ? null
+                  : (_) {
+                      HapticFeedback.selectionClick();
+                      if (!state.isEqEnabled) {
+                        cubit.setEqualizerEnabled(true);
+                      }
+                      if (label == 'Custom') {
+                        cubit.applyPreset(EqPreset(
+                            name: 'Custom',
+                            gains: List<double>.from(state.eqPreset.gains)));
+                      } else {
+                        cubit.applyPreset(itemPreset);
+                      }
+                    },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          width: double.infinity,
+          height: 40,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.tune_rounded, size: 16),
+            label: Text(context.l10n.eqUnlockStudioConsole,
+                style: const TextStyle(fontSize: AppFontSize.label)),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _setStudioMode(context, true);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEssentialSlidersPane(
+    BuildContext context,
+    PlayerCubit cubit,
+    PlayerState state,
+    PulsrPalette p,
+    String? dspBlocked,
+  ) {
+    final bassVal = _getBassGain(state);
+    final midVal = _getMidGain(state);
+    final trebleVal = _getTrebleGain(state);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            context.l10n.eqQuickToneDials,
+            style: TextStyle(
+              fontSize: AppFontSize.tiny,
+              fontWeight: FontWeight.w800,
+              letterSpacing: AppTracking.wide,
+              color: p.textTertiary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          _buildMacroSliderRow(
+            context: context,
+            icon: Icons.speaker_rounded,
+            title: context.l10n.eqMacroBassTitle,
+            subtitle: context.l10n.eqMacroBassDesc,
+            value: bassVal,
+            accentColor: p.accent,
+            p: p,
+            onChanged: (val) => _setBassMacro(cubit, state, val),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          _buildMacroSliderRow(
+            context: context,
+            icon: Icons.mic_rounded,
+            title: context.l10n.eqMacroMidTitle,
+            subtitle: context.l10n.eqMacroMidDesc,
+            value: midVal,
+            accentColor: AppColors.accentCyan,
+            p: p,
+            onChanged: (val) => _setMidMacro(cubit, state, val),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          _buildMacroSliderRow(
+            context: context,
+            icon: Icons.auto_awesome_rounded,
+            title: context.l10n.eqMacroTrebleTitle,
+            subtitle: context.l10n.eqMacroTrebleDesc,
+            value: trebleVal,
+            accentColor: AppColors.warning,
+            p: p,
+            onChanged: (val) => _setTrebleMacro(cubit, state, val),
+          ),
+        ],
       ),
     );
   }
@@ -6899,7 +7136,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   }
 
   Widget _buildHardwareDeviceProfileBar(BuildContext context, PlayerCubit cubit,
-      PlayerState state, PulsrPalette p) {
+      PlayerState state, PulsrPalette p, {bool compact = false}) {
     AudioOutputInfo? output;
     try {
       output = context.select<SettingsCubit?, AudioOutputInfo?>(
@@ -6924,10 +7161,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         devName.contains('speaker');
 
     return Container(
-      margin: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s6, vertical: AppSpacing.xxs),
+      margin: EdgeInsets.symmetric(
+          horizontal: compact ? AppSpacing.xxs : AppSpacing.md,
+          vertical: AppSpacing.xxs),
+      padding: EdgeInsets.symmetric(
+          horizontal: compact ? AppSpacing.xxs : AppSpacing.s6,
+          vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(AppRadii.r16),

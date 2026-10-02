@@ -2344,6 +2344,10 @@
       "title": {}
     }
   },
+  "removeFromFavorites": "Remove from Favorites",
+  "@removeFromFavorites": {
+    "description": "Swipe action that unfavorites a track"
+  },
   "cornerRadiusLabel": "Card & Artwork Corner Radius ({px}px)",
   "@cornerRadiusLabel": {
     "description": "tranche7 tpl",

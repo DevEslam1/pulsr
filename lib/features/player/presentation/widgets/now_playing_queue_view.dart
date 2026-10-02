@@ -232,6 +232,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                 children: [
                                   CachedArtwork(
                                     id: song.id,
+                                    albumId: song.albumId,
                                     remoteUrl: song.remoteArtworkUrl,
                                     type: ArtworkType.AUDIO,
                                     size: 42,

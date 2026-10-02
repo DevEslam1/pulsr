@@ -206,6 +206,44 @@ void main() {
       expect(vid1.isMissing, isFalse);
     });
 
+    test(
+        'importOnlineTracksAsFavorites never clobbers an existing row on id collision',
+        () async {
+      // Deterministic id for the video below. Pre-occupy it with an unrelated
+      // local song to simulate the 62-bit hash colliding with a real row.
+      const track = YtmTrack(
+        videoId: 'collision_vid',
+        title: 'Colliding Online',
+        artist: 'A',
+        duration: Duration(minutes: 2),
+      );
+      final collidingId = track.songId;
+
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: Value(collidingId),
+              title: 'Precious Local',
+              path: '/storage/music/precious.mp3',
+              isFavorite: const Value(true),
+            ),
+          );
+
+      final res = await repository.importOnlineTracksAsFavorites([track]);
+      expect(res.getOrElse((_) => -1), equals(1));
+
+      final all = (await repository.getAllSongs()).getOrElse((_) => []);
+      final local = all.where((s) => s.path == '/storage/music/precious.mp3');
+      expect(local.length, equals(1),
+          reason: 'the unrelated local row must not be overwritten');
+
+      final online = await (db.select(db.songsTable)
+            ..where((t) => t.remoteId.equals('collision_vid')))
+          .getSingle();
+      expect(online.id, isNot(equals(collidingId)),
+          reason: 'online row must be allocated a fresh id');
+      expect(online.source, equals(SongSource.youtube));
+    });
+
     test('Record play history updates song count and lastPlayed', () async {
       final song = SongsTableCompanion.insert(
         id: const Value(3),

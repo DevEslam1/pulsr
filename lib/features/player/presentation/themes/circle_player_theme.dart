@@ -264,6 +264,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                           child: song != null
                                               ? CachedArtwork(
                                                   id: song.id,
+                                                  albumId: song.albumId,
                                                   remoteUrl:
                                                       song.remoteArtworkUrl ?? song.artworkUri,
                                                   type: ArtworkType.AUDIO,

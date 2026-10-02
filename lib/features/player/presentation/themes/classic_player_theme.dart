@@ -435,6 +435,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                               child: song != null
                                                   ? CachedArtwork(
                                                       id: song.id,
+                                                      albumId: song.albumId,
                                                       remoteUrl:
                                                           song.remoteArtworkUrl ?? song.artworkUri,
                                                       type: ArtworkType.AUDIO,

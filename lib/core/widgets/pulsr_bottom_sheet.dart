@@ -1,4 +1,5 @@
 // lib/core/widgets/pulsr_bottom_sheet.dart
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
@@ -38,6 +39,8 @@ class PulsrSheetHelper {
 
     // Landscape phone: present as centered dialog to avoid bottom sheet clipping/distortion
     if (isLandscape && size.height < 480) {
+      final maxW = math.min(size.width * 0.94, 760.0);
+      final maxH = math.min(size.height * 0.94, size.height - 16.0);
       return PulsrDialogHelper.showCustomDialog<T>(
         context,
         useRootNavigator: useRootNavigator,
@@ -54,15 +57,15 @@ class PulsrSheetHelper {
           return Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: 520,
-                maxHeight: size.height * 0.88,
+                maxWidth: maxW,
+                maxHeight: maxH,
               ),
               child: Dialog(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 insetPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.sm,
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
                 ),
                 child: ClipRRect(
                   borderRadius: AppRadii.dialogRadius,

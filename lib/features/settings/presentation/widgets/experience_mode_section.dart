@@ -72,22 +72,17 @@ class ExperienceModeSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.s10),
-        AnimatedSize(
+        AnimatedSwitcher(
           duration: context.motionMs(200),
-          curve: context.motionCurve(Curves.easeOutCubic),
-          alignment: Alignment.topLeft,
-          child: AnimatedSwitcher(
-            duration: context.motionMs(200),
-            child: Text(
-              isPro
-                  ? l10n.experienceModeProfessionalDesc
-                  : l10n.experienceModeNormalDesc,
-              key: ValueKey<bool>(isPro),
-              style: TextStyle(
-                color: p.textSecondary,
-                fontSize: AppFontSize.label,
-                height: 1.35,
-              ),
+          child: Text(
+            isPro
+                ? l10n.experienceModeProfessionalDesc
+                : l10n.experienceModeNormalDesc,
+            key: ValueKey<bool>(isPro),
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.label,
+              height: 1.35,
             ),
           ),
         ),
@@ -176,8 +171,25 @@ class _WhatChangesExpander extends StatefulWidget {
   State<_WhatChangesExpander> createState() => _WhatChangesExpanderState();
 }
 
-class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
+class _WhatChangesExpanderState extends State<_WhatChangesExpander>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
   bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+  }
 
   @override
   void didUpdateWidget(covariant _WhatChangesExpander oldWidget) {
@@ -185,7 +197,14 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
     // Collapse so stale Pro/Normal copy is never left showing after a switch.
     if (oldWidget.isPro != widget.isPro && _expanded) {
       _expanded = false;
+      _controller.value = 0.0;
     }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -289,7 +308,14 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
               borderRadius: BorderRadius.circular(AppRadii.r10),
               onTap: () {
                 HapticFeedback.selectionClick();
-                setState(() => _expanded = !_expanded);
+                setState(() {
+                  _expanded = !_expanded;
+                  if (_expanded) {
+                    _controller.forward();
+                  } else {
+                    _controller.reverse();
+                  }
+                });
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -328,16 +354,21 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander> {
               ),
             ),
           ),
-          // Only the visible content is laid out; collapsed content is not
-          // built with unbounded height (see settings_screen section note).
-          AnimatedSize(
-            duration: context.motionMs(240),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            clipBehavior: Clip.none,
-            child: _expanded
-                ? changesBody
-                : const SizedBox(width: double.infinity),
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              if (_controller.value == 0.0 && !_expanded) {
+                return const SizedBox(width: double.infinity);
+              }
+              return ClipRect(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: _animation.value,
+                  child: child,
+                ),
+              );
+            },
+            child: changesBody,
           ),
         ],
       ),

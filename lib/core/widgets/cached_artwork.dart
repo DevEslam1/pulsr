@@ -130,6 +130,14 @@ class ArtworkLruCache {
   }
 }
 
+/// Broadcasts an in-place artwork change so already-mounted [CachedArtwork]s
+/// re-resolve their bitmap. Widgets whose cache key survived the invalidation
+/// ignore the notification, so unrelated artwork is never blanked.
+class ArtworkInvalidationBus {
+  ArtworkInvalidationBus._();
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+}
+
 class CachedArtwork extends StatefulWidget {
   final int id;
   final ArtworkType type;
@@ -148,6 +156,10 @@ class CachedArtwork extends StatefulWidget {
   final int? cacheWidth;
   final int? cacheHeight;
 
+  /// MediaStore album ID used as a fallback when the song's own artwork query
+  /// returns null. Must be [song.albumId] — NOT the song id.
+  final int? albumId;
+
   const CachedArtwork({
     super.key,
     required this.id,
@@ -160,7 +172,27 @@ class CachedArtwork extends StatefulWidget {
     this.highQuality = false,
     this.cacheWidth,
     this.cacheHeight,
+    this.albumId,
   });
+
+  /// Drops every cached quality tier for [type]/[id] and notifies mounted
+  /// widgets. Call after rewriting a file's embedded cover so the new image is
+  /// shown instead of the stale cached bitmap.
+  static Future<void> invalidate({
+    required int id,
+    ArtworkType type = ArtworkType.AUDIO,
+  }) async {
+    final base = '${type.name}_$id';
+    for (final key in [base, '${base}_hq']) {
+      ArtworkLruCache().remove(key);
+      // Best-effort disk eviction: never let an unresponsive platform path
+      // provider stall the caller (e.g. the tag-save flow).
+      await ArtworkCacheManager()
+          .remove(key)
+          .timeout(const Duration(seconds: 2), onTimeout: () {});
+    }
+    ArtworkInvalidationBus.revision.value++;
+  }
 
   static String upgradeToHighResArtwork(String url) {
     var upgraded = url;
@@ -191,7 +223,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
   /// De-dupes concurrent cold-cache fetches: multiple widgets requesting the
   /// same resolved cache key share a single underlying bytes fetch instead of
   /// each issuing its own remote/device query.
-  static final Map<String, Future<Uint8List?>> _inFlight = {};
+  // NOTE: _inFlight deduplication was removed — sharing a Future caused all
+  // widgets to get null when the first fetch failed (e.g. slow network on
+  // initial load), leaving every card stuck with a placeholder permanently.
+  // Direct per-widget fetches are simpler and more reliable.
 
   bool get _isHighRes =>
       widget.highQuality || (widget.size.isFinite && widget.size > 250);
@@ -202,9 +237,26 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   String get _cacheKey => _isHighRes ? '${_baseKey}_hq' : _baseKey;
 
+  int _lastArtworkRevision = 0;
+
   @override
   void initState() {
     super.initState();
+    _lastArtworkRevision = ArtworkInvalidationBus.revision.value;
+    ArtworkInvalidationBus.revision.addListener(_onArtworkInvalidated);
+    _loadArtwork();
+  }
+
+  void _onArtworkInvalidated() {
+    final revision = ArtworkInvalidationBus.revision.value;
+    if (revision == _lastArtworkRevision) return;
+    _lastArtworkRevision = revision;
+    // Only widgets whose key was evicted need to reload; unaffected artwork
+    // keeps its bitmap and skips the rebuild entirely.
+    if (_cache.containsKey(_cacheKey)) return;
+    _cachedBytes = null;
+    _loadToken++;
+    if (mounted) setState(() {});
     _loadArtwork();
   }
 
@@ -215,7 +267,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
         oldWidget.type != widget.type ||
         oldWidget.remoteUrl != widget.remoteUrl ||
         oldWidget.highQuality != widget.highQuality ||
-        oldWidget.size != widget.size) {
+        oldWidget.size != widget.size ||
+        oldWidget.albumId != widget.albumId) {
       _loadToken++;
       final nextKey = _cacheKey;
       if (_cache.containsKey(nextKey)) {
@@ -225,6 +278,12 @@ class _CachedArtworkState extends State<CachedArtwork> {
       }
       _loadArtwork();
     }
+  }
+
+  @override
+  void dispose() {
+    ArtworkInvalidationBus.revision.removeListener(_onArtworkInvalidated);
+    super.dispose();
   }
 
   static Future<Uint8List?> _fetchRemote(String url,
@@ -354,9 +413,12 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
     // 1. Check in-memory LRU cache for target key
     if (_cache.containsKey(key)) {
-      setState(() {
-        _cachedBytes = _cache.get(key);
-      });
+      // Assign directly: if called from initState (before mount), setState would
+      // be silently ignored, leaving _cachedBytes null and showing a placeholder.
+      // The initial build() reads _cachedBytes directly after initState returns.
+      // If called after mount (didUpdateWidget / invalidation), schedule rebuild.
+      _cachedBytes = _cache.get(key);
+      if (mounted) setState(() {});
       return;
     }
 
@@ -364,6 +426,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
     // to avoid any blank or flashing UI while HQ is asynchronously queried/decoded.
     if (isHq && _cache.containsKey(baseKey)) {
       _cachedBytes = _cache.get(baseKey);
+      if (mounted) setState(() {});
     }
 
     // 2. Check persistent disk cache for target key
@@ -392,48 +455,62 @@ class _CachedArtworkState extends State<CachedArtwork> {
       }
     }
 
-    // 3. Fetch remote or query local storage.
-    // In-flight dedupe: concurrent widgets requesting the same resolved cache
-    // key share one underlying raw-bytes fetch. Each widget still applies its
-    // own cache.put + setState under its own load token below.
+    // 3. Fetch remote or query local storage (each widget fetches independently
+    //    — no shared in-flight Future — so a single failure does not block
+    //    every other card on screen from eventually loading its artwork).
     final remoteUrl = widget.remoteUrl;
     final isThumbnail = !isHq && widget.size <= 220;
 
     Future<Uint8List?> pending;
-    final existingInFlight = _inFlight[key];
-    if (existingInFlight != null) {
-      pending = existingInFlight;
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      pending = _fetchRemote(
+        remoteUrl,
+        highQuality: isHq,
+        lowQuality: isThumbnail,
+      ).then((remoteBytes) {
+        if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
+        if (widget.id > 0) {
+          // Fallback to device artwork when remote fetch fails / returns empty.
+          return _audioQuery.queryArtwork(
+            widget.id,
+            widget.type,
+            format: ArtworkFormat.JPEG,
+            size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+            quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+          );
+        }
+        return null;
+      });
     } else {
-      final Future<Uint8List?> fetch;
-      if (remoteUrl != null && remoteUrl.isNotEmpty) {
-        fetch = _fetchRemote(
-          remoteUrl,
-          highQuality: isHq,
-          lowQuality: isThumbnail,
-        ).then((remoteBytes) {
-          if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
-          if (widget.id > 0) {
-            return _queryDeviceArtwork(
+      if (widget.id > 0) {
+        pending = _audioQuery
+            .queryArtwork(
               widget.id,
               widget.type,
-              isHq: isHq,
-              isThumbnail: isThumbnail,
+              format: ArtworkFormat.JPEG,
+              size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+              quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+            )
+            .then((bytes) async {
+          if (bytes != null && bytes.isNotEmpty) return bytes;
+          // Fallback: try album artwork with the correct MediaStore album ID.
+          final fallbackAlbumId = widget.albumId;
+          if (widget.type == ArtworkType.AUDIO &&
+              fallbackAlbumId != null &&
+              fallbackAlbumId > 0) {
+            return _audioQuery.queryArtwork(
+              fallbackAlbumId,
+              ArtworkType.ALBUM,
+              format: ArtworkFormat.JPEG,
+              size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+              quality: isHq ? 100 : (isThumbnail ? 65 : 80),
             );
           }
           return null;
         });
       } else {
-        fetch = widget.id > 0
-            ? _queryDeviceArtwork(
-                widget.id,
-                widget.type,
-                isHq: isHq,
-                isThumbnail: isThumbnail,
-              )
-            : Future<Uint8List?>.value(null);
+        pending = Future<Uint8List?>.value(null);
       }
-      pending = fetch.whenComplete(() => _inFlight.remove(key));
-      _inFlight[key] = pending;
     }
 
     pending.then((bytes) {
@@ -446,35 +523,6 @@ class _CachedArtworkState extends State<CachedArtwork> {
         }
       }
     }).catchError((_) {});
-  }
-
-  Future<Uint8List?> _queryDeviceArtwork(
-    int id,
-    ArtworkType type, {
-    required bool isHq,
-    required bool isThumbnail,
-  }) async {
-    try {
-      final res = await _audioQuery.queryArtwork(
-        id,
-        type,
-        format: ArtworkFormat.JPEG,
-        size: isHq ? 1000 : (isThumbnail ? 180 : 350),
-        quality: isHq ? 100 : (isThumbnail ? 65 : 80),
-      );
-      if (res != null && res.isNotEmpty) return res;
-      if (type == ArtworkType.AUDIO) {
-        final albumRes = await _audioQuery.queryArtwork(
-          id,
-          ArtworkType.ALBUM,
-          format: ArtworkFormat.JPEG,
-          size: isHq ? 1000 : (isThumbnail ? 180 : 350),
-          quality: isHq ? 100 : (isThumbnail ? 65 : 80),
-        );
-        if (albumRes != null && albumRes.isNotEmpty) return albumRes;
-      }
-    } catch (_) {}
-    return null;
   }
 
   @override
@@ -494,17 +542,14 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 ? constraints.biggest.shortestSide
                 : 200.0);
 
-        // When the caller asked to fill the parent (`size: double.infinity`)
-        // but the incoming constraints are unbounded, resolve a finite extent
-        // so the RenderBox always receives a size. Without this the ClipRRect
-        // and its child are left unlaid-out, cascading into
-        // "RenderBox was not laid out" / "child.hasSize is not true" crashes.
-        final double? extent = isBounded
-            ? effectiveSize
-            : (hasBoundedConstraints ? null : effectiveSize);
+        // Always resolve a finite extent. A null extent (unbounded parent or a
+        // `size: double.infinity` request) left the ClipRRect/SizedBox without
+        // a size, cascading into "RenderBox was not laid out" crashes. The
+        // hundreds/tiny fallbacks keep the box finite in every context.
+        final double extent = effectiveSize;
 
         final placeholder = ArtworkPlaceholder(
-          size: extent ?? double.infinity,
+          size: extent,
           borderRadius: effectiveBorderRadius,
           icon: widget.fallbackIcon,
         );

@@ -194,6 +194,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                                     child: CachedArtwork(
                                       id: album.id,
                                       type: ArtworkType.ALBUM,
+                                      remoteUrl: album.artworkUri,
                                       size: 250,
                                       borderRadius: 14,
                                       fallbackIcon: Icons.album_rounded,

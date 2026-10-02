@@ -12,6 +12,7 @@ import 'package:pulsr/features/auth/cubit/auth_state.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/settings/presentation/settings_screen.dart';
 import 'package:pulsr/features/settings/presentation/widgets/settings_hero_card.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -237,5 +238,53 @@ void main() {
       await tester.pump();
       expect(identical(state.memoizedSearchResults, initialResults), isTrue);
     });
+
+    testWidgets('SettingsScreen phone landscape scroll and toggle super sections',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 390);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(buildTestScreen());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final soundSectionHeader = find.text('SOUND & PLAYBACK');
+      if (soundSectionHeader.evaluate().isNotEmpty) {
+        await tester.tap(soundSectionHeader);
+        await settleAnims(tester);
+        await tester.tap(soundSectionHeader);
+        await settleAnims(tester);
+      }
+
+      for (int i = 0; i < 15; i++) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -300));
+        await settleAnims(tester);
+      }
+    });
+
+    testWidgets(
+        'SettingsScreen professional mode scroll and toggle super sections without layout crash',
+        (tester) async {
+      await settingsCubit.setExperienceMode(ExperienceMode.professional);
+      await pumpScreen(tester);
+
+      final soundSectionHeader = find.text('SOUND & PLAYBACK');
+      if (soundSectionHeader.evaluate().isNotEmpty) {
+        await tester.tap(soundSectionHeader);
+        await settleAnims(tester);
+        await tester.tap(soundSectionHeader);
+        await settleAnims(tester);
+      }
+
+      for (int i = 0; i < 15; i++) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -300));
+        await settleAnims(tester);
+      }
+    });
   });
 }
+

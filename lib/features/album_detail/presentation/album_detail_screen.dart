@@ -201,6 +201,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                     child: CachedArtwork(
                                       id: album.id,
                                       type: ArtworkType.ALBUM,
+                                      remoteUrl: album.artworkUri,
                                       size: artworkSize,
                                       borderRadius: 24,
                                     ),
@@ -444,6 +445,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               child: CachedArtwork(
                 id: album.id,
                 type: ArtworkType.ALBUM,
+                remoteUrl: album.artworkUri,
                 size: artSize,
                 borderRadius: 24,
                 highQuality: true,

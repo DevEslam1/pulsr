@@ -1085,7 +1085,7 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
                     horizontal: true,
                     groupKey: songs.isEmpty
                         ? ''
-                        : '${songs.first.id}-${songs.length}',
+                        : '${songs.first.id}',
                     child: _TrendingCard(
                       song: song,
                       onTap: () =>
@@ -1117,7 +1117,7 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
                 itemBuilder: (context, i) => StaggeredReveal(
                   index: i,
                   groupKey:
-                      songs.isEmpty ? '' : '${songs.first.id}-${songs.length}',
+                      songs.isEmpty ? '' : '${songs.first.id}',
                   child: SongTile(
                     song: songs[i],
                     index: i,
@@ -1134,7 +1134,7 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
                 StaggeredReveal(
                   index: i,
                   groupKey:
-                      songs.isEmpty ? '' : '${songs.first.id}-${songs.length}',
+                      songs.isEmpty ? '' : '${songs.first.id}',
                   child: SongTile(
                     song: songs[i],
                     index: i,
@@ -1245,6 +1245,7 @@ class _TrendingCard extends StatelessWidget {
                     id: song.id,
                     remoteUrl:
                         song.remoteArtworkUrl ?? song.artworkUri,
+                    albumId: song.albumId,
                     type: ArtworkType.AUDIO,
                     size: size,
                     borderRadius: AppRadii.r18,
@@ -1634,7 +1635,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                       horizontal: true,
                       groupKey: songs.isEmpty
                           ? ''
-                          : '${songs.first.id}-${songs.length}',
+                          : '${songs.first.id}',
                       child: Padding(
                         padding: const EdgeInsetsDirectional.only(
                             end: AppSpacing.s14),
@@ -1650,7 +1651,9 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                                   children: [
                                     CachedArtwork(
                                       id: song.id,
-                                      remoteUrl: song.remoteArtworkUrl,
+                                      remoteUrl:
+                                          song.remoteArtworkUrl ?? song.artworkUri,
+                                      albumId: song.albumId,
                                       type: ArtworkType.AUDIO,
                                       size: size,
                                       borderRadius: AppRadii.r18,
@@ -1872,7 +1875,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                     index: index,
                     groupKey: songs.isEmpty
                         ? ''
-                        : '${songs.first.id}-${songs.length}',
+                        : '${songs.first.id}',
                     child: SongTile(
                       song: song,
                       onTap: () => playerCubit.playSong(song, queue: songs),
@@ -1940,7 +1943,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                     index: index,
                     groupKey: songs.isEmpty
                         ? ''
-                        : '${songs.first.id}-${songs.length}',
+                        : '${songs.first.id}',
                     child: SongTile(
                       song: song,
                       onTap: () => playerCubit.playSong(song, queue: songs),

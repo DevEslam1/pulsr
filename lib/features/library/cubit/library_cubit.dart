@@ -43,6 +43,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
   int _songsToken = 0;
+  bool _snapshotConsumed = false;
 
   /// DB-level pagination window for the songs watch. The full 10k-row list
   /// is never held in state; [loadMoreSongs] grows the window by one page.
@@ -105,15 +106,24 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           category: 'LibraryCubit');
     }
 
-    try {
-      final snapshot = await LibraryCacheManager().loadSnapshot();
-      if (snapshot != null && snapshot.songs.isNotEmpty && !isClosed) {
-        safeEmit(state.copyWith(
-          songs: snapshot.songs,
-          isLoading: false,
-        ));
-      }
-    } catch (_) {}
+    // The disk snapshot exists only to paint a cold start before the live
+    // watch emits. Re-applying it on a later init() (e.g. after a rescan)
+    // would briefly resurrect deleted songs, so it is consumed exactly once.
+    if (!_snapshotConsumed) {
+      _snapshotConsumed = true;
+      try {
+        final snapshot = await LibraryCacheManager().loadSnapshot();
+        if (snapshot != null &&
+            snapshot.songs.isNotEmpty &&
+            !isClosed &&
+            state.songs.isEmpty) {
+          safeEmit(state.copyWith(
+            songs: snapshot.songs,
+            isLoading: false,
+          ));
+        }
+      } catch (_) {}
+    }
 
     await _subscribeSongs();
     if (isClosed) return;
@@ -421,16 +431,36 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           .map((s) => s.id == songId ? s.copyWith(isFavorite: isFavorite) : s)
           .toList();
 
-      // Keep the actual pre-toggle row: rollback must restore it even when the
-      // song is not visible in the current (possibly filtered) songs list.
-      SongsTableData? preToggleFav;
+      // Resolve the pre-toggle row. `state.favorites` is authoritative when
+      // present, but a favorited song can be absent from a not-yet-loaded or
+      // filtered list, so fall back to the songs page and finally a DB read
+      // instead of assuming "not a favorite" (which would flip the wrong way).
+      SongsTableData? known;
       for (final s in state.favorites) {
         if (s.id == songId) {
-          preToggleFav = s;
+          known = s;
           break;
         }
       }
-      final wasFav = preToggleFav != null;
+      known ??= state.songs.where((s) => s.id == songId).firstOrNull;
+      if (known == null && _musicRepository != null) {
+        try {
+          final res = await _musicRepository!.getSongsByIds([songId]);
+          known = res.fold((_) => null, (list) => list.firstOrNull);
+        } catch (e, st) {
+          ErrorLogger.log('Favorite toggle: song lookup failed for $songId',
+              error: e, stackTrace: st, category: 'LibraryCubit');
+        }
+        // The repository lookup awaited: the favorites watch-stream may have
+        // emitted during the gap. Bail if closed or superseded instead of
+        // clobbering that update with the stale pre-await snapshot.
+        if (isClosed || _favoriteOpTokens[songId] != opToken) return;
+      }
+
+      // Keep the actual pre-toggle row: rollback must restore it even when the
+      // song is not visible in the current (possibly filtered) songs list.
+      final preToggleFav = known;
+      final wasFav = known?.isFavorite ?? false;
 
       if (wasFav) {
         _pendingFavoriteTargets[songId] = false;
@@ -439,32 +469,12 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         safeEmit(state.copyWith(favorites: favs, songs: songsWith(false)));
       } else {
         _pendingFavoriteTargets[songId] = true;
-        SongsTableData? matchingSong;
-        for (final s in state.songs) {
-          if (s.id == songId) {
-            matchingSong = s;
-            break;
-          }
-        }
-        if (matchingSong == null && _musicRepository != null) {
-          try {
-            final res = await _musicRepository!.getSongsByIds([songId]);
-            matchingSong = res.fold((_) => null, (list) => list.firstOrNull);
-          } catch (e, st) {
-            ErrorLogger.log('Favorite toggle: song lookup failed for $songId',
-                error: e, stackTrace: st, category: 'LibraryCubit');
-          }
-          // The repository lookup awaited: the favorites watch-stream may have
-          // emitted during the gap. Bail if closed or superseded instead of
-          // clobbering that update with the stale pre-await snapshot.
-          if (isClosed || _favoriteOpTokens[songId] != opToken) return;
-        }
-        if (matchingSong != null) {
+        if (known != null) {
           // Re-read favorites after any await so a watch emission that landed in
           // the gap is not overwritten by our optimistic emit.
           final favs = List<SongsTableData>.from(state.favorites);
           if (!favs.any((s) => s.id == songId)) {
-            favs.add(matchingSong.copyWith(isFavorite: true));
+            favs.add(known.copyWith(isFavorite: true));
           }
           safeEmit(state.copyWith(favorites: favs, songs: songsWith(true)));
         }
@@ -495,7 +505,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         // explicitly ensure song is removed from reconciled favorites AND emit songsWith(false).
         final reconciled = List<SongsTableData>.from(state.favorites);
         if (wasFav) {
-          if (!reconciled.any((s) => s.id == songId)) {
+          if (!reconciled.any((s) => s.id == songId) && preToggleFav != null) {
             reconciled.add(preToggleFav.copyWith(isFavorite: true));
           }
         } else {
@@ -619,6 +629,40 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       res.fold((_) {}, result.addAll);
     }
     return result;
+  }
+
+  /// Permanently deletes the current selection from the database and, for
+  /// local files, from disk. Returns the number removed, or -1 on failure.
+  /// Clears the selection on success.
+  Future<int> deleteSelectedSongs() async {
+    if (isClosed) return 0;
+    final selected = await getSelectedSongs();
+    if (isClosed) return 0;
+    if (selected.isEmpty) {
+      clearSelection();
+      return 0;
+    }
+    final repo = _musicRepository ??
+        (getIt.isRegistered<IMusicRepository>()
+            ? getIt<IMusicRepository>()
+            : null);
+    if (repo == null) {
+      safeEmit(state.copyWith(errorMessage: 'Delete is unavailable right now'));
+      return -1;
+    }
+    final ids = selected.map((s) => s.id).toList();
+    final result = await repo.deleteSongs(ids);
+    if (isClosed) return 0;
+    return result.fold(
+      (failure) {
+        safeEmit(state.copyWith(errorMessage: failure.message));
+        return -1;
+      },
+      (_) {
+        clearSelection();
+        return ids.length;
+      },
+    );
   }
 
   /// Batch imports YouTube Music playlist tracks as Favorites.

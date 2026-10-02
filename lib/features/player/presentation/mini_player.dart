@@ -1100,6 +1100,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadii.r8),
                     child: CachedArtwork(
                       id: song.id,
+                      albumId: song.albumId,
                       remoteUrl: song.remoteArtworkUrl,
                       type: ArtworkType.AUDIO,
                       size: 40,

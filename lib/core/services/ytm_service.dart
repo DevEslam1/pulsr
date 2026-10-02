@@ -663,6 +663,44 @@ class YtmService {
     return winner.future;
   }
 
+  /// Picks the largest thumbnail URL from an InnerTube `thumbnail` object
+  /// (`{ thumbnails: [{ url, width, height }, ...] }`). Mirrors the native
+  /// `extractThumbnailUrl` so the Dart fallback yields the same artwork as the
+  /// native extractor; without it, home carousels render placeholders because
+  /// the fallback is a single request and routinely wins the search race.
+  static String? _extractThumbnailUrl(dynamic thumbnailObj) {
+    if (thumbnailObj is! Map) return null;
+    final thumbs = thumbnailObj['thumbnails'];
+    if (thumbs is! List) return null;
+    String? best;
+    var maxPixels = -1;
+    for (final item in thumbs) {
+      if (item is! Map) continue;
+      final url = (item['url'] as String?)?.trim();
+      if (url == null || url.isEmpty) continue;
+      final w = (item['width'] as num?)?.toInt() ?? 0;
+      final h = (item['height'] as num?)?.toInt() ?? 0;
+      final pixels = w * h;
+      if (best == null || pixels > maxPixels) {
+        maxPixels = pixels;
+        best = url;
+      }
+    }
+    return best;
+  }
+
+  static String? _innertubeArtwork(Map<String, dynamic> renderer) {
+    final responsive = ((renderer['thumbnail'] as Map?)?['musicThumbnailRenderer']
+        as Map?)?['thumbnail'];
+    final fromResponsive = _extractThumbnailUrl(responsive);
+    if (fromResponsive != null) return fromResponsive;
+    final twoRow = ((renderer['thumbnailRenderer'] as Map?)?[
+            'musicThumbnailRenderer'] as Map?)?['thumbnail'] ??
+        ((renderer['thumbnail'] as Map?)?['musicThumbnailRenderer']
+            as Map?)?['thumbnail'];
+    return _extractThumbnailUrl(twoRow);
+  }
+
   Future<List<YtmTrack>> _searchInnertube(String query,
       {int limit = 30}) async {
     try {
@@ -771,6 +809,7 @@ class YtmService {
                   title: title,
                   artist: artist,
                   duration: Duration.zero,
+                  artworkUrl: _innertubeArtwork(r),
                 ));
               }
               return;
@@ -811,6 +850,7 @@ class YtmService {
                   title: title,
                   artist: artist,
                   duration: Duration.zero,
+                  artworkUrl: _innertubeArtwork(r),
                 ));
               }
               return;

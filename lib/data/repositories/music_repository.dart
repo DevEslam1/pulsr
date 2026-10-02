@@ -577,9 +577,14 @@ class MusicRepository implements IMusicRepository {
             ));
             n++;
           } else {
+            // The deterministic negative id is only 62 bits of the video hash,
+            // so a collision with an unrelated row (a local file, a CUE virtual
+            // track, or another video) is possible. Never clobber it: allocate
+            // the next free id in the online id space instead.
+            final id = await _resolveFreeSongId(songData.id);
             await _db.into(_db.songsTable).insert(
                   SongsTableCompanion(
-                    id: Value(songData.id),
+                    id: Value(id),
                     title: Value(songData.title),
                     artist: Value(songData.artist),
                     album: Value(songData.album),
@@ -604,6 +609,26 @@ class MusicRepository implements IMusicRepository {
       return Left(
           DatabaseFailure('Failed to import online tracks as favorites', e));
     }
+  }
+
+  /// Returns [preferred] when no row owns that id, otherwise walks the online
+  /// (negative) id space until a free slot is found. Keeps the deterministic
+  /// id for the common case while guaranteeing an insert never overwrites an
+  /// unrelated song on a hash collision. Must be called inside the import
+  /// transaction so earlier inserts in the same batch are visible.
+  Future<int> _resolveFreeSongId(int preferred) async {
+    var candidate = preferred;
+    for (var i = 0; i < 4096; i++) {
+      final clash = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.equals(candidate))
+            ..limit(1))
+          .getSingleOrNull();
+      if (clash == null) return candidate;
+      candidate = candidate < 0 ? candidate - 1 : candidate + 1;
+    }
+    // Pathological fallback: a time-derived magnitude cannot equal a
+    // video-hash id in practice, and still lives in the negative id space.
+    return -(DateTime.now().microsecondsSinceEpoch & 0x3FFFFFFFFFFFFFFF);
   }
 
   @override
@@ -2245,18 +2270,37 @@ class MusicRepository implements IMusicRepository {
                 t.cueStartMs.isNull()))
           .getSingleOrNull();
       if (existing != null) {
-        await (_db.update(_db.songsTable)
-              ..where((t) => t.id.equals(existing.id)))
-            .write(
-          SongsTableCompanion(
-            title: Value(title),
-            artist: Value(artist),
-            album: Value(album),
-            genre: Value(genre),
-            year: Value(year),
-            trackNumber: Value(trackNumber),
-          ),
-        );
+        await _db.transaction(() async {
+          await (_db.update(_db.songsTable)
+                ..where((t) => t.id.equals(existing.id)))
+              .write(
+            SongsTableCompanion(
+              title: Value(title),
+              artist: Value(artist),
+              album: Value(album),
+              genre: Value(genre),
+              year: Value(year),
+              trackNumber: Value(trackNumber),
+            ),
+          );
+          // Keep the denormalised album/artist rows in step: the library
+          // browse surfaces read titles/names from those tables, so a tag edit
+          // would otherwise leave a renamed album/artist showing stale text
+          // until the next full MediaStore scan.
+          if (existing.albumId != null && existing.albumId! > 0) {
+            await (_db.update(_db.albumsTable)
+                  ..where((t) => t.id.equals(existing.albumId!)))
+                .write(AlbumsTableCompanion(
+              title: Value(album),
+              artist: Value(artist),
+            ));
+          }
+          if (existing.artistId != null && existing.artistId! > 0) {
+            await (_db.update(_db.artistsTable)
+                  ..where((t) => t.id.equals(existing.artistId!)))
+                .write(ArtistsTableCompanion(name: Value(artist)));
+          }
+        });
       }
       return const Right(null);
     } catch (e) {

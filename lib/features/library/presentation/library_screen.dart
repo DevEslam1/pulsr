@@ -21,6 +21,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -614,6 +615,34 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(
                                 context.l10n.addedToQueue(selected.length))));
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete_outline_rounded, color: p.error),
+                      tooltip: context.l10n.delete,
+                      onPressed: () async {
+                        final count = state.selectedSongIds.length;
+                        final confirmed =
+                            await PulsrDialogHelper.showConfirmDialog(
+                          context,
+                          title: context.l10n.delete,
+                          message:
+                              context.l10n.deleteMultipleConfirmation(count),
+                          icon: Icons.delete_outline_rounded,
+                          confirmLabel: context.l10n.delete,
+                          cancelLabel: context.l10n.cancel,
+                          isDestructive: true,
+                        );
+                        if (confirmed != true || !context.mounted) return;
+                        final removed = await cubit.deleteSelectedSongs();
+                        if (!context.mounted || removed <= 0) return;
+                        ScaffoldMessenger.of(context)
+                          ..clearSnackBars()
+                          ..showSnackBar(SnackBar(
+                            content: Text(removed == 1
+                                ? context.l10n.songDeleted
+                                : context.l10n.songsDeleted),
+                          ));
                       },
                     ),
                   ],

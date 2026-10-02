@@ -6389,6 +6389,12 @@ abstract class AppLocalizations {
   /// **'Removed \"{title}\" from favorites'**
   String removedFavorite(Object title);
 
+  /// Swipe action that unfavorites a track
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from Favorites'**
+  String get removeFromFavorites;
+
   /// tranche7 tpl
   ///
   /// In en, this message translates to:

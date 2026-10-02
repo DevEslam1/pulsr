@@ -74,6 +74,23 @@ void main() {
     );
   }
 
+  // The link/profile lookup is async; under parallel-suite load a single
+  // pumpEventQueue can finish before the apply lands. Poll until the expected
+  // preset appears so the assertion is not timing-dependent.
+  Future<void> waitForPreset(PlayerCubit cubit, String name) async {
+    for (var i = 0; i < 400; i++) {
+      if (cubit.state.eqPreset.name == name) return;
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  }
+
+  // Give negative assertions a bounded settle window to prove no change lands.
+  Future<void> settle() async {
+    for (var i = 0; i < 10; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  }
+
   test('auto-applies the linked profile when the linked device activates',
       () async {
     const profile = SettingsProfile(
@@ -96,6 +113,7 @@ void main() {
 
     fakeHiRes.emitDevice(btDevice());
     await pumpEventQueue();
+    await waitForPreset(cubit, 'Bass Boost');
 
     expect(cubit.state.eqPreset.name, 'Bass Boost');
     expect(cubit.state.isSaturationEnabled, isTrue);
@@ -128,6 +146,7 @@ void main() {
 
     fakeHiRes.emitDevice(btDevice());
     await pumpEventQueue();
+    await waitForPreset(cubit, 'Bass Boost');
     expect(cubit.state.eqPreset.name, 'Bass Boost');
 
     // Re-point the link, then re-emit the SAME device (e.g. sample-rate
@@ -138,6 +157,7 @@ void main() {
         profileId: 'profile_home_test');
     fakeHiRes.emitDevice(btDevice());
     await pumpEventQueue();
+    await settle();
     expect(cubit.state.eqPreset.name, 'Bass Boost');
   });
 
@@ -160,6 +180,7 @@ void main() {
 
     fakeHiRes.emitDevice(btDevice());
     await pumpEventQueue();
+    await settle();
 
     expect(cubit.state.eqPreset.name, 'Flat');
     expect(cubit.state.isSaturationEnabled, isFalse);

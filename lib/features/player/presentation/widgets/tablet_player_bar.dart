@@ -295,6 +295,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                       AppRadii.r10),
                                               child: CachedArtwork(
                                                 id: song.id,
+                                                albumId: song.albumId,
                                                 remoteUrl:
                                                     song.remoteArtworkUrl ??
                                                         song.artworkUri,

@@ -63,6 +63,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                 child: CachedArtwork(
                                     id: album.id,
                                     type: ArtworkType.ALBUM,
+                                    remoteUrl: album.artworkUri,
                                     size: double.infinity,
                                     borderRadius: 18),
                               ),
@@ -115,6 +116,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                             leading: CachedArtwork(
                                 id: album.id,
                                 type: ArtworkType.ALBUM,
+                                remoteUrl: album.artworkUri,
                                 size: 48,
                                 borderRadius: 12),
                             title: Text(album.title,

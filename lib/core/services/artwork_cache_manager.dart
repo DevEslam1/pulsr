@@ -193,6 +193,23 @@ class ArtworkCacheManager {
     }
   }
 
+  /// Removes a single key from both the memory and persistent disk caches.
+  /// Used when a song's embedded artwork is rewritten in place, so the stale
+  /// bitmap is not served back after the file changes.
+  Future<void> remove(String key) async {
+    _memoryCache.remove(key);
+    _weakMemoryCache.remove(key);
+    try {
+      if (_cacheDir == null) await init();
+      if (_cacheDir != null && await _cacheDir!.exists()) {
+        final file = File(p.join(_cacheDir!.path, _keyToFileName(key)));
+        if (await file.exists()) {
+          await file.delete().catchError((_) => file);
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Clears only the in-memory caches on transient memory pressure, leaving the
   /// persistent disk cache intact so artwork does not have to be re-fetched and
   /// re-decoded once the pressure subsides.

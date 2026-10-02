@@ -2059,6 +2059,10 @@
       "title": {}
     }
   },
+  "removeFromFavorites": "Quitar de favoritos",
+  "@removeFromFavorites": {
+    "description": "Swipe action that unfavorites a track"
+  },
   "cornerRadiusLabel": "Radio de esquinas ({px}px)",
   "@cornerRadiusLabel": {
     "description": "tranche7 tpl",

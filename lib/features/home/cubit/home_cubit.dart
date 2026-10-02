@@ -75,6 +75,10 @@ class HomeCubit extends PulsrCubit<HomeState> {
   final Map<String, int> _categoryFetchTimestamps = {};
   // FIX-H6: Track in-flight categories to prevent TTL eviction while request is pending
   final Set<String> _inFlightCategories = {};
+  // Monotonic per-category fetch generation. A retry or cache clear bumps it so
+  // the still-running previous fetch cannot clear the in-flight flag belonging
+  // to the newer request when its `finally` eventually runs.
+  final Map<String, int> _categoryTokens = {};
 
   bool get isLoggedIn => _account.isLoggedIn;
 
@@ -125,6 +129,8 @@ class HomeCubit extends PulsrCubit<HomeState> {
 
     _inFlightCategories.add(category);
     _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
+    final fetchToken = (_categoryTokens[category] ?? 0) + 1;
+    _categoryTokens[category] = fetchToken;
 
     late final Future<List<YtmTrack>> future;
     future = () async {
@@ -152,10 +158,9 @@ class HomeCubit extends PulsrCubit<HomeState> {
               limit: 25);
         }
         if (category == 'Trending Egypt') {
-          try {
-            final trending = await _ytm.trending(limit: 25);
-            if (trending.isNotEmpty) return trending;
-          } catch (_) {}
+          // Deliberately does NOT reuse `_ytm.trending()`. The global trending
+          // feed already backs 'Recommended For You', so sharing it produced
+          // two identical carousels for anonymous users.
           return await _ytm.searchWithFallback(
               categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
               limit: 25);
@@ -173,7 +178,11 @@ class HomeCubit extends PulsrCubit<HomeState> {
             error: e, stackTrace: st, category: 'HomeCubit');
         return <YtmTrack>[];
       } finally {
-        _inFlightCategories.remove(category);
+        // Only retire the in-flight flag when this fetch is still the latest
+        // generation; a retry/clear that superseded us owns the flag now.
+        if (_categoryTokens[category] == fetchToken) {
+          _inFlightCategories.remove(category);
+        }
       }
     }();
 
@@ -182,12 +191,18 @@ class HomeCubit extends PulsrCubit<HomeState> {
   }
 
   void retryCategory(String category) {
+    _categoryTokens[category] = (_categoryTokens[category] ?? 0) + 1;
     _inFlightCategories.remove(category);
     _categoryFutures.remove(category);
     _categoryFetchTimestamps.remove(category);
   }
 
   void clearCache() {
+    // Invalidate every in-flight generation before dropping the caches, so an
+    // outstanding fetch cannot clear a flag added by a post-clear request.
+    for (final key in _categoryTokens.keys.toList()) {
+      _categoryTokens[key] = _categoryTokens[key]! + 1;
+    }
     _inFlightCategories.clear();
     _categoryFutures.clear();
     _categoryFetchTimestamps.clear();

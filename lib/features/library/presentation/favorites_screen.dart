@@ -406,7 +406,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           return PulsrDismissible(
                             key: ValueKey('fav_screen_${song.id}'),
                             startToEndLabel: context.l10n.playNext,
-                            endToStartLabel: context.l10n.delete,
+                            endToStartLabel: context.l10n.removeFromFavorites,
                             backgroundBuilder: (context, isConfirming) =>
                                 PulsrDismissible.buildActionBackground(
                               context: context,
@@ -420,10 +420,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 (context, isConfirming) =>
                                     PulsrDismissible.buildActionBackground(
                               context: context,
-                              icon: Icons.delete_outline_rounded,
-                              label: context.l10n.delete,
-                              color: p.error,
-                              backgroundColor: p.error.withValues(alpha: 0.2),
+                              icon: Icons.favorite_border_rounded,
+                              label: context.l10n.removeFromFavorites,
+                              color: p.favorite,
+                              backgroundColor: p.favorite.withValues(alpha: 0.2),
                               isConfirming: isConfirming,
                               isEnd: true,
                             ),

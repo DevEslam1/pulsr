@@ -3512,6 +3512,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get removeFromFavorites => 'Remove from Favorites';
+
+  @override
   String cornerRadiusLabel(Object px) {
     return 'Card & Artwork Corner Radius (${px}px)';
   }

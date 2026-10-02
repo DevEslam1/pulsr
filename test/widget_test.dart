@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
-import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/di/injection.dart' show getIt, initializationReady;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -309,9 +309,21 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
   @override
   Future<void> validatePlayerState() async {}
+  @override
+  double get preampDb => 0.0;
+  @override
+  ValueNotifier<bool> get platformBridgeDegraded =>
+      ValueNotifier<bool>(false);
 }
 
 void main() {
+  // The splash gates its routing on the DI initialization future; unblock it
+  // so the first frame can render instead of waiting for its 8s safety net.
+  setUpAll(() {
+    initializationReady
+        .timeout(const Duration(seconds: 1), onTimeout: () {});
+  });
+
   setUp(() async {
     await getIt.reset();
   });

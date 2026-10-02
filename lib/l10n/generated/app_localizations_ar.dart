@@ -3508,6 +3508,9 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get removeFromFavorites => 'إزالة من المفضلة';
+
+  @override
   String cornerRadiusLabel(Object px) {
     return 'استدارة الزوايا ($px)';
   }

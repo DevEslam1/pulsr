@@ -1,12 +1,16 @@
 // test/core/services/ytm_service_test.dart
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtmService extends Mock implements YtmService {}
 
@@ -311,6 +315,76 @@ void main() {
       expect(await service.isAvailable(), isFalse);
       expect(await service.isAvailable(), isFalse);
       expect(calls, equals(1), reason: 'the answer is fixed at compile time');
+    });
+
+    test(
+        'Dart InnerTube fallback keeps thumbnail artwork so home carousels '
+        'are not left blank when the fallback wins the search race', () async {
+      SharedPreferences.setMockInitialValues({});
+      // Native search comes back empty, so the Dart fallback is promoted.
+      _mockChannel((call) async {
+        if (call.method == 'search') return const [];
+        return null;
+      });
+
+      const maxRes = 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg';
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'contents': {
+              'musicResponsiveListItemRenderer': {
+                'playlistItemData': {'videoId': 'dQw4w9WgXcQ'},
+                'flexColumns': [
+                  {
+                    'musicResponsiveListItemFlexColumnRenderer': {
+                      'text': {
+                        'runs': [
+                          {'text': 'Never Gonna Give You Up'}
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    'musicResponsiveListItemFlexColumnRenderer': {
+                      'text': {
+                        'runs': [
+                          {'text': 'Rick Astley'}
+                        ]
+                      }
+                    }
+                  },
+                ],
+                'thumbnail': {
+                  'musicThumbnailRenderer': {
+                    'thumbnail': {
+                      'thumbnails': [
+                        {
+                          'url':
+                              'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+                          'width': 480,
+                          'height': 360,
+                        },
+                        {'url': maxRes, 'width': 1280, 'height': 720},
+                      ]
+                    }
+                  }
+                },
+              }
+            }
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final service = YtmService()..debugHttpClient = client;
+      final results = await service.searchWithFallback('rick astley');
+
+      expect(results, hasLength(1));
+      expect(results.first.videoId, equals('dQw4w9WgXcQ'));
+      expect(results.first.artworkUrl, equals(maxRes),
+          reason: 'the Dart fallback used to drop thumbnails entirely, '
+              'blanking every home carousel card');
     });
   });
 

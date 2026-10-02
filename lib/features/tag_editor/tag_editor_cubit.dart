@@ -7,6 +7,7 @@ import '../../core/constants/channels.dart';
 import '../../core/services/metadata_search_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/lrc_parser.dart';
+import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
@@ -559,6 +560,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             await Future.delayed(const Duration(milliseconds: 100));
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
+            await CachedArtwork.invalidate(id: s.id);
             taggedSongs.add(s);
             pendingPaths.remove(s.path);
             // C-04: Persist the shrinking checkpoint periodically rather than
@@ -679,6 +681,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       if (isClosed) return;
       await _scannerService.rescanSingleFile(state.song.path);
       if (isClosed) return;
+      await CachedArtwork.invalidate(id: state.song.id);
 
       _userEditedFields.clear();
       if (lyricsTruncated && !isClosed) {

@@ -15,6 +15,13 @@ Widget _wrap(Widget child) {
   );
 }
 
+Uint8List _onePixelPng() => Uint8List.fromList([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+      0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 213, 196, 200, 0, 0, 0, 13, 73, 68, 65, 84,
+      120, 156, 99, 96, 248, 15, 0, 1, 5, 1, 2, 162, 162, 190, 253, 0, 0, 0, 0,
+      73, 69, 78, 68, 174, 66, 96, 130
+    ]);
+
 void main() {
   group('CachedArtwork Widget Tests', () {
     testWidgets('Renders placeholder when no cached bytes available',
@@ -129,6 +136,32 @@ void main() {
       await tester.pump();
 
       expect(find.byType(Image), findsOneWidget);
+    });
+
+    testWidgets(
+        'invalidate() clears a mounted widget and drops the stale bitmap',
+        (tester) async {
+      const songId = 987654;
+      final key = '${ArtworkType.AUDIO.name}_$songId';
+      ArtworkLruCache().put(key, _onePixelPng(), persistToDisk: false);
+      addTearDown(() => ArtworkLruCache().remove(key));
+
+      await tester.pumpWidget(
+        _wrap(const CachedArtwork(id: songId, size: 64.0)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byType(Image), findsOneWidget);
+
+      // Simulate the post-invalidate state (memory evicted + revision bumped)
+      // that a mounted widget observes when a file's cover is rewritten.
+      ArtworkLruCache().remove(key);
+      ArtworkInvalidationBus.revision.value++;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byType(Image), findsNothing);
+      expect(find.byType(ArtworkPlaceholder), findsOneWidget);
     });
   });
 }

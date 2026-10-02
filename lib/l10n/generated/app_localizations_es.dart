@@ -3524,6 +3524,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get removeFromFavorites => 'Quitar de favoritos';
+
+  @override
   String cornerRadiusLabel(Object px) {
     return 'Radio de esquinas (${px}px)';
   }
