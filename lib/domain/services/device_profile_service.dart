@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/audio_output_info.dart';
@@ -55,6 +56,11 @@ class DeviceProfileService {
   static const String _keyEnabled = 'setting_auto_device_profiles_enabled';
   static const String _keyRegistry = 'setting_device_registry';
   static const int _maxRegistryEntries = 30;
+
+  /// Serializes every read-modify-write of the persisted link/registry JSON.
+  /// Two concurrent [rememberLink]/[rememberDevice] calls would otherwise each
+  /// read the same snapshot and the later write would drop the other's entry.
+  final Mutex _prefsMutex = Mutex();
 
   /// Stable identity for an output device. Bluetooth/wired/USB/HDMI devices
   /// are keyed by "type:normalized name"; the built-in speaker collapses to
@@ -119,60 +125,64 @@ class DeviceProfileService {
     required String deviceKey,
     required String deviceLabel,
     required String profileId,
-  }) async {
-    final links = await getLinks();
-    links[deviceKey] = DeviceProfileLink(
-      deviceKey: deviceKey,
-      profileId: profileId,
-      deviceLabel: deviceLabel,
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _keyLinks, json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
-  }
+  }) =>
+      _prefsMutex.protect(() async {
+        final links = await getLinks();
+        links[deviceKey] = DeviceProfileLink(
+          deviceKey: deviceKey,
+          profileId: profileId,
+          deviceLabel: deviceLabel,
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_keyLinks,
+            json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+      });
 
-  Future<void> forgetLink(String deviceKey) async {
-    final links = await getLinks();
-    if (links.remove(deviceKey) == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _keyLinks, json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
-  }
+  Future<void> forgetLink(String deviceKey) => _prefsMutex.protect(() async {
+        final links = await getLinks();
+        if (links.remove(deviceKey) == null) return;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_keyLinks,
+            json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+      });
 
   /// Remembers a seen device for the UI list (bounded, most recent kept).
-  Future<void> rememberDevice(String deviceKey, String deviceLabel) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_keyRegistry);
-      final entries = <DeviceProfileEntry>[];
-      if (raw != null) {
-        final decoded = json.decode(raw) as List<dynamic>;
-        for (final e in decoded) {
-          final map = e as Map<String, dynamic>;
-          entries.add(DeviceProfileEntry(
-            deviceKey: map['deviceKey'] as String? ?? '',
-            deviceLabel: map['deviceLabel'] as String? ?? '',
-          ));
+  Future<void> rememberDevice(String deviceKey, String deviceLabel) =>
+      _prefsMutex.protect(() async {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final raw = prefs.getString(_keyRegistry);
+          final entries = <DeviceProfileEntry>[];
+          if (raw != null) {
+            final decoded = json.decode(raw) as List<dynamic>;
+            for (final e in decoded) {
+              final map = e as Map<String, dynamic>;
+              entries.add(DeviceProfileEntry(
+                deviceKey: map['deviceKey'] as String? ?? '',
+                deviceLabel: map['deviceLabel'] as String? ?? '',
+              ));
+            }
+          }
+          entries.removeWhere((e) => e.deviceKey == deviceKey);
+          entries.insert(
+            0,
+            DeviceProfileEntry(deviceKey: deviceKey, deviceLabel: deviceLabel),
+          );
+          final capped = entries.take(_maxRegistryEntries).toList();
+          await prefs.setString(
+            _keyRegistry,
+            json.encode(capped
+                .map((e) => {
+                      'deviceKey': e.deviceKey,
+                      'deviceLabel': e.deviceLabel,
+                    })
+                .toList()),
+          );
+        } catch (e, st) {
+          ErrorLogger.log('Failed to remember output device',
+              error: e, stackTrace: st, category: 'DeviceProfileService');
         }
-      }
-      entries.removeWhere((e) => e.deviceKey == deviceKey);
-      entries.insert(
-        0,
-        DeviceProfileEntry(deviceKey: deviceKey, deviceLabel: deviceLabel),
-      );
-      final capped = entries.take(_maxRegistryEntries).toList();
-      await prefs.setString(
-        _keyRegistry,
-        json.encode(capped
-            .map(
-                (e) => {'deviceKey': e.deviceKey, 'deviceLabel': e.deviceLabel})
-            .toList()),
-      );
-    } catch (e, st) {
-      ErrorLogger.log('Failed to remember output device',
-          error: e, stackTrace: st, category: 'DeviceProfileService');
-    }
-  }
+      });
 
   Future<List<DeviceProfileEntry>> registryDevices() async {
     try {
@@ -201,24 +211,25 @@ class DeviceProfileService {
   }
 
   /// Imports device-profile links from JSON (merging with existing links).
-  Future<bool> importLinksJson(String jsonStr) async {
-    try {
-      final decoded = json.decode(jsonStr) as Map<String, dynamic>;
-      final links = await getLinks();
-      for (final entry in decoded.entries) {
-        if (entry.value is Map<String, dynamic>) {
-          links[entry.key] =
-              DeviceProfileLink.fromJson(entry.value as Map<String, dynamic>);
+  Future<bool> importLinksJson(String jsonStr) =>
+      _prefsMutex.protect(() async {
+        try {
+          final decoded = json.decode(jsonStr) as Map<String, dynamic>;
+          final links = await getLinks();
+          for (final entry in decoded.entries) {
+            if (entry.value is Map<String, dynamic>) {
+              links[entry.key] = DeviceProfileLink.fromJson(
+                  entry.value as Map<String, dynamic>);
+            }
+          }
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_keyLinks,
+              json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
+          return true;
+        } catch (e, st) {
+          ErrorLogger.log('Failed to import device profile links from JSON',
+              error: e, stackTrace: st, category: 'DeviceProfileService');
+          return false;
         }
-      }
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          _keyLinks, json.encode(links.map((k, v) => MapEntry(k, v.toJson()))));
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to import device profile links from JSON',
-          error: e, stackTrace: st, category: 'DeviceProfileService');
-      return false;
-    }
-  }
+      });
 }

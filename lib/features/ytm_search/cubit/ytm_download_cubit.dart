@@ -82,6 +82,9 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final Map<String, int> _recentlyCompleted = {};
   static const int _recentlyCompletedTtlMs = 10000;
 
+  /// Upper bound on [_reconciledVideoIds]; oldest entries are evicted first.
+  static const int _maxReconciledIds = 500;
+
   YtmDownloadCubit(
     this._service,
     this._playerCubit, {
@@ -144,7 +147,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
         _reconciledVideoIds.add(task.videoId);
         _recentlyCompleted[task.videoId] = now;
         // FIX-H04 / B-06: Cap reconciled IDs at 500, evicting oldest (insertion order)
-        while (_reconciledVideoIds.length > 250) {
+        while (_reconciledVideoIds.length > _maxReconciledIds) {
           _reconciledVideoIds.remove(_reconciledVideoIds.first);
         }
         unawaited(_onDownloadComplete(task).whenComplete(() {
@@ -196,7 +199,12 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
             .write(SongsTableCompanion(
                 durationMs: Value(resolved.duration.inMilliseconds)));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      // Was `catch (_) {}`: a failed duration backfill silently left the
+      // library row with a stale/zero duration. Keep it non-fatal but log it.
+      ErrorLogger.log('Failed to backfill downloaded track duration',
+          error: e, stackTrace: st, category: 'YtmDownloadCubit');
+    }
 
     final oldId = task.sourceSongId ??
         YtmTrack(

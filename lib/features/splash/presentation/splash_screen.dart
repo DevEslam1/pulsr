@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -20,6 +21,11 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   bool _timedOut = false;
 
+  /// Re-entrancy guard: the retry button can be tapped repeatedly (or while the
+  /// initial check is still awaiting) which would fire duplicate routed
+  /// navigation and double timeouts.
+  bool _isChecking = false;
+
   @override
   void initState() {
     super.initState();
@@ -27,36 +33,53 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkNextScreen() async {
-    // Hold the intro for its full choreography, but never route before the DI
-    // graph is actually ready. The timeout is a safety net so a stuck
-    // initializer can never trap the user on the splash (I25).
-    bool timedOut = false;
+    if (_isChecking) return;
+    _isChecking = true;
     try {
-      await Future.wait<void>([
-        Future<void>.delayed(const Duration(milliseconds: 800)),
-        initializationReady.timeout(
-          const Duration(seconds: 8),
-          onTimeout: () {
-            timedOut = true;
-          },
-        ),
-      ]);
-    } catch (_) {
-      timedOut = true;
-    }
-    if (!mounted) return;
-    if (timedOut && !getIt.allReadySync()) {
-      setState(() => _timedOut = true);
-      return;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
+      // Hold the intro for its full choreography, but never route before the DI
+      // graph is actually ready. The timeout is a safety net so a stuck
+      // initializer can never trap the user on the splash (I25).
+      bool timedOut = false;
+      try {
+        await Future.wait<void>([
+          Future<void>.delayed(const Duration(milliseconds: 800)),
+          initializationReady.timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              timedOut = true;
+            },
+          ),
+        ]);
+      } catch (e, st) {
+        ErrorLogger.log('Splash initialization wait failed',
+            error: e, stackTrace: st, category: 'Splash');
+        timedOut = true;
+      }
+      if (!mounted) return;
+      if (timedOut && !getIt.allReadySync()) {
+        setState(() => _timedOut = true);
+        return;
+      }
 
-    if (!mounted) return;
-    if (onboardingDone) {
-      context.go('/');
-    } else {
-      context.go('/onboarding');
+      var onboardingDone = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        onboardingDone = prefs.getBool('onboarding_completed') ?? false;
+      } catch (e, st) {
+        // A prefs failure must not strand the user on the splash; fall through
+        // to onboarding, which is the safe default.
+        ErrorLogger.log('Failed to read onboarding flag',
+            error: e, stackTrace: st, category: 'Splash');
+      }
+
+      if (!mounted) return;
+      if (onboardingDone) {
+        context.go('/');
+      } else {
+        context.go('/onboarding');
+      }
+    } finally {
+      _isChecking = false;
     }
   }
 
@@ -90,6 +113,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 96,
                   height: 96,
                   fit: BoxFit.cover,
+                  semanticLabel: context.l10n.appTitle,
                 ),
               ),
             )

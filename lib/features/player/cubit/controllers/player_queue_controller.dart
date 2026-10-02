@@ -107,7 +107,7 @@ class PlayerQueueController {
     required Duration position,
     required double speed,
   }) {
-    for (final s in songs) { _slotLookupCache[s.id] = s; }
+    _cacheSlotSongs(_slotLookupCache, songs);
     _queueSlots[slot] = QueueSlotData(
       songIds: songs.map((s) => s.id).toList(),
       currentIndex: currentIndex,

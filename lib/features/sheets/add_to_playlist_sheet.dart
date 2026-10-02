@@ -277,57 +277,61 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                       );
                     }
 
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: playlists.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.s6),
-                      itemBuilder: (context, index) {
-                        final playlist = playlists[index];
-                        return PulsrPressable(
-                          pressedScale: 0.98,
-                          onTap: () =>
-                              _addToExistingPlaylist(context, playlist),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s14,
-                                vertical: AppSpacing.s10),
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainer.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(AppRadii.r14),
-                              border: Border.all(color: p.hairline),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(AppSpacing.xs),
-                                  decoration: BoxDecoration(
-                                    color: p.accentContainer,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r10),
-                                  ),
-                                  child: Icon(Icons.queue_music_rounded,
-                                      color: p.accent, size: 20),
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (int index = 0; index < playlists.length; index++) ...[
+                          if (index > 0) const SizedBox(height: AppSpacing.s6),
+                          Builder(builder: (context) {
+                            final playlist = playlists[index];
+                            return PulsrPressable(
+                              pressedScale: 0.98,
+                              onTap: () =>
+                                  _addToExistingPlaylist(context, playlist),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.s14,
+                                    vertical: AppSpacing.s10),
+                                decoration: BoxDecoration(
+                                  color:
+                                      p.surfaceContainer.withValues(alpha: 0.6),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r14),
+                                  border: Border.all(color: p.hairline),
                                 ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Text(
-                                    playlist.name,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: AppFontSize.body,
-                                      color: p.textPrimary,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding:
+                                          const EdgeInsets.all(AppSpacing.xs),
+                                      decoration: BoxDecoration(
+                                        color: p.accentContainer,
+                                        borderRadius:
+                                            BorderRadius.circular(AppRadii.r10),
+                                      ),
+                                      child: Icon(Icons.queue_music_rounded,
+                                          color: p.accent, size: 20),
                                     ),
-                                  ),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Expanded(
+                                      child: Text(
+                                        playlist.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: AppFontSize.body,
+                                          color: p.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(Icons.add_circle_outline_rounded,
+                                        color: p.accent, size: 22),
+                                  ],
                                 ),
-                                Icon(Icons.add_circle_outline_rounded,
-                                    color: p.accent, size: 22),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
                     );
                   },
                 ),

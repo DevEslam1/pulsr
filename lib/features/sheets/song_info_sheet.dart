@@ -34,7 +34,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
-class SongInfoSheet extends StatelessWidget {
+class SongInfoSheet extends StatefulWidget {
   final SongsTableData song;
 
   const SongInfoSheet({super.key, required this.song});
@@ -48,19 +48,50 @@ class SongInfoSheet extends StatelessWidget {
     );
   }
 
+  @override
+  State<SongInfoSheet> createState() => _SongInfoSheetState();
+}
+
+class _SongInfoSheetState extends State<SongInfoSheet> {
+  SongsTableData get song => widget.song;
+
+  /// Live listener waiting for the user to return from the system write-settings
+  /// screen. Held as state so it is always disposed when the sheet unmounts;
+  /// the previous fire-and-forget local variable leaked when navigation never
+  /// resumed.
+  AppLifecycleListener? _settingsRetryListener;
+
+  @override
+  void dispose() {
+    _settingsRetryListener?.dispose();
+    _settingsRetryListener = null;
+    super.dispose();
+  }
+
   Future<void> _shareSong(BuildContext context) async {
     final text =
         '${context.l10n.browseCheckOut} "${song.title}" ${context.l10n.browseBy} ${song.artist} ${context.l10n.browseOnPulsr}';
-    if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
-      final exists = await File(song.path).exists();
-      if (exists) {
-        await SharePlus.instance.share(
-          ShareParams(files: [XFile(song.path)], text: text),
+    try {
+      if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
+        final exists = await File(song.path).exists();
+        if (exists) {
+          await SharePlus.instance.share(
+            ShareParams(files: [XFile(song.path)], text: text),
+          );
+          return;
+        }
+      }
+      await SharePlus.instance.share(ShareParams(text: text));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to share song',
+          error: e, stackTrace: st, category: 'SongInfoSheet');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.somethingWentWrong)),
         );
-        return;
       }
     }
-    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   Future<void> _setRingtone(BuildContext context, String type) async {
@@ -141,11 +172,13 @@ class SongInfoSheet extends StatelessWidget {
     MethodChannel channel,
     String type,
   ) {
-    AppLifecycleListener? listener;
-    listener = AppLifecycleListener(
+    // Dispose any prior pending listener so rapid retries cannot stack them.
+    _settingsRetryListener?.dispose();
+    _settingsRetryListener = AppLifecycleListener(
       onResume: () async {
+        final listener = _settingsRetryListener;
+        _settingsRetryListener = null;
         listener?.dispose();
-        listener = null;
         try {
           final canWrite = await channel
                   .invokeMethod<bool>('checkWriteSettingsPermission') ??
@@ -961,7 +994,11 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
                 children: List.generate(5, (index) {
                   final starNum = index + 1;
                   final isFilled = starNum <= currentRating;
-                  return GestureDetector(
+                  return Semantics(
+                    button: true,
+                    selected: isFilled,
+                    label: '${context.l10n.trackRating} $starNum / 5',
+                    child: GestureDetector(
                     onTap: () async {
                       final newRating = currentRating == starNum ? 0 : starNum;
                       await _ratingStore.setRating(trackKey, newRating);
@@ -978,6 +1015,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
                         size: 22,
                         color: isFilled ? p.warning : p.textTertiary,
                       ),
+                    ),
                     ),
                   );
                 }),

@@ -57,10 +57,18 @@ class YtmBrowseService {
   YtmBrowseService(this._ytmService);
 
   /// Clears in-memory browse feed cache upon network/region changes.
+  ///
+  /// Any in-flight shared fetch must be completed before its completer is
+  /// dropped; otherwise callers already awaiting [_pendingFeed] would hang
+  /// forever once the reference is nulled.
   void clearCache() {
     _cachedSections = null;
     _lastFetchTime = null;
+    final pending = _pendingFeed;
     _pendingFeed = null;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(const []);
+    }
   }
 
   /// Fetches Home feed sections including Quick Picks, Recommended, and Trending.
@@ -73,10 +81,17 @@ class YtmBrowseService {
     if (_pendingFeed != null) return _pendingFeed!.future;
     _pendingFeed = Completer<List<YtmBrowseSection>>();
     try {
-      // Curated diverse showcase when offline/initial load with dynamic fallback
-      final charts = await getTrendingCharts();
-      final newReleases = await getNewReleases();
-      final moods = await getMoodsAndGenres();
+      // Curated diverse showcase when offline/initial load with dynamic
+      // fallback. Fire all three requests concurrently: they are independent
+      // network calls and awaiting them sequentially tripled first-paint time.
+      final results = await Future.wait<List<YtmBrowseItem>>([
+        getTrendingCharts(),
+        getNewReleases(),
+        getMoodsAndGenres(),
+      ]);
+      final charts = results[0];
+      final newReleases = results[1];
+      final moods = results[2];
 
       final rawSections = [
         YtmBrowseSection(

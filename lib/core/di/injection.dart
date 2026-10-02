@@ -35,7 +35,10 @@ Future<void> configureDependencies() async {
       await getIt
           .getAsync<PulsrAudioHandler>()
           .timeout(const Duration(seconds: 12));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('PulsrAudioHandler DI warm-up timed out or failed',
+          error: e, stackTrace: st, category: 'DI');
+    }
     try {
       await getIt.getAsync<PlayerCubit>().timeout(const Duration(seconds: 5));
     } catch (e, st) {
@@ -46,12 +49,18 @@ Future<void> configureDependencies() async {
       await getIt
           .getAsync<YtmDownloadCubit>()
           .timeout(const Duration(seconds: 5));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('YtmDownloadCubit DI warm-up timed out or failed',
+          error: e, stackTrace: st, category: 'DI');
+    }
     try {
       await getIt
           .getAsync<FileIntentHandler>()
           .timeout(const Duration(seconds: 5));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('FileIntentHandler DI warm-up timed out or failed',
+          error: e, stackTrace: st, category: 'DI');
+    }
     // Per-song override stores load their SharedPreferences map asynchronously
     // in their constructors; sync getters (player cubit per-track sync, smart
     // playlist filters, song-info sheet) must never observe the empty pre-load
@@ -62,10 +71,16 @@ Future<void> configureDependencies() async {
         getIt<PerSongEqStore>().ready,
         getIt<PerSongVolumeStore>().ready,
       ]).timeout(const Duration(seconds: 5));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Per-song override store warm-up timed out or failed',
+          error: e, stackTrace: st, category: 'DI');
+    }
     try {
       await getIt.allReady().timeout(const Duration(seconds: 5));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('getIt.allReady() warm-up timed out or failed',
+          error: e, stackTrace: st, category: 'DI');
+    }
     validateDependencies(getIt);
   } finally {
     if (!_initializationReady.isCompleted) _initializationReady.complete();
@@ -73,16 +88,20 @@ Future<void> configureDependencies() async {
 }
 
 void validateDependencies(GetIt getIt) {
-  assert(getIt.isRegistered<AppDatabase>(),
-      'AppDatabase must be registered in DI');
-  assert(getIt.isRegistered<PulsrAudioHandler>(),
-      'PulsrAudioHandler must be registered in DI');
-  assert(getIt.isRegistered<PlayerCubit>(),
-      'PlayerCubit must be registered in DI');
-  assert(getIt.isRegistered<DownloadsCubit>(),
-      'DownloadsCubit must be registered in DI');
-  assert(getIt.isRegistered<YtmDownloadCubit>(),
-      'YtmDownloadCubit must be registered in DI');
+  // `assert` is stripped in release builds, so a missing eager singleton only
+  // surfaced as a mysterious launch crash (or a null lookup deep in the UI).
+  // Throw an explicit [StateError] that survives `--release`.
+  void require<T extends Object>() {
+    if (!getIt.isRegistered<T>()) {
+      throw StateError('${T.toString()} must be registered in DI');
+    }
+  }
+
+  require<AppDatabase>();
+  require<PulsrAudioHandler>();
+  require<PlayerCubit>();
+  require<DownloadsCubit>();
+  require<YtmDownloadCubit>();
 }
 
 FutureOr<void> disposeHttpClient(HttpClient client) {

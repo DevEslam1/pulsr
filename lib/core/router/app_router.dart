@@ -64,8 +64,8 @@ Page<dynamic> _buildPulsrPageRoute({
   return CustomTransitionPage<void>(
     key: key,
     child: child,
-    transitionDuration: const Duration(milliseconds: 320),
-    reverseTransitionDuration: const Duration(milliseconds: 280),
+    transitionDuration: PulsrMotion.page,
+    reverseTransitionDuration: PulsrMotion.layout,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       if (!context.motionEnabled) {
         return child;
@@ -132,8 +132,8 @@ Page<dynamic> _buildTabPage({
   return CustomTransitionPage<void>(
     key: key,
     child: child,
-    transitionDuration: const Duration(milliseconds: 240),
-    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionDuration: PulsrMotion.state,
+    reverseTransitionDuration: PulsrMotion.state,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       if (!context.motionEnabled) return child;
       final curved = CurvedAnimation(
@@ -469,8 +469,8 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const NowPlayingScreen(),
-          transitionDuration: const Duration(milliseconds: 340),
-          reverseTransitionDuration: const Duration(milliseconds: 280),
+          transitionDuration: PulsrMotion.page,
+          reverseTransitionDuration: PulsrMotion.layout,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             if (!context.motionEnabled) return child;
             final curved = CurvedAnimation(

@@ -7,6 +7,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -24,6 +25,7 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/pulsr_static_grid.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../../core/utils/formatters.dart';
@@ -608,6 +610,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       onPressed: () async {
                         final selected = await cubit.getSelectedSongs();
                         if (!context.mounted) return;
+                        SoundFeedbackService.playSuccess(mirrorHaptics: true);
                         for (final s in selected) {
                           playerCubit.addToQueue(s);
                         }
@@ -634,6 +637,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                           isDestructive: true,
                         );
                         if (confirmed != true || !context.mounted) return;
+                        SoundFeedbackService.playWarning(mirrorHaptics: true);
                         final removed = await cubit.deleteSelectedSongs();
                         if (!context.mounted || removed <= 0) return;
                         ScaffoldMessenger.of(context)
@@ -968,18 +972,12 @@ class _LibraryScreenState extends State<LibraryScreen>
     StateSetter setSheetState, {
     required VoidCallback onEnterOrganize,
   }) {
-    return GridView.builder(
+    return PulsrStaticGrid(
       key: ValueKey('tabs_grid_${_activeTabs.map((t) => t.name).join('_')}'),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      addAutomaticKeepAlives: false,
-      addRepaintBoundaries: true,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: sheetContext.isTablet ? 3 : 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        mainAxisExtent: 74,
-      ),
+      crossAxisCount: sheetContext.isTablet ? 3 : 2,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      mainAxisExtent: 74,
       itemCount: LibraryTabItem.values.length,
       itemBuilder: (_, i) {
         final item = LibraryTabItem.values[i];

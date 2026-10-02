@@ -22,6 +22,7 @@ class PrefsKeys {
   static const String customEqProfiles = 'custom_eq_profiles';
   static const String resumeAfterInterruption =
       'setting_resume_after_interruption';
+  static const String soundFeedbackEnabled = 'setting_sound_feedback_enabled';
   static const String themeMode = 'setting_theme_mode';
   // Live store is 'setting_custom_accent' (SettingsCubit._keyCustomAccent);
   // the '_color' suffixed value was a dead duplicate (orphan 20-01).

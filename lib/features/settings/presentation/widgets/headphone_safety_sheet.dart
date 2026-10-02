@@ -6,6 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
@@ -52,27 +53,39 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
   }
 
   Future<void> _refreshState() async {
-    final dose = await _channel.getWeeklyDose();
-    if (!mounted) return;
-    final active = await _channel.isSafetyAttenuationActive();
-    if (!mounted) return;
-    setState(() {
-      _weeklyDose = dose;
-      _attenuationActive = active;
-      _loading = false;
-    });
-  }
-
-  Future<void> _pollTelemetry() async {
-    final dose = await _channel.getWeeklyDose();
-    if (!mounted) return;
-    final active = await _channel.isSafetyAttenuationActive();
-    if (!mounted) return;
-    if (dose != _weeklyDose || active != _attenuationActive) {
+    try {
+      final dose = await _channel.getWeeklyDose();
+      if (!mounted) return;
+      final active = await _channel.isSafetyAttenuationActive();
+      if (!mounted) return;
       setState(() {
         _weeklyDose = dose;
         _attenuationActive = active;
+        _loading = false;
       });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to refresh headphone safety state',
+          error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _pollTelemetry() async {
+    try {
+      final dose = await _channel.getWeeklyDose();
+      if (!mounted) return;
+      final active = await _channel.isSafetyAttenuationActive();
+      if (!mounted) return;
+      if (dose != _weeklyDose || active != _attenuationActive) {
+        setState(() {
+          _weeklyDose = dose;
+          _attenuationActive = active;
+        });
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to poll headphone safety telemetry',
+          error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
     }
   }
 

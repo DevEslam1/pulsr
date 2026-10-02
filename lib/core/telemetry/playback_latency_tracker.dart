@@ -400,13 +400,11 @@ class PlaybackLatencyTracker {
     }
     final summary =
         '[PlaybackLatency] playId=${report.playId} videoId=${report.videoId} total=${report.total.inMilliseconds}ms bucket=${report.bucket.name} success=${report.success} breakdown: ${parts.join(", ")}';
+    // Single persistent sink: ErrorLogger. The debug line is dev-only and
+    // gated so a normal run never emits to two sinks at once.
     if (_enableDebugPrint) {
       debugPrint(summary);
-    } else {
-      // In tests, avoid debugPrint noise but still log via ErrorLogger breadcrumb for capture
-      ErrorLogger.addBreadcrumb(summary, category: 'playback.latency.summary');
     }
-    // Also always log via ErrorLogger for persistent diagnostics
     ErrorLogger.log(summary, category: 'PlaybackLatency');
   }
 

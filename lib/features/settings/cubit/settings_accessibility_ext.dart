@@ -2,6 +2,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/performance/gpu_budget.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import 'settings_cubit.dart';
 
 /// Accessibility-related settings mutations, split out of `SettingsCubit` so
@@ -29,4 +30,12 @@ extension SettingsAccessibilityX on SettingsCubit {
       GpuBudget.setEnabled(prefs.getBool(_keyReduceMotion) ?? false);
     } catch (_) {}
   }
+
+  /// Sets whether UI sound feedback is enabled app-wide.
+  Future<void> setSoundFeedbackEnabled(bool value) async {
+    SoundFeedbackService.setEnabled(value);
+  }
+
+  /// Whether UI sound feedback is currently enabled.
+  bool get isSoundFeedbackEnabled => SoundFeedbackService.enabled;
 }

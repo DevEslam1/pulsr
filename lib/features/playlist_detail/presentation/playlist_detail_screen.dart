@@ -63,7 +63,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   /// Cleared on retry to force a fresh subscription.
   Stream<_PlaylistSongsResult>? _songsStream;
 
-  Stream<_PlaylistSongsResult> _resolveSongsStream() {
+  Stream<_PlaylistSongsResult> _resolveSongsStream(String invalidRulesMessage) {
     final cached = _songsStream;
     if (cached != null) return cached;
     final useCases = _useCases;
@@ -80,8 +80,10 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             .watchSmartPlaylistSongs(criteria)
             .map((songs) => _PlaylistSongsResult(songs: songs));
       } else {
+        // Corrupt criteria: surface a retryable error instead of pretending the
+        // playlist is simply empty.
         stream = Stream.value(
-          const _PlaylistSongsResult(songs: <SongsTableData>[]),
+          _PlaylistSongsResult(error: invalidRulesMessage),
         );
       }
     } else {
@@ -238,7 +240,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final p = context.palette;
     final playlistUseCases = _useCases;
 
-    final Stream<_PlaylistSongsResult> songsStream = _resolveSongsStream();
+    final Stream<_PlaylistSongsResult> songsStream =
+        _resolveSongsStream(context.l10n.browseCouldNotLoadTracks);
 
     return StreamBuilder<_PlaylistSongsResult>(
       stream: songsStream,

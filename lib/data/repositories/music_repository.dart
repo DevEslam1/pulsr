@@ -6,9 +6,13 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import '../../core/constants/audio_formats.dart';
 import '../../core/errors/failures.dart';
 import '../../core/utils/cue_parser.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/safe_file_path.dart';
 import '../../domain/models/chapter_info.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
@@ -1904,6 +1908,75 @@ class MusicRepository implements IMusicRepository {
     return res.fold(Left.new, (_) => const Right(null));
   }
 
+  /// Resolves the directories Pulsr is allowed to delete local audio from.
+  /// Any provider that fails (e.g. unsupported platform) is skipped.
+  Future<List<String>> _allowedDeleteRoots() async {
+    final roots = <String>[];
+    Future<void> add(Future<Directory?> Function() provider) async {
+      try {
+        final dir = await provider();
+        if (dir != null) roots.add(dir.path);
+      } catch (_) {}
+    }
+
+    await add(getApplicationDocumentsDirectory);
+    await add(getApplicationSupportDirectory);
+    await add(getTemporaryDirectory);
+    if (Platform.isAndroid) {
+      await add(getExternalStorageDirectory);
+    }
+    return roots;
+  }
+
+  /// Defensive containment check before deleting a local file. Requires the
+  /// path to be a non-empty absolute audio file whose canonical location sits
+  /// under an allowed app root. If no root can be resolved, the delete is
+  /// refused (fail safe).
+  Future<bool> _isSafeLocalDeletePath(String path) async {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty || !p.isAbsolute(trimmed)) return false;
+
+    final file = SafeFilePath.validate(
+      trimmed,
+      allowedExtensions: AudioFormats.supportedExtensions.toList(),
+      checkExists: true,
+    );
+    if (file == null) return false;
+
+    final roots = await _allowedDeleteRoots();
+    if (roots.isEmpty) {
+      ErrorLogger.log(
+        'Refusing to delete "$path": no allowed root could be resolved',
+        category: 'Security',
+      );
+      return false;
+    }
+
+    try {
+      final canonicalFile = await file.resolveSymbolicLinks();
+      for (final root in roots) {
+        String canonicalRoot;
+        try {
+          canonicalRoot = await Directory(root).resolveSymbolicLinks();
+        } catch (_) {
+          continue;
+        }
+        if (p.equals(canonicalFile, canonicalRoot)) continue;
+        if (p.isWithin(canonicalRoot, canonicalFile)) return true;
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to canonicalize delete path "$path"',
+          error: e, stackTrace: st, category: 'Security');
+      return false;
+    }
+
+    ErrorLogger.log(
+      'Refusing to delete file outside allowed roots: $path',
+      category: 'Security',
+    );
+    return false;
+  }
+
   @override
   Future<Result<List<int>>> deleteSongsWithReport(List<int> ids) async {
     if (ids.isEmpty) return const Right([]);
@@ -1954,6 +2027,7 @@ class MusicRepository implements IMusicRepository {
         final path = song.path;
         if (path.isEmpty || path.startsWith('ytmusic://')) continue;
         try {
+          if (!await _isSafeLocalDeletePath(path)) continue;
           final file = File(path);
           if (await file.exists()) {
             await file.delete();

@@ -198,18 +198,24 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                         children: widget.availableLetters.map((letter) {
                           final isSelected = letter == currentLetter;
                           return Expanded(
-                            child: Center(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  letter,
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.tiny,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w900
-                                        : FontWeight.w600,
-                                    color:
-                                        isSelected ? p.accent : p.textTertiary,
+                            child: Semantics(
+                              button: true,
+                              selected: isSelected,
+                              label: letter,
+                              child: Center(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    letter,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.tiny,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w900
+                                          : FontWeight.w600,
+                                      color: isSelected
+                                          ? p.accent
+                                          : p.textTertiary,
+                                    ),
                                   ),
                                 ),
                               ),

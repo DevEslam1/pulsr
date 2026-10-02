@@ -23,14 +23,21 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   /// cannot materialize every row into memory (OOM risk on large libraries).
   static const int previewCap = 100;
 
+  /// The default rule seeded into [initialState]. Seeding it up-front (instead
+  /// of emitting via [addRule] from the constructor body) keeps the first
+  /// emitted state consistent with the initial state and avoids a spurious
+  /// state emission during construction.
+  static const SmartRule _initialRule = SmartRule(
+    field: SmartRuleField.playCount,
+    operator: SmartOperator.greaterThan,
+    value: '0',
+  );
+
   SmartPlaylistBuilderCubit(this._engine, this._playlistUseCases)
-      : super(const SmartPlaylistBuilderState()) {
-    // Initialize with default initial rule
-    addRule(const SmartRule(
-      field: SmartRuleField.playCount,
-      operator: SmartOperator.greaterThan,
-      value: '0',
-    ));
+      : super(SmartPlaylistBuilderState(
+          criteria: const SmartCriteria(rules: [_initialRule]),
+        )) {
+    _updatePreview();
   }
 
   void initWithPlaylist(PlaylistsTableData playlist) {

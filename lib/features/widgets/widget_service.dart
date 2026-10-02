@@ -28,14 +28,13 @@ class WidgetService {
       if (_appGroupConfigured) return;
       try {
         await HomeWidget.setAppGroupId(appGroupId);
+        // Only mark configured once the call actually succeeded so a transient
+        // failure is retried on the next update.
+        _appGroupConfigured = true;
       } catch (e) {
         ErrorLogger.log('Failed to set iOS app group ID',
             error: e, category: 'WidgetService');
       }
-      // C-06: Only mark the app group as configured on iOS. Previously this was
-      // set unconditionally (including on Android, where setAppGroupId is never
-      // called), which would silently skip future iOS-only setup.
-      _appGroupConfigured = true;
     } else if (Platform.isAndroid) {
       if (_androidInitialized) return;
       _androidInitialized = true;
@@ -166,12 +165,18 @@ class WidgetService {
         await HomeWidget.saveWidgetData<String>('upNext', upNext);
         await HomeWidget.saveWidgetData<String>('queueCover', queueCover ?? '');
 
-        // If artwork is already cached for this song, set it immediately
+        // If artwork is already cached for this song, set it immediately.
+        // Otherwise always re-queue resolution — a missing/stale cache must not
+        // be skipped just because this song id was saved before.
         final cachedArt = _artworkCache[song.id];
         if (cachedArt != null && File(cachedArt).existsSync()) {
           _lastSavedArtworkSongId = song.id;
           await HomeWidget.saveWidgetData<String>('artwork', cachedArt);
-        } else if (_lastSavedArtworkSongId != song.id) {
+        } else {
+          if (cachedArt != null) {
+            _artworkCache.remove(song.id);
+            _roundedArtworkCache.remove(song.id);
+          }
           _pendingArtworkQueue.removeWhere((s) => s.id == song.id);
           // C-04: Cap queue at 3 entries, drop oldest on rapid track changes
           while (_pendingArtworkQueue.length >= 3) {
@@ -364,7 +369,9 @@ class WidgetService {
             HttpClient? client;
             try {
               final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
-              if (uri != null) {
+              if (uri != null &&
+                  uri.scheme == 'https' &&
+                  uri.host.isNotEmpty) {
                 client = HttpClient()
                   ..connectionTimeout = const Duration(seconds: 8)
                   ..idleTimeout = const Duration(seconds: 5);

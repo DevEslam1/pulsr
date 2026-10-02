@@ -125,8 +125,21 @@ class DspDebugReport {
       detectedOemEngines: parsedOem,
       stages: parsedStages,
       activeEffectNames: parsedActive,
-      timestamp: DateTime.now(),
+      timestamp: _parseTimestamp(map['timestamp']),
     );
+  }
+
+  /// Parses the report's persisted ISO-8601 timestamp, falling back to "now"
+  /// only when the value is absent or unparseable. Dropping it (or always
+  /// using now) made a re-read report claim to be freshly captured, so stale
+  /// debug snapshots could not be told apart from live ones.
+  static DateTime _parseTimestamp(Object? raw) {
+    if (raw is DateTime) return raw;
+    if (raw is String) {
+      final parsed = DateTime.tryParse(raw);
+      if (parsed != null) return parsed;
+    }
+    return DateTime.now();
   }
 
   Map<String, dynamic> toMap() => {

@@ -1,5 +1,16 @@
 // lib/domain/models/lyrics_line.dart
 
+/// Value equality for lists whose elements implement `==`. Kept local so the
+/// pure domain model does not depend on Flutter's `listEquals`.
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 enum LyricsSource { embedded, externalLrc, lrclib, ytmusic, none }
 
 /// Timestamp metadata for a single word within an enhanced LRC synchronized line.
@@ -80,16 +91,19 @@ class LyricsLine {
           timestamp == other.timestamp &&
           text == other.text &&
           source == other.source &&
+          _listEquals(words, other.words) &&
           translation == other.translation &&
           isVocal == other.isVocal;
 
   @override
-  int get hashCode =>
-      timestamp.hashCode ^
-      text.hashCode ^
-      source.hashCode ^
-      translation.hashCode ^
-      isVocal.hashCode;
+  int get hashCode => Object.hash(
+        timestamp,
+        text,
+        source,
+        Object.hashAll(words),
+        translation,
+        isVocal,
+      );
 }
 
 class LyricsResult {

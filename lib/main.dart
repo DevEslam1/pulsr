@@ -22,6 +22,7 @@ import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
 import 'core/services/artwork_cache_manager.dart';
 import 'core/services/settings_cache.dart';
+import 'core/services/sound_feedback_service.dart';
 import 'core/services/automation_trigger_service.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
@@ -114,6 +115,7 @@ Future<void> main() async {
   try {
     await SettingsCache().init();
     await ArtworkCacheManager().init();
+    await SoundFeedbackService.init();
   } catch (_) {}
 
   // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
@@ -158,6 +160,15 @@ Future<void> main() async {
     ErrorLogger.log('DI configureDependencies failed or timed out',
         error: e, stackTrace: st, category: 'Startup');
   }
+
+  SoundFeedbackService.isMusicPlaying = () {
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        return getIt<PulsrAudioHandler>().playbackState.value.playing;
+      }
+    } catch (_) {}
+    return false;
+  };
 
   // Defer heavy post-DI tasks to AFTER runApp to eliminate Davey! 1223ms jank on OnePlus
   // Previously awaited 3x8s before first frame -> Skipped 121 frames. Now fire-and-forget.

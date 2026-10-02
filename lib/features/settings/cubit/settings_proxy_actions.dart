@@ -103,6 +103,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
       proxyBypassHosts: newConfig.bypassHosts,
     );
 
+    final previousState = state;
     safeEmit(updated);
 
     final prefs = await SharedPreferences.getInstance();
@@ -120,7 +121,21 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
       } else {
         await _secureStorage.delete(key: SettingsCubit._keyProxyPasswordSecure);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to persist proxy password to secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'SettingsCubit',
+      );
+      if (!isClosed) {
+        safeEmit(state.copyWith(
+          hasProxyPassword: previousState.hasProxyPassword,
+          errorMessage:
+              'Failed to save proxy password securely. It was not changed.',
+        ));
+      }
+    }
     await prefs.remove(SettingsCubit._keyProxyPassword);
     await prefs.setString(
         SettingsCubit._keyProxyBypassHosts, newConfig.bypassHosts);

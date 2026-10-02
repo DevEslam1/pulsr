@@ -612,6 +612,20 @@ mixin SettingsCategorySectionsB on State<SettingsScreen> {
       _SearchItem(
         categoryId: 'appearance',
         category: context.l10n.settingsCategoryAppearance,
+        title: 'UI Sound Effects',
+        subtitle: 'Play subtle audio feedback for interactions',
+        icon: Icons.volume_up_rounded,
+        keywords: ['sound', 'audio', 'feedback', 'effects', 'click', 'haptic'],
+        trailing: Switch.adaptive(
+          value: SoundFeedbackService.enabled,
+          onChanged: (val) => SoundFeedbackService.setEnabled(val),
+        ),
+        onTap: () =>
+            SoundFeedbackService.setEnabled(!SoundFeedbackService.enabled),
+      ),
+      _SearchItem(
+        categoryId: 'appearance',
+        category: context.l10n.settingsCategoryAppearance,
         title: context.l10n.settingsSearchNowPlayingThemeTitle,
         subtitle: getThemeModeTitle(state.playerThemeMode, context.l10n),
         icon: Icons.art_track_rounded,

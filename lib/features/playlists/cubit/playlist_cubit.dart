@@ -9,6 +9,7 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/connectivity_guard.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
@@ -490,20 +491,64 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final result = await _playlistUseCases.createPlaylist(name,
         isSmart: isSmart, smartCriteria: criteria);
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(errorMessage: null)),
+      (failure) {
+        SoundFeedbackService.playError(mirrorHaptics: true);
+        safeEmit(state.copyWith(errorMessage: failure.message));
+      },
+      (_) {
+        SoundFeedbackService.playSuccess(mirrorHaptics: true);
+        safeEmit(state.copyWith(errorMessage: null));
+      },
     );
   }
 
   Future<void> renamePlaylist(int playlistId, String newName) async {
     final result = await _playlistUseCases.renamePlaylist(playlistId, newName);
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(errorMessage: null)),
+      (failure) {
+        SoundFeedbackService.playError(mirrorHaptics: true);
+        safeEmit(state.copyWith(errorMessage: failure.message));
+      },
+      (_) {
+        SoundFeedbackService.playSuccess(mirrorHaptics: true);
+        safeEmit(state.copyWith(errorMessage: null));
+      },
     );
   }
 
+  /// Undo helper for a deleted playlist: recreates it and restores its songs.
+  /// Returns the new playlist id, or null when creation fails.
+  Future<int?> restorePlaylist(
+    String name, {
+    bool isSmart = false,
+    String? criteria,
+    List<int> songIds = const [],
+  }) async {
+    final result = await _playlistUseCases.createPlaylist(name,
+        isSmart: isSmart, smartCriteria: criteria);
+    final newId = result.getOrElse((_) => -1);
+    if (newId <= 0) {
+      SoundFeedbackService.playError(mirrorHaptics: true);
+      final message = result.fold((failure) => failure.message, (_) => '');
+      safeEmit(state.copyWith(errorMessage: message));
+      return null;
+    }
+    SoundFeedbackService.playSuccess(mirrorHaptics: true);
+    if (!isSmart && songIds.isNotEmpty) {
+      final addResult =
+          await _playlistUseCases.addSongsToPlaylist(newId, songIds);
+      addResult.fold(
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (_) => safeEmit(state.copyWith(errorMessage: null)),
+      );
+    } else {
+      safeEmit(state.copyWith(errorMessage: null));
+    }
+    return newId;
+  }
+
   Future<void> deletePlaylist(int playlistId) async {
+    SoundFeedbackService.playWarning(mirrorHaptics: true);
     final removedSub = _smartSubscriptions.remove(playlistId);
     removedSub?.cancel();
     removeFromComposite(removedSub);
@@ -806,6 +851,16 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   void removeCustomPlaylist(String id) {
     final updated =
         onlineState.customPlaylists.where((p) => p.id != id).toList();
+    _setOnlineState((s) => s.copyWith(customPlaylists: updated));
+    unawaited(_saveOnlineCache());
+  }
+
+  /// Re-inserts a previously removed custom online playlist (Undo). No-op when
+  /// an entry with the same id is already present.
+  void restoreCustomPlaylist(OnlinePlaylistEntry entry) {
+    if (onlineState.customPlaylists.any((p) => p.id == entry.id)) return;
+    final updated = List<OnlinePlaylistEntry>.from(onlineState.customPlaylists)
+      ..add(entry);
     _setOnlineState((s) => s.copyWith(customPlaylists: updated));
     unawaited(_saveOnlineCache());
   }

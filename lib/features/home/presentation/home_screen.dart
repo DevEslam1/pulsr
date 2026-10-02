@@ -16,6 +16,7 @@ import '../../../core/widgets/pulsr_logo.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/pulsr_static_grid.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -57,12 +58,17 @@ double _scaledTitleBoxHeight(BuildContext context) {
 /// Dynamically calculates the carousel height to comfortably fit card artwork,
 /// dynamic text-scaled title box, artist line, and padding without overflowing.
 double _scaledCarouselHeight(BuildContext context, bool isTablet) {
-  final cardWidth = context.responsive
-      .value(compact: 138.0, medium: 150.0, expanded: 158.0);
+  final cardWidth =
+      context.responsive.value(compact: 138.0, medium: 150.0, expanded: 158.0);
   final titleHeight = _scaledTitleBoxHeight(context);
   final textScale = MediaQuery.textScalerOf(context).scale(14.0);
   final artistHeight = textScale * 1.35;
-  return cardWidth + AppSpacing.xs + titleHeight + AppSpacing.s2 + artistHeight + 12.0;
+  return cardWidth +
+      AppSpacing.xs +
+      titleHeight +
+      AppSpacing.s2 +
+      artistHeight +
+      12.0;
 }
 
 class HomeScreen extends StatelessWidget {
@@ -150,6 +156,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   List<String> get _onlineCategories => _homeCubit.onlineCategories;
   bool _notificationDenied = false;
+
+  /// Session-only dismissal of the notification banner. Deliberately not
+  /// persisted: dismissing the banner must not clear the underlying
+  /// `notification_permission_denied` flag, otherwise a real denial would stay
+  /// hidden on every subsequent launch.
+  bool _notificationBannerDismissed = false;
 
   @override
   void initState() {
@@ -391,7 +403,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   ),
 
                   // ---------- Notification Permission Denied Banner (B-37) ----------
-                  if (_notificationDenied)
+                  if (_notificationDenied && !_notificationBannerDismissed)
                     Padding(
                       padding: EdgeInsetsDirectional.fromSTEB(
                         Adaptive.pagePadding(context),
@@ -440,13 +452,13 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             IconButton(
                               icon: const Icon(Icons.close, size: 16),
                               tooltip: context.l10n.close,
-                              onPressed: () async {
-                                final prefs =
-                                    await SharedPreferences.getInstance();
-                                await prefs.setBool(
-                                    'notification_permission_denied', false);
+                              // Hide for this session only. Clearing the
+                              // persisted denial flag here made a genuine
+                              // denial disappear permanently.
+                              onPressed: () {
                                 if (mounted) {
-                                  setState(() => _notificationDenied = false);
+                                  setState(() =>
+                                      _notificationBannerDismissed = true);
                                 }
                               },
                             ),
@@ -1083,9 +1095,7 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
                   return StaggeredReveal(
                     index: index,
                     horizontal: true,
-                    groupKey: songs.isEmpty
-                        ? ''
-                        : '${songs.first.id}',
+                    groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: _TrendingCard(
                       song: song,
                       onTap: () =>
@@ -1100,24 +1110,17 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
                 title:
                     '${context.l10n.browseTopChartsSongs} (${songs.length})'),
             if (context.trackGridColumns > 1)
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: true,
+              PulsrStaticGrid(
+                crossAxisCount: context.trackGridColumns,
+                mainAxisExtent: 72,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 4,
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: context.trackGridColumns,
-                  mainAxisExtent: 72,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 4,
-                ),
                 itemCount: songs.length,
                 itemBuilder: (context, i) => StaggeredReveal(
                   index: i,
-                  groupKey:
-                      songs.isEmpty ? '' : '${songs.first.id}',
+                  groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                   child: SongTile(
                     song: songs[i],
                     index: i,
@@ -1133,8 +1136,7 @@ class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
               for (int i = 0; i < songs.length; i++)
                 StaggeredReveal(
                   index: i,
-                  groupKey:
-                      songs.isEmpty ? '' : '${songs.first.id}',
+                  groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                   child: SongTile(
                     song: songs[i],
                     index: i,
@@ -1243,8 +1245,7 @@ class _TrendingCard extends StatelessWidget {
                 children: [
                   CachedArtwork(
                     id: song.id,
-                    remoteUrl:
-                        song.remoteArtworkUrl ?? song.artworkUri,
+                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
                     albumId: song.albumId,
                     type: ArtworkType.AUDIO,
                     size: size,
@@ -1633,9 +1634,7 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                     return StaggeredReveal(
                       index: index,
                       horizontal: true,
-                      groupKey: songs.isEmpty
-                          ? ''
-                          : '${songs.first.id}',
+                      groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                       child: Padding(
                         padding: const EdgeInsetsDirectional.only(
                             end: AppSpacing.s14),
@@ -1651,8 +1650,8 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                                   children: [
                                     CachedArtwork(
                                       id: song.id,
-                                      remoteUrl:
-                                          song.remoteArtworkUrl ?? song.artworkUri,
+                                      remoteUrl: song.remoteArtworkUrl ??
+                                          song.artworkUri,
                                       albumId: song.albumId,
                                       type: ArtworkType.AUDIO,
                                       size: size,
@@ -1825,19 +1824,13 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
               ),
             ),
             if (columns > 1)
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: true,
+              PulsrStaticGrid(
+                crossAxisCount: columns,
+                mainAxisExtent: 72,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 4,
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columns,
-                  mainAxisExtent: 72,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 4,
-                ),
                 itemCount: totalItemCount,
                 itemBuilder: (context, index) {
                   if (index >= songs.length) {
@@ -1873,9 +1866,7 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                   final song = songs[index];
                   return StaggeredReveal(
                     index: index,
-                    groupKey: songs.isEmpty
-                        ? ''
-                        : '${songs.first.id}',
+                    groupKey: songs.isEmpty ? '' : '${songs.first.id}',
                     child: SongTile(
                       song: song,
                       onTap: () => playerCubit.playSong(song, queue: songs),
@@ -1886,73 +1877,62 @@ class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
                 },
               )
             else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: true,
-                itemCount: totalItemCount,
-                itemBuilder: (context, index) {
-                  if (index >= songs.length) {
-                    return Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context),
-                        vertical: AppSpacing.sm,
-                      ),
-                      child: Center(
-                        child: OutlinedButton.icon(
-                          onPressed: loading ? null : _loadMore,
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                                color: p.accent.withValues(alpha: 0.3)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r20),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.s10,
-                            ),
+              for (int index = 0; index < totalItemCount; index++)
+                if (index >= songs.length)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context),
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Center(
+                      child: OutlinedButton.icon(
+                        onPressed: loading ? null : _loadMore,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                              color: p.accent.withValues(alpha: 0.3)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.r20),
                           ),
-                          icon: loading
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(p.accent),
-                                  ),
-                                )
-                              : Icon(Icons.expand_more_rounded,
-                                  size: 18, color: p.accent),
-                          label: Text(
-                            '${context.l10n.loadMore} (+50)',
-                            style: TextStyle(
-                              color: p.accent,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.s10,
+                          ),
+                        ),
+                        icon: loading
+                            ? SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(p.accent),
+                                ),
+                              )
+                            : Icon(Icons.expand_more_rounded,
+                                size: 18, color: p.accent),
+                        label: Text(
+                          '${context.l10n.loadMore} (+50)',
+                          style: TextStyle(
+                            color: p.accent,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                    );
-                  }
-
-                  final song = songs[index];
-                  return StaggeredReveal(
-                    index: index,
-                    groupKey: songs.isEmpty
-                        ? ''
-                        : '${songs.first.id}',
-                    child: SongTile(
-                      song: song,
-                      onTap: () => playerCubit.playSong(song, queue: songs),
-                      onMorePressed: () =>
-                          SongInfoSheet.show(context, song: song),
                     ),
-                  );
-                },
-              ),
+                  )
+                else
+                  StaggeredReveal(
+                    index: index,
+                    groupKey: songs.isEmpty ? '' : '${songs.first.id}',
+                    child: SongTile(
+                      song: songs[index],
+                      onTap: () =>
+                          playerCubit.playSong(songs[index], queue: songs),
+                      onMorePressed: () =>
+                          SongInfoSheet.show(context, song: songs[index]),
+                    ),
+                  ),
           ],
         );
       },
@@ -2055,7 +2035,10 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
       if (scanner == null) return;
       final granted = await scanner.checkPermission();
       if (mounted) setState(() => _hasPermission = granted);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to check media permission',
+          error: e, stackTrace: st, category: 'HomeScreen');
+    }
   }
 
   Future<void> _requestPermission() async {
@@ -2080,7 +2063,16 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
           _scan();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to request media permission',
+          error: e, stackTrace: st, category: 'HomeScreen');
+      if (mounted) {
+        setState(() => _hasPermission = false);
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(context.l10n.homePermissionSubtitle)),
+        );
+      }
+    }
   }
 
   Future<void> _scan() async {

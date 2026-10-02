@@ -46,10 +46,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   _AlbumSort _sort = _AlbumSort.track;
   final Set<int> _selectedIds = {};
 
+  // Memoized so rebuilds (sort changes, selection, theme) do not resubscribe to
+  // the DB watch stream.
+  late final Stream<Result<List<SongsTableData>>> _songsStream;
+
   @override
   void initState() {
     super.initState();
     _useCase = widget.getAlbumsUseCase ?? getIt<GetAlbumsUseCase>();
+    _songsStream = _useCase.watchAlbumSongs(widget.album.id).distinct();
     _loadSortPreference();
   }
 
@@ -137,7 +142,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         (Adaptive.isTablet(context) && context.screenWidth >= 800);
 
     return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: _useCase.watchAlbumSongs(album.id).distinct(),
+      stream: _songsStream,
       builder: (context, snapshot) {
         final loadFailed = snapshot.hasError ||
             (snapshot.data?.fold((l) => true, (_) => false) ?? false);
@@ -198,12 +203,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                 children: [
                                   Hero(
                                     tag: widget.heroTag ?? 'album_${album.id}',
-                                    child: CachedArtwork(
-                                      id: album.id,
-                                      type: ArtworkType.ALBUM,
-                                      remoteUrl: album.artworkUri,
-                                      size: artworkSize,
-                                      borderRadius: 24,
+                                    child: Semantics(
+                                      image: true,
+                                      label: album.title,
+                                      child: CachedArtwork(
+                                        id: album.id,
+                                        type: ArtworkType.ALBUM,
+                                        remoteUrl: album.artworkUri,
+                                        size: artworkSize,
+                                        borderRadius: 24,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: AppSpacing.sm),
@@ -442,13 +451,17 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             final artSize = (constraints.maxWidth * 0.7).clamp(140.0, 280.0);
             return Hero(
               tag: widget.heroTag ?? 'album_${album.id}',
-              child: CachedArtwork(
-                id: album.id,
-                type: ArtworkType.ALBUM,
-                remoteUrl: album.artworkUri,
-                size: artSize,
-                borderRadius: 24,
-                highQuality: true,
+              child: Semantics(
+                image: true,
+                label: album.title,
+                child: CachedArtwork(
+                  id: album.id,
+                  type: ArtworkType.ALBUM,
+                  remoteUrl: album.artworkUri,
+                  size: artSize,
+                  borderRadius: 24,
+                  highQuality: true,
+                ),
               ),
             );
           },

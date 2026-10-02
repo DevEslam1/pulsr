@@ -77,6 +77,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// persisted and letting the engine overlap tracks anyway.
   Future<void> _forceCrossfadeOffForBitPerfect() async {
     if (state.crossfadeSeconds <= 0.01) return;
+    markDirty('crossfadeSeconds');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(SettingsCubit._keyCrossfade, 0.0);
     if (isClosed) return;
@@ -88,6 +89,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setBitPerfectOutput(bool enabled) async {
+    markDirty('bitPerfectOutput');
     if (enabled) {
       final block = AudioConflicts.bitPerfectBlockedReason(
         state.currentOutputDevice,
@@ -177,6 +179,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setBypassDspOnBitPerfect(bool enabled) async {
+    markDirty('bypassDspOnBitPerfect');
     safeEmit(state.copyWith(bypassDspOnBitPerfect: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, enabled);
@@ -221,6 +224,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// The actual native call happens in PlayerCubit (it owns the track-change
   /// stream and the de-dupe state); this only persists the preference.
   Future<void> setFollowTrackSampleRate(bool value) async {
+    markDirty('followTrackSampleRate');
     safeEmit(state.copyWith(followTrackSampleRate: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.followTrackSampleRate, value);
@@ -232,6 +236,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// the persisted preference can never claim native DSD on a path that cannot
   /// carry it. PCM is always allowed and is the default.
   Future<void> setDsdOutputMode(DsdOutputMode mode) async {
+    markDirty('dsdOutputMode');
     if (mode == DsdOutputMode.dop && !state.dsdDopSupported) {
       safeEmit(state.copyWith(
         errorMessage:
@@ -248,6 +253,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// the DSP bypass and follow-track, then surfaces the conflict reason rather
   /// than silently muting stages. Disabled when the path cannot do bit-perfect.
   Future<void> setStrictBitPerfect(bool enabled) async {
+    markDirty('strictBitPerfect');
+    markDirty('bitPerfectOutput');
+    markDirty('bypassDspOnBitPerfect');
+    markDirty('followTrackSampleRate');
     // FIX-C01: Capture pre-call follow-track rate for rollback
     final prevFollowRate = state.followTrackSampleRate;
     if (enabled) {
@@ -512,6 +521,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setDspPreference(String preference) async {
+    markDirty('dspPreference');
     safeEmit(state.copyWith(dspPreference: preference));
     // EqualizerManager is the single writer for effect keys (including
     // dspPreference). Only persist directly when it is unavailable.
@@ -530,6 +540,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     double? releaseMs,
     double? lookaheadMs,
   }) async {
+    markDirty('limiterEnabled');
+    markDirty('limiterThresholdDb');
+    markDirty('limiterReleaseMs');
+    markDirty('limiterLookaheadMs');
     final newEnabled = enabled;
     final newThreshold = thresholdDb ?? state.limiterThresholdDb;
     final newRelease = releaseMs ?? state.limiterReleaseMs;
@@ -570,6 +584,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setSystemEffectsPolicy(String policy) async {
+    markDirty('systemEffectsPolicy');
     safeEmit(state.copyWith(systemEffectsPolicy: policy));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.systemEffectsPolicy, policy);
@@ -600,6 +615,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setBluetoothLatencyOffsetMs(int offsetMs) async {
+    markDirty('bluetoothLatencyOffsetMs');
     final clamped = offsetMs.clamp(0, 500);
     safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
     final prefs = await SharedPreferences.getInstance();
@@ -609,6 +625,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Toggles per-session audio telemetry. The logger reads this flag on every
   /// call, so disabling takes effect immediately with no re-wiring.
   Future<void> setSessionLogEnabled(bool enabled) async {
+    markDirty('sessionLogEnabled');
     safeEmit(state.copyWith(sessionLogEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.audioSessionLogEnabled, enabled);
@@ -617,6 +634,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Opt-in per-track output-format negotiation. Off by default so the manual
   /// device-global output format is untouched unless the user asks for it.
   Future<void> setOutputFormatNegotiationEnabled(bool enabled) async {
+    markDirty('outputFormatNegotiationEnabled');
     safeEmit(state.copyWith(outputFormatNegotiationEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.outputFormatNegotiationEnabled, enabled);
@@ -626,6 +644,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// bypassed). Persisted here and pushed to every player by the player
   /// layer; takes effect for newly built sinks.
   Future<void> setAaudioOutputEnabled(bool enabled) async {
+    markDirty('aaudioOutputEnabled');
     safeEmit(state.copyWith(aaudioOutputEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.aaudioOutputEnabled, enabled);
@@ -646,6 +665,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// maximum and applies the composed output gain in the native float DSP path.
   /// Unavailable on non-Android and while Bit-Perfect bypass is active.
   Future<void> setDvcEnabled(bool enabled) async {
+    markDirty('dvcEnabled');
     safeEmit(state.copyWith(dvcEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.dvcEnabled, enabled);
@@ -659,6 +679,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<bool> setUsbHardwareVolumeEnabled(bool enabled) async {
+    markDirty('usbHardwareVolumeEnabled');
     try {
       safeEmit(state.copyWith(usbHardwareVolumeEnabled: enabled));
       final prefs = await SharedPreferences.getInstance();
@@ -670,6 +691,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   /// Resampler quality (0=Fast/linear, 1=Standard, 2=High, 3=Ultra).
   Future<void> setSincResamplerQuality(int quality) async {
+    markDirty('sincResamplerQuality');
     final clamped = quality.clamp(0, 3);
     safeEmit(state.copyWith(sincResamplerQuality: clamped));
     final prefs = await SharedPreferences.getInstance();
@@ -679,6 +701,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   /// BPM-synced crossfade toggle. Pushed straight to the crossfade manager.
   Future<void> setBpmSyncCrossfadeEnabled(bool enabled) async {
+    markDirty('bpmSyncCrossfadeEnabled');
     safeEmit(state.copyWith(bpmSyncCrossfadeEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bpmSyncCrossfadeEnabled, enabled);
@@ -693,6 +716,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.  /// Whether the AAudio stream should attempt EXCLUSIVE sharing first.
   Future<void> setAaudioPreferExclusive(bool value) async {
+    markDirty('aaudioPreferExclusive');
     safeEmit(state.copyWith(aaudioPreferExclusive: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.aaudioPreferExclusive, value);
@@ -712,6 +736,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Target stream buffer capacity for the AAudio path (20-1000 ms).
   /// Re-pushed to running players so it applies without toggling output.
   Future<void> setAaudioTargetBufferMs(int ms) async {
+    markDirty('aaudioTargetBufferMs');
     final clamped = ms.clamp(20, 1000);
     safeEmit(state.copyWith(aaudioTargetBufferMs: clamped));
     final prefs = await SharedPreferences.getInstance();
@@ -734,6 +759,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// preference is persisted here and pushed to every player by the player
   /// layer's settings observer (and restored on boot by the audio handler).
   Future<void> setFloatOutputEnabled(bool enabled) async {
+    markDirty('floatOutputEnabled');
     safeEmit(state.copyWith(floatOutputEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.floatOutputEnabled, enabled);
@@ -749,6 +775,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   // ── F3/F4/F7/F8/F9/F10 ──────────────────────────────────────────────
   Future<void> setHedgedResolutionEnabled(bool v) async {
+    markDirty('hedgedResolutionEnabled');
     safeEmit(state.copyWith(hedgedResolutionEnabled: v));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.hedgedResolutionEnabled, v);
@@ -763,6 +790,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setAdaptiveQualityEnabled(bool v) async {
+    markDirty('adaptiveQualityEnabled');
     safeEmit(state.copyWith(adaptiveQualityEnabled: v));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.adaptiveQualityEnabled, v);
@@ -777,6 +805,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setDuckingMode(String mode) async {
+    markDirty('duckingMode');
     safeEmit(state.copyWith(duckingMode: mode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.duckingMode, mode);
@@ -791,6 +820,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setDuckingLevel(double level) async {
+    markDirty('duckingLevel');
     final clamped = level.clamp(0.05, 1.0);
     safeEmit(state.copyWith(duckingLevel: clamped));
     final prefs = await SharedPreferences.getInstance();
@@ -806,6 +836,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setMultiOutputMode(String mode) async {
+    markDirty('multiOutputMode');
     final parsed = MultiOutputMode.values.firstWhere(
       (m) => m.name == mode,
       orElse: () => MultiOutputMode.systemDefault,
@@ -841,6 +872,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setDspSnapshotEnabled(bool v) async {
+    markDirty('dspSnapshotEnabled');
     safeEmit(state.copyWith(dspSnapshotEnabled: v));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.dspSnapshotEnabled, v);
@@ -855,6 +887,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setSilenceSkipSensitivity(int v) async {
+    markDirty('silenceSkipSensitivity');
     final clamped = v.clamp(0, 100);
     safeEmit(state.copyWith(silenceSkipSensitivity: clamped));
     final prefs = await SharedPreferences.getInstance();

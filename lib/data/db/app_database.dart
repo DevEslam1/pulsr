@@ -27,14 +27,23 @@ class AppDatabase extends _$AppDatabase {
   /// search index may be incomplete and tracks can be unfindable.
   /// Surfaced instead of only printed (defect 08-04 / 05-01).
   /// The search path calls [repairFtsIndex] on FTS error.
+  ///
+  /// Kept process-global because [MusicRepository] and the health check read it
+  /// statically; the per-instance repair budget below is tracked separately.
   static bool ftsRebuildFailed = false;
 
-  /// Repair attempts made this session. Bounded so a persistently broken index
-  /// cannot loop forever; a manual `force` rebuild or a 5-minute cooldown resets the budget.
-  static int _ftsRepairAttempts = 0;
-  static const int _ftsRepairMaxAttempts = 3;
-  static DateTime? _lastFtsRepairTime;
-  static const Duration _ftsRepairCooldown = Duration(minutes: 5);
+  /// True when the v11 constraint migration failed and was rolled back.
+  /// Deliberately distinct from [ftsRebuildFailed] so a constraint failure is
+  /// not misreported as an FTS rebuild failure (defect 08-04 / 05-01).
+  bool migrationFailed = false;
+
+  /// Repair attempts made this session (per database instance). Bounded so a
+  /// persistently broken index cannot loop forever; a manual `force` rebuild or
+  /// a 5-minute cooldown resets the budget.
+  int _ftsRepairAttempts = 0;
+  final int _ftsRepairMaxAttempts = 3;
+  DateTime? _lastFtsRepairTime;
+  final Duration _ftsRepairCooldown = const Duration(minutes: 5);
 
   /// Best-effort FTS repair: recreates the index tables/triggers and rebuilds.
   /// Retries up to [_ftsRepairMaxAttempts] times with backoff, so a transient
@@ -264,8 +273,15 @@ class AppDatabase extends _$AppDatabase {
       try {
         await executeSql('ROLLBACK TO SAVEPOINT v11_migration;');
         await executeSql('RELEASE SAVEPOINT v11_migration;');
-      } catch (_) {}
-      AppDatabase.ftsRebuildFailed = true;
+      } catch (rollbackError, rollbackStack) {
+        ErrorLogger.log(
+          'V11 constraint migration rollback failed',
+          error: rollbackError,
+          stackTrace: rollbackStack,
+          category: 'Database',
+        );
+      }
+      db?.migrationFailed = true;
       ErrorLogger.log(
         'V11 constraint migration failed and was rolled back',
         error: e,

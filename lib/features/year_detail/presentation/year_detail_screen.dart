@@ -36,11 +36,14 @@ class YearDetailScreen extends StatefulWidget {
 
 class _YearDetailScreenState extends State<YearDetailScreen> {
   late GetYearsUseCase _useCase;
+  late final Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getYearsUseCase ?? getIt<GetYearsUseCase>();
+    // Memoized so rebuilds do not resubscribe to the DB watch stream.
+    _songsStream = _useCase.watchYearSongs(widget.yearItem.year).distinct();
   }
 
   @override
@@ -49,7 +52,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
     final yearItem = widget.yearItem;
 
     return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: _useCase.watchYearSongs(yearItem.year).distinct(),
+      stream: _songsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -123,7 +126,10 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
             children: [
               const SizedBox(height: AppSpacing.md),
               Center(
-                child: Container(
+                child: Semantics(
+                  image: true,
+                  label: '${yearItem.year}',
+                  child: Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
@@ -142,6 +148,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                     Icons.calendar_today_rounded,
                     size: 44,
                     color: p.info,
+                  ),
                   ),
                 ),
               ),
@@ -209,6 +216,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
                   ),
                 )
               : Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     for (int i = 0; i < songs.length; i++)
                       SongTile(

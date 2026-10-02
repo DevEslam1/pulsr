@@ -71,7 +71,11 @@ class SortFilterSheet extends StatelessWidget {
           itemBuilder: (context, index) {
             final option = sortOptions[index];
             final isSelected = currentSort == option['key'];
-            return PulsrPressable(
+            return Semantics(
+              button: true,
+              selected: isSelected,
+              label: option['label'],
+              child: PulsrPressable(
               pressedScale: 0.985,
               onTap: () {
                 // Newly selected options start in their natural direction:
@@ -122,6 +126,7 @@ class SortFilterSheet extends StatelessWidget {
                       ),
                   ],
                 ),
+              ),
               ),
             );
           },

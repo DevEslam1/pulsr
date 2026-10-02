@@ -1,6 +1,31 @@
 // lib/features/player/cubit/controllers/player_queue_slots.dart
 part of 'player_queue_controller.dart';
 
+/// Upper bound on the slot lookup cache. Three slots of
+/// [PlayerQueueController.maxQueueSize] plus reconciled replacements fit
+/// comfortably; the cap only guards against unbounded growth from long
+/// sessions, evicting the least-recently-written songs first.
+const int _maxSlotLookupCacheEntries = 4096;
+
+/// Caches [songs] for slot hydration, marking each as the most recently written
+/// entry (LRU-ish) and evicting the oldest beyond [_maxSlotLookupCacheEntries].
+void _cacheSlotSongs(
+  Map<int, SongsTableData> cache,
+  List<SongsTableData> songs,
+) {
+  for (final s in songs) {
+    cache.remove(s.id);
+    cache[s.id] = s;
+  }
+  final excess = cache.length - _maxSlotLookupCacheEntries;
+  if (excess > 0) {
+    final oldest = cache.keys.take(excess).toList(growable: false);
+    for (final key in oldest) {
+      cache.remove(key);
+    }
+  }
+}
+
 extension PlayerQueueSlotsExtension on PlayerQueueController {
   void debouncedPersistQueueSlots() {
     _persistQueueDebounce?.cancel();
@@ -119,7 +144,9 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
-  Future<void> clearQueue() async {
+  Future<void> clearQueue() => _queueMutex.protect(_clearQueueLocked);
+
+  Future<void> _clearQueueLocked() async {
     final state = _getState();
     final current = state.currentSong;
     final retained = current != null ? [current] : <SongsTableData>[];
@@ -177,7 +204,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     });
   }
 
-  Future<void> reorderQueue(int oldIndex, int newIndex) async {
+  Future<void> reorderQueue(int oldIndex, int newIndex) =>
+      _queueMutex.protect(() => _reorderQueueLocked(oldIndex, newIndex));
+
+  Future<void> _reorderQueueLocked(int oldIndex, int newIndex) async {
     final state = _getState();
     if (oldIndex < 0 ||
         oldIndex >= state.queue.length ||
@@ -243,11 +273,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
-  Future<void> removeQueueItem(int index) async {
+  Future<void> removeQueueItem(int index) =>
+      _queueMutex.protect(() => _removeQueueItemLocked(index));
+
+  Future<void> _removeQueueItemLocked(int index) async {
     final state = _getState();
     if (index < 0 || index >= state.queue.length) return;
     if (state.queue.length <= 1) {
-      await clearQueue();
+      await _clearQueueLocked();
       return;
     }
 
@@ -426,7 +459,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     } catch (_) {}
   }
 
-  Future<void> addToQueue(SongsTableData song) async {
+  Future<void> addToQueue(SongsTableData song) =>
+      _queueMutex.protect(() => _addToQueueLocked(song));
+
+  Future<void> _addToQueueLocked(SongsTableData song) async {
     final state = _getState();
     final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
     if (existingIdx != -1) {
@@ -438,7 +474,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         return;
       }
       // Reorder existing song to end instead of enqueuing duplicate into audio handler
-      await reorderQueue(existingIdx, state.queue.length - 1);
+      await _reorderQueueLocked(existingIdx, state.queue.length - 1);
       return;
     }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
@@ -464,20 +500,20 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       }
       return;
     }
-    final updatedQueue = [...state.queue, song];
+    // Re-fetch state after the await: a concurrent mutation is impossible under
+    // the mutex, but playback may have advanced, so never append to the stale
+    // queue snapshot captured before `addToQueueEnd`.
+    final s = _getState();
+    final updatedQueue = [...s.queue, song];
     setQueueSlot(
-      state.activeQueueSlot,
+      s.activeQueueSlot,
       songs: updatedQueue,
-      currentIndex: state.currentIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
+      currentIndex: s.currentIndex,
+      position: s.position,
+      speed: s.playbackSpeed,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
-    // Re-fetch state after the await: the track may have advanced during
-    // addToQueueEnd, so emit the new queue onto the fresh playback snapshot
-    // rather than reverting currentSong/currentIndex/position to the stale one.
-    final s = _getState();
     _emit(s.copyWith(
       queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
     ));
@@ -485,10 +521,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _updateWidgetThrottled();
   }
 
-  Future<void> playNext(SongsTableData song) async {
+  Future<void> playNext(SongsTableData song) =>
+      _queueMutex.protect(() => _playNextLocked(song));
+
+  Future<void> _playNextLocked(SongsTableData song) async {
     final state = _getState();
     if (state.queue.isEmpty) {
-      await addToQueue(song);
+      await _addToQueueLocked(song);
       return;
     }
     final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
@@ -502,7 +541,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       }
       final adjustedTarget =
           targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
-      await reorderQueue(existingIdx, adjustedTarget);
+      await _reorderQueueLocked(existingIdx, adjustedTarget);
       return;
     }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
@@ -528,28 +567,31 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       }
       return;
     }
-    final updatedQueue = List<SongsTableData>.from(state.queue);
-    updatedQueue.insert(targetSlot, song);
+    // Re-fetch state after the await so the insert lands on the fresh playback
+    // snapshot (and after the current track) instead of the stale queue.
+    final s = _getState();
+    final insertAt = (s.currentIndex + 1).clamp(0, s.queue.length);
+    final updatedQueue = List<SongsTableData>.from(s.queue);
+    updatedQueue.insert(insertAt, song);
     setQueueSlot(
-      state.activeQueueSlot,
+      s.activeQueueSlot,
       songs: updatedQueue,
-      currentIndex: state.currentIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
+      currentIndex: s.currentIndex,
+      position: s.position,
+      speed: s.playbackSpeed,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
-    // Re-fetch state after the await: the track may have advanced during
-    // insertNextInQueue, so emit the new queue onto the fresh playback snapshot
-    // rather than reverting currentSong/currentIndex/position to the stale one.
-    final s = _getState();
     _emit(s.copyWith(
       queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
     ));
     _invalidateQueueSyncResolution();
   }
 
-  Future<void> addAllToQueue(List<SongsTableData> songs) async {
+  Future<void> addAllToQueue(List<SongsTableData> songs) =>
+      _queueMutex.protect(() => _addAllToQueueLocked(songs));
+
+  Future<void> _addAllToQueueLocked(List<SongsTableData> songs) async {
     final state = _getState();
     if (songs.isEmpty || _isClosed()) return;
     final room = PlayerQueueController.maxQueueSize - state.queue.length;
@@ -577,17 +619,18 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       }
     }
     if (added.isEmpty || _isClosed()) return;
-    final updatedQueue = [...state.queue, ...added];
+    // Re-fetch state after the awaits so the batch lands on the fresh queue.
+    final s = _getState();
+    final updatedQueue = [...s.queue, ...added];
     setQueueSlot(
-      state.activeQueueSlot,
+      s.activeQueueSlot,
       songs: updatedQueue,
-      currentIndex: state.currentIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
+      currentIndex: s.currentIndex,
+      position: s.position,
+      speed: s.playbackSpeed,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
-    final s = _getState();
     _emit(s.copyWith(
       queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
       playback: s.playback.copyWith(

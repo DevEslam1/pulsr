@@ -651,6 +651,9 @@ class _AddStationDialogState extends State<_AddStationDialog> {
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
       return context.l10n.radioErrorInvalidUrl;
     }
+    if (!RadioStation.isHttpUrl(url)) {
+      return context.l10n.radioErrorInvalidUrl;
+    }
     return null;
   }
 

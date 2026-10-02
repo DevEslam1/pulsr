@@ -624,142 +624,161 @@ class _RuleCardState extends State<_RuleCard> {
         borderRadius: AppRadii.cardRadius,
         border: Border.all(color: p.hairline),
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Field Dropdown
-              Expanded(
-                flex: 3,
-                child: DropdownButtonFormField<SmartRuleField>(
-                  initialValue: widget.rule.field,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: p.surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
-                    border: const OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(AppRadii.r8)),
-                        borderSide: BorderSide.none),
+      child: Semantics(
+        container: true,
+        label: '${context.l10n.smartRules}: ${widget.rule.field.label}',
+        child: Column(
+          children: [
+            Row(
+              children: [
+                // Field Dropdown
+                Expanded(
+                  flex: 3,
+                  child: Semantics(
+                    label: 'Field',
+                    child: DropdownButtonFormField<SmartRuleField>(
+                      initialValue: widget.rule.field,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: p.surfaceContainerHigh,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s10,
+                            vertical: AppSpacing.s6),
+                        border: const OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(AppRadii.r8)),
+                            borderSide: BorderSide.none),
+                      ),
+                      items: SmartRuleField.values.map((f) {
+                        return DropdownMenuItem(
+                          value: f,
+                          child: Text(f.label,
+                              style: const TextStyle(
+                                  fontSize: AppFontSize.bodySmall,
+                                  fontWeight: FontWeight.w600)),
+                        );
+                      }).toList(),
+                      onChanged: (f) {
+                        if (f != null) {
+                          widget.onChanged(widget.rule.copyWith(field: f));
+                        }
+                      },
+                    ),
                   ),
-                  items: SmartRuleField.values.map((f) {
-                    return DropdownMenuItem(
-                      value: f,
-                      child: Text(f.label,
-                          style: const TextStyle(
-                              fontSize: AppFontSize.bodySmall,
-                              fontWeight: FontWeight.w600)),
-                    );
-                  }).toList(),
-                  onChanged: (f) {
-                    if (f != null) {
-                      widget.onChanged(widget.rule.copyWith(field: f));
-                    }
-                  },
                 ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: AppSpacing.xs),
 
-              // Operator Dropdown
-              Expanded(
-                flex: 3,
-                child: DropdownButtonFormField<SmartOperator>(
-                  initialValue: widget.rule.operator,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: p.surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
-                    border: const OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(AppRadii.r8)),
-                        borderSide: BorderSide.none),
+                // Operator Dropdown
+                Expanded(
+                  flex: 3,
+                  child: Semantics(
+                    label: 'Operator',
+                    child: DropdownButtonFormField<SmartOperator>(
+                      initialValue: widget.rule.operator,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: p.surfaceContainerHigh,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s10,
+                            vertical: AppSpacing.s6),
+                        border: const OutlineInputBorder(
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(AppRadii.r8)),
+                            borderSide: BorderSide.none),
+                      ),
+                      items: SmartOperator.values.map((o) {
+                        return DropdownMenuItem(
+                          value: o,
+                          child: Text(o.label,
+                              style: const TextStyle(
+                                  fontSize: AppFontSize.bodySmall,
+                                  fontWeight: FontWeight.w600)),
+                        );
+                      }).toList(),
+                      onChanged: (o) {
+                        if (o != null) {
+                          widget.onChanged(widget.rule.copyWith(operator: o));
+                        }
+                      },
+                    ),
                   ),
-                  items: SmartOperator.values.map((o) {
-                    return DropdownMenuItem(
-                      value: o,
-                      child: Text(o.label,
-                          style: const TextStyle(
-                              fontSize: AppFontSize.bodySmall,
-                              fontWeight: FontWeight.w600)),
-                    );
-                  }).toList(),
-                  onChanged: (o) {
-                    if (o != null) {
-                      widget.onChanged(widget.rule.copyWith(operator: o));
-                    }
-                  },
                 ),
-              ),
 
-              IconButton(
-                icon: Icon(Icons.close_rounded, size: 20, color: p.error),
-                tooltip: context.l10n.delete,
-                onPressed: widget.onDelete,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-
-          // Value Input
-          if (widget.rule.field == SmartRuleField.isFavorite ||
-              widget.rule.field == SmartRuleField.isLossless)
-            DropdownButtonFormField<String>(
-              initialValue: widget.rule.value.toLowerCase() == 'true' ||
-                      widget.rule.value == '1'
-                  ? 'true'
-                  : 'false',
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: p.surfaceContainerHigh,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
-                border: const OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.all(Radius.circular(AppRadii.r8)),
-                    borderSide: BorderSide.none),
-              ),
-              items: [
-                DropdownMenuItem(
-                    value: 'true', child: Text(context.l10n.yesBool)),
-                DropdownMenuItem(
-                    value: 'false', child: Text(context.l10n.noBool)),
+                IconButton(
+                  icon: Icon(Icons.close_rounded, size: 20, color: p.error),
+                  tooltip: context.l10n.delete,
+                  onPressed: widget.onDelete,
+                ),
               ],
-              onChanged: (val) {
-                if (val != null) {
-                  widget.onChanged(widget.rule.copyWith(value: val));
-                }
-              },
-            )
-          else
-            TextField(
-              controller: _valueController,
-              onChanged: (val) {
-                widget.onChanged(widget.rule.copyWith(value: val));
-              },
-              keyboardType: (widget.rule.field == SmartRuleField.playCount ||
-                      widget.rule.field == SmartRuleField.year ||
-                      widget.rule.field == SmartRuleField.decade ||
-                      widget.rule.field == SmartRuleField.durationMs ||
-                      widget.rule.field == SmartRuleField.rating ||
-                      widget.rule.operator == SmartOperator.withinDays)
-                  ? TextInputType.number
-                  : TextInputType.text,
-              decoration: InputDecoration(
-                hintText:
-                    _getHintForField(widget.rule.field, widget.rule.operator),
-                filled: true,
-                fillColor: p.surfaceContainerHigh,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                border: const OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.all(Radius.circular(AppRadii.r8)),
-                    borderSide: BorderSide.none),
-              ),
             ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+
+            // Value Input
+            if (widget.rule.field == SmartRuleField.isFavorite ||
+                widget.rule.field == SmartRuleField.isLossless)
+              Semantics(
+                label: 'Value',
+                child: DropdownButtonFormField<String>(
+                  initialValue: widget.rule.value.toLowerCase() == 'true' ||
+                          widget.rule.value == '1'
+                      ? 'true'
+                      : 'false',
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: p.surfaceContainerHigh,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                    border: const OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.all(Radius.circular(AppRadii.r8)),
+                        borderSide: BorderSide.none),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                        value: 'true', child: Text(context.l10n.yesBool)),
+                    DropdownMenuItem(
+                        value: 'false', child: Text(context.l10n.noBool)),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) {
+                      widget.onChanged(widget.rule.copyWith(value: val));
+                    }
+                  },
+                ),
+              )
+            else
+              Semantics(
+                label: 'Value',
+                child: TextField(
+                  controller: _valueController,
+                  onChanged: (val) {
+                    widget.onChanged(widget.rule.copyWith(value: val));
+                  },
+                  keyboardType:
+                      (widget.rule.field == SmartRuleField.playCount ||
+                              widget.rule.field == SmartRuleField.year ||
+                              widget.rule.field == SmartRuleField.decade ||
+                              widget.rule.field == SmartRuleField.durationMs ||
+                              widget.rule.field == SmartRuleField.rating ||
+                              widget.rule.operator == SmartOperator.withinDays)
+                          ? TextInputType.number
+                          : TextInputType.text,
+                  decoration: InputDecoration(
+                    hintText: _getHintForField(
+                        widget.rule.field, widget.rule.operator),
+                    filled: true,
+                    fillColor: p.surfaceContainerHigh,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                    border: const OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.all(Radius.circular(AppRadii.r8)),
+                        borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

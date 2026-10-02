@@ -3,6 +3,8 @@
 // Stores a millisecond offset per audio path so a user's manual sync
 // correction survives restarts. Backed by SharedPreferences with a bounded
 // entry count; failures are swallowed as best-effort (offset is cosmetic).
+import 'dart:async';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart';
 
@@ -11,6 +13,24 @@ class LyricsOffsetStore {
   static const String _pathSuffix = '_path';
   static const String _indexKey = 'lyrics_offset_index_v1';
   static const int maxEntries = 500;
+
+  /// Serializes all read-modify-write operations on [_indexKey]. Without this,
+  /// two concurrent `setOffsetMs` calls can each read the same index snapshot
+  /// and the second write silently drops the first key. Shared by every
+  /// instance because SharedPreferences itself is process-global.
+  static Future<void> _indexChain = Future<void>.value();
+
+  static Future<T> _synchronized<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _indexChain = _indexChain.then((_) async {
+      try {
+        completer.complete(await action());
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
 
   String _hash(String path) {
     var h1 = 0x811c9dc5;
@@ -78,19 +98,24 @@ class LyricsOffsetStore {
     }
   }
 
-  Future<void> _touchIndex(SharedPreferences prefs, String key) async {
-    try {
-      final index = prefs.getStringList(_indexKey) ?? <String>[];
-      index.remove(key);
-      index.add(key);
-      // Evict oldest beyond the bound (both value and path marker).
-      while (index.length > maxEntries) {
-        final evicted = index.removeAt(0);
-        await prefs.remove(evicted);
-        await prefs.remove('$evicted$_pathSuffix');
+  Future<void> _touchIndex(SharedPreferences prefs, String key) {
+    return _synchronized(() async {
+      try {
+        final index = prefs.getStringList(_indexKey) ?? <String>[];
+        index.remove(key);
+        index.add(key);
+        // Evict oldest beyond the bound (both value and path marker).
+        while (index.length > maxEntries) {
+          final evicted = index.removeAt(0);
+          await prefs.remove(evicted);
+          await prefs.remove('$evicted$_pathSuffix');
+        }
+        await prefs.setStringList(_indexKey, index);
+      } catch (e, st) {
+        ErrorLogger.log('Lyrics offset index update failed',
+            error: e, stackTrace: st, category: 'Lyrics');
       }
-      await prefs.setStringList(_indexKey, index);
-    } catch (_) {}
+    });
   }
 
   Future<void> clearOffset(String path) async {
@@ -100,8 +125,10 @@ class LyricsOffsetStore {
       final key = _key(path);
       await prefs.remove(key);
       await prefs.remove('$key$_pathSuffix');
-      final index = prefs.getStringList(_indexKey) ?? <String>[];
-      if (index.remove(key)) await prefs.setStringList(_indexKey, index);
+      await _synchronized(() async {
+        final index = prefs.getStringList(_indexKey) ?? <String>[];
+        if (index.remove(key)) await prefs.setStringList(_indexKey, index);
+      });
     } catch (e, st) {
       ErrorLogger.log('Lyrics offset clear failed',
           error: e, stackTrace: st, category: 'Lyrics');

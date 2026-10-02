@@ -6,6 +6,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/services/ytm_browse_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -58,7 +59,9 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
           _error = null;
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load YTM browse feed',
+          error: e, stackTrace: st, category: 'YtmBrowseScreen');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -144,6 +147,12 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                                   const SizedBox(height: AppSpacing.lg),
                               itemBuilder: (context, index) {
                                 final section = _sections[index];
+                                // Build the queue once per section instead of
+                                // once per card (was O(n^2) per horizontal row).
+                                final queueSongs = [
+                                  for (final e in section.items)
+                                    e.toYtmTrack().toSongData()
+                                ];
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -191,10 +200,6 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                                                 width: AppSpacing.s14),
                                         itemBuilder: (context, i) {
                                           final item = section.items[i];
-                                          final queueSongs = [
-                                            for (final e in section.items)
-                                              e.toYtmTrack().toSongData()
-                                          ];
                                           return _buildBrowseCard(
                                               context, item, queueSongs, p);
                                         },
@@ -217,7 +222,10 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
     final cardWidth = Adaptive.isTablet(context) ? 180.0 : 140.0;
     final imgHeight = (cardWidth * 0.92).roundToDouble();
 
-    return Container(
+    return Semantics(
+      button: true,
+      label: context.l10n.songByArtist(item.title, item.subtitle),
+      child: Container(
       width: cardWidth,
       decoration: BoxDecoration(
         color: p.surfaceCard,
@@ -332,6 +340,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

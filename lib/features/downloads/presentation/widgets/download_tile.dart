@@ -323,13 +323,20 @@ class DownloadTile extends StatelessWidget {
                   end: task.progress.clamp(0.0, 1.0),
                 ),
                 builder: (context, animatedProgress, _) {
-                  return LinearProgressIndicator(
-                    value: task.status == DownloadStatus.tagging
+                  final progressValue = task.status == DownloadStatus.tagging
+                      ? null
+                      : (animatedProgress > 0 ? animatedProgress : null);
+                  return Semantics(
+                    label: statusLabel,
+                    value: progressValue == null
                         ? null
-                        : (animatedProgress > 0 ? animatedProgress : null),
-                    backgroundColor: p.surfaceContainerHigh,
-                    valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                    minHeight: 6,
+                        : '${(progressValue * 100).toStringAsFixed(0)}%',
+                    child: LinearProgressIndicator(
+                      value: progressValue,
+                      backgroundColor: p.surfaceContainerHigh,
+                      valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                      minHeight: 6,
+                    ),
                   );
                 },
               ),

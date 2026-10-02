@@ -97,8 +97,10 @@ class DsdPcmStreamAudioSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final from = start ?? 0;
-    final to = end ?? wavBytes.length;
+    // Clamp the requested byte range to the buffer so a hostile/over-long
+    // Range header cannot trigger an out-of-bounds sublist RangeError.
+    final from = (start ?? 0).clamp(0, wavBytes.length);
+    final to = (end ?? wavBytes.length).clamp(from, wavBytes.length);
     return StreamAudioResponse(
       rangeRequestsSupported: true,
       sourceLength: wavBytes.length,

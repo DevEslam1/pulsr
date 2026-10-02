@@ -1,6 +1,8 @@
 // lib/features/home/cubit/home_cubit.dart
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/network/connectivity_guard.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -21,6 +23,17 @@ class HomeState {
         loginEpoch: loginEpoch ?? this.loginEpoch,
         isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HomeState &&
+          runtimeType == other.runtimeType &&
+          loginEpoch == other.loginEpoch &&
+          isLoggedIn == other.isLoggedIn;
+
+  @override
+  int get hashCode => Object.hash(loginEpoch, isLoggedIn);
 }
 
 /// Owns the Home online-category data fetching and its TTL cache so the UI no
@@ -82,6 +95,12 @@ class HomeCubit extends PulsrCubit<HomeState> {
 
   bool get isLoggedIn => _account.isLoggedIn;
 
+  /// Number of category futures currently held in the TTL cache. Exposed so the
+  /// cache-cap test can assert the cache never overshoots
+  /// [_maxCachedCategories].
+  @visibleForTesting
+  int get cachedCategoryCount => _categoryFutures.length;
+
   List<String> get onlineCategories =>
       isLoggedIn ? _loggedInCategories : _anonymousCategories;
 
@@ -114,19 +133,6 @@ class HomeCubit extends PulsrCubit<HomeState> {
       _categoryFetchTimestamps.remove(category);
     }
 
-    // Prune oldest non-in-flight entries if exceeding capacity
-    if (_categoryFutures.length >= _maxCachedCategories) {
-      final evictable = _categoryFetchTimestamps.entries
-          .where((e) => !_inFlightCategories.contains(e.key))
-          .toList()
-        ..sort((a, b) => a.value.compareTo(b.value));
-      for (final e in evictable
-          .take(_categoryFutures.length - _maxCachedCategories + 1)) {
-        _categoryFutures.remove(e.key);
-        _categoryFetchTimestamps.remove(e.key);
-      }
-    }
-
     _inFlightCategories.add(category);
     _categoryFetchTimestamps[category] = _monotonicClock.elapsedMilliseconds;
     final fetchToken = (_categoryTokens[category] ?? 0) + 1;
@@ -147,12 +153,26 @@ class HomeCubit extends PulsrCubit<HomeState> {
               final recs =
                   await _account.fetchHomeRecommendations(maxTracks: 50);
               if (recs.isNotEmpty) return recs;
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log(
+                'Home recommendations fetch failed; falling back to trending',
+                error: e,
+                stackTrace: st,
+                category: 'HomeCubit',
+              );
+            }
           }
           try {
             final trending = await _ytm.trending(limit: 25);
             if (trending.isNotEmpty) return trending;
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log(
+              'Home trending fetch failed; falling back to search',
+              error: e,
+              stackTrace: st,
+              category: 'HomeCubit',
+            );
+          }
           return await _ytm.searchWithFallback(
               categoryQueries['Recommended For You'] ?? 'top hits music',
               limit: 25);
@@ -187,7 +207,46 @@ class HomeCubit extends PulsrCubit<HomeState> {
     }();
 
     _categoryFutures[category] = future;
+
+    _pruneCategoryCache();
     return future;
+  }
+
+  /// Drops cached category futures until the cache is back within
+  /// [_maxCachedCategories]. Called *after* the incoming entry is inserted so
+  /// the entry being fetched can never be the one evicted by an off-by-one
+  /// prune. Oldest non-in-flight entries go first; when every remaining entry
+  /// is in-flight the oldest is still evicted (its future keeps resolving for
+  /// any existing awaiter) so the cap can never overshoot.
+  void _pruneCategoryCache() {
+    void evict(String key) {
+      _categoryFutures.remove(key);
+      _categoryFetchTimestamps.remove(key);
+      _inFlightCategories.remove(key);
+    }
+
+    final evictable = _categoryFetchTimestamps.keys
+        .where((k) => !_inFlightCategories.contains(k))
+        .toList()
+      ..sort((a, b) =>
+          _categoryFetchTimestamps[a]!.compareTo(_categoryFetchTimestamps[b]!));
+    for (final key in evictable) {
+      if (_categoryFutures.length <= _maxCachedCategories) break;
+      evict(key);
+    }
+
+    while (_categoryFutures.length > _maxCachedCategories) {
+      String? oldest;
+      int? oldestMs;
+      for (final entry in _categoryFetchTimestamps.entries) {
+        if (oldestMs == null || entry.value < oldestMs) {
+          oldestMs = entry.value;
+          oldest = entry.key;
+        }
+      }
+      if (oldest == null) break;
+      evict(oldest);
+    }
   }
 
   void retryCategory(String category) {

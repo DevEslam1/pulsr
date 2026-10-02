@@ -43,6 +43,11 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   // instance-level, so a per-build `ArtistBioService()` defeated it).
   late Future<ArtistInfo?> _bioFuture;
 
+  // Memoized watch streams: recreating them in build() resubscribed to the DB
+  // on every rebuild and reset the StreamBuilder's snapshot.
+  late Stream<Result<List<AlbumsTableData>>> _albumsStream;
+  late Stream<Result<List<SongsTableData>>> _songsStream;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +56,13 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         ? getIt<ArtistBioService>()
         : ArtistBioService();
     _bioFuture = _bioService.getArtistInfo(widget.artist.name);
+    _rebuildStreams();
+  }
+
+  void _rebuildStreams() {
+    _albumsStream =
+        _useCase.watchArtistAlbums(widget.artist.id).distinct();
+    _songsStream = _useCase.watchArtistSongs(widget.artist.id).distinct();
   }
 
   @override
@@ -59,6 +71,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
     if (widget.artist.id != oldWidget.artist.id) {
       setState(() {
         _bioFuture = _bioService.getArtistInfo(widget.artist.name);
+        _rebuildStreams();
       });
     }
   }
@@ -79,7 +92,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         children: [
           const SizedBox(height: AppSpacing.md),
           Center(
-            child: Container(
+            child: Semantics(
+              image: true,
+              label: artist.name,
+              child: Container(
               padding: const EdgeInsets.all(AppSpacing.xxs),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -99,6 +115,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                 size: isTablet ? 160 : 130,
                 borderRadius: 999,
                 fallbackIcon: Icons.person_rounded,
+              ),
               ),
             ),
           ),
@@ -224,7 +241,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
         children: [
           // Discography (Albums)
           StreamBuilder<Result<List<AlbumsTableData>>>(
-            stream: _useCase.watchArtistAlbums(artist.id).distinct(),
+            stream: _albumsStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting &&
                   !snapshot.hasData) {
@@ -308,7 +325,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
           // Top Tracks
           StreamBuilder<Result<List<SongsTableData>>>(
-            stream: _useCase.watchArtistSongs(artist.id).distinct(),
+            stream: _songsStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting &&
                   !snapshot.hasData) {

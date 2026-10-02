@@ -122,7 +122,14 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             isLoading: false,
           ));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to load library cache snapshot',
+          error: e,
+          stackTrace: st,
+          category: 'LibraryCubit',
+        );
+      }
     }
 
     await _subscribeSongs();

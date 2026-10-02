@@ -141,6 +141,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
       perSongEqStore: dependencies?.perSongEqStore ?? perSongEqStore,
       perSongVolumeStore: dependencies?.perSongVolumeStore ?? perSongVolumeStore,
+      songRatingStore: dependencies?.songRatingStore ?? songRatingStore,
+      quranManager: PlayerQuranManager(
+        service: dependencies?.quranModeService ?? quranModeService,
+      ),
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
@@ -215,6 +219,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       },
     );
     unawaited(queueController.restoreQueueSlots());
+    unawaited(playbackOptionsController.restoreQuranMode());
     _listenToSettings();
     _listenToAudioService();
     _syncAudioEffects(force: true);
@@ -326,6 +331,9 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   static const int _maxNegativeIdEntries = 1000;
   final Map<String, int> _remoteIdToNegativeId = {};
+  // Reverse index of the values currently held by [_remoteIdToNegativeId], so
+  // collision checks are O(1) instead of the O(n) `Map.containsValue` scan.
+  final Set<int> _negativeIdValues = {};
   // Starts strictly below the hash-derived range (which spans
   // [-1000000001, -2]) so a fallback-assigned id can never collide with a
   // hash-derived one.
@@ -337,21 +345,24 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     final cached = _remoteIdToNegativeId[id];
     if (cached != null) return cached;
     if (_remoteIdToNegativeId.length >= _maxNegativeIdEntries) {
-      _remoteIdToNegativeId.remove(_remoteIdToNegativeId.keys.first);
+      final evictedKey = _remoteIdToNegativeId.keys.first;
+      final evictedValue = _remoteIdToNegativeId.remove(evictedKey);
+      if (evictedValue != null) _negativeIdValues.remove(evictedValue);
     }
     // Map non-numeric IDs into collision-free negative integer space (never colliding on 0 or positive DB IDs)
     final h = -(id.hashCode.abs() % 1000000000 + 2);
     int assigned;
-    if (!_remoteIdToNegativeId.containsValue(h)) {
+    if (!_negativeIdValues.contains(h)) {
       assigned = h;
     } else {
       // Fallback: skip any value already in use. The counter lives below the
       // hash range so it also cannot collide with a hash-derived id.
       do {
         assigned = _nextAssignedNegativeId--;
-      } while (_remoteIdToNegativeId.containsValue(assigned));
+      } while (_negativeIdValues.contains(assigned));
     }
     _remoteIdToNegativeId[id] = assigned;
+    _negativeIdValues.add(assigned);
     return assigned;
   }
 
@@ -698,6 +709,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           error: e, stackTrace: st, category: 'PlayerCubit');
     }
     _remoteIdToNegativeId.clear();
+    _negativeIdValues.clear();
     await super.close();
   }
 }

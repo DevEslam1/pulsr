@@ -10,6 +10,10 @@ import '../../domain/models/visualizer_preset.dart';
 class VisualizerPresetStore {
   static const String _key = 'setting_custom_visualizer_preset';
 
+  /// Upper bound on an imported .json preset, so a multi-GB or malformed file
+  /// cannot be slurped into memory before it is parsed/stored.
+  static const int maxImportBytes = 2 * 1024 * 1024;
+
   Future<VisualizerPreset> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -24,8 +28,13 @@ class VisualizerPresetStore {
   }
 
   Future<void> save(VisualizerPreset preset) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(preset.toJson()));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, jsonEncode(preset.toJson()));
+    } catch (e, st) {
+      ErrorLogger.log('VisualizerPresetStore save failed',
+          error: e, stackTrace: st, category: 'VisualizerPresetStore');
+    }
   }
 
   Future<void> clear() async {
@@ -45,6 +54,15 @@ class VisualizerPresetStore {
       final ioFile =
           SafeFilePath.validate(file.path, allowedExtensions: const ['json']);
       if (ioFile == null) return null;
+      final size = await ioFile.length();
+      if (size > maxImportBytes) {
+        ErrorLogger.log(
+          'VisualizerPresetStore import rejected: file is $size bytes '
+          '(max $maxImportBytes)',
+          category: 'VisualizerPresetStore',
+        );
+        return null;
+      }
       final content = await ioFile.readAsString();
       final preset = VisualizerPreset.fromJsonString(content);
       await save(preset);

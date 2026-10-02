@@ -32,6 +32,23 @@ enum PulsrBreakpoint implements Comparable<PulsrBreakpoint> {
   bool get isExpanded => this == PulsrBreakpoint.expanded;
   bool get isLarge => this == PulsrBreakpoint.large;
 
+  /// Canonical maximum readable content width for this tier.
+  ///
+  /// Single source of truth consumed by `PulsrLayoutMetrics`,
+  /// `PulsrViewport` and `PulsrLayoutDelegate`, so wide-screen centering no
+  /// longer diverges between surfaces.
+  double get contentMaxWidth => switch (this) {
+        PulsrBreakpoint.compact => 640.0,
+        PulsrBreakpoint.medium => 720.0,
+        PulsrBreakpoint.expanded => 860.0,
+        PulsrBreakpoint.large => 1000.0,
+      };
+
+  /// Canonical "short landscape" height threshold, shared by the viewport
+  /// token ([PulsrViewport.isShortHeight]) and the shell layout delegate so
+  /// both compact the UI at the same height.
+  static const double shortHeightThreshold = 600.0;
+
   /// Returns the breakpoint tier for the current [context].
   static PulsrBreakpoint of(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;

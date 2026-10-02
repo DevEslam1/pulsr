@@ -37,6 +37,11 @@ class RoomCorrectionService {
   static const double defaultMaxHz = 16000.0;
   static const int captureSampleRate = 48000;
 
+  /// Upper bound on buffered mic PCM: 60 s of mono 16-bit audio. A stuck or
+  /// duplicated capture stream must not grow the buffer without limit and OOM
+  /// the app; extra blocks past the cap are dropped.
+  static const int maxCaptureBytes = captureSampleRate * 2 * 60;
+
   /// Log-spaced measurement tones, ascending, within [minHz, maxHz].
   static List<double> tonePlan({
     int count = defaultToneCount,
@@ -428,7 +433,14 @@ class RoomCorrectionService {
 
   /// Starts mic capture; PCM blocks accumulate until [stopCapture].
   /// Returns false with a log when microphone permission is denied.
+  ///
+  /// Re-entrancy safe: any previous capture subscription is cancelled before a
+  /// new one is armed, so overlapping starts cannot double-append PCM into the
+  /// same buffer.
   Future<bool> startCapture({int sampleRate = captureSampleRate}) async {
+    await _captureSub?.cancel();
+    _captureSub = null;
+    _capturing = false;
     try {
       final micStatus = await Permission.microphone.status;
       if (!micStatus.isGranted) {
@@ -443,7 +455,12 @@ class RoomCorrectionService {
       _pcmBuffer.clear();
       _captureSub = _events.receiveBroadcastStream().listen((data) {
         if (data is Map && data['pcm'] is Uint8List) {
-          _pcmBuffer.add(data['pcm'] as Uint8List);
+          final chunk = data['pcm'] as Uint8List;
+          final remaining = maxCaptureBytes - _pcmBuffer.length;
+          if (remaining <= 0) return;
+          _pcmBuffer.add(chunk.length <= remaining
+              ? chunk
+              : Uint8List.sublistView(chunk, 0, remaining));
         }
       }, onError: (Object e) {
         ErrorLogger.log('Room-correction capture stream error',

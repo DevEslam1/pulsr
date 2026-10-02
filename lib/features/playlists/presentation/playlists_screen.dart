@@ -15,6 +15,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/safe_file_path.dart';
 import '../../../core/widgets/empty_state_widget.dart';
@@ -22,6 +23,7 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_toast.dart';
+import '../../../core/widgets/pulsr_static_grid.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
@@ -78,8 +80,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           .generateSuggestionsAsync(allSongs, forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() => _suggestions = suggestions);
-    } catch (_) {
-      // Suggestions are a best-effort convenience; stay hidden on failure.
+    } catch (e, st) {
+      // Suggestions are a best-effort convenience and stay hidden on failure,
+      // but the reason must still reach crash reporting.
+      ErrorLogger.log('Failed to load playlist suggestions',
+          error: e, stackTrace: st, category: 'PlaylistsScreen');
     }
   }
 
@@ -329,16 +334,34 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       final plName = pl.name;
       final isSmart = pl.isSmart;
       final smartCriteria = pl.smartCriteria;
+      // P0-4: capture membership before the playlist (and its join rows) is
+      // deleted so Undo can restore the exact contents. Smart playlists derive
+      // their songs from criteria, so only local playlists carry song ids.
+      List<int> songIds = const [];
+      if (!isSmart) {
+        try {
+          final useCases = getIt<PlaylistUseCases>();
+          final res = await useCases.watchPlaylistSongs(pl.id).first;
+          songIds = res.fold(
+            (_) => const <int>[],
+            (songs) => [for (final s in songs) s.id],
+          );
+        } catch (e, st) {
+          ErrorLogger.log('Failed to capture playlist songs for undo',
+              error: e, stackTrace: st, category: 'PlaylistsScreen');
+        }
+      }
       await cubit.deletePlaylist(pl.id);
       messenger.showSnackBar(
         SnackBar(
           content: Text('$plName - $undoLabel?'),
           action: SnackBarAction(
             label: undoLabel,
-            onPressed: () => cubit.createPlaylist(
+            onPressed: () => cubit.restorePlaylist(
               plName,
               isSmart: isSmart,
               criteria: smartCriteria,
+              songIds: songIds,
             ),
           ),
         ),
@@ -691,17 +714,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             Padding(
               padding: EdgeInsets.symmetric(
                   horizontal: Adaptive.pagePadding(context)),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: true,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: isTabletLandscape ? 2 : columns,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.0,
-                ),
+              child: PulsrStaticGrid(
+                crossAxisCount: isTabletLandscape ? 2 : columns,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                childAspectRatio: 1.0,
                 itemCount: smartPlaylists.length,
                 itemBuilder: (context, index) {
                   final pl = smartPlaylists[index];
@@ -841,17 +858,11 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               Padding(
                 padding: EdgeInsets.symmetric(
                     horizontal: Adaptive.pagePadding(context)),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isTabletLandscape ? 2 : columns,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 1.0,
-                  ),
+                child: PulsrStaticGrid(
+                  crossAxisCount: isTabletLandscape ? 2 : columns,
+                  crossAxisSpacing: 14,
+                  mainAxisSpacing: 14,
+                  childAspectRatio: 1.0,
                   itemCount: userPlaylists.length,
                   itemBuilder: (context, index) {
                     final pl = userPlaylists[index];
@@ -1013,6 +1024,35 @@ class _OnlinePlaylistsContent extends StatelessWidget {
           ? '${context.l10n.browseQueued} $queuedCount ${context.l10n.browseLikedSongsForDownload} ${context.l10n.browseActiveDownloadsSuffix}'
           : context.l10n.browseAllLikedSongsDownloadedOffline,
       isSuccess: queuedCount > 0,
+    );
+  }
+
+  /// P0-4: a saved online playlist is removed only after an explicit
+  /// confirmation, and Undo restores the exact cached entry (no re-fetch).
+  Future<void> _confirmRemoveCustomPlaylist(
+    BuildContext context,
+    OnlinePlaylistEntry entry,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final undoLabel = context.l10n.undo;
+    final confirmed = await PulsrDialogHelper.showConfirmDialog(
+      context,
+      title: '${context.l10n.delete} "${entry.title}"?',
+      message: context.l10n.browseCannotBeUndone,
+      icon: Icons.delete_outline_rounded,
+      confirmLabel: context.l10n.delete,
+      isDestructive: true,
+    );
+    if (confirmed != true) return;
+    cubit.removeCustomPlaylist(entry.id);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${entry.title} - $undoLabel?'),
+        action: SnackBarAction(
+          label: undoLabel,
+          onPressed: () => cubit.restoreCustomPlaylist(entry),
+        ),
+      ),
     );
   }
 
@@ -1246,17 +1286,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: true,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: 1.0,
-                        ),
+                      child: PulsrStaticGrid(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 1.0,
                         itemCount: online.accountPlaylists.length,
                         itemBuilder: (context, i) {
                           final pl = online.accountPlaylists[i];
@@ -1334,17 +1368,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
-                      child: GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: true,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: columns,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                          childAspectRatio: 1.0,
-                        ),
+                      child: PulsrStaticGrid(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio: 1.0,
                         itemCount: online.customPlaylists.length,
                         itemBuilder: (context, i) {
                           final pl = online.customPlaylists[i];
@@ -1354,7 +1382,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                 context.push('/online-playlist', extra: pl),
                             onDownload: () =>
                                 _downloadCustomPlaylist(context, pl),
-                            onRemove: () => cubit.removeCustomPlaylist(pl.id),
+                            onRemove: () => _confirmRemoveCustomPlaylist(
+                                context, pl),
                           );
                         },
                       ),

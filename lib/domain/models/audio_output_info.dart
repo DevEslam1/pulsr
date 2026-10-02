@@ -1,5 +1,18 @@
 // lib/domain/models/audio_output_info.dart
 
+/// Value equality for lists whose elements implement `==`.
+///
+/// Importing `package:flutter/foundation.dart` here would drag Flutter into the
+/// pure domain layer, so this model keeps a local, dependency-free helper.
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 /// Per-format direct-playback capability (from Android's
 /// isDirectPlaybackSupported probe).
 class AudioDirectFormat {
@@ -25,6 +38,19 @@ class AudioDirectFormat {
         'sampleRate': sampleRate,
         'supported': supported,
       };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AudioDirectFormat &&
+          runtimeType == other.runtimeType &&
+          encoding == other.encoding &&
+          sampleRate == other.sampleRate &&
+          supported == other.supported;
+
+  @override
+  int get hashCode =>
+      Object.hash(encoding, sampleRate, supported);
 }
 
 class AudioDeviceEntry {
@@ -82,6 +108,32 @@ class AudioDeviceEntry {
         'sampleRates': sampleRates,
         'maxBitDepth': maxBitDepth,
       };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AudioDeviceEntry &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          type == other.type &&
+          typeName == other.typeName &&
+          isCurrent == other.isCurrent &&
+          isPreferred == other.isPreferred &&
+          _listEquals(sampleRates, other.sampleRates) &&
+          maxBitDepth == other.maxBitDepth;
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        name,
+        type,
+        typeName,
+        isCurrent,
+        isPreferred,
+        Object.hashAll(sampleRates),
+        maxBitDepth,
+      );
 }
 
 class AudioOutputInfo {
@@ -380,21 +432,72 @@ class AudioOutputInfo {
           isUsbDac == other.isUsbDac &&
           sampleRate == other.sampleRate &&
           bitDepth == other.bitDepth &&
+          isBitPerfectActive == other.isBitPerfectActive &&
+          isBitPerfectSupported == other.isBitPerfectSupported &&
+          _listEquals(supportedSampleRates, other.supportedSampleRates) &&
+          _listEquals(availableDevices, other.availableDevices) &&
           targetSampleRate == other.targetSampleRate &&
           targetBitDepth == other.targetBitDepth &&
-          isBitPerfectActive == other.isBitPerfectActive &&
-          isBitPerfectSupported == other.isBitPerfectSupported;
+          nativeSampleRate == other.nativeSampleRate &&
+          nativeFramesPerBuffer == other.nativeFramesPerBuffer &&
+          isDirectSupported == other.isDirectSupported &&
+          isOffloadSupported == other.isOffloadSupported &&
+          bitPerfectFailureReason == other.bitPerfectFailureReason &&
+          activeDeviceType == other.activeDeviceType &&
+          isBluetooth == other.isBluetooth &&
+          isLeAudio == other.isLeAudio &&
+          bleAudioPresent == other.bleAudioPresent &&
+          _listEquals(directFormats, other.directFormats) &&
+          usbAudioClass == other.usbAudioClass &&
+          usbDacLabel == other.usbDacLabel &&
+          btCodecName == other.btCodecName &&
+          btSampleRateHz == other.btSampleRateHz &&
+          btBitDepth == other.btBitDepth &&
+          btLdacQualityMode == other.btLdacQualityMode &&
+          btCodecConnected == other.btCodecConnected &&
+          btA2dpPresent == other.btA2dpPresent &&
+          btReason == other.btReason &&
+          _listEquals(btSelectableCodecs, other.btSelectableCodecs) &&
+          _listEquals(btSupportedCodecs, other.btSupportedCodecs) &&
+          _listEquals(btSelectableSampleRates, other.btSelectableSampleRates) &&
+          _listEquals(btSelectableBitDepths, other.btSelectableBitDepths);
 
   @override
-  int get hashCode =>
-      deviceName.hashCode ^
-      isUsbDac.hashCode ^
-      sampleRate.hashCode ^
-      bitDepth.hashCode ^
-      targetSampleRate.hashCode ^
-      targetBitDepth.hashCode ^
-      isBitPerfectActive.hashCode ^
-      isBitPerfectSupported.hashCode;
+  int get hashCode => Object.hashAll([
+        deviceName,
+        isUsbDac,
+        sampleRate,
+        bitDepth,
+        isBitPerfectActive,
+        isBitPerfectSupported,
+        Object.hashAll(supportedSampleRates),
+        Object.hashAll(availableDevices),
+        targetSampleRate,
+        targetBitDepth,
+        nativeSampleRate,
+        nativeFramesPerBuffer,
+        isDirectSupported,
+        isOffloadSupported,
+        bitPerfectFailureReason,
+        activeDeviceType,
+        isBluetooth,
+        isLeAudio,
+        bleAudioPresent,
+        Object.hashAll(directFormats),
+        usbAudioClass,
+        usbDacLabel,
+        btCodecName,
+        btSampleRateHz,
+        btBitDepth,
+        btLdacQualityMode,
+        btCodecConnected,
+        btA2dpPresent,
+        btReason,
+        Object.hashAll(btSelectableCodecs),
+        Object.hashAll(btSupportedCodecs),
+        Object.hashAll(btSelectableSampleRates),
+        Object.hashAll(btSelectableBitDepths),
+      ]);
 
   @override
   String toString() {

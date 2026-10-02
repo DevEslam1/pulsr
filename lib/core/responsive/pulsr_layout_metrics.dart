@@ -24,12 +24,7 @@ enum PulsrLayoutArchetype {
 class PulsrLayoutMetrics {
   // ── Canonical Content Max-Widths (G1 single source of truth) ─────────────
   static double contentMaxWidth(BuildContext context) =>
-      switch (PulsrBreakpoint.of(context)) {
-        PulsrBreakpoint.compact => 640.0,
-        PulsrBreakpoint.medium => 720.0,
-        PulsrBreakpoint.expanded => 860.0,
-        PulsrBreakpoint.large => 1000.0,
-      };
+      PulsrBreakpoint.of(context).contentMaxWidth;
 
   static BoxConstraints contentConstraints(BuildContext context) =>
       BoxConstraints(maxWidth: contentMaxWidth(context));

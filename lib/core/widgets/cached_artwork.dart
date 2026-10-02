@@ -28,6 +28,13 @@ class ArtworkLruCache {
   int get length => _cache.length + _weakLargeCache.length;
   int get currentBytes => _currentBytes;
 
+  /// Drops [WeakReference]s whose target has been reclaimed by the GC. Without
+  /// this, a key inserted once for a large payload would linger in the map
+  /// forever (the strong bytes are gone, but the map entry never is).
+  void _sweepDeadWeakEntries() {
+    _weakLargeCache.removeWhere((_, ref) => ref.target == null);
+  }
+
   bool containsKey(String key) {
     if (_cache.containsKey(key)) return true;
     final weak = _weakLargeCache[key];
@@ -69,6 +76,15 @@ class ArtworkLruCache {
 
     // FIX-F2: Large payloads (>512KB) are held via WeakReference so memory pressure can reclaim them
     if (bytes.length > largePayloadThreshold) {
+      // Re-inserting a key must not count against the weak-key cap.
+      _weakLargeCache.remove(key);
+      // Sweep reclaimed targets, then bound the number of live weak keys so a
+      // stream of transient large payloads cannot leak map entries.
+      _sweepDeadWeakEntries();
+      while (_weakLargeCache.length >= maxCapacity &&
+          _weakLargeCache.isNotEmpty) {
+        _weakLargeCache.remove(_weakLargeCache.keys.first);
+      }
       _weakLargeCache[key] = WeakReference(bytes);
       if (persistToDisk) {
         ArtworkCacheManager().put(key, bytes);

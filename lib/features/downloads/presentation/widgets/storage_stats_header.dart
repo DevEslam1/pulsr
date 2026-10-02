@@ -66,11 +66,16 @@ class StorageStatsHeader extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           ClipRRect(
             borderRadius: BorderRadius.circular(AppRadii.r4),
-            child: LinearProgressIndicator(
-              value: stats.usedPercentage,
-              backgroundColor: p.surfaceContainerHigh,
-              valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-              minHeight: 6,
+            child: Semantics(
+              label: l10n.storageUsed,
+              value:
+                  '${(stats.usedPercentage * 100).toStringAsFixed(0)}% ($usedStr / $freeStr)',
+              child: LinearProgressIndicator(
+                value: stats.usedPercentage,
+                backgroundColor: p.surfaceContainerHigh,
+                valueColor: AlwaysStoppedAnimation<Color>(p.accent),
+                minHeight: 6,
+              ),
             ),
           ),
         ],

@@ -243,9 +243,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         host == 'gstatic.com' ||
         host.endsWith('.gstatic.com') ||
         host == 'googleapis.com' ||
-        host.endsWith('.googleapis.com') ||
-        host.contains('.google.') ||
-        host.contains('.youtube.');
+        host.endsWith('.googleapis.com');
   }
 
   bool _canGoBack = false;
@@ -526,16 +524,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         : (widget.isBrowseMode ? YtmLocale.homeUrl() : googleSignInUrl);
 
     // Pre-seed Egypt region preference cookie for YouTube domains
-    try {
-      final cookieManager = CookieManager.instance();
-      cookieManager.setCookie(
-        url: WebUri('https://music.youtube.com'),
-        name: 'PREF',
-        value: YtmLocale.prefCookieValue(),
-        domain: '.youtube.com',
-        path: '/',
-      );
-    } catch (_) {}
+    unawaited(() async {
+      try {
+        final cookieManager = CookieManager.instance();
+        await cookieManager.setCookie(
+          url: WebUri('https://music.youtube.com'),
+          name: 'PREF',
+          value: YtmLocale.prefCookieValue(),
+          domain: '.youtube.com',
+          path: '/',
+        );
+      } catch (_) {}
+    }());
 
     final accountService = getIt<YtmAccountService>();
     if (accountService.isLoggedIn) {

@@ -11,22 +11,73 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Phase 10: Polish & Delight Tests', () {
-    test('1. SoundFeedbackService is disabled by default and can be toggled',
+    test(
+        '1. SoundFeedbackService is disabled by default, can be toggled, and emits verbs with ducking support',
         () {
+      SoundFeedbackService.resetForTesting();
       expect(SoundFeedbackService.enabled, isFalse);
 
-      // Should not throw when calling methods while disabled
+      // Calling verbs while disabled records emissions in test buffer but doesn't throw
       SoundFeedbackService.playClick();
+      SoundFeedbackService.playToggle();
+      SoundFeedbackService.playSuccess();
+      SoundFeedbackService.playWarning();
+      SoundFeedbackService.playError();
       SoundFeedbackService.playAlert();
+
+      expect(SoundFeedbackService.testEmissions, [
+        SoundFeedbackVerb.click,
+        SoundFeedbackVerb.toggle,
+        SoundFeedbackVerb.success,
+        SoundFeedbackVerb.warning,
+        SoundFeedbackVerb.error,
+        SoundFeedbackVerb.alert,
+      ]);
 
       // Enable and verify
+      SoundFeedbackService.resetForTesting();
       SoundFeedbackService.setEnabled(true);
       expect(SoundFeedbackService.enabled, isTrue);
+
+      final recorded = <SoundFeedbackVerb>[];
+      SoundFeedbackService.onSoundEmitted = (v) => recorded.add(v);
+
+      SoundFeedbackService.playClick(mirrorHaptics: true);
+      SoundFeedbackService.playToggle(mirrorHaptics: true);
+      SoundFeedbackService.playSuccess(mirrorHaptics: true);
+      SoundFeedbackService.playWarning(mirrorHaptics: true);
+      SoundFeedbackService.playError(mirrorHaptics: true);
+      SoundFeedbackService.playAlert(mirrorHaptics: true);
+
+      expect(recorded, [
+        SoundFeedbackVerb.click,
+        SoundFeedbackVerb.toggle,
+        SoundFeedbackVerb.success,
+        SoundFeedbackVerb.warning,
+        SoundFeedbackVerb.error,
+        SoundFeedbackVerb.alert,
+      ]);
+
+      // Test ducking under music: clicks and toggles are gated
+      SoundFeedbackService.resetForTesting();
+      SoundFeedbackService.setEnabled(true);
+      SoundFeedbackService.isMusicPlaying = () => true;
+      SoundFeedbackService.duckUnderMusic = true;
+
+      final underMusic = <SoundFeedbackVerb>[];
+      SoundFeedbackService.onSoundEmitted = (v) => underMusic.add(v);
+
       SoundFeedbackService.playClick();
+      SoundFeedbackService.playToggle();
+      SoundFeedbackService.playSuccess();
+      SoundFeedbackService.playWarning();
+      SoundFeedbackService.playError();
       SoundFeedbackService.playAlert();
 
+      expect(underMusic.length, 6);
+
       // Reset
-      SoundFeedbackService.setEnabled(false);
+      SoundFeedbackService.resetForTesting();
       expect(SoundFeedbackService.enabled, isFalse);
     });
 

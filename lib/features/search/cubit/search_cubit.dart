@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../data/db/app_database.dart';
@@ -278,7 +279,10 @@ class SearchCubit extends PulsrCubit<SearchState> {
         ].take(historyMax).toList();
         await prefs.setStringList(_historyKey, updated);
         if (!isClosed) safeEmit(state.copyWith(history: updated));
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to persist search history',
+            error: e, stackTrace: st, category: 'SearchCubit');
+      }
     }));
   }
 
@@ -287,7 +291,10 @@ class SearchCubit extends PulsrCubit<SearchState> {
     try {
       final p = await SharedPreferences.getInstance();
       await p.remove(_historyKey);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to clear search history',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
     if (!isClosed) safeEmit(state.copyWith(history: []));
   }
 
@@ -405,7 +412,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
   void _failSearch(int generation, Object error, StackTrace stackTrace) {
     if (generation != _generation || isClosed) return;
     addError(error, stackTrace);
-    safeEmit(state.copyWith(isLoading: false, errorMessage: 'Search failed'));
+    final message = error is AppFailure ? error.message : 'Search failed';
+    safeEmit(state.copyWith(isLoading: false, errorMessage: message));
   }
 
   /// Backwards-compatible delegate; the implementation lives in

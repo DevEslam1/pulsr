@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import '../../core/utils/error_logger.dart';
+
 /// Trim to apply at the head/tail of a track for seamless joins.
 /// F6: OGG/Opus pre-skip (312 samples at 48kHz) and end-trim handling.
 class GaplessTrim {
@@ -43,13 +45,33 @@ class GaplessTrimHandler {
   /// (@44.1kHz ~47.9ms).
   static const Duration aacEncoderDelay = Duration(microseconds: 47873);
 
+  /// Bounded LRU cache of header-derived trims. Insertion order is the LRU
+  /// order (Dart maps preserve it); a hit moves the entry to the back and a
+  /// miss past [headerTrimCacheMax] evicts from the front. This stops a large
+  /// library from growing the cache without limit.
+  static const int headerTrimCacheMax = 512;
   static final Map<String, GaplessTrim> _headerTrimCache = {};
+
+  static GaplessTrim? _cacheLookup(String filePath) {
+    final cached = _headerTrimCache.remove(filePath);
+    if (cached != null) _headerTrimCache[filePath] = cached;
+    return cached;
+  }
+
+  static void _cacheStore(String filePath, GaplessTrim trim) {
+    _headerTrimCache.remove(filePath);
+    _headerTrimCache[filePath] = trim;
+    while (_headerTrimCache.length > headerTrimCacheMax) {
+      _headerTrimCache.remove(_headerTrimCache.keys.first);
+    }
+  }
 
   /// Reads actual header-derived gapless metadata (LAME Xing header or M4A iTunSMPB).
   static Future<GaplessTrim?> readHeaderGaplessTrim(String filePath,
       {int sampleRate = 44100}) async {
-    if (_headerTrimCache.containsKey(filePath)) {
-      return _headerTrimCache[filePath];
+    final cached = _cacheLookup(filePath);
+    if (cached != null) {
+      return cached;
     }
     try {
       final file = File(filePath);
@@ -64,10 +86,13 @@ class GaplessTrimHandler {
         trim = await _readM4aItunSmpb(file, sampleRate);
       }
       if (trim != null) {
-        _headerTrimCache[filePath] = trim;
+        _cacheStore(filePath, trim);
       }
       return trim;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Gapless header trim read failed: $filePath',
+          error: e, stackTrace: st, category: 'Gapless');
+    }
     return null;
   }
 
@@ -173,8 +198,9 @@ class GaplessTrimHandler {
   /// Synchronously inspects local audio file header for LAME Xing / M4A iTunSMPB atoms.
   static GaplessTrim? readHeaderGaplessTrimSync(String filePath,
       {int sampleRate = 44100}) {
-    if (_headerTrimCache.containsKey(filePath)) {
-      return _headerTrimCache[filePath];
+    final cached = _cacheLookup(filePath);
+    if (cached != null) {
+      return cached;
     }
     try {
       final file = File(filePath);
@@ -226,7 +252,7 @@ class GaplessTrimHandler {
                         preSkip: Duration(microseconds: preSkipUs),
                         postTrim: Duration(microseconds: postTrimUs),
                       );
-                      _headerTrimCache[filePath] = trim;
+                      _cacheStore(filePath, trim);
                       return trim;
                     }
                   }
@@ -264,7 +290,7 @@ class GaplessTrimHandler {
                   preSkip: Duration(microseconds: preSkipUs),
                   postTrim: Duration(microseconds: postTrimUs),
                 );
-                _headerTrimCache[filePath] = trim;
+                _cacheStore(filePath, trim);
                 return trim;
               }
             }
@@ -273,7 +299,10 @@ class GaplessTrimHandler {
           raf.closeSync();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Gapless header trim read (sync) failed: $filePath',
+          error: e, stackTrace: st, category: 'Gapless');
+    }
     return null;
   }
 

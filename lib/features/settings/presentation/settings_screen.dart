@@ -12,6 +12,7 @@ import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/missing_artwork_service.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -178,9 +179,25 @@ class SettingsScreenState extends State<SettingsScreen>
     super.dispose();
   }
 
+  /// Rebuilds the settings shell only when state this tree actually renders
+  /// changes. Transient fields owned by other surfaces are ignored so an async
+  /// probe or validation error can't force a full rebuild of the whole screen:
+  /// - `errorMessage` is surfaced by the app-level snackbar listener (main.dart).
+  /// - `isTestingAllProxies` drives the separate proxy screen's `BlocConsumer`.
+  /// - `systemEffectsBundles` is not rendered here (only `systemEffectsStatus`).
+  static bool _settingsBuildWhen(SettingsState previous, SettingsState current) {
+    SettingsState scrub(SettingsState s) => s.copyWith(
+          errorMessage: null,
+          isTestingAllProxies: false,
+          systemEffectsBundles: const <String>[],
+        );
+    return scrub(previous) != scrub(current);
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<SettingsCubit, SettingsState>(
+      buildWhen: _settingsBuildWhen,
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
 

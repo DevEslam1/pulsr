@@ -2,6 +2,8 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
+import '../utils/error_logger.dart';
+
 /// Provides a lightweight connectivity pre-check for online fetch operations (I10).
 class ConnectivityGuard {
   static Connectivity _connectivity = Connectivity();
@@ -18,7 +20,12 @@ class ConnectivityGuard {
     try {
       final results = await _connectivity.checkConnectivity();
       return results.any((r) => r != ConnectivityResult.none);
-    } catch (_) {
+    } catch (e, st) {
+      // Fail open, but record why: a platform without a connectivity
+      // implementation or a transient plugin failure is the only reason this
+      // path runs, and silently swallowing it hid those cases entirely.
+      ErrorLogger.log('Connectivity pre-check failed; failing open',
+          error: e, stackTrace: st, category: 'Network');
       return true;
     }
   }
@@ -30,7 +37,9 @@ class ConnectivityGuard {
       return results.contains(ConnectivityResult.mobile) &&
           !results.contains(ConnectivityResult.wifi) &&
           !results.contains(ConnectivityResult.ethernet);
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Metered-connection check failed; assuming unmetered',
+          error: e, stackTrace: st, category: 'Network');
       return false;
     }
   }

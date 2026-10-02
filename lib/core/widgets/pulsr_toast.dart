@@ -8,6 +8,7 @@ import '../constants/app_typography.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
 import '../performance/gpu_budget.dart';
+import '../services/sound_feedback_service.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 import 'pulsr_dock_tracker.dart';
@@ -77,6 +78,10 @@ class PulsrToast {
     try {
       if (isError) {
         HapticFeedback.heavyImpact();
+        SoundFeedbackService.playError();
+      } else if (isSuccess) {
+        HapticFeedback.mediumImpact();
+        SoundFeedbackService.playSuccess();
       } else {
         HapticFeedback.lightImpact();
       }

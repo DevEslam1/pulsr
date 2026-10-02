@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/cloud_sync_service.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import 'auth_state.dart';
 
 @injectable
@@ -52,6 +53,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       final user = await _authService.signInWithGoogle();
       if (isClosed) return;
       if (user != null) {
+        SoundFeedbackService.playSuccess(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -59,10 +61,12 @@ class AuthCubit extends PulsrCubit<AuthState> {
         ));
         await syncNow();
       } else {
+        SoundFeedbackService.playError(mirrorHaptics: true);
         safeEmit(state.copyWith(status: AuthStatus.unauthenticated));
       }
     } catch (e) {
       if (isClosed) return;
+      SoundFeedbackService.playError(mirrorHaptics: true);
       final msg = _mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
@@ -78,6 +82,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       final user = await _authService.signInWithEmail(email, password);
       if (isClosed) return;
       if (user != null) {
+        SoundFeedbackService.playSuccess(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -85,6 +90,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
         ));
         await syncNow();
       } else {
+        SoundFeedbackService.playError(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
           errorMessage: 'Sign in failed. Please try again.',
@@ -92,6 +98,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       }
     } catch (e) {
       if (isClosed) return;
+      SoundFeedbackService.playError(mirrorHaptics: true);
       final msg = _mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
@@ -107,6 +114,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       final user = await _authService.signUpWithEmail(email, password);
       if (isClosed) return;
       if (user != null) {
+        SoundFeedbackService.playSuccess(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
@@ -114,6 +122,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
         ));
         await syncNow();
       } else {
+        SoundFeedbackService.playError(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
           errorMessage: 'Sign up failed. Please try again.',
@@ -121,6 +130,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       }
     } catch (e) {
       if (isClosed) return;
+      SoundFeedbackService.playError(mirrorHaptics: true);
       final msg = _mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 
 /// An abstraction for preferences storage with an in-memory read cache and batched/async writing.
 class PrefsRepository {
@@ -73,11 +74,13 @@ class PrefsRepository {
           {bool immediate = false}) =>
       set(key, value, immediate: immediate);
 
-  /// Cancels the batch timer and flushes any pending writes to prevent data loss.
-  void dispose() {
+  /// Cancels the batch timer and flushes any pending writes to prevent data
+  /// loss. Awaitable so callers can guarantee queued writes reached disk
+  /// before tearing the repository down (Issue 13).
+  Future<void> dispose() async {
     _batchTimer?.cancel();
     _batchTimer = null;
-    unawaited(flush());
+    await flush();
   }
 
   Future<void> remove(String key) async {
@@ -93,16 +96,37 @@ class PrefsRepository {
 
     final writes = Map<String, dynamic>.from(_pendingWrites);
     _pendingWrites.clear();
+    Object? firstError;
+    StackTrace? firstStack;
     for (final entry in writes.entries) {
-      await _writeToDisk(entry.key, entry.value);
+      try {
+        await _writeToDisk(entry.key, entry.value);
+      } catch (e, st) {
+        // `_writeToDisk` already logged the rejection; keep flushing the rest
+        // so one unsupported value cannot drop unrelated queued writes.
+        firstError ??= e;
+        firstStack ??= st;
+      }
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStack ?? StackTrace.current);
     }
   }
 
   void _scheduleBatchWrite() {
     _batchTimer ??= Timer(const Duration(milliseconds: 300), () {
       _batchTimer = null;
-      flush();
+      unawaited(_flushSafely());
     });
+  }
+
+  Future<void> _flushSafely() async {
+    try {
+      await flush();
+    } catch (e, st) {
+      ErrorLogger.log('PrefsRepository batched flush failed',
+          error: e, stackTrace: st, category: 'Prefs');
+    }
   }
 
   Future<void> _writeToDisk(String key, dynamic value) async {
@@ -116,6 +140,17 @@ class PrefsRepository {
       await _prefs.setDouble(key, value);
     } else if (value is List<String>) {
       await _prefs.setStringList(key, value);
+    } else {
+      // Never silently drop a write: surface the programming error instead of
+      // losing data with a no-op (defect: unsupported preference type).
+      final error = ArgumentError(
+        'PrefsRepository does not support values of type '
+        '${value.runtimeType} (key: "$key"). Supported: bool, String, int, '
+        'double, List<String>.',
+      );
+      ErrorLogger.log('PrefsRepository rejected unsupported value type',
+          error: error, category: 'Prefs');
+      throw error;
     }
   }
 }

@@ -1,6 +1,9 @@
 // lib/core/errors/app_error.dart
 // FIX-D1: Strongly-typed sealed error taxonomy for Pulsr
+import 'dart:async';
 import 'dart:io';
+import 'package:drift/drift.dart'
+    show DriftWrappedException, InvalidDataException, CouldNotRollBackException;
 import 'package:flutter/services.dart';
 
 /// Sealed hierarchy of domain and system errors across Pulsr.
@@ -104,10 +107,47 @@ class GenericAppError extends AppError {
 AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
   if (error is AppError) return error;
 
+  if (error is TimeoutException) {
+    return NetworkError(
+      code: 'NET_TIMEOUT',
+      userMessage: 'The request timed out. Please try again.',
+      isTimeout: true,
+      cause: error,
+      stackTrace: stackTrace,
+    );
+  }
+
+  // TLS handshake failures are an [IOException], not a [SocketException], so
+  // they must be matched before the generic socket case or a bad cert / MITM
+  // proxy reads as a plain connectivity blip.
+  if (error is HandshakeException) {
+    return NetworkError(
+      code: 'NET_TLS_ERROR',
+      userMessage:
+          'Secure connection failed. Check your network or proxy settings.',
+      cause: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   if (error is SocketException || error is HttpException) {
     return NetworkError(
       code: 'NET_SOCKET_ERROR',
       userMessage: 'Network connection failed. Please check your connection.',
+      cause: error,
+      stackTrace: stackTrace,
+    );
+  }
+
+  // Drift wraps database/SQLite failures in its own exception types. They are
+  // storage failures, not generic ones, so the UI can offer a storage-specific
+  // remedy (free space, retry, reset cache) instead of "unexpected error".
+  if (error is DriftWrappedException ||
+      error is InvalidDataException ||
+      error is CouldNotRollBackException) {
+    return StorageError(
+      code: 'DB_ERROR',
+      userMessage: 'A database error occurred. Please try again.',
       cause: error,
       stackTrace: stackTrace,
     );
@@ -149,6 +189,15 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
     );
   }
 
+  if (error is FormatException) {
+    return GenericAppError(
+      code: 'FORMAT_ERROR',
+      userMessage: 'The data could not be read because it is malformed.',
+      cause: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   final msg = error.toString();
   final lower = msg.toLowerCase();
   // Word-boundary match so unrelated words containing "bot" (robot, bottle,
@@ -159,6 +208,19 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
       code: 'YTM_BOT_BLOCK',
       userMessage: 'YouTube Music bot check triggered. Please wait a moment.',
       isBotBlock: true,
+      cause: error,
+      stackTrace: stackTrace,
+    );
+  }
+
+  // SQLite can also surface raw engine errors (e.g. from a plugin or an
+  // unwrapped platform channel) whose type we cannot import here without
+  // pulling dart:ffi into every consumer. Match the engine's stable
+  // `SqliteException(<code>)` prefix instead.
+  if (lower.contains('sqliteexception')) {
+    return StorageError(
+      code: 'DB_ERROR',
+      userMessage: 'A database error occurred. Please try again.',
       cause: error,
       stackTrace: stackTrace,
     );

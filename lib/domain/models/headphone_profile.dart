@@ -3,6 +3,17 @@ import 'dart:math' as math;
 
 import 'eq_preset.dart';
 
+/// Value equality for lists whose elements implement `==`. Kept local so the
+/// pure domain model does not depend on Flutter's `listEquals`.
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
 /// A single parametric (biquad) filter from a real AutoEQ correction profile.
 ///
 /// AutoEQ ships its corrections as parametric filter lists with explicit
@@ -36,6 +47,19 @@ class EqFilter {
         q: (json['q'] as num?)?.toDouble() ?? 1.414,
         filterType: (json['type'] as num?)?.toInt() ?? EqFilterType.peaking,
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EqFilter &&
+          runtimeType == other.runtimeType &&
+          frequency == other.frequency &&
+          gain == other.gain &&
+          q == other.q &&
+          filterType == other.filterType;
+
+  @override
+  int get hashCode => Object.hash(frequency, gain, q, filterType);
 }
 
 /// Native `FilterType` ordinals (see `android/app/src/main/cpp/DspParams.h`).
@@ -104,10 +128,12 @@ class HeadphoneProfile {
                 f.gain.isFinite)
             .toList();
     return HeadphoneProfile(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      brand: json['brand'] as String,
-      model: json['model'] as String,
+      // Required strings are null-guarded: a stored profile missing a key must
+      // not throw and abort the whole profile load.
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      brand: json['brand'] as String? ?? '',
+      model: json['model'] as String? ?? '',
       category: json['category'] as String? ?? 'Headphone',
       // If profile is already 10 bands keep as is, otherwise interpolate from 5-band
       gains: rawGains.length == EqPreset.centerFrequencies.length
@@ -277,8 +303,28 @@ class HeadphoneProfile {
       identical(this, other) ||
       other is HeadphoneProfile &&
           runtimeType == other.runtimeType &&
-          id == other.id;
+          id == other.id &&
+          name == other.name &&
+          brand == other.brand &&
+          model == other.model &&
+          category == other.category &&
+          _listEquals(gains, other.gains) &&
+          bassBoost == other.bassBoost &&
+          preampGain == other.preampGain &&
+          _listEquals(filters, other.filters) &&
+          source == other.source;
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => Object.hash(
+        id,
+        name,
+        brand,
+        model,
+        category,
+        Object.hashAll(gains),
+        bassBoost,
+        preampGain,
+        Object.hashAll(filters),
+        source,
+      );
 }

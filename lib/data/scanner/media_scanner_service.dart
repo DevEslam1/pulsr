@@ -87,6 +87,7 @@ class MediaScannerService {
   DateTime? get lastScanAt => _lastScanAt;
   int? get lastScanEpochSec => _lastScanEpochSec;
   bool _isEnrichingQuality = false;
+  bool _isScanning = false;
 
   /// True when a resume-triggered delta scan is worthwhile (default: 15 min
   /// since last successful scan). Used by app-resume hooks to avoid a full
@@ -285,6 +286,12 @@ class MediaScannerService {
     bool autoHideSystemMedia = true,
     bool incremental = false,
   }) async {
+    if (_isScanning) {
+      ErrorLogger.log('scanDeviceLibrary ignored: a scan is already running',
+          category: 'scanner');
+      return 0;
+    }
+    _isScanning = true;
     _emitProgress(0.0,
         currentFile: 'Initializing scanner...', isIncremental: incremental);
     try {
@@ -343,27 +350,51 @@ class MediaScannerService {
           totalCount: songsToProcess.length,
           isIncremental: incremental);
 
-      // Query genres mapping from MediaStore to populate genre names
+      // Query genres mapping from MediaStore to populate genre names.
+      // Android 11+ exposes the genre string inline on each song, so only the
+      // songs without it need the legacy per-genre `queryAudiosFrom` fallback
+      // (which was N+1 queries over the whole genre table).
       final Map<int, String> songGenres = {};
-      try {
-        final genres = await _audioQuery.queryGenres();
-        for (final g in genres) {
-          final genreName = g.genre.trim();
-          if (genreName.isEmpty || genreName.toLowerCase() == '<unknown>') {
-            continue;
-          }
-          try {
-            final audios = await _audioQuery.queryAudiosFrom(
-              AudiosFromType.GENRE_ID,
-              g.id,
-            );
-            for (final a in audios) {
-              songGenres[a.id] = genreName;
-            }
-          } catch (_) {}
+      final Set<int> missingGenreIds = <int>{};
+      for (final s in songsToProcess) {
+        final rawInline = s.getMap['genre'];
+        final inline = rawInline is String ? rawInline.trim() : null;
+        if (inline != null &&
+            inline.isNotEmpty &&
+            inline.toLowerCase() != '<unknown>') {
+          songGenres[s.id] = inline;
+        } else {
+          missingGenreIds.add(s.id);
         }
-      } catch (e) {
-        ErrorLogger.log('queryGenres failed', error: e, category: 'scanner');
+      }
+
+      if (missingGenreIds.isNotEmpty) {
+        try {
+          final genres = await _audioQuery.queryGenres();
+          for (final g in genres) {
+            final genreName = g.genre.trim();
+            if (genreName.isEmpty || genreName.toLowerCase() == '<unknown>') {
+              continue;
+            }
+            try {
+              final audios = await _audioQuery.queryAudiosFrom(
+                AudiosFromType.GENRE_ID,
+                g.id,
+              );
+              for (final a in audios) {
+                if (missingGenreIds.contains(a.id)) {
+                  songGenres[a.id] = genreName;
+                }
+              }
+            } catch (e, st) {
+              ErrorLogger.log('queryAudiosFrom genre ${g.id} failed',
+                  error: e, stackTrace: st, category: 'scanner');
+            }
+          }
+        } catch (e, st) {
+          ErrorLogger.log('queryGenres failed',
+              error: e, stackTrace: st, category: 'scanner');
+        }
       }
 
       final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
@@ -454,6 +485,8 @@ class MediaScannerService {
       ErrorLogger.log('Media scanner failed',
           error: e, stackTrace: st, category: 'scanner');
       rethrow;
+    } finally {
+      _isScanning = false;
     }
   }
 

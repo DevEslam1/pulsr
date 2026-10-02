@@ -10,6 +10,10 @@ class MilkdropPresetStore {
   static const String _keyContent = 'setting_milkdrop_preset';
   static const String _keyName = 'setting_milkdrop_preset_name';
 
+  /// Upper bound on an imported .milk file, so a multi-GB or malformed file
+  /// cannot be slurped into memory before it is parsed/stored.
+  static const int maxImportBytes = 2 * 1024 * 1024;
+
   Future<MilkdropPreset> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -27,9 +31,14 @@ class MilkdropPresetStore {
   }
 
   Future<void> save(MilkdropPreset preset, String rawContent) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyContent, rawContent);
-    await prefs.setString(_keyName, preset.name);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyContent, rawContent);
+      await prefs.setString(_keyName, preset.name);
+    } catch (e, st) {
+      ErrorLogger.log('MilkdropPresetStore save failed',
+          error: e, stackTrace: st, category: 'MilkdropPresetStore');
+    }
   }
 
   Future<void> clear() async {
@@ -50,6 +59,15 @@ class MilkdropPresetStore {
       final ioFile =
           SafeFilePath.validate(file.path, allowedExtensions: const ['milk']);
       if (ioFile == null) return null;
+      final size = await ioFile.length();
+      if (size > maxImportBytes) {
+        ErrorLogger.log(
+          'MilkdropPresetStore import rejected: file is $size bytes '
+          '(max $maxImportBytes)',
+          category: 'MilkdropPresetStore',
+        );
+        return null;
+      }
       final content = await ioFile.readAsString();
       final cleanName =
           file.name.replaceAll(RegExp(r'\.milk$', caseSensitive: false), '');

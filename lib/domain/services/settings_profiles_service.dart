@@ -1,6 +1,7 @@
 // lib/core/services/settings_profiles_service.dart
 import 'dart:convert';
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart';
 
@@ -142,6 +143,11 @@ class SettingsProfile {
 class SettingsProfilesService {
   static const String _keyProfiles = 'setting_custom_profiles';
 
+  /// Serializes the read-modify-write of the profiles list. Without it, two
+  /// concurrent [saveProfile]/[deleteProfile] calls can read the same snapshot
+  /// and the later write silently drops the other mutation.
+  final Mutex _prefsMutex = Mutex();
+
   Future<List<SettingsProfile>> getProfiles() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -159,26 +165,27 @@ class SettingsProfilesService {
     return SettingsProfile.defaultProfiles;
   }
 
-  Future<void> saveProfile(SettingsProfile profile) async {
-    final list = await getProfiles();
-    final updated = List<SettingsProfile>.from(list);
-    final idx = updated.indexWhere((p) => p.id == profile.id);
-    if (idx >= 0) {
-      updated[idx] = profile;
-    } else {
-      updated.add(profile);
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
-  }
+  Future<void> saveProfile(SettingsProfile profile) =>
+      _prefsMutex.protect(() async {
+        final list = await getProfiles();
+        final updated = List<SettingsProfile>.from(list);
+        final idx = updated.indexWhere((p) => p.id == profile.id);
+        if (idx >= 0) {
+          updated[idx] = profile;
+        } else {
+          updated.add(profile);
+        }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
+      });
 
-  Future<void> deleteProfile(String profileId) async {
-    final list = await getProfiles();
-    final updated = List<SettingsProfile>.from(list);
-    updated.removeWhere((p) => p.id == profileId);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
-  }
+  Future<void> deleteProfile(String profileId) => _prefsMutex.protect(() async {
+        final list = await getProfiles();
+        final updated = List<SettingsProfile>.from(list);
+        updated.removeWhere((p) => p.id == profileId);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
+      });
 }

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../motion/pulsr_motion.dart';
+import '../services/sound_feedback_service.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -111,6 +112,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
   void _toggle() {
     if (!isEnabled) return;
     HapticFeedback.lightImpact();
+    SoundFeedbackService.playToggle();
     widget.onChanged!(!widget.value);
   }
 

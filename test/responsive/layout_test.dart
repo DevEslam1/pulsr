@@ -117,7 +117,7 @@ void main() {
       expect(delegate.showRail, isTrue);
       expect(delegate.navWidth, 260.0);
       expect(delegate.showSideInspector, isTrue);
-      expect(delegate.contentMaxWidth, 1400.0);
+      expect(delegate.contentMaxWidth, 1000.0);
       expect(delegate.playerBarHeight, 90.0);
     });
   });

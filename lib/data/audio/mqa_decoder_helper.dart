@@ -7,6 +7,21 @@ import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../db/app_database.dart';
 
+/// Thrown when MQA playback cannot proceed — the file carries no MQA
+/// signature, or it is too large to unfold in memory. Mirrors the
+/// [DsdUnsupportedException] contract so callers fail a track gracefully
+/// instead of leaking a raw [UnsupportedError].
+class MqaUnsupportedException implements Exception {
+  final String message;
+
+  const MqaUnsupportedException([
+    this.message = 'MQA playback is not supported for this file',
+  ]);
+
+  @override
+  String toString() => 'MqaUnsupportedException: $message';
+}
+
 /// Detects likely MQA-encoded audio and performs an *approximate* first-unfold
 /// (44.1/48 kHz -> 88.2/96 kHz) via linear interpolation of PCM frames.
 /// This is NOT a licensed/authenticated MQA Core decoder: no authentication,
@@ -147,12 +162,26 @@ class MqaDecoderHelper {
 
     final fileSize = await file.length();
     if (fileSize > kMaxInMemoryDecodeBytes) {
-      throw UnsupportedError(
+      throw MqaUnsupportedException(
         'MQA file exceeds max in-memory decode size of 300 MB (${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB)',
       );
     }
 
     final bytes = await file.readAsBytes();
+
+    // Gate the approximate unfold on an actual MQA signature. Without this a
+    // caller could hand any 24-bit PCM as "MQA" and get resampled/relabelled
+    // output. Confirmed MQA paths keep their existing unfold behavior.
+    final hasSignature = testUnfold != null ||
+        containsMqaSignature(
+          bytes.length > 8192 ? bytes.sublist(0, 8192) : bytes,
+        );
+    if (!hasSignature) {
+      throw const MqaUnsupportedException(
+        'MQA signature not found; refusing to unfold non-MQA content.',
+      );
+    }
+
     // The MQA core signal is the file's native rate (typically 44.1 or 48 kHz)
     // and the first unfold doubles it. Deriving it from the track metadata keeps
     // 44.1 kHz-family files from being unfolded with the wrong ratio (which
@@ -229,8 +258,10 @@ class _MqaStreamAudioSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final from = start ?? 0;
-    final to = end ?? wavBytes.length;
+    // Clamp the requested byte range to the buffer so a request beyond the
+    // payload cannot trigger an out-of-bounds sublist RangeError.
+    final from = (start ?? 0).clamp(0, wavBytes.length);
+    final to = (end ?? wavBytes.length).clamp(from, wavBytes.length);
     return StreamAudioResponse(
       rangeRequestsSupported: true,
       sourceLength: wavBytes.length,

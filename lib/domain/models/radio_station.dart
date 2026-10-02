@@ -100,11 +100,50 @@ class RadioStation {
 
   /// True only for absolute `http://` / `https://` URLs with a host.
   /// Local files, relative paths and `ytmusic://` sentinels are rejected.
+  /// Hosts that resolve to localhost / link-local / private ranges are also
+  /// rejected so a station can never be pointed at the device or its network.
   static bool isHttpUrl(String url) {
     final uri = Uri.tryParse(url.trim());
     if (uri == null) return false;
-    return (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
+    final host = uri.host;
+    if (host.isEmpty) return false;
+    return !_isUnsafeHost(host);
+  }
+
+  /// Rejects loopback, link-local, unique-local and RFC 1918 hosts.
+  static bool _isUnsafeHost(String host) {
+    final lower = host.toLowerCase();
+    if (lower == 'localhost' || lower.endsWith('.local')) return true;
+
+    if (lower.contains(':')) {
+      if (lower == '::1') return true;
+      final firstGroup = lower.split(':').first;
+      final value = int.tryParse(firstGroup, radix: 16);
+      if (value != null) {
+        // fc00::/7 (unique local) and fe80::/10 (link-local)
+        if ((value & 0xfe00) == 0xfc00) return true;
+        if ((value & 0xffc0) == 0xfe80) return true;
+      }
+      return false;
+    }
+
+    final parts = lower.split('.');
+    if (parts.length != 4) return false;
+    final octets = <int>[];
+    for (final part in parts) {
+      final value = int.tryParse(part);
+      if (value == null || value < 0 || value > 255) return false;
+      octets.add(value);
+    }
+    final a = octets[0];
+    final b = octets[1];
+    if (a == 127) return true; // 127.0.0.0/8
+    if (a == 10) return true; // 10.0.0.0/8
+    if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+    if (a == 192 && b == 168) return true; // 192.168.0.0/16
+    if (a == 169 && b == 254) return true; // 169.254.0.0/16
+    return false;
   }
 
   static String _fallbackName(String url) {

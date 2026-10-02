@@ -55,11 +55,25 @@ class _DuplicateFinderSheetState extends State<DuplicateFinderSheet> {
     _scanForDuplicates();
   }
 
+  /// Groups tracks that are genuinely the same recording. Title + artist alone
+  /// collides across different albums (e.g. several "Intro"/"Interlude" tracks)
+  /// and across different edits, so the key also folds in the album, a coarse
+  /// duration bucket, and the file size.
+  static String _duplicateKey(SongsTableData song) {
+    final title = song.title.trim().toLowerCase();
+    final artist = song.artist.trim().toLowerCase();
+    final album = song.album.trim().toLowerCase();
+    // Bucket to 2-second windows so near-identical rips still cluster while
+    // live/radio edits of different lengths stay apart.
+    final durationBucket = song.durationMs ~/ 2000;
+    final fileSize = song.fileSize ?? 0;
+    return '$title\u0000$artist\u0000$album\u0000$durationBucket\u0000$fileSize';
+  }
+
   void _scanForDuplicates() {
     final Map<String, List<SongsTableData>> map = {};
     for (final song in widget.allSongs) {
-      final key =
-          '${song.title.trim().toLowerCase()}_${song.artist.trim().toLowerCase()}';
+      final key = _duplicateKey(song);
       map.putIfAbsent(key, () => []).add(song);
     }
 

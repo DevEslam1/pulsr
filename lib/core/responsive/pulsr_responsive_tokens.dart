@@ -69,8 +69,8 @@ class PulsrViewport {
     final orientation =
         width > height ? Orientation.landscape : Orientation.portrait;
     final sizeClass = PulsrBreakpoint.fromWidth(width);
-    final isShortHeight =
-        height < 500.0 && orientation == Orientation.landscape;
+    final isShortHeight = height < PulsrBreakpoint.shortHeightThreshold &&
+        orientation == Orientation.landscape;
     final isUltraWide = width >= 1200.0;
 
     final hinge = PulsrBreakpoint.hinge(context);
@@ -118,14 +118,7 @@ class PulsrViewport {
   }
 
   /// Maximum content width constraint preventing sprawling lines on wide screens.
-  double get contentMaxWidth {
-    return switch (sizeClass) {
-      PulsrBreakpoint.compact => 560.0,
-      PulsrBreakpoint.medium => 780.0,
-      PulsrBreakpoint.expanded => 960.0,
-      PulsrBreakpoint.large => 1100.0,
-    };
-  }
+  double get contentMaxWidth => sizeClass.contentMaxWidth;
 
   /// BoxConstraints applying [contentMaxWidth].
   BoxConstraints get contentConstraints =>

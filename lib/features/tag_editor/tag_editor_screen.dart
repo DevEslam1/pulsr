@@ -238,9 +238,11 @@ class _TagEditorBody extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 720),
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s20, vertical: AppSpacing.md),
+            ExcludeSemantics(
+              excluding: isSaving,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s20, vertical: AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -267,6 +269,7 @@ class _TagEditorBody extends StatelessWidget {
                   _TagFields(state: state, cubit: cubit),
                   const SizedBox(height: AppSpacing.xl),
                 ],
+                ),
               ),
             ),
             if (isSaving) _SavingOverlay(state: state),
@@ -600,27 +603,31 @@ class _SavingOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Container(
-      color: Colors.black45,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(
-              value: state.isBatchMode ? state.batchProgress : null,
-              color: p.accent,
-            ),
-            if (state.isBatchMode && state.batchProgress != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                '${(state.batchProgress! * 100).toInt()}%',
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        color: Colors.black45,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                value: state.isBatchMode ? state.batchProgress : null,
+                color: p.accent,
               ),
+              if (state.isBatchMode && state.batchProgress != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  '${(state.batchProgress! * 100).toInt()}%',
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

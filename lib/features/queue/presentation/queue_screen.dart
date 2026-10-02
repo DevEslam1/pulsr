@@ -15,6 +15,8 @@ import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/playlist_suggestions_service.dart';
+import '../../../core/services/sound_feedback_service.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
@@ -57,7 +59,8 @@ class QueueScreen extends StatelessWidget {
                             isDestructive: true,
                           );
                           if (confirm == true && context.mounted) {
-                            HapticFeedback.mediumImpact();
+                            PulsrHaptics.destructive();
+                            SoundFeedbackService.playWarning();
                             final removed = List.of(playerState.queue);
                             final removedIndex = playerState.currentIndex;
                             await cubit.clearQueue();
@@ -69,6 +72,8 @@ class QueueScreen extends StatelessWidget {
                                   action: SnackBarAction(
                                     label: context.l10n.undo,
                                     onPressed: () {
+                                      PulsrHaptics.confirm();
+                                      SoundFeedbackService.playSuccess();
                                       try {
                                         cubit.restoreQueue(
                                             removed, removedIndex);
@@ -86,7 +91,8 @@ class QueueScreen extends StatelessWidget {
                           }
                           break;
                         case 'shuffle':
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.tap();
+                          SoundFeedbackService.playClick();
                           final shuffled = List.of(playerState.queue)
                             ..shuffle();
                           // Rebuild queue with shuffled order centered on current
@@ -153,12 +159,15 @@ class QueueScreen extends StatelessWidget {
                           if (name != null &&
                               name.isNotEmpty &&
                               context.mounted) {
+                            // Re-read after the dialog await: the queue may have
+                            // been reordered/cleared while the dialog was open,
+                            // so the stale `playerState` must not be used.
                             final songIds =
-                                playerState.queue.map((s) => s.id).toList();
+                                cubit.state.queue.map((s) => s.id).toList();
                             final result = await getIt<PlaylistUseCases>()
                                 .createPlaylist(name);
-                            result.fold(
-                              (failure) {
+                            await result.fold(
+                              (failure) async {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -168,14 +177,27 @@ class QueueScreen extends StatelessWidget {
                                 }
                               },
                               (playlistId) async {
-                                await getIt<PlaylistUseCases>()
-                                    .addSongsToPlaylist(playlistId, songIds);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text(context.l10n.queueSaved)),
-                                  );
-                                }
+                                final addResult =
+                                    await getIt<PlaylistUseCases>()
+                                        .addSongsToPlaylist(
+                                            playlistId, songIds);
+                                if (!context.mounted) return;
+                                addResult.fold(
+                                  (failure) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content: Text(
+                                              '${context.l10n.saveFailed}: ${failure.message}')),
+                                    );
+                                  },
+                                  (_) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content:
+                                              Text(context.l10n.queueSaved)),
+                                    );
+                                  },
+                                );
                               },
                             );
                           }
@@ -424,7 +446,8 @@ class QueueScreen extends StatelessWidget {
                                     minHeight: AppSpacing.minTouchTarget,
                                   ),
                                   onPressed: () {
-                                    HapticFeedback.heavyImpact();
+                                    PulsrHaptics.destructive();
+                                    SoundFeedbackService.playWarning();
                                     context
                                         .read<PlayerCubit>()
                                         .removeQueueItem(index);

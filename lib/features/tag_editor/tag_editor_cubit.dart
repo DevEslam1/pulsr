@@ -604,13 +604,6 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             clearBatchProgress: true,
           ));
         } else {
-          _batchArtistEdited = false;
-          _batchAlbumEdited = false;
-          _batchGenreEdited = false;
-          _batchYearEdited = false;
-          _batchTrackEdited = false;
-          _batchDiscEdited = false;
-          _batchCommentEdited = false;
           _history.clear();
           _userEditedFields.clear();
           // FIX-C08: Inform user that lyrics are not editable in batch mode
@@ -731,6 +724,17 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         status: TagEditorStatus.failure,
         errorMessage: 'Failed to save tags: $e',
       ));
+    } finally {
+      // P0-5 follow-up: clear the batch dirty flags on every exit path (success,
+      // failure, or cancellation) so a failed/aborted save cannot leak stale
+      // field edits into the next save.
+      _batchArtistEdited = false;
+      _batchAlbumEdited = false;
+      _batchGenreEdited = false;
+      _batchYearEdited = false;
+      _batchTrackEdited = false;
+      _batchDiscEdited = false;
+      _batchCommentEdited = false;
     }
   }
 }

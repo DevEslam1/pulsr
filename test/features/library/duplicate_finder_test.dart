@@ -1,4 +1,5 @@
 // test/features/library/duplicate_finder_test.dart
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +87,84 @@ void main() {
       expect(deletedItems, isNotNull);
       expect(deletedItems!.length, equals(1));
       expect(deletedItems!.first.id, equals(songMp3.id));
+    });
+  });
+
+  group('DuplicateFinderSheet key collision', () {
+    Future<void> pumpSheet(
+      WidgetTester tester,
+      List<SongsTableData> songs,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: DuplicateFinderSheet(allSongs: songs),
+          ),
+        ),
+      );
+    }
+
+    SongsTableData song({
+      required int id,
+      String title = 'Intro',
+      String artist = 'Same Artist',
+      String album = 'Same Album',
+      int durationMs = 100000,
+      int? fileSize,
+    }) {
+      return createTestSong(
+        id: id,
+        title: title,
+        artist: artist,
+        album: album,
+        durationMs: durationMs,
+      ).copyWith(fileSize: Value(fileSize));
+    }
+
+    testWidgets('same title/artist on different albums are not duplicates',
+        (tester) async {
+      await pumpSheet(tester, [
+        song(id: 1, album: 'Album A'),
+        song(id: 2, album: 'Album B'),
+      ]);
+
+      expect(find.text('0 duplicate clusters found'), findsOneWidget);
+    });
+
+    testWidgets('durations in different buckets are not duplicates',
+        (tester) async {
+      await pumpSheet(tester, [
+        song(id: 1, durationMs: 100000),
+        song(id: 2, durationMs: 130000),
+      ]);
+
+      expect(find.text('0 duplicate clusters found'), findsOneWidget);
+    });
+
+    testWidgets(
+        'same metadata/duration but different file size are not duplicates',
+        (tester) async {
+      await pumpSheet(tester, [
+        song(id: 1, fileSize: 1000),
+        song(id: 2, fileSize: 2000),
+      ]);
+
+      expect(find.text('0 duplicate clusters found'), findsOneWidget);
+    });
+
+    testWidgets('identical metadata/duration/size are grouped', (tester) async {
+      await pumpSheet(tester, [
+        song(id: 1, fileSize: 1000),
+        song(id: 2, fileSize: 1000),
+      ]);
+
+      expect(find.text('1 duplicate clusters found'), findsOneWidget);
     });
   });
 }

@@ -1,6 +1,8 @@
 // test/errors/app_error_taxonomy_test.dart
 // FIX-D1: Unit tests verifying AppError taxonomy and resolution
+import 'dart:async';
 import 'dart:io';
+import 'package:drift/drift.dart' show DriftWrappedException;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/errors/app_error.dart';
@@ -88,6 +90,48 @@ void main() {
 
       expect(identical(resolved, existing), isTrue);
       expect(resolved.code, equals('AUDIO_DECODE_ERR'));
+    });
+
+    test('TimeoutException resolves to a timeout NetworkError', () {
+      final error = resolveAppError(TimeoutException('request timed out'));
+
+      expect(error, isA<NetworkError>());
+      final netError = error as NetworkError;
+      expect(netError.code, equals('NET_TIMEOUT'));
+      expect(netError.isTimeout, isTrue);
+    });
+
+    test('HandshakeException resolves to a TLS NetworkError', () {
+      final error = resolveAppError(const HandshakeException('bad cert'));
+
+      expect(error, isA<NetworkError>());
+      final netError = error as NetworkError;
+      expect(netError.code, equals('NET_TLS_ERROR'));
+      expect(netError.isTimeout, isFalse);
+    });
+
+    test('FormatException resolves to a FORMAT_ERROR GenericAppError', () {
+      final error = resolveAppError(const FormatException('malformed json'));
+
+      expect(error, isA<GenericAppError>());
+      expect(error.code, equals('FORMAT_ERROR'));
+      expect(error.cause, isA<FormatException>());
+    });
+
+    test('Drift wrapped database errors resolve to StorageError', () {
+      final error = resolveAppError(
+          DriftWrappedException(message: 'invalid statement'));
+
+      expect(error, isA<StorageError>());
+      expect(error.code, equals('DB_ERROR'));
+    });
+
+    test('raw SqliteException strings resolve to StorageError', () {
+      final error = resolveAppError(
+          Exception('SqliteException(19): UNIQUE constraint failed'));
+
+      expect(error, isA<StorageError>());
+      expect(error.code, equals('DB_ERROR'));
     });
   });
 }

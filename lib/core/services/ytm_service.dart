@@ -166,6 +166,7 @@ class YtmService {
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
       StreamController<void>.broadcast();
+  bool _disposed = false;
 
   /// Shared persistent HTTP client for Dart-side Innertube calls (search
   /// fallback). Keep-alive reuses TCP+TLS across requests; the previous
@@ -200,6 +201,7 @@ class YtmService {
   Timer? _botCooldownTimer;
 
   void _syncBotCooldownNotifier() {
+    if (_disposed) return;
     _botCooldownTimer?.cancel();
     _botCooldownTimer = null;
     final remaining = _botChallengeUntil.difference(DateTime.now());
@@ -321,16 +323,22 @@ class YtmService {
   Stream<void> get onAuthExpired => _authExpiredController.stream;
 
   void notifyAuthExpired() {
+    if (_disposed) return;
     _authExpiredController.add(null);
   }
 
   @disposeMethod
   void dispose() {
+    _disposed = true;
+    _botCooldownTimer?.cancel();
+    _botCooldownTimer = null;
+    botCooldownNotifier.dispose();
     _authExpiredController.close();
     try {
       _httpClient.close();
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Failed to close YTM HTTP client during dispose',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -350,8 +358,9 @@ class YtmService {
   Future<void> syncCookies(String cookies) async {
     try {
       await _channel.invokeMethod<bool>('setCookies', {'cookies': cookies});
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -368,8 +377,9 @@ class YtmService {
       await _channel
           .invokeMethod<bool>('clearCookies')
           .timeout(const Duration(seconds: 4));
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -391,8 +401,9 @@ class YtmService {
       await _channel
           .invokeMethod<bool>('invalidatePoToken')
           .timeout(const Duration(seconds: 2));
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -446,8 +457,9 @@ class YtmService {
     try {
       await _channel
           .invokeMethod<bool>('setDataSyncId', {'dataSyncId': dataSyncId});
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -455,8 +467,9 @@ class YtmService {
   Future<void> preWarm() async {
     try {
       await _channel.invokeMethod<bool>('preWarm');
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -474,8 +487,9 @@ class YtmService {
   Future<void> resetIdentities() async {
     try {
       await _channel.invokeMethod<bool>('resetIdentities');
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -504,22 +518,25 @@ class YtmService {
       if (getIt.isRegistered<YtmUrlCache>()) {
         getIt<YtmUrlCache>().clear();
       }
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
     try {
       if (getIt.isRegistered<YtmBrowseService>()) {
         getIt<YtmBrowseService>().clearCache();
       }
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
     try {
       await _channel
           .invokeMethod<bool>('clearNetworkCaches')
           .timeout(const Duration(seconds: 3));
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
   }
 
@@ -906,8 +923,9 @@ class YtmService {
         timeout: _defaultSearchTimeout,
       );
       if (raw != null && raw.isNotEmpty) return _parseTracks(raw);
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
     return trending(limit: limit);
   }
@@ -922,8 +940,9 @@ class YtmService {
         timeout: _defaultSearchTimeout,
       );
       if (raw != null && raw.isNotEmpty) return _parseTracks(raw);
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
     return const [];
   }
@@ -1060,8 +1079,9 @@ class YtmService {
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
+        } catch (e, st) {
+          ErrorLogger.log('Non-critical YTM operation failed',
+              error: e, stackTrace: st, category: 'YTM');
         }
         return cachedEntry.toStream(quality: quality);
       }
@@ -1110,8 +1130,9 @@ class YtmService {
             _noteResolveSuccess(videoId: videoId);
             inBotCooldown = false;
           }
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
+        } catch (e, st) {
+          ErrorLogger.log('Non-critical YTM operation failed',
+              error: e, stackTrace: st, category: 'YTM');
         }
       } else {
         debugPrint(
@@ -1125,8 +1146,9 @@ class YtmService {
 
     try {
       _tracker?.markStage(PlaybackStage.pluginEntered);
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
     // Tier-1 (authenticated account InnerTube) and Tier-2 (native multi-client
     // extractor) used to run strictly one after the other, so a slow Tier-1
@@ -1168,16 +1190,18 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.clientRequestSent);
               _tracker?.markStage(PlaybackStage.poTokenNeeded);
-            } catch (_) {
-              // Best-effort: failure intentionally ignored on this non-critical path.
+            } catch (e, st) {
+              ErrorLogger.log('Non-critical YTM operation failed',
+                  error: e, stackTrace: st, category: 'YTM');
             }
             final directStream =
                 await account.resolvePlayerStream(videoId, quality: quality);
             if (directStream != null) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
-              } catch (_) {
-                // Best-effort: failure intentionally ignored on this non-critical path.
+              } catch (e, st) {
+                ErrorLogger.log('Non-critical YTM operation failed',
+                    error: e, stackTrace: st, category: 'YTM');
               }
               // putStream, not put: the entry keeps the real container, MIME and
               // bitrate. put() alone let a later cache hit rebuild the stream by
@@ -1232,8 +1256,9 @@ class YtmService {
           _tracker?.markStage(PlaybackStage.clientRequestSent);
           // Check poToken state heuristically: if we have a cached token, this is warm
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
+        } catch (e, st) {
+          ErrorLogger.log('Non-critical YTM operation failed',
+              error: e, stackTrace: st, category: 'YTM');
         }
         // maxRetries: 0 — the native side already runs its own multi-client
         // hedged chain with internal retries. A Dart-level timeout retry can't
@@ -1254,8 +1279,9 @@ class YtmService {
         if (stream != null) {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
-          } catch (_) {
-            // Best-effort: failure intentionally ignored on this non-critical path.
+          } catch (e, st) {
+            ErrorLogger.log('Non-critical YTM operation failed',
+                error: e, stackTrace: st, category: 'YTM');
           }
           urlCache?.putStream(stream, quality: cacheQuality);
           _noteResolveSuccess(videoId: videoId);
@@ -1369,8 +1395,9 @@ class YtmService {
           if (stream != null) {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
-            } catch (_) {
-              // Best-effort: failure intentionally ignored on this non-critical path.
+            } catch (e, st) {
+              ErrorLogger.log('Non-critical YTM operation failed',
+                  error: e, stackTrace: st, category: 'YTM');
             }
             urlCache?.putStream(stream, quality: cacheQuality);
             _noteResolveSuccess(videoId: videoId);
@@ -1408,8 +1435,9 @@ class YtmService {
       if (dartStream != null) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
+        } catch (e, st) {
+          ErrorLogger.log('Non-critical YTM operation failed',
+              error: e, stackTrace: st, category: 'YTM');
         }
         urlCache?.putStream(dartStream, quality: cacheQuality);
         _noteResolveSuccess(videoId: videoId);
@@ -1452,8 +1480,9 @@ class YtmService {
           await getPoTokenState().timeout(const Duration(seconds: 2));
       guestPoToken = poState?['streamingPoToken'] as String?;
       guestVisitorData = poState?['visitorData'] as String?;
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
+    } catch (e, st) {
+      ErrorLogger.log('Non-critical YTM operation failed',
+          error: e, stackTrace: st, category: 'YTM');
     }
 
     final List<_DartPlayerClient> clients = [

@@ -27,6 +27,16 @@ import '../../../../core/responsive/pulsr_layout_metrics.dart';
 
 enum DownloadFilter { all, downloading, completed, failed }
 
+/// Returns the subset of [selected] that still maps to a live task. Extracted
+/// to the top level so the selection-pruning rule can be unit-tested without
+/// building the whole screen.
+@visibleForTesting
+Set<String> pruneSelectedVideoIds(
+    Set<String> selected, Iterable<String> validVideoIds) {
+  final valid = validVideoIds.toSet();
+  return selected.where(valid.contains).toSet();
+}
+
 class DownloadsScreen extends StatefulWidget {
   final AppDatabase? db;
 
@@ -82,7 +92,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         borderRadius: BorderRadius.circular(AppRadii.r12),
       ),
       onSelected: (_) {
-        setState(() => _filter = filter);
+        setState(() {
+          _filter = filter;
+          // Prune selections that reference tasks which no longer exist so the
+          // screen can never remain stuck in selection mode after the list or
+          // filter shrinks (deleted/completed tasks are dropped from the map).
+          final validIds = context.read<DownloadsCubit>().state.tasks.keys;
+          final pruned = pruneSelectedVideoIds(_selectedVideoIds, validIds);
+          _selectedVideoIds
+            ..clear()
+            ..addAll(pruned);
+        });
       },
     );
   }
@@ -115,7 +135,24 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             DownloadFilter.failed => failedTasks,
           };
 
-          return Scaffold(
+          return BlocListener<DownloadsCubit, DownloadsState>(
+            // Prune selected ids when the underlying task map changes so a
+            // removed/completed task cannot leave the screen stuck in
+            // selection mode with stale "N selected" state.
+            listenWhen: (prev, curr) =>
+                _selectedVideoIds.isNotEmpty && curr.tasks != prev.tasks,
+            listener: (context, state) {
+              if (_selectedVideoIds.any((id) => !state.tasks.containsKey(id))) {
+                setState(() {
+                  final pruned =
+                      pruneSelectedVideoIds(_selectedVideoIds, state.tasks.keys);
+                  _selectedVideoIds
+                    ..clear()
+                    ..addAll(pruned);
+                });
+              }
+            },
+            child: Scaffold(
             backgroundColor: p.bg,
             appBar: AppBar(
               backgroundColor: Colors.transparent,
@@ -387,7 +424,14 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                           );
                         }
 
-                        final task = filteredTasks[index - 2];
+                        // Guard the index-2 offset (two leading header rows)
+                        // against a task list that shrank between builds.
+                        final taskIndex = index - 2;
+                        if (taskIndex < 0 ||
+                            taskIndex >= filteredTasks.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final task = filteredTasks[taskIndex];
                         final playable =
                             task.status == DownloadStatus.complete &&
                                 task.localSongId != null;
@@ -461,10 +505,37 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     backgroundColor: p.surfaceContainer,
                     onRefresh: () async {
                       final cubit = context.read<DownloadsCubit>();
-                      await Future.wait([
-                        cubit.loadInitialTasks(),
-                        cubit.refreshStorageStats(),
-                      ]);
+                      try {
+                        await Future.wait([
+                          cubit.loadInitialTasks(),
+                          cubit.refreshStorageStats(),
+                        ]);
+                        // Both loaders record failures in state.errorMessage
+                        // (surfaced by the listener above); re-surface here so a
+                        // pull-to-refresh failure is not silently swallowed.
+                        final failure = cubit.state.errorMessage;
+                        if (failure != null && context.mounted) {
+                          PulsrToast.show(
+                            context,
+                            message: resolveUiErrorMessage(context, failure),
+                            icon: Icons.error_outline_rounded,
+                            isError: true,
+                          );
+                        }
+                      } catch (e, st) {
+                        ErrorLogger.log('Downloads refresh failed',
+                            error: e,
+                            stackTrace: st,
+                            category: 'Downloads');
+                        if (context.mounted) {
+                          PulsrToast.show(
+                            context,
+                            message: l10n.libraryReadError,
+                            icon: Icons.error_outline_rounded,
+                            isError: true,
+                          );
+                        }
+                      }
                     },
                     child: Center(
                       child: ConstrainedBox(
@@ -477,6 +548,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                 },
               ),
             ),
+          ),
           );
         },
       ),

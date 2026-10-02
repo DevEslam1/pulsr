@@ -36,11 +36,15 @@ class GenreDetailScreen extends StatefulWidget {
 
 class _GenreDetailScreenState extends State<GenreDetailScreen> {
   late GetGenresUseCase _useCase;
+  late final Stream<Result<List<SongsTableData>>> _songsStream;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.getGenresUseCase ?? getIt<GetGenresUseCase>();
+    // Memoize the watch stream: recreating it in build() resubscribed to the DB
+    // on every rebuild (scroll/theme) and reset snapshot state.
+    _songsStream = _useCase.watchGenreSongs(widget.genreItem.name).distinct();
   }
 
   @override
@@ -49,7 +53,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
     final genreItem = widget.genreItem;
 
     return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: _useCase.watchGenreSongs(genreItem.name).distinct(),
+      stream: _songsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -140,7 +144,10 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
             children: [
               const SizedBox(height: AppSpacing.md),
               Center(
-                child: Container(
+                child: Semantics(
+                  image: true,
+                  label: genreItem.name,
+                  child: Container(
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
@@ -159,6 +166,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                     Icons.style_rounded,
                     size: 48,
                     color: p.accent,
+                  ),
                   ),
                 ),
               ),
@@ -226,6 +234,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                   ),
                 )
               : Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     for (int i = 0; i < songs.length; i++)
                       SongTile(

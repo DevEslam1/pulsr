@@ -17,14 +17,21 @@ class AppHttpOverrides extends HttpOverrides {
 
   void update(ProxyConfig newConfig) {
     _config = newConfig;
-    // Log resolved proxy string rather than raw host:port when disabled to avoid misleading :8080
+    // Log the resolved findProxy string rather than the raw host:port, and
+    // redact the endpoint inside it: the address may reveal a private/VPN exit
+    // or a credentialed proxy and must not reach the logs verbatim.
     final resolved =
         newConfig.toFindProxyString(Uri.parse('https://example.com'));
     debugPrint(
       '[AppHttpOverrides] Proxy updated: enabled=${newConfig.enabled}, '
-      'type=${newConfig.type.name}, resolved=$resolved, host=${newConfig.host}:${newConfig.port}',
+      'type=${newConfig.type.name}, resolved=${_redactProxyAddress(resolved)}',
     );
   }
+
+  /// Replaces the `PROXY <host>:<port>` token with a redacted placeholder so
+  /// the configured proxy endpoint never reaches the logs.
+  static String _redactProxyAddress(String findProxy) =>
+      findProxy.replaceAll(RegExp(r'PROXY\s+[^;\s]+'), 'PROXY [REDACTED]');
 
   @override
   HttpClient createHttpClient(SecurityContext? context) {

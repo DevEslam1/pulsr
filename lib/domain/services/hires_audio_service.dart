@@ -189,12 +189,12 @@ class HiResAudioService {
           .timeout(const Duration(seconds: 3));
       if (res != null) {
         final info = AudioOutputInfo.fromMap(res);
-        // Avoid duplicate stream emission if same as cached
+        // Avoid duplicate stream emission if same as cached. Compare every
+        // observable field via the same predicate the event listener uses, so
+        // a force-refresh cannot republish a route change that only differs in
+        // Bluetooth codec / LE Audio / USB class.
         final cached = _cachedOutputInfo;
-        if (cached == null ||
-            cached.deviceName != info.deviceName ||
-            cached.sampleRate != info.sampleRate ||
-            cached.isBitPerfectActive != info.isBitPerfectActive) {
+        if (cached == null || !_isSameOutputInfo(cached, info)) {
           _cachedOutputInfo = info;
           if (!_deviceController.isClosed) _deviceController.add(info);
         } else {

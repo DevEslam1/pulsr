@@ -17,6 +17,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../core/services/hires_audio_service.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/theme_scheduler_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
@@ -392,11 +393,11 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     );
   }
 
-  SettingsState _loadAudioPrefs(
+  Future<SettingsState> _loadAudioPrefs(
     SharedPreferences prefs,
     EqualizerManager? effectManager, [
     SettingsState? baseState,
-  ]) {
+  ]) async {
     final current = baseState ?? state;
     final replayGainModeStr =
         prefs.getString(_keyReplayGainMode) ?? ReplayGainMode.track.name;
@@ -435,7 +436,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         (loadedBitPerfect && loadedCrossfade > 0.01) ? 0.0 : loadedCrossfade;
     if (effectiveCrossfade != loadedCrossfade) {
       try {
-        unawaited(prefs.setDouble(_keyCrossfade, effectiveCrossfade));
+        await prefs.setDouble(_keyCrossfade, effectiveCrossfade);
       } catch (e, st) {
         // FIX-A05: Log crossfade normalization persistence failure
         ErrorLogger.log('Failed to persist normalized crossfade setting',
@@ -745,7 +746,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             ? getIt<EqualizerManager>()
             : null;
         try {
-          runningState = _loadAudioPrefs(prefs, effectManager, runningState);
+          runningState =
+              await _loadAudioPrefs(prefs, effectManager, runningState);
         } catch (e, st) {
           ErrorLogger.log(
             'Failed to load audio preferences',
@@ -934,6 +936,110 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         if (reconciledDirty.contains('multiOutputMode')) {
           loadedState =
               loadedState.copyWith(multiOutputMode: previous.multiOutputMode);
+        }
+        if (reconciledDirty.contains('replayGainMode')) {
+          loadedState =
+              loadedState.copyWith(replayGainMode: previous.replayGainMode);
+        }
+        if (reconciledDirty.contains('replayGainPreampWithRg')) {
+          loadedState = loadedState.copyWith(
+              replayGainPreampWithRg: previous.replayGainPreampWithRg);
+        }
+        if (reconciledDirty.contains('replayGainPreampWithoutRg')) {
+          loadedState = loadedState.copyWith(
+              replayGainPreampWithoutRg: previous.replayGainPreampWithoutRg);
+        }
+        if (reconciledDirty.contains('dspPreference')) {
+          loadedState =
+              loadedState.copyWith(dspPreference: previous.dspPreference);
+        }
+        if (reconciledDirty.contains('systemEffectsPolicy')) {
+          loadedState = loadedState.copyWith(
+              systemEffectsPolicy: previous.systemEffectsPolicy);
+        }
+        if (reconciledDirty.contains('bluetoothLatencyOffsetMs')) {
+          loadedState = loadedState.copyWith(
+              bluetoothLatencyOffsetMs: previous.bluetoothLatencyOffsetMs);
+        }
+        if (reconciledDirty.contains('hedgedResolutionEnabled')) {
+          loadedState = loadedState.copyWith(
+              hedgedResolutionEnabled: previous.hedgedResolutionEnabled);
+        }
+        if (reconciledDirty.contains('adaptiveQualityEnabled')) {
+          loadedState = loadedState.copyWith(
+              adaptiveQualityEnabled: previous.adaptiveQualityEnabled);
+        }
+        if (reconciledDirty.contains('duckingMode')) {
+          loadedState =
+              loadedState.copyWith(duckingMode: previous.duckingMode);
+        }
+        if (reconciledDirty.contains('duckingLevel')) {
+          loadedState =
+              loadedState.copyWith(duckingLevel: previous.duckingLevel);
+        }
+        if (reconciledDirty.contains('dspSnapshotEnabled')) {
+          loadedState = loadedState.copyWith(
+              dspSnapshotEnabled: previous.dspSnapshotEnabled);
+        }
+        if (reconciledDirty.contains('silenceSkipSensitivity')) {
+          loadedState = loadedState.copyWith(
+              silenceSkipSensitivity: previous.silenceSkipSensitivity);
+        }
+        if (reconciledDirty.contains('sessionLogEnabled')) {
+          loadedState = loadedState.copyWith(
+              sessionLogEnabled: previous.sessionLogEnabled);
+        }
+        if (reconciledDirty.contains('outputFormatNegotiationEnabled')) {
+          loadedState = loadedState.copyWith(
+              outputFormatNegotiationEnabled:
+                  previous.outputFormatNegotiationEnabled);
+        }
+        if (reconciledDirty.contains('floatOutputEnabled')) {
+          loadedState = loadedState.copyWith(
+              floatOutputEnabled: previous.floatOutputEnabled);
+        }
+        if (reconciledDirty.contains('aaudioOutputEnabled')) {
+          loadedState = loadedState.copyWith(
+              aaudioOutputEnabled: previous.aaudioOutputEnabled);
+        }
+        if (reconciledDirty.contains('dvcEnabled')) {
+          loadedState = loadedState.copyWith(dvcEnabled: previous.dvcEnabled);
+        }
+        if (reconciledDirty.contains('usbHardwareVolumeEnabled')) {
+          loadedState = loadedState.copyWith(
+              usbHardwareVolumeEnabled: previous.usbHardwareVolumeEnabled);
+        }
+        if (reconciledDirty.contains('aaudioPreferExclusive')) {
+          loadedState = loadedState.copyWith(
+              aaudioPreferExclusive: previous.aaudioPreferExclusive);
+        }
+        if (reconciledDirty.contains('aaudioTargetBufferMs')) {
+          loadedState = loadedState.copyWith(
+              aaudioTargetBufferMs: previous.aaudioTargetBufferMs);
+        }
+        if (reconciledDirty.contains('sincResamplerQuality')) {
+          loadedState = loadedState.copyWith(
+              sincResamplerQuality: previous.sincResamplerQuality);
+        }
+        if (reconciledDirty.contains('bpmSyncCrossfadeEnabled')) {
+          loadedState = loadedState.copyWith(
+              bpmSyncCrossfadeEnabled: previous.bpmSyncCrossfadeEnabled);
+        }
+        if (reconciledDirty.contains('limiterEnabled')) {
+          loadedState =
+              loadedState.copyWith(limiterEnabled: previous.limiterEnabled);
+        }
+        if (reconciledDirty.contains('limiterLookaheadMs')) {
+          loadedState = loadedState.copyWith(
+              limiterLookaheadMs: previous.limiterLookaheadMs);
+        }
+        if (reconciledDirty.contains('limiterThresholdDb')) {
+          loadedState = loadedState.copyWith(
+              limiterThresholdDb: previous.limiterThresholdDb);
+        }
+        if (reconciledDirty.contains('limiterReleaseMs')) {
+          loadedState = loadedState.copyWith(
+              limiterReleaseMs: previous.limiterReleaseMs);
         }
 
         // Emit before the platform round-trips below: main.dart drives themeMode,
@@ -1314,9 +1420,11 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         minSizeKb: minSizeKb,
         autoHideSystemMedia: state.autoHideSystemMedia,
       );
+      SoundFeedbackService.playSuccess(mirrorHaptics: true);
       safeEmit(state.copyWith(isScanning: false, scanResultCount: count));
       return count;
     } catch (e) {
+      SoundFeedbackService.playError(mirrorHaptics: true);
       safeEmit(state.copyWith(isScanning: false, errorMessage: e.toString()));
       return 0;
     }

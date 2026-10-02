@@ -9,6 +9,8 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/responsive/breakpoints.dart';
+import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -16,6 +18,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -44,6 +47,7 @@ class FolderDetailScreen extends StatefulWidget {
 class _FolderDetailScreenState extends State<FolderDetailScreen> {
   late final FolderUseCases _useCase;
   late final ScrollController _scrollController;
+  late final Stream<Result<List<SongsTableData>>> _songsStream;
   late bool _isExcluded;
   bool _showCollapsedTitle = false;
 
@@ -51,6 +55,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   void initState() {
     super.initState();
     _useCase = widget.folderUseCases ?? getIt<FolderUseCases>();
+    // Memoized so rebuilds (scroll-collapse, exclusion toggle) do not
+    // resubscribe to the folder's DB watch stream.
+    _songsStream = _useCase.watchFolderSongs(widget.folder.path).distinct();
     _isExcluded = widget.folder.isExcluded;
     _scrollController = ScrollController()..addListener(_onScroll);
   }
@@ -63,8 +70,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   }
 
   void _onScroll() {
-    final offset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    final show = offset > 180;
+    final offset =
+        _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final show = offset > 160;
     if (show != _showCollapsedTitle) {
       setState(() => _showCollapsedTitle = show);
     }
@@ -232,8 +240,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     double iconSize = 20,
   }) {
     final isDark = p.isDark;
-    final surface = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.14);
-    final border = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.18);
+    final surface =
+        (isDark ? Colors.white : Colors.black).withValues(alpha: 0.14);
+    final border =
+        (isDark ? Colors.white : Colors.black).withValues(alpha: 0.18);
 
     final button = Material(
       color: Colors.transparent,
@@ -277,88 +287,13 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     return button;
   }
 
-  Widget _buildTopActionPill(
-    BuildContext context,
-    List<SongsTableData> songs,
-    PulsrPalette p,
-  ) {
-    final isDark = p.isDark;
-    final surface = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.14);
-    final border = (isDark ? Colors.white : Colors.black).withValues(alpha: 0.18);
-
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(999.0),
-        border: Border.all(color: border, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius:
-                  const BorderRadius.horizontal(left: Radius.circular(999.0)),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Clipboard.setData(ClipboardData(text: widget.folder.path));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        '${context.l10n.browseCopy}: ${widget.folder.name}'),
-                  ),
-                );
-              },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                child: Icon(
-                  Icons.share_outlined,
-                  size: 18,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          Container(
-            width: 0.5,
-            height: 18,
-            color: Colors.white.withValues(alpha: 0.25),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius:
-                  const BorderRadius.horizontal(right: Radius.circular(999.0)),
-              onTap: () => _showFolderOptionsMenu(context, songs, p),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                child: Icon(
-                  Icons.more_horiz_rounded,
-                  size: 20,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBigWhitePlayButton(
     BuildContext context,
     PulsrPalette p,
-    List<SongsTableData> songs,
-  ) {
+    List<SongsTableData> songs, {
+    double size = 56,
+    double iconSize = 34,
+  }) {
     final isEnabled = songs.isNotEmpty;
 
     return Material(
@@ -375,15 +310,15 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               }
             : null,
         child: Container(
-          width: 58,
-          height: 58,
+          width: size,
+          height: size,
           alignment: Alignment.center,
-          child: const Padding(
-            padding: EdgeInsets.only(left: 3),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(start: 3),
             child: Icon(
               Icons.play_arrow_rounded,
               color: Colors.black,
-              size: 36,
+              size: iconSize,
             ),
           ),
         ),
@@ -412,7 +347,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             id: featuredSong.id,
             albumId: featuredSong.albumId,
             remoteUrl: featuredSong.remoteArtworkUrl ?? featuredSong.artworkUri,
-            size: 400,
+            size: 600,
             borderRadius: 0,
             highQuality: true,
           ),
@@ -442,12 +377,179 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     );
   }
 
+  Widget _buildCoverArt(
+    BuildContext context,
+    List<SongsTableData> songs,
+    PulsrPalette p,
+    double size,
+  ) {
+    final List<({int id, int? albumId, String? remoteUrl})> distinctArts = [];
+    final Set<String> seen = {};
+    for (final s in songs) {
+      final key = s.artworkUri ?? '${s.albumId ?? s.id}';
+      if (!seen.contains(key)) {
+        seen.add(key);
+        distinctArts.add((
+          id: s.id,
+          albumId: s.albumId,
+          remoteUrl: s.remoteArtworkUrl ?? s.artworkUri,
+        ));
+        if (distinctArts.length == 4) break;
+      }
+    }
+
+    Widget content;
+    if (distinctArts.length >= 4) {
+      final half = size / 2;
+      content = SizedBox(
+        width: size,
+        height: size,
+        child: Column(
+          children: [
+            Row(
+              children: [
+                CachedArtwork(
+                  id: distinctArts[0].id,
+                  albumId: distinctArts[0].albumId,
+                  remoteUrl: distinctArts[0].remoteUrl,
+                  size: half,
+                  borderRadius: 0,
+                ),
+                CachedArtwork(
+                  id: distinctArts[1].id,
+                  albumId: distinctArts[1].albumId,
+                  remoteUrl: distinctArts[1].remoteUrl,
+                  size: half,
+                  borderRadius: 0,
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                CachedArtwork(
+                  id: distinctArts[2].id,
+                  albumId: distinctArts[2].albumId,
+                  remoteUrl: distinctArts[2].remoteUrl,
+                  size: half,
+                  borderRadius: 0,
+                ),
+                CachedArtwork(
+                  id: distinctArts[3].id,
+                  albumId: distinctArts[3].albumId,
+                  remoteUrl: distinctArts[3].remoteUrl,
+                  size: half,
+                  borderRadius: 0,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    } else if (distinctArts.isNotEmpty) {
+      content = CachedArtwork(
+        id: distinctArts.first.id,
+        albumId: distinctArts.first.albumId,
+        remoteUrl: distinctArts.first.remoteUrl,
+        size: size,
+        borderRadius: AppRadii.r20,
+        highQuality: true,
+      );
+    } else {
+      content = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              p.accentContainer,
+              p.surfaceContainer,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            _isExcluded ? Icons.folder_off_rounded : Icons.folder_rounded,
+            size: size * 0.42,
+            color: _isExcluded ? p.error : p.accent,
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      image: true,
+      label: widget.folder.name,
+      child: Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        border: Border.all(
+          color:
+              (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 28,
+            spreadRadius: -4,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: p.accent.withValues(alpha: 0.14),
+            blurRadius: 40,
+            spreadRadius: -6,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadii.r20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            content,
+            if (_isExcluded)
+              Container(
+                color: Colors.black.withValues(alpha: 0.55),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.error.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                    ),
+                    child: Text(
+                      context.l10n.browseExcludeFromScan,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
+
   Widget _buildFeaturedCard(
     BuildContext context,
     List<SongsTableData> songs,
     PulsrPalette p,
-    int totalDurationMs,
-  ) {
+    int totalDurationMs, {
+    bool compact = false,
+  }) {
     if (songs.isEmpty) return const SizedBox.shrink();
 
     final featuredSong = songs.firstWhere(
@@ -458,17 +560,22 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       orElse: () => songs.first,
     );
 
+    final hPadding = compact ? AppSpacing.sm : AppSpacing.sm;
+    final vPadding = compact ? AppSpacing.xs : AppSpacing.sm;
+    final artSize = compact ? 46.0 : 54.0;
+
     return Container(
       margin: EdgeInsets.symmetric(
-        horizontal: Adaptive.pagePadding(context),
-        vertical: AppSpacing.xs,
+        horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
+        vertical: compact ? AppSpacing.xxs : AppSpacing.xs,
       ),
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: vPadding),
       decoration: BoxDecoration(
         color: (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(AppRadii.r16),
         border: Border.all(
-          color: (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
+          color:
+              (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
           width: 1,
         ),
       ),
@@ -478,7 +585,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             id: featuredSong.id,
             albumId: featuredSong.albumId,
             remoteUrl: featuredSong.remoteArtworkUrl ?? featuredSong.artworkUri,
-            size: 54,
+            size: artSize,
             borderRadius: AppRadii.r12,
           ),
           const SizedBox(width: AppSpacing.md),
@@ -504,7 +611,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
                   ),
@@ -515,7 +622,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: p.textSecondary,
                   ),
                 ),
@@ -524,20 +631,23 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ),
           const SizedBox(width: AppSpacing.sm),
           Material(
-            color: (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+            color:
+                (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
             shape: const CircleBorder(),
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: () {
                 HapticFeedback.lightImpact();
                 final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                context.read<PlayerCubit>().playSong(shuffled.first, queue: shuffled);
+                context
+                    .read<PlayerCubit>()
+                    .playSong(shuffled.first, queue: shuffled);
               },
               child: Padding(
-                padding: const EdgeInsets.all(9),
+                padding: const EdgeInsets.all(8),
                 child: Icon(
                   Icons.shuffle_rounded,
-                  size: 19,
+                  size: 18,
                   color: p.textPrimary,
                 ),
               ),
@@ -551,16 +661,23 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   Widget _buildBreadcrumbs(
     BuildContext context,
     PulsrPalette p,
-    String fullPath,
-  ) {
+    String fullPath, {
+    bool compact = false,
+  }) {
     final cleanPath = fullPath.replaceAll('\\', '/');
     final parts = cleanPath.split('/').where((s) => s.isNotEmpty).toList();
     if (parts.isEmpty) return const SizedBox.shrink();
 
+    // Preserve the original root so breadcrumb taps navigate the *same* tree.
+    // Previously every crumb was rebuilt as an absolute UNIX path ('/C:' for a
+    // Windows drive), which dropped the drive/root and broke navigation.
+    final isUnixAbsolute = cleanPath.startsWith('/');
+    final isWindowsDrive = RegExp(r'^[A-Za-z]:$').hasMatch(parts.first);
+
     return Container(
-      height: 32,
+      height: compact ? 28 : 32,
       margin: EdgeInsets.symmetric(
-        horizontal: Adaptive.pagePadding(context),
+        horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
         vertical: AppSpacing.xxs,
       ),
       child: ListView.separated(
@@ -575,7 +692,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         itemBuilder: (context, index) {
           final isLast = index == parts.length - 1;
           final name = parts[index];
-          final subPath = '/${parts.sublist(0, index + 1).join('/')}';
+          final joined = parts.sublist(0, index + 1).join('/');
+          final subPath = isWindowsDrive && index == 0
+              ? '$joined/'
+              : isUnixAbsolute
+                  ? '/$joined'
+                  : joined;
 
           return Center(
             child: Material(
@@ -736,18 +858,193 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     );
   }
 
+  Widget _buildSplitHero(
+    BuildContext context,
+    List<SongsTableData> songs,
+    PulsrPalette p,
+    int totalDurationMs,
+  ) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final isShort = screenHeight < 480;
+    final coverSize = isShort
+        ? (screenHeight * 0.28).clamp(96.0, 130.0)
+        : (screenHeight * 0.28).clamp(130.0, 240.0);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildCoverArt(context, songs, p, coverSize),
+        const SizedBox(height: AppSpacing.xs),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          child: Text(
+            widget.folder.name,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: isShort ? 17 : 20,
+                  letterSpacing: -0.3,
+                ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${Formatters.formatTrackCount(songs.length)} • ${_formatTotalDuration(totalDurationMs)}',
+          style: TextStyle(
+            color: p.textSecondary,
+            fontSize: AppFontSize.caption,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        // Action Row: [ ( i ) ] [ ( ▶ ) ] [ ( ★ ) ]
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildGlassCircleButton(
+              icon: Icons.info_outline_rounded,
+              size: isShort ? 36 : 40,
+              iconSize: isShort ? 18 : 20,
+              p: p,
+              tooltip: 'Folder Details',
+              onTap: () => _showFolderOptionsMenu(context, songs, p),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            _buildBigWhitePlayButton(
+              context,
+              p,
+              songs,
+              size: isShort ? 46 : 52,
+              iconSize: isShort ? 26 : 30,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            _buildGlassCircleButton(
+              icon: _isExcluded
+                  ? Icons.visibility_off_rounded
+                  : Icons.star_rounded,
+              iconColor: _isExcluded ? p.error : Colors.white,
+              size: isShort ? 36 : 40,
+              iconSize: isShort ? 18 : 20,
+              p: p,
+              tooltip: _isExcluded
+                  ? context.l10n.browseIncludeInScan
+                  : context.l10n.browseExcludeFromScan,
+              onTap: _toggleExclusion,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        _buildFeaturedCard(context, songs, p, totalDurationMs, compact: true),
+        _buildBreadcrumbs(context, p, widget.folder.path, compact: true),
+      ],
+    );
+  }
+
+  Widget _buildSplitTrackList(
+    BuildContext context,
+    List<SongsTableData> songs,
+    PulsrPalette p,
+  ) {
+    if (songs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: EmptyStateWidget(
+          icon: Icons.music_off_rounded,
+          title: context.l10n.browseNoTracksFound,
+          subtitle: context.l10n.browseNoTracksInFolder,
+        ),
+      );
+    }
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: PulsrLayoutMetrics.contentMaxWidth(context),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.xs,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    context.l10n.browseTopTracks,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          letterSpacing: -0.3,
+                        ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: p.textTertiary,
+                  ),
+                  const Spacer(),
+                  Text(
+                    Formatters.formatTrackCount(songs.length),
+                    style: TextStyle(
+                      color: p.textTertiary,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (int i = 0; i < songs.length; i++) ...[
+              _buildSongRow(context, songs, i, p),
+              if (i < songs.length - 1)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 64),
+                  child: Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: p.hairline.withValues(alpha: 0.35),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final folder = widget.folder;
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final headerHeight = (screenHeight * 0.40).clamp(310.0, 370.0);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isLandscape = PulsrBreakpoint.isLandscape(context);
+    final isTablet = Adaptive.isTablet(context);
+    final isWide = screenWidth >= 800;
+
+    // Responsive split threshold:
+    // Any landscape mode, or any tablet in landscape, or wide tablet/desktop (>= 800dp)
+    final shouldSplit = isLandscape || (isTablet && isWide);
+
+    // Fluid height for portrait header based on screen dimensions and text scaler
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.3);
+    final headerHeight =
+        (screenHeight * (isTablet ? 0.34 : 0.38) * textScale)
+            .clamp(280.0, isTablet ? 420.0 : 360.0);
 
     return PulsrPagePopScope(
       child: Scaffold(
         backgroundColor: p.bg,
         body: StreamBuilder<Result<List<SongsTableData>>>(
-          stream: _useCase.watchFolderSongs(folder.path).distinct(),
+          stream: _songsStream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting &&
                 !snapshot.hasData) {
@@ -775,63 +1072,58 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             final totalDurationMs =
                 songs.fold<int>(0, (sum, s) => sum + s.durationMs);
 
-            return Center(
-              child: ConstrainedBox(
-                constraints: PulsrLayoutMetrics.contentConstraints(context),
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
+            // Responsive Layout: Tablet / Landscape Master-Detail Split
+            if (shouldSplit) {
+              return DetailScaffold(
+                leading: const PulsrBackButton(),
+                leftPaneFlex: isLandscape ? 4.2 : 4.0,
+                rightPaneFlex: isLandscape ? 5.8 : 6.0,
+                hero: _buildSplitHero(context, songs, p, totalDurationMs),
+                body: _buildSplitTrackList(context, songs, p),
+              );
+            }
+
+            // Portrait Phone / Narrow View: Collapsing Immersive Apple Music layout
+            return CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+                // Apple Music Immersive Header (Hero Artwork + Blur Fade + Title + Round Action Buttons)
+                SliverAppBar(
+                  expandedHeight: headerHeight,
+                  pinned: true,
+                  elevation: 0,
+                  backgroundColor: p.bg,
+                  surfaceTintColor: Colors.transparent,
+                  leading: const PulsrBackButton(),
+                  title: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: _showCollapsedTitle ? 1.0 : 0.0,
+                    child: Text(
+                      folder.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                      ),
+                    ),
                   ),
-                  slivers: [
-                    // Apple Music Immersive Header (Hero Artwork + Blur Fade + Title + Round Action Buttons)
-                    SliverAppBar(
-                      expandedHeight: headerHeight,
-                      pinned: true,
-                      elevation: 0,
-                      backgroundColor: p.bg,
-                      surfaceTintColor: Colors.transparent,
-                      leading: Padding(
-                        padding: const EdgeInsets.only(left: AppSpacing.sm),
-                        child: Center(
-                          child: _buildGlassCircleButton(
-                            icon: Icons.arrow_back_ios_new_rounded,
-                            iconSize: 18,
-                            size: 38,
-                            p: p,
-                            tooltip: MaterialLocalizations.of(context)
-                                .backButtonTooltip,
-                            onTap: () {
-                              if (context.canPop()) {
-                                context.pop();
-                              } else {
-                                context.go('/');
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                      title: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 200),
-                        opacity: _showCollapsedTitle ? 1.0 : 0.0,
-                        child: Text(
-                          folder.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 17,
-                          ),
-                        ),
-                      ),
-                      centerTitle: true,
-                      actions: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: AppSpacing.sm),
-                          child: Center(
-                            child: _buildTopActionPill(context, songs, p),
-                          ),
-                        ),
-                      ],
-                      flexibleSpace: FlexibleSpaceBar(
+                  centerTitle: true,
+                  flexibleSpace: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final safeTop = MediaQuery.paddingOf(context).top;
+                      final minExtent = kToolbarHeight + safeTop;
+                      final maxExtent = headerHeight;
+                      final delta = maxExtent - minExtent;
+                      final currentExtent = constraints.maxHeight;
+                      final t = delta > 0
+                          ? ((maxExtent - currentExtent) / delta).clamp(0.0, 1.0)
+                          : 0.0;
+                      final heroContentOpacity =
+                          (1.0 - (t * 2.2)).clamp(0.0, 1.0);
+
+                      return FlexibleSpaceBar(
                         collapseMode: CollapseMode.parallax,
                         background: Stack(
                           fit: StackFit.expand,
@@ -866,77 +1158,97 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                             ),
 
                             // 3. Title & Apple Music Action Row [ (i) ] [ (▶) ] [ (★) ]
-                            Positioned(
-                              left: AppSpacing.lg,
-                              right: AppSpacing.lg,
+                            PositionedDirectional(
+                              start: AppSpacing.lg,
+                              end: AppSpacing.lg,
                               bottom: AppSpacing.md,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    folder.name,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 27,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.5,
-                                      color: Colors.white,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black54,
-                                          blurRadius: 14,
-                                          offset: Offset(0, 2),
+                              child: Opacity(
+                                opacity: heroContentOpacity,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      folder.name,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: screenWidth < 360
+                                            ? 22.0
+                                            : (isTablet ? 30.0 : 26.0),
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.5,
+                                        color: Colors.white,
+                                        shadows: const [
+                                          Shadow(
+                                            color: Colors.black54,
+                                            blurRadius: 14,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        _buildGlassCircleButton(
+                                          icon: Icons.info_outline_rounded,
+                                          size: 40,
+                                          iconSize: 20,
+                                          p: p,
+                                          tooltip: 'Folder Details',
+                                          onTap: () =>
+                                              _showFolderOptionsMenu(
+                                                  context, songs, p),
+                                        ),
+                                        SizedBox(
+                                          width: screenWidth < 360
+                                              ? AppSpacing.md
+                                              : AppSpacing.xl,
+                                        ),
+                                        _buildBigWhitePlayButton(
+                                            context, p, songs),
+                                        SizedBox(
+                                          width: screenWidth < 360
+                                              ? AppSpacing.md
+                                              : AppSpacing.xl,
+                                        ),
+                                        _buildGlassCircleButton(
+                                          icon: _isExcluded
+                                              ? Icons.visibility_off_rounded
+                                              : Icons.star_rounded,
+                                          iconColor: _isExcluded
+                                              ? p.error
+                                              : Colors.white,
+                                          size: 40,
+                                          iconSize: 22,
+                                          p: p,
+                                          tooltip: _isExcluded
+                                              ? context.l10n.browseIncludeInScan
+                                              : context.l10n.browseExcludeFromScan,
+                                          onTap: _toggleExclusion,
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: [
-                                      _buildGlassCircleButton(
-                                        icon: Icons.info_outline_rounded,
-                                        size: 40,
-                                        iconSize: 20,
-                                        p: p,
-                                        tooltip: 'Folder Details',
-                                        onTap: () => _showFolderOptionsMenu(
-                                            context, songs, p),
-                                      ),
-                                      const SizedBox(width: AppSpacing.xl),
-                                      _buildBigWhitePlayButton(
-                                          context, p, songs),
-                                      const SizedBox(width: AppSpacing.xl),
-                                      _buildGlassCircleButton(
-                                        icon: _isExcluded
-                                            ? Icons.visibility_off_rounded
-                                            : Icons.star_rounded,
-                                        iconColor: _isExcluded
-                                            ? p.error
-                                            : Colors.white,
-                                        size: 40,
-                                        iconSize: 22,
-                                        p: p,
-                                        tooltip: _isExcluded
-                                            ? context.l10n.browseIncludeInScan
-                                            : context.l10n.browseExcludeFromScan,
-                                        onTap: _toggleExclusion,
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
+                  ),
+                ),
 
-                    // Featured Card & Breadcrumbs
-                    SliverToBoxAdapter(
+                // Featured Card & Breadcrumbs & Section Header (Centered with content constraints)
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints:
+                          PulsrLayoutMetrics.contentConstraints(context),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -948,7 +1260,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
 
                           // Top Songs > Header
                           Padding(
-                            padding: EdgeInsets.fromLTRB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                               Adaptive.pagePadding(context),
                               AppSpacing.sm,
                               Adaptive.pagePadding(context),
@@ -957,7 +1269,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                             child: Row(
                               children: [
                                 Text(
-                                  'Top Songs',
+                                  context.l10n.browseTopTracks,
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleMedium
@@ -973,35 +1285,50 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                   size: 20,
                                   color: p.textTertiary,
                                 ),
+                                const Spacer(),
+                                Text(
+                                  Formatters.formatTrackCount(songs.length),
+                                  style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ),
+                ),
 
-                    // Song List Items
-                    if (songs.isEmpty)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xl),
-                          child: EmptyStateWidget(
-                            icon: Icons.music_off_rounded,
-                            title: context.l10n.browseNoTracksFound,
-                            subtitle: context.l10n.browseNoTracksInFolder,
-                          ),
-                        ),
-                      )
-                    else
-                      SliverPadding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppSpacing.scrollBottom,
-                        ),
-                        sliver: SliverList.separated(
-                          itemCount: songs.length,
-                          separatorBuilder: (_, __) => Padding(
-                            padding: EdgeInsets.only(
-                              left: 64 + Adaptive.pagePadding(context),
+                // Song List Items
+                if (songs.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: EmptyStateWidget(
+                        icon: Icons.music_off_rounded,
+                        title: context.l10n.browseNoTracksFound,
+                        subtitle: context.l10n.browseNoTracksInFolder,
+                      ),
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    ),
+                    sliver: SliverList.separated(
+                      itemCount: songs.length,
+                      separatorBuilder: (_, __) => Center(
+                        child: ConstrainedBox(
+                          constraints:
+                              PulsrLayoutMetrics.contentConstraints(context),
+                          child: Padding(
+                            padding: EdgeInsetsDirectional.only(
+                              start: 64 + Adaptive.pagePadding(context),
                             ),
                             child: Divider(
                               height: 1,
@@ -1009,13 +1336,18 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                               color: p.hairline.withValues(alpha: 0.35),
                             ),
                           ),
-                          itemBuilder: (context, index) =>
-                              _buildSongRow(context, songs, index, p),
                         ),
                       ),
-                  ],
-                ),
-              ),
+                      itemBuilder: (context, index) => Center(
+                        child: ConstrainedBox(
+                          constraints:
+                              PulsrLayoutMetrics.contentConstraints(context),
+                          child: _buildSongRow(context, songs, index, p),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),

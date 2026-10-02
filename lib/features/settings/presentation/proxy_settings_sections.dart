@@ -227,21 +227,17 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                         radius: AppRadii.r14,
                       ),
                     ),
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: proxyList.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: AppSpacing.xs),
-                    itemBuilder: (context, index) {
+                  for (int index = 0; index < proxyList.length; index++) ...[
+                    if (index > 0) const SizedBox(height: AppSpacing.xs),
+                    Builder(builder: (context) {
                       final item = proxyList[index];
                       final isActive = state.proxyEnabled &&
                           state.proxyHost.trim() == item.host.trim() &&
                           state.proxyPort == item.port;
 
                       return _buildProxyItemCard(p, item, isActive);
-                    },
-                  ),
+                    }),
+                  ],
                 ],
               ],
             ),

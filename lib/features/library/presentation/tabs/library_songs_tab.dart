@@ -76,86 +76,92 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           itemBuilder: (context, index) {
             final song = songs[index];
             final isSelected = state.selectedSongIds.contains(song.id);
-            return InkWell(
-              borderRadius: BorderRadius.circular(AppRadii.r18),
-              onTap: () {
-                if (state.isMultiSelectMode) {
-                  cubit.toggleSongSelection(song.id);
-                } else {
-                  playerCubit.playSong(song, queue: songs);
-                }
-              },
-              onLongPress: () => cubit.toggleSongSelection(song.id),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: CachedArtwork(
-                            id: song.id,
-                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                            albumId: song.albumId,
-                            type: ArtworkType.AUDIO,
-                            size: double.infinity,
-                            borderRadius: 18,
-                          ),
-                        ),
-                        if (isSelected)
+            return Semantics(
+              button: true,
+              selected: isSelected,
+              label: '${song.title}, ${song.artist}',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadii.r18),
+                onTap: () {
+                  if (state.isMultiSelectMode) {
+                    cubit.toggleSongSelection(song.id);
+                  } else {
+                    playerCubit.playSong(song, queue: songs);
+                  }
+                },
+                onLongPress: () => cubit.toggleSongSelection(song.id),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
                           Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: p.accent.withValues(alpha: 0.45),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r18),
+                            child: CachedArtwork(
+                              id: song.id,
+                              remoteUrl:
+                                  song.remoteArtworkUrl ?? song.artworkUri,
+                              albumId: song.albumId,
+                              type: ArtworkType.AUDIO,
+                              size: double.infinity,
+                              borderRadius: 18,
+                            ),
+                          ),
+                          if (isSelected)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: p.accent.withValues(alpha: 0.45),
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadii.r18),
+                                ),
+                                child: const Center(
+                                  child: Icon(Icons.check_circle_rounded,
+                                      color: Colors.white, size: 36),
+                                ),
                               ),
-                              child: const Center(
-                                child: Icon(Icons.check_circle_rounded,
-                                    color: Colors.white, size: 36),
+                            ),
+                          PositionedDirectional(
+                            end: 6,
+                            top: 6,
+                            child: Material(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () =>
+                                    SongInfoSheet.show(context, song: song),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(AppSpacing.s6),
+                                  child: Icon(Icons.more_vert_rounded,
+                                      color: Colors.white, size: 18),
+                                ),
                               ),
                             ),
                           ),
-                        PositionedDirectional(
-                          end: 6,
-                          top: 6,
-                          child: Material(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () =>
-                                  SongInfoSheet.show(context, song: song),
-                              child: const Padding(
-                                padding: EdgeInsets.all(AppSpacing.s6),
-                                child: Icon(Icons.more_vert_rounded,
-                                    color: Colors.white, size: 18),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    song.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppFontSize.bodySmall),
-                  ),
-                  const SizedBox(height: AppSpacing.s2),
-                  Text(
-                    song.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: p.textSecondary, fontSize: AppFontSize.label),
-                  ),
-                ],
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.bodySmall),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      song.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: p.textSecondary, fontSize: AppFontSize.label),
+                    ),
+                  ],
+                ),
               ),
             );
           },

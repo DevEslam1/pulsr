@@ -6,6 +6,7 @@ import 'package:mutex/mutex.dart';
 
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/download_task.dart';
 import '../../../domain/repositories/download_repository_interface.dart'; // FIX-I02
@@ -199,6 +200,15 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     });
     if (shouldDrop || isClosed) {
       return;
+    }
+
+    final previousTask = state.tasks[task.videoId];
+    if (previousTask != null && previousTask.status != task.status) {
+      if (task.status == DownloadStatus.complete) {
+        SoundFeedbackService.playSuccess(mirrorHaptics: true);
+      } else if (task.status == DownloadStatus.failed) {
+        SoundFeedbackService.playError(mirrorHaptics: true);
+      }
     }
 
     final updatedTasks = Map<String, DownloadTask>.unmodifiable({

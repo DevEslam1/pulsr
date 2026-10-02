@@ -86,7 +86,7 @@ class PulsrLayoutDelegate {
       if (isLandscape) {
         // Landscape phone (e.g. 844x390) needs wide bottom nav, while a tablet
         // or foldable with adequate height (>= 600) can use the side rail.
-        if (height < 600) {
+        if (height < PulsrBreakpoint.shortHeightThreshold) {
           return ShellLayoutMode.bottomNavWide;
         } else {
           return ShellLayoutMode.sideRailCollapsed;
@@ -131,19 +131,10 @@ class PulsrLayoutDelegate {
   }
 
   /// Maximum content width constraint to avoid unreadable line lengths on wide screens.
-  double get contentMaxWidth {
-    switch (layoutMode) {
-      case ShellLayoutMode.bottomNav:
-      case ShellLayoutMode.bottomNavWide:
-        return double.infinity;
-      case ShellLayoutMode.sideRailCollapsed:
-        return 1000.0;
-      case ShellLayoutMode.sideRailExpanded:
-        return 1200.0;
-      case ShellLayoutMode.sideRailFull:
-        return 1400.0;
-    }
-  }
+  ///
+  /// Delegates to the canonical per-breakpoint value on [PulsrBreakpoint] so
+  /// the shell and the content surfaces agree.
+  double get contentMaxWidth => breakpoint.contentMaxWidth;
 
   /// Effective player bar height for the current layout mode.
   double get playerBarHeight {

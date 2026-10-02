@@ -19,6 +19,7 @@ import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
+import 'nav_destinations.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/player_shortcut_scope.dart';
 import 'widgets/stacked_bottom_dock.dart';
@@ -104,10 +105,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   void _restoreLastShellTab() {
     SharedPreferences.getInstance().then((prefs) {
+      if (!mounted) return;
       final savedTab = prefs.getInt('setting_last_shell_tab');
+      // Derive the upper bound from the live destination list rather than a
+      // hard-coded count so adding/removing a primary tab cannot restore an
+      // out-of-range branch index.
+      final destinationCount = pulsrDestinations(context).length;
       if (savedTab != null &&
           savedTab > 0 &&
-          savedTab < 5 &&
+          savedTab < destinationCount &&
           mounted &&
           widget.navigationShell.currentIndex == 0) {
         try {

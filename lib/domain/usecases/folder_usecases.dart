@@ -1,5 +1,4 @@
 // lib/domain/usecases/folder_usecases.dart
-import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
@@ -64,8 +63,12 @@ class FolderUseCases {
     final List<FolderItem> items = [];
     for (final entry in folderSongCounts.entries) {
       final path = entry.key;
+      // Normalize Windows '\' separators to '/' before splitting. Splitting on
+      // Platform.pathSeparator alone left a whole Windows path as one segment,
+      // so the generated folder name became the full path.
       final name = path
-              .split(Platform.pathSeparator)
+              .replaceAll('\\', '/')
+              .split('/')
               .where((s) => s.isNotEmpty)
               .lastOrNull ??
           path;

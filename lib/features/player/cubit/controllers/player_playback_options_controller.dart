@@ -20,6 +20,7 @@ import '../../../../data/audio/song_rating_store.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
+import '../managers/player_quran_manager.dart';
 import '../player_state.dart';
 import '../quran_restore_snapshot.dart';
 
@@ -38,6 +39,8 @@ class PlayerPlaybackOptionsController {
   final PerSongPlaybackStore _perSongPlaybackStore;
   final PerSongVolumeStore _perSongVolumeStore;
   final PerSongEqStore _perSongEqStore;
+  final PlayerQuranManager _quranManager;
+  final SongRatingStore _songRatingStore;
 
   bool get isClosed => _isClosed();
 
@@ -48,6 +51,8 @@ class PlayerPlaybackOptionsController {
     PerSongPlaybackStore? perSongPlaybackStore,
     PerSongVolumeStore? perSongVolumeStore,
     PerSongEqStore? perSongEqStore,
+    PlayerQuranManager? quranManager,
+    SongRatingStore? songRatingStore,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
@@ -61,7 +66,9 @@ class PlayerPlaybackOptionsController {
         _onLoadLyrics = onLoadLyrics,
         _perSongPlaybackStore = perSongPlaybackStore ?? PerSongPlaybackStore(),
         _perSongVolumeStore = perSongVolumeStore ?? PerSongVolumeStore(),
-        _perSongEqStore = perSongEqStore ?? PerSongEqStore();
+        _perSongEqStore = perSongEqStore ?? PerSongEqStore(),
+        _quranManager = quranManager ?? PlayerQuranManager(),
+        _songRatingStore = songRatingStore ?? SongRatingStore();
 
   // ──────────────────────────────────────────────
   // Sleep Timer
@@ -185,8 +192,7 @@ class PlayerPlaybackOptionsController {
   // Overrides & Ratings
   // ──────────────────────────────────────────────
   Future<void> setSongRating(int songId, int rating) async {
-    final store = SongRatingStore();
-    await store.setRating(songId.toString(), rating);
+    await _songRatingStore.setRating(songId.toString(), rating);
     final s = _getState();
     if (s.currentSong?.id == songId) {
       _emit(s.copyWith(playback: s.playback.copyWith(currentSongRating: rating)));

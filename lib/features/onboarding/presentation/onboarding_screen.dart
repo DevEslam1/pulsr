@@ -1,7 +1,6 @@
 // lib/features/onboarding/presentation/onboarding_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +13,8 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
+import '../../../core/services/sound_feedback_service.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -60,6 +61,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       await _scanLibrary();
       await _completeOnboarding();
+    } catch (e, st) {
+      ErrorLogger.log('Onboarding permission grant flow failed',
+          error: e, stackTrace: st, category: 'Onboarding');
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(content: Text(context.l10n.somethingWentWrong)),
+          );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -93,8 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (status.isDenied || status.isPermanentlyDenied) {
           final messenger = mounted ? ScaffoldMessenger.of(context) : null;
           final msg = mounted ? context.l10n.onboardingNotificationDenied : '';
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('notification_permission_denied', true);
+          await _setNotificationDeniedPref(true);
           if (mounted && messenger != null) {
             messenger
               ..clearSnackBars()
@@ -108,14 +118,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               );
           }
         } else if (status.isGranted) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('notification_permission_denied', false);
+          await _setNotificationDeniedPref(false);
         }
       } catch (e, st) {
         final messenger = mounted ? ScaffoldMessenger.of(context) : null;
         final msg = mounted ? context.l10n.onboardingNotificationDenied : '';
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('notification_permission_denied', true);
+        await _setNotificationDeniedPref(true);
         ErrorLogger.log('Notification permission request failed',
             error: e, stackTrace: st, category: 'Onboarding');
         if (mounted && messenger != null) {
@@ -131,8 +139,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
       }
     } else {
+      await _setNotificationDeniedPref(true);
+    }
+  }
+
+  /// Persists the notification-denied flag without letting a SharedPreferences
+  /// failure escape the notification catch path (a throw here would surface as
+  /// an unhandled async error and skip the user-facing snackbar).
+  Future<void> _setNotificationDeniedPref(bool denied) async {
+    try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('notification_permission_denied', true);
+      await prefs.setBool('notification_permission_denied', denied);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist notification permission flag',
+          error: e, stackTrace: st, category: 'Onboarding');
     }
   }
 
@@ -181,6 +201,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _completeOnboarding() async {
+    SoundFeedbackService.playSuccess(mirrorHaptics: true);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_completed', true);
     if (mounted) {
@@ -189,6 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextPage() {
+    SoundFeedbackService.playClick(mirrorHaptics: true);
     if (_currentPage < _lastPage) {
       _pageController.nextPage(
         duration: context.motionMs(350),
@@ -286,7 +308,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(_pageCount, (index) {
                       final isActive = index == _currentPage;
-                      return AnimatedContainer(
+                      return Semantics(
+                        selected: isActive,
+                        label: 'Page ${index + 1} of $_pageCount',
+                        child: AnimatedContainer(
                         duration: context.motionMs(300),
                         margin: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.xxs),
@@ -297,6 +322,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         decoration: BoxDecoration(
                           color: isActive ? p.accent : p.hairline,
                           borderRadius: BorderRadius.circular(AppRadii.r4),
+                        ),
                         ),
                       );
                     }),
@@ -853,11 +879,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   alignment: WrapAlignment.center,
-                  children: AppColors.customAccents.map((color) {
+                  children: AppColors.customAccents.indexed.map((entry) {
+                    final index = entry.$1;
+                    final color = entry.$2;
                     final isSelected = selected == color.toARGB32();
-                    return GestureDetector(
+                    return Semantics(
+                      button: true,
+                      selected: isSelected,
+                      label: '${context.l10n.customAccentColor} ${index + 1}',
+                      child: GestureDetector(
                       onTap: () {
-                        HapticFeedback.selectionClick();
+                        PulsrHaptics.selection();
+                        SoundFeedbackService.playClick();
                         cubit.setCustomAccentColor(color);
                       },
                       child: AnimatedContainer(
@@ -883,10 +916,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               )
                             : null,
                       ),
-                    );
-                  }).toList(),
-                ),
-              )
+                    ),
+                  );
+                }).toList(),
+              ),
+            )
                   .animate()
                   .fadeIn(duration: context.motionMs(500))
                   .scale(begin: const Offset(0.9, 0.9)),

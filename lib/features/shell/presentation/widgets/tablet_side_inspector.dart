@@ -142,7 +142,11 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: GestureDetector(
+                              child: Semantics(
+                                button: true,
+                                selected: _selectedTabIndex == 0,
+                                label: context.l10n.queue,
+                                child: GestureDetector(
                                 onTap: () =>
                                     setState(() => _selectedTabIndex = 0),
                                 child: Container(
@@ -193,10 +197,15 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                   ),
                                 ),
                               ),
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.xxs),
                             Expanded(
-                              child: GestureDetector(
+                              child: Semantics(
+                                button: true,
+                                selected: _selectedTabIndex == 1,
+                                label: context.l10n.lyricsLabel,
+                                child: GestureDetector(
                                 onTap: () =>
                                     setState(() => _selectedTabIndex = 1),
                                 child: Container(
@@ -240,6 +249,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                     ],
                                   ),
                                 ),
+                              ),
                               ),
                             ),
                           ],

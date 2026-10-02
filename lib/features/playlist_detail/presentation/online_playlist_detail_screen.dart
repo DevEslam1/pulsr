@@ -265,6 +265,14 @@ class _OnlinePlaylistDetailScreenState
             isSuccess: true,
           );
         }
+      } else if (mounted) {
+        // Creating the local playlist failed — surface it instead of silently
+        // reporting success (or nothing at all).
+        PulsrToast.show(
+          context,
+          message: saveFailedText,
+          isError: true,
+        );
       }
     } catch (_) {
       if (mounted) {
@@ -495,13 +503,8 @@ class _OnlinePlaylistDetailScreenState
               ),
             )
           else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
+            for (int index = 0; index < filtered.length; index++)
+              Builder(builder: (context) {
                 final track = filtered[index];
                 final song = track.toSongData();
                 return SongTile(
@@ -527,8 +530,7 @@ class _OnlinePlaylistDetailScreenState
                     context.read<PlayerCubit>().playSong(song, queue: songs);
                   },
                 );
-              },
-            ),
+              }),
         ],
       ),
     );
