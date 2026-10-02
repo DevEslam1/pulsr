@@ -4343,5 +4343,12 @@
   "conflictAaudioDirectCrossfade": "معطَّل: AAudio Direct مفعّل — يُطبَّق Crossfade في سلسلة DSP في ExoPlayer التي يتجاوزها. أوقف AAudio Direct لاستخدام Crossfade.",
   "conflictOemDoubleProcessing": "تحذير: Dolby/Dirac في النظام نشط — تشغيل DSP الخاص بـ Pulsr فوقه يسبب معالجة مزدوجة. يُفضَّل تفضيل DSP = أصلي وتعطيل تأثيرات النظام.",
   "conflictVolumeBoostClipping": "خطر القص: مضخم EQ المسبق ({preampDb} dB) + التعزيز (+{boostDb} dB) = +{totalDb} dB > هامش 6 dB.",
-  "conflictHighBoostDistortion": "قد يسبب التعزيز العالي تشوهًا أو إجهادًا سمعيًا."
+  "conflictHighBoostDistortion": "قد يسبب التعزيز العالي تشوهًا أو إجهادًا سمعيًا.",
+  "swipeToPlayNextFavoriteHint": "اسحب للتشغيل التالي أو الإضافة إلى المفضلة",
+  "removeSelectedDownloadsConfirm": "{count, plural, =1{إزالة التنزيل المحدد؟} other{إزالة {count} تنزيلات محددة؟}}",
+  "equalizerResponseCurve": "منحنى استجابة المُعادِل",
+  "maxVolume": "الحد الأقصى للصوت",
+  "pageLoadingProgress": "تقدّم تحميل الصفحة",
+  "albumArtworkLabel": "صورة الألبوم",
+  "failedToApplyLabel": "تعذّر تطبيق {label}"
 }

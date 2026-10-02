@@ -115,6 +115,10 @@ class AudioVisualizerState extends State<AudioVisualizer>
   late AnimationController _animController;
   bool _isAppActive = true;
   bool _hasActiveSession = false;
+  // Wall-clock of the last tick that actually did work. The AnimationController
+  // fires _onTick on every vsync frame (~60fps); the recompute+repaint only
+  // needs ~30fps, so _onTick throttles against this. 0 means "never ticked".
+  int _lastTickMs = 0;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
@@ -383,7 +387,14 @@ class AudioVisualizerState extends State<AudioVisualizer>
   bool get isDecayedToBaseline => _isDecayedToBaseline();
 
   @visibleForTesting
-  void onTickForTesting() => _onTick();
+  void onTickForTesting() {
+    // Bypass the ~30fps wall-clock throttle in _onTick: tests drive ticks in a
+    // tight synchronous loop where no real time elapses between calls, and they
+    // rely on each call advancing the decay. Resetting the throttle marker keeps
+    // that deterministic behavior unchanged while production still throttles.
+    _lastTickMs = 0;
+    _onTick();
+  }
 
   @visibleForTesting
   List<double> get currentDataForTesting => List.unmodifiable(_currentData);
@@ -395,6 +406,17 @@ class AudioVisualizerState extends State<AudioVisualizer>
   }
 
   void _onTick() {
+    // Throttle to ~30fps. The AnimationController's addListener fires on every
+    // vsync frame (~60fps); its 33ms duration only sets value speed, not
+    // callback cadence. Gating the recompute+ValueNotifier+repaint below behind
+    // a ~32ms window halves per-frame CPU/GPU while staying visually smooth.
+    // The decay-to-baseline path still runs (now at 30fps) and still converges
+    // and still calls _stopAnimation() once settled. The deterministic test
+    // hook (onTickForTesting) resets _lastTickMs so each simulated tick works.
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs - _lastTickMs < 32) return;
+    _lastTickMs = nowMs;
+
     if (!mounted ||
         !context.motionEnabled ||
         !TickerMode.valuesOf(context).enabled ||

@@ -112,7 +112,10 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
       _retryTimer?.cancel();
       _retryTimer = null;
       // A successful poll after the timer was parked resumes normal emission.
+      // Emit the freshly fetched sample first so recovery has no one-tick
+      // staleness before the restarted timer produces its next value.
       if (_pollingTimer == null && _listenerCount > 0) {
+        emit(telemetry);
         _startPolling();
         return;
       }

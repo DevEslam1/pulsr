@@ -551,7 +551,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final confirmed = await PulsrDialogHelper.showConfirmDialog(
       context,
       title: l10n.delete,
-      message: 'Remove $count selected download${count == 1 ? "" : "s"}?',
+      message: l10n.removeSelectedDownloadsConfirm(count),
       confirmLabel: l10n.delete,
       cancelLabel: l10n.cancel,
       isDestructive: true,

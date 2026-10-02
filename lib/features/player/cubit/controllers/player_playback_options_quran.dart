@@ -1,6 +1,14 @@
 // lib/features/player/cubit/controllers/player_playback_options_quran.dart
 part of 'player_playback_options_controller.dart';
 
+/// In-memory copy of the pre-Quran DSP snapshot, kept alongside the persisted
+/// copy in SharedPreferences. Acts as a fallback when the persisted snapshot
+/// failed to write or is later unreadable/corrupt, so disabling Quran Mode can
+/// still restore the real DSP instead of stranding the Quran EQ/reverb/speed
+/// while the toggle reads off. Library-scoped because an extension cannot hold
+/// instance state and PlayerQuranManager is not imported into this library.
+QuranRestoreSnapshot? _inMemoryPreQuranSnapshot;
+
 /// Quran Mode DSP application and its restore-snapshot persistence. Extracted
 /// from [PlayerPlaybackOptionsController] to keep that controller <= 400 lines.
 extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
@@ -65,15 +73,26 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     if (enabled == s.isQuranModeEnabled) return;
     if (enabled) {
       final snapshot = _captureQuranRestoreSnapshot(s);
+      // Keep the snapshot in memory as well as persisting it: a failed/corrupt
+      // prefs write must not leave disabling unable to restore the real DSP.
+      _inMemoryPreQuranSnapshot = snapshot;
       await _persistQuranSnapshot(snapshot);
       _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: true)));
       final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
       await _applyQuranProfile(profile);
     } else {
-      final snapshot = await loadQuranSnapshot();
+      // Prefer the persisted snapshot; fall back to the in-memory copy when the
+      // persisted one is missing or corrupt (loadQuranSnapshot returns null).
+      final snapshot = await loadQuranSnapshot() ?? _inMemoryPreQuranSnapshot;
       if (snapshot != null) {
         await _restoreFromSnapshot(snapshot);
+      } else {
+        // Neither source is available: never flip the toggle off while Quran
+        // DSP stays applied. Reset the Quran-controlled effects to safe
+        // defaults so the toggle and the real effect chain agree.
+        await _restoreSafeDefaults();
       }
+      _inMemoryPreQuranSnapshot = null;
       await _clearQuranSnapshot();
       final current = _getState();
       _emit(current.copyWith(dsp: current.dsp.copyWith(isQuranModeEnabled: false)));
@@ -151,6 +170,41 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore from Quran snapshot',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsQuran');
+    }
+  }
+
+  /// Fallback used when Quran Mode is disabled but no restorable snapshot
+  /// exists (neither persisted nor in memory). Turns the Quran-applied DSP
+  /// back off so the toggle and the real effect chain agree, rather than
+  /// leaving Quran EQ/reverb/saturation/dynamics/speed applied. Mirrors the
+  /// "off" half of [_restoreFromSnapshot] without captured values; shuffle is
+  /// intentionally left untouched since Quran Mode does not change it.
+  Future<void> _restoreSafeDefaults() async {
+    final s = _getState();
+    _emit(s.copyWith(
+      dsp: s.dsp.copyWith(
+        isEqEnabled: false,
+        isReverbEnabled: false,
+        reverbWetDry: 0.0,
+        isSaturationEnabled: false,
+        isDynamicsEnabled: false,
+      ),
+      playback: s.playback.copyWith(
+        playbackSpeed: 1.0,
+      ),
+    ));
+
+    try {
+      await _audioHandler.setEqualizerEnabled(false);
+      await _audioHandler.setReverb(false, wetDry: 0.0);
+      await _audioHandler.setSaturation(false);
+      await _audioHandler.setDynamicsPreset(s.dynamicsPreset, enabled: false);
+      await setPlaybackSpeed(1.0);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore safe defaults while disabling Quran Mode',
           error: e,
           stackTrace: st,
           category: 'PlayerPlaybackOptionsQuran');

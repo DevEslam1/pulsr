@@ -40,6 +40,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
+  @override
+  void updateFavorite(int songId, bool isFavorite) {}
+
   double _vol = 1.0;
   int setVolumeCallCount = 0;
   @override

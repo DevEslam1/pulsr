@@ -375,6 +375,13 @@ class AuraTheme {
 
     return ThemeData(
       useMaterial3: true,
+      // Android predictive-back page transitions; other platforms keep their
+      // framework defaults.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+        },
+      ),
       fontFamily: fontFamily,
       fontFamilyFallback: fontFallbacks,
       brightness: brightness,

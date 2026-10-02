@@ -159,13 +159,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   color: p.accent,
                   backgroundColor: p.surfaceContainer,
                   onRefresh: () => context.read<LibraryCubit>().init(),
-                  child: ListView(
+                  child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding:
-                        const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
-                    children: [
+                    slivers: [
                       // ---------- Local / Online Tabs Switcher ----------
-                      Padding(
+                      SliverToBoxAdapter(
+                        child: Padding(
                         padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
                           8,
@@ -187,11 +186,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               count: onlineFavorites.length,
                             ),
                           ],
+                          ),
                         ),
                       ),
 
                       // ---------- Hero Banner Card ----------
-                      Padding(
+                      SliverToBoxAdapter(
+                        child: Padding(
                         padding: EdgeInsetsDirectional.fromSTEB(
                           Adaptive.pagePadding(context),
                           0,
@@ -351,11 +352,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             ],
                           ),
                         ),
+                        ),
                       ),
 
                       // ---------- Song List or Empty State ----------
                       if (currentTabFavorites.isEmpty)
-                        Padding(
+                        SliverToBoxAdapter(
+                          child: Padding(
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.s40),
                           child: Center(
@@ -373,9 +376,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                   : l10n.connectYtmSubtitle,
                             ),
                           ),
+                          ),
                         )
                       else if (songs.isEmpty && _searchQuery.isNotEmpty)
-                        Padding(
+                        SliverToBoxAdapter(
+                          child: Padding(
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.s40),
                           child: Center(
@@ -391,9 +396,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               },
                             ),
                           ),
+                          ),
                         )
                       else
-                        ...List.generate(songs.length, (index) {
+                        SliverList.builder(
+                          itemCount: songs.length,
+                          itemBuilder: (context, index) {
                           final song = songs[index];
                           return PulsrDismissible(
                             key: ValueKey('fav_screen_${song.id}'),
@@ -461,7 +469,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               ),
                             ),
                           );
-                        }),
+                          },
+                        ),
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: AppSpacing.scrollBottom),
+                      ),
                     ],
                   ),
                 ),

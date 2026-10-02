@@ -1,7 +1,8 @@
 // lib/features/player/cubit/controllers/queue_slot_data.dart
 import '../../../../data/db/app_database.dart';
 
-/// In-memory representation of a saved playback queue slot (slots 1–9).
+/// In-memory representation of a saved playback queue slot. The player keeps
+/// 3 slots, indexed 0–2 (see QueueSlotCodec.maxSlotIndex).
 class QueueSlotData {
   /// Ordered list of song database identifiers in the slot.
   final List<int> songIds;

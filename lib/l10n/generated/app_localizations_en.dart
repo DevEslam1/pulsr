@@ -7931,4 +7931,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get conflictHighBoostDistortion =>
       'High boost may cause distortion or hearing fatigue.';
+
+  @override
+  String get swipeToPlayNextFavoriteHint => 'Swipe to play next / favorite';
+
+  @override
+  String removeSelectedDownloadsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Remove $count selected downloads?',
+      one: 'Remove 1 selected download?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get equalizerResponseCurve => 'Equalizer response curve';
+
+  @override
+  String get maxVolume => 'Max volume';
+
+  @override
+  String get pageLoadingProgress => 'Page loading progress';
+
+  @override
+  String get albumArtworkLabel => 'Album artwork';
+
+  @override
+  String failedToApplyLabel(String label) {
+    return 'Failed to apply $label';
+  }
 }

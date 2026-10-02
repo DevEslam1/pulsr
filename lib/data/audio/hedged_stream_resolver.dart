@@ -10,6 +10,13 @@ class HedgedStreamResolver {
   /// Race [attempts] with optional stagger between launches.
   /// [hedgeDelay] staggers the 2nd+ attempt so the fast path usually wins
   /// without paying double cost on every resolve.
+  ///
+  /// LIMITATION: Dart futures cannot be cancelled, so a losing attempt is not
+  /// aborted — it keeps running to completion in the background after the race
+  /// has settled (only its result is discarded). Callers must therefore pass
+  /// attempts that are safe to run redundantly / idempotent (e.g. network reads,
+  /// not writes). Truly cancelling losers would require cancellation support in
+  /// the underlying resolver, which is out of scope here.
   static Future<T> race<T>(
     List<Future<T> Function()> attempts, {
     Duration hedgeDelay = const Duration(milliseconds: 250),

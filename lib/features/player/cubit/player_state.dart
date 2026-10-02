@@ -395,6 +395,12 @@ abstract class PlayerState with _$PlayerState {
   /// High-performance diff: skips high-frequency position ticks while reacting
   /// to playback, queue, and lyrics/overlay view changes, plus user-visible
   /// DSP active status toggles (EQ, Quran mode, active DSP stages).
+  ///
+  /// NOTE: this deliberately ignores internal DSP *parameter* churn
+  /// (e.g. virtualizerStrength, reverbWetDry) — those change rapidly during
+  /// slider drags and have their own listeners; folding them in here would
+  /// defeat the purpose of this `buildWhen` gate. See
+  /// player_audit_remediation_test.dart ("ignores internal DSP parameters").
   bool differsFromBeyondPosition(PlayerState other) {
     return playback.differsBeyondPosition(other.playback) ||
         queueSlice.differs(other.queueSlice) ||

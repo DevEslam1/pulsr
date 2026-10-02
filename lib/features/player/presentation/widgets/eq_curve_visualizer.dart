@@ -80,7 +80,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     }
 
     return Semantics(
-      label: 'Equalizer response curve',
+      label: context.l10n.equalizerResponseCurve,
       child: visualizer,
     );
   }

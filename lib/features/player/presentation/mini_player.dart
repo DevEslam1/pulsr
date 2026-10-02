@@ -1142,6 +1142,8 @@ class MiniPlayerHorizontal extends StatelessWidget {
                         : context.l10n.play,
                     iconSize: 26,
                     visualDensity: VisualDensity.compact,
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
                     icon: Icon(
                       state.isPlaying
                           ? Icons.pause_rounded
@@ -1157,6 +1159,8 @@ class MiniPlayerHorizontal extends StatelessWidget {
                     tooltip: context.l10n.next,
                     iconSize: 24,
                     visualDensity: VisualDensity.compact,
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
                     icon: Icon(
                       Icons.skip_next_rounded,
                       color: p.textPrimary,

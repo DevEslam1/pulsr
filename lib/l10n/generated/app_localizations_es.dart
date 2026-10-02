@@ -7988,4 +7988,36 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get conflictHighBoostDistortion =>
       'Un refuerzo alto puede causar distorsión o fatiga auditiva.';
+
+  @override
+  String get swipeToPlayNextFavoriteHint =>
+      'Desliza para reproducir a continuación o marcar como favorito';
+
+  @override
+  String removeSelectedDownloadsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '¿Quitar $count descargas seleccionadas?',
+      one: '¿Quitar 1 descarga seleccionada?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get equalizerResponseCurve => 'Curva de respuesta del ecualizador';
+
+  @override
+  String get maxVolume => 'Volumen máximo';
+
+  @override
+  String get pageLoadingProgress => 'Progreso de carga de la página';
+
+  @override
+  String get albumArtworkLabel => 'Carátula del álbum';
+
+  @override
+  String failedToApplyLabel(String label) {
+    return 'No se pudo aplicar $label';
+  }
 }

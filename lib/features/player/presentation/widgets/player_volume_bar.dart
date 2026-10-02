@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../cubit/player_cubit.dart';
@@ -79,7 +80,7 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
               size: 20,
               color: p.textSecondary,
             ),
-            tooltip: 'Max volume',
+            tooltip: context.l10n.maxVolume,
             visualDensity: VisualDensity.compact,
             onPressed: () {
               setState(() => _dragVolume = null);

@@ -51,6 +51,10 @@ class QueueSlotCodec {
       final songs = entry.value.songs;
       data['${entry.key}'] = {
         'songIds': songs.map((s) => s.id).toList(),
+        // Serialize rows not resolvable via getSongsByIds on restore: YouTube
+        // rows and any synthetic negative-id row (radio stations carry a
+        // negative id + a stream URL in `path`, so they are covered here).
+        // Without materializing them mergeInPersistedOrder would drop them.
         'onlineSongs': songs
             .where((s) => s.source == SongSource.youtube || s.id < 0)
             .map((s) => {
@@ -86,21 +90,31 @@ class QueueSlotCodec {
     if (decoded.length > maxDocumentKeys) return null;
     final map = Map<String, dynamic>.from(decoded);
     final version = map['schemaVersion'];
-    if (version != null && (version is! int || version > currentSchemaVersion || version < 1)) {
+    // Reject non-int, future (> current) or negative versions. Version 0 and a
+    // missing version are legacy payloads that are migrated up, not rejected.
+    if (version != null &&
+        (version is! int || version > currentSchemaVersion || version < 0)) {
       return null;
     }
-    if (version == null) {
+    if (version == null || version == 0) {
       return migrateDocument(map);
     }
     return map;
   }
 
   /// Migrates older schema payloads up to [currentSchemaVersion].
+  ///
+  /// Throws [ArgumentError] for unsupported versions (negative, or newer than
+  /// this build understands) so a corrupt/forward-dated document fails loudly
+  /// rather than being silently misread.
   static Map<String, dynamic> migrateDocument(Map<String, dynamic> document) {
     final doc = Map<String, dynamic>.from(document);
     final version = doc['schemaVersion'] as int? ?? 0;
+    if (version < 0 || version > currentSchemaVersion) {
+      throw ArgumentError('Unsupported queue-slot schemaVersion: $version');
+    }
     if (version == 0) {
-      doc['schemaVersion'] = 1;
+      doc['schemaVersion'] = currentSchemaVersion;
     }
     return doc;
   }
@@ -120,13 +134,19 @@ class QueueSlotCodec {
     final rawIds = slotData['songIds'];
     if (rawIds is! List) return null;
     if (rawIds.length > maxQueueSize) return null;
-    final songIds = rawIds.whereType<int>().toList();
-    if (songIds.isEmpty) return null;
 
     final rawOnline = slotData['onlineSongs'];
     final onlineSongsById = rawOnline is List
         ? decodeOnlineSongs(rawOnline)
         : const <int, SongsTableData>{};
+
+    // Keep positive (DB-backed) ids and negative ids that have a materialized
+    // online song; drop orphan/corrupt negatives that nothing can resolve.
+    final songIds = rawIds
+        .whereType<int>()
+        .where((id) => id >= 0 || onlineSongsById.containsKey(id))
+        .toList();
+    if (songIds.isEmpty) return null;
 
     final rawIndex = slotData['currentIndex'];
     final currentIndex = rawIndex is int ? rawIndex : 0;

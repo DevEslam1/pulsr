@@ -47,6 +47,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/responsive/adaptive_grid.dart';
+import '../../../core/router/safe_navigation.dart';
 part 'tabs/library_songs_tab.dart';
 part 'tabs/library_collections_tabs.dart';
 part 'tabs/library_favorites_tab.dart';

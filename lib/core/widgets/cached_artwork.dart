@@ -6,6 +6,7 @@ import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
 import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
+import '../utils/l10n_extensions.dart';
 import 'artwork_placeholder.dart';
 
 /// LRU Memory Bitmap Cache for Artwork images.
@@ -187,8 +188,13 @@ class _CachedArtworkState extends State<CachedArtwork> {
   Uint8List? _cachedBytes;
   int _loadToken = 0;
 
+  /// De-dupes concurrent cold-cache fetches: multiple widgets requesting the
+  /// same resolved cache key share a single underlying bytes fetch instead of
+  /// each issuing its own remote/device query.
+  static final Map<String, Future<Uint8List?>> _inFlight = {};
+
   bool get _isHighRes =>
-      widget.highQuality || widget.size > 250 || widget.size == double.infinity;
+      widget.highQuality || (widget.size.isFinite && widget.size > 250);
 
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
@@ -386,37 +392,48 @@ class _CachedArtworkState extends State<CachedArtwork> {
       }
     }
 
-    // 3. Fetch remote or query local storage
+    // 3. Fetch remote or query local storage.
+    // In-flight dedupe: concurrent widgets requesting the same resolved cache
+    // key share one underlying raw-bytes fetch. Each widget still applies its
+    // own cache.put + setState under its own load token below.
     final remoteUrl = widget.remoteUrl;
     final isThumbnail = !isHq && widget.size <= 220;
 
     Future<Uint8List?> pending;
-    if (remoteUrl != null && remoteUrl.isNotEmpty) {
-      pending = _fetchRemote(
-        remoteUrl,
-        highQuality: isHq,
-        lowQuality: isThumbnail,
-      ).then((remoteBytes) {
-        if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
-        if (widget.id > 0) {
-          return _queryDeviceArtwork(
-            widget.id,
-            widget.type,
-            isHq: isHq,
-            isThumbnail: isThumbnail,
-          );
-        }
-        return null;
-      });
+    final existingInFlight = _inFlight[key];
+    if (existingInFlight != null) {
+      pending = existingInFlight;
     } else {
-      pending = widget.id > 0
-          ? _queryDeviceArtwork(
+      final Future<Uint8List?> fetch;
+      if (remoteUrl != null && remoteUrl.isNotEmpty) {
+        fetch = _fetchRemote(
+          remoteUrl,
+          highQuality: isHq,
+          lowQuality: isThumbnail,
+        ).then((remoteBytes) {
+          if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
+          if (widget.id > 0) {
+            return _queryDeviceArtwork(
               widget.id,
               widget.type,
               isHq: isHq,
               isThumbnail: isThumbnail,
-            )
-          : Future<Uint8List?>.value(null);
+            );
+          }
+          return null;
+        });
+      } else {
+        fetch = widget.id > 0
+            ? _queryDeviceArtwork(
+                widget.id,
+                widget.type,
+                isHq: isHq,
+                isThumbnail: isThumbnail,
+              )
+            : Future<Uint8List?>.value(null);
+      }
+      pending = fetch.whenComplete(() => _inFlight.remove(key));
+      _inFlight[key] = pending;
     }
 
     pending.then((bytes) {
@@ -529,7 +546,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
             width: extent,
             height: extent,
             child: Semantics(
-              label: 'Album artwork',
+              label: context.l10n.albumArtworkLabel,
               image: true,
               child: content,
             ),

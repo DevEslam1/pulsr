@@ -280,11 +280,15 @@ class GaplessTrimHandler {
   /// Detects container/codec from a file path and returns the trim.
   /// [preSkipOverrideMs]/[postTrimOverrideMs] come from parsed headers
   /// (OpusHead pre-skip, granule end-trim) when available.
+  /// [sampleRate] is threaded into the header parser so the sample-count→
+  /// duration math is correct for non-44.1kHz content (e.g. 48kHz); it falls
+  /// back to the documented 44100 default when null/unknown.
   static GaplessTrim trimFor({
     required String path,
     String? codec,
     int? preSkipOverrideMs,
     int? postTrimOverrideMs,
+    int? sampleRate,
   }) {
     if (preSkipOverrideMs != null || postTrimOverrideMs != null) {
       return GaplessTrim(
@@ -294,7 +298,11 @@ class GaplessTrimHandler {
             Duration(milliseconds: (postTrimOverrideMs ?? 0).clamp(0, 5000)),
       );
     }
-    final headerTrim = readHeaderGaplessTrimSync(path);
+    final headerTrim = readHeaderGaplessTrimSync(
+      path,
+      sampleRate:
+          (sampleRate != null && sampleRate > 0) ? sampleRate : 44100,
+    );
     if (headerTrim != null) {
       return headerTrim;
     }

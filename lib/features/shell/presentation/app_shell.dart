@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/router/safe_navigation.dart';
 import '../../../core/responsive/layout_delegate.dart';
 import '../../../core/responsive/pulsr_hinge_gap.dart';
 import '../../../core/utils/error_logger.dart';
@@ -169,7 +170,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _openNowPlaying(BuildContext context) {
-    context.push('/now-playing');
+    context.pushDebounced('/now-playing');
   }
 
   @visibleForTesting

@@ -79,14 +79,21 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   // Monotonic counter bumped whenever the queue is mutated; used to invalidate
   // the home-widget "up next" title cache on reorder.
   int _queueVersion = 0;
-  final AsyncGuard _trackChangedGuard = AsyncGuard();
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
+  // Guards a SponsorBlock auto-skip seek so overlapping position ticks cannot
+  // fire a second seek while the first is still in flight.
+  bool _isSponsorBlockSeeking = false;
 
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
 
   @override
   void invalidateMediaItemResolution() => _mediaItemGuard.next();
+
+  /// Invalidates any in-flight restored-queue (`_audioHandler.queue`)
+  /// resolution. Called after a programmatic queue mutation so a slow DB lookup
+  /// for an older engine-queue snapshot cannot clobber the just-applied change.
+  void invalidateQueueSyncResolution() => _queueSyncGuard.next();
 
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
@@ -182,6 +189,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
       onResumePerSongMemory: (song) => unawaited(
           playbackOptionsController.applyPerSongPlaybackMemory(song)),
+      invalidateQueueSyncResolution: invalidateQueueSyncResolution,
     );
     transportController = PlayerTransportController(
       audioHandler: _audioHandler,
@@ -300,7 +308,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         );
         _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
         // Re-apply composed gain (ReplayGain, loudness equalization, volume boost) for new settings
-        _audioHandler.setVolume(_audioHandler.volume);
+        unawaited(_audioHandler
+            .setVolume(_audioHandler.volume)
+            .catchError((Object e, StackTrace st) {
+          ErrorLogger.log('Re-apply volume on settings change failed',
+              error: e, stackTrace: st, category: 'PlayerCubit');
+        }));
         if (settingsState.followTrackSampleRate) {
           final song = state.currentSong;
           if (song != null) {
@@ -313,7 +326,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   static const int _maxNegativeIdEntries = 1000;
   final Map<String, int> _remoteIdToNegativeId = {};
-  int _nextAssignedNegativeId = -2;
+  // Starts strictly below the hash-derived range (which spans
+  // [-1000000001, -2]) so a fallback-assigned id can never collide with a
+  // hash-derived one.
+  int _nextAssignedNegativeId = -1000000002;
 
   int _resolveMediaItemId(String id) {
     final parsed = int.tryParse(id);
@@ -325,18 +341,37 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }
     // Map non-numeric IDs into collision-free negative integer space (never colliding on 0 or positive DB IDs)
     final h = -(id.hashCode.abs() % 1000000000 + 2);
-    final assigned = !_remoteIdToNegativeId.containsValue(h)
-        ? h
-        : _nextAssignedNegativeId--;
+    int assigned;
+    if (!_remoteIdToNegativeId.containsValue(h)) {
+      assigned = h;
+    } else {
+      // Fallback: skip any value already in use. The counter lives below the
+      // hash range so it also cannot collide with a hash-derived id.
+      do {
+        assigned = _nextAssignedNegativeId--;
+      } while (_remoteIdToNegativeId.containsValue(assigned));
+    }
     _remoteIdToNegativeId[id] = assigned;
     return assigned;
+  }
+
+  /// The engine's authoritative current queue index when known and in range for
+  /// a queue of [length]; otherwise null so callers fall back to a by-identity
+  /// search. Preferring the engine index disambiguates duplicate songs, where
+  /// `indexWhere` would always resolve to the first occurrence.
+  int? _engineQueueIndexWithin(int length) {
+    final idx = _audioHandler.playbackState.valueOrNull?.queueIndex;
+    return (idx != null && idx >= 0 && idx < length) ? idx : null;
   }
 
   void _listenToAudioService() {
     autoSub(_audioHandler.onTrackChanged, (song) {
       if (isClosed) return;
-      _trackChangedGuard.next();
-      final songIndex = state.queue.indexWhere((s) => _isSameTrack(s, song));
+      // Invalidate any in-flight mediaItem resolution for the previous track so
+      // a slow DB lookup cannot re-emit the old song after this change.
+      invalidateMediaItemResolution();
+      final songIndex = _engineQueueIndexWithin(state.queue.length) ??
+          state.queue.indexWhere((s) => _isSameTrack(s, song));
       final isSameSong = _isSameTrack(state.currentSong, song);
       safeEmit(state.copyWith(
         playback: state.playback.copyWith(
@@ -408,7 +443,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             : (song.durationMs > 0
                 ? Duration(milliseconds: song.durationMs)
                 : (isSameSong ? state.duration : Duration.zero));
-        final songQueueIndex = state.queue.indexWhere((s) => _isSameTrack(s, song));
+        final songQueueIndex = _engineQueueIndexWithin(state.queue.length) ??
+            state.queue.indexWhere((s) => _isSameTrack(s, song));
         final effectiveIndex = songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
 
         safeEmit(state.copyWith(
@@ -475,11 +511,32 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       }
       if (restored.isNotEmpty && !_isSameQueue(state.queue, restored)) {
         final current = state.currentSong;
-        final anchored = current == null ? -1 : restored.indexWhere((s) => _isSameTrack(s, current));
+        int resolvedIndex;
+        if (current == null) {
+          // No current track to anchor on: clamp the previous index into range.
+          resolvedIndex = state.currentIndex.clamp(0, restored.length - 1);
+        } else {
+          // Keep currentIndex pointing at currentSong instead of an arbitrary
+          // clamp: prefer an identity match, then a strict id match, then the
+          // engine's own current queue index, and only clamp as a last resort.
+          var idx = restored.indexWhere((s) => _isSameTrack(s, current));
+          if (idx == -1) idx = restored.indexWhere((s) => s.id == current.id);
+          if (idx == -1) {
+            final engineIndex =
+                _audioHandler.playbackState.valueOrNull?.queueIndex;
+            if (engineIndex != null &&
+                engineIndex >= 0 &&
+                engineIndex < restored.length) {
+              idx = engineIndex;
+            }
+          }
+          resolvedIndex =
+              idx != -1 ? idx : state.currentIndex.clamp(0, restored.length - 1);
+        }
         safeEmit(state.copyWith(
           queueSlice: state.queueSlice.copyWith(
             queue: restored,
-            currentIndex: (anchored != -1 ? anchored : state.currentIndex).clamp(0, restored.length - 1),
+            currentIndex: resolvedIndex,
           ),
         ));
       }
@@ -506,6 +563,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           !_userPausedIntentionally &&
           ps.processingState != AudioProcessingState.ready &&
           ps.processingState != AudioProcessingState.completed) {
+        // Keep the optimistic "playing" through transient non-ready states
+        // (idle/loading/buffering) during a selection/load so the play button
+        // doesn't flicker at track start. NOTE: a genuine programmatic stop
+        // into idle should clear isPlaying at its own source rather than rely
+        // on this override; see player-logic-review follow-up.
         resolvedPlaying = true;
       }
 
@@ -549,7 +611,21 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     }
     autoSub(positionUpdates.throttleTime(PlayerConstants.positionThrottleDuration, trailing: true), (pos) {
       safeEmit(state.copyWith(playback: state.playback.copyWith(position: pos)));
-      if (state.isPlaying) widgetBridge.updateWidgetProgressThrottled(state);
+      if (state.isPlaying) {
+        widgetBridge.updateWidgetProgressThrottled(state);
+        // SponsorBlock auto-skip: jump past a skippable segment when one covers
+        // the current position. Guarded so overlapping ticks never double-seek.
+        if (!_isSponsorBlockSeeking) {
+          final skipTarget =
+              metadataController.sponsorBlockSkipTarget(pos, isPlaying: true);
+          if (skipTarget != null) {
+            _isSponsorBlockSeeking = true;
+            unawaited(seek(skipTarget).whenComplete(() {
+              _isSponsorBlockSeeking = false;
+            }));
+          }
+        }
+      }
     });
 
     autoSub(_audioHandler.errorStream, (err) {

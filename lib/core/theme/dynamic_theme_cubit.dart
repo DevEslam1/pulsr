@@ -8,6 +8,7 @@ import 'package:palette_generator/palette_generator.dart';
 import '../../data/db/app_database.dart';
 import '../bloc/base_cubit.dart';
 import '../constants/app_colors.dart';
+import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
 
@@ -203,8 +204,15 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
         if (cachedBytes != null && cachedBytes.isNotEmpty) {
           imageProvider = MemoryImage(cachedBytes);
         } else {
+          // Palette sampling only needs a 64x64 swatch, so fetching the ~1200px
+          // high-res artwork here wastes bandwidth and memory. Feed the low-res
+          // thumbnail URL to the extractor instead of the high-res upgrade.
+          final lowResUrl = ArtworkCacheManager.toLowQualityArtworkUrl(
+              remoteArtworkUrl,
+              width: 220,
+              height: 220);
           imageProvider =
-              ResizeImage(NetworkImage(highResUrl), width: 128, height: 128);
+              ResizeImage(NetworkImage(lowResUrl), width: 128, height: 128);
         }
       } else {
         // 2. Local audio file from MediaStore

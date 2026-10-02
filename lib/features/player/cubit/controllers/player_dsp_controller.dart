@@ -1,6 +1,7 @@
 // lib/features/player/cubit/controllers/player_dsp_controller.dart
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/prefs_keys.dart';
@@ -32,6 +33,7 @@ import '../player_state.dart';
 
 part 'player_dsp_effects.dart';
 part 'player_dsp_profiles.dart';
+part 'player_dsp_comparison.dart';
 
 /// Orchestrates all audio DSP effects, equalizer presets, and bit-perfect conflict gating.
 class PlayerDspController {
@@ -108,35 +110,39 @@ class PlayerDspController {
     _deviceSub = null;
   }
 
-  int _followSampleRateGen = 0;
+  final Mutex _followSampleRateMutex = Mutex();
   int? _lastFollowedSampleRate;
 
+  /// [H-18] Serializes concurrent follow-rate requests (e.g. rapid track
+  /// changes) through a mutex so overlapping native output-format switches
+  /// apply in strict order instead of racing one another.
   Future<void> maybeFollowTrackSampleRate(SongsTableData song) async {
     final service = _hiResAudioService;
-    final settings = _settingsCubit?.state;
-    if (service == null || settings == null) return;
-    final gen = ++_followSampleRateGen;
-    final rate = HiResAudioService.followTrackRateToApply(
-      trackSampleRate: song.sampleRate,
-      lastRequestedSampleRate: _lastFollowedSampleRate,
-      isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
-      followTrackEnabled:
-          settings.followTrackSampleRate || settings.strictBitPerfect,
-    );
-    if (rate == null) return;
-    try {
-      final depth = (song.bitDepth != null && song.bitDepth! > 0)
-          ? song.bitDepth!
-          : PlayerConstants.defaultBitDepth;
-      await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
-      if (_isClosed() || gen != _followSampleRateGen) return;
-      _lastFollowedSampleRate = rate;
-      await _settingsCubit?.refreshOutputDevice();
-    } catch (e, st) {
-      _lastFollowedSampleRate = null;
-      ErrorLogger.log('Follow-track sample rate failed ($rate)',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-    }
+    if (service == null || _settingsCubit == null) return;
+    await _followSampleRateMutex.protect(() async {
+      final settings = _settingsCubit!.state;
+      final rate = HiResAudioService.followTrackRateToApply(
+        trackSampleRate: song.sampleRate,
+        lastRequestedSampleRate: _lastFollowedSampleRate,
+        isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
+        followTrackEnabled:
+            settings.followTrackSampleRate || settings.strictBitPerfect,
+      );
+      if (rate == null) return;
+      try {
+        final depth = (song.bitDepth != null && song.bitDepth! > 0)
+            ? song.bitDepth!
+            : PlayerConstants.defaultBitDepth;
+        await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
+        if (_isClosed()) return;
+        _lastFollowedSampleRate = rate;
+        await _settingsCubit!.refreshOutputDevice();
+      } catch (e, st) {
+        _lastFollowedSampleRate = null;
+        ErrorLogger.log('Follow-track sample rate failed ($rate)',
+            error: e, stackTrace: st, category: 'PlayerDspController');
+      }
+    });
   }
 
   String? dspBlockedReason() {
@@ -380,48 +386,4 @@ class PlayerDspController {
   }
 
   Timer? _abRevertTimer;
-
-  Future<void> startAbComparison() async {
-    _abRevertTimer?.cancel();
-    _abRevertTimer = Timer(const Duration(seconds: 10), () {
-      endAbComparison();
-    });
-    return _audioHandler.startAbComparison();
-  }
-
-  Future<void> endAbComparison() {
-    _abRevertTimer?.cancel();
-    _abRevertTimer = null;
-    return _audioHandler.endAbComparison();
-  }
-
-  Future<void> setBandMode(int count) async {
-    if (count == 10 || count == 32) {
-      await _audioHandler.set32BandMode(count == 32);
-    } else if (count == 64) {
-      await _audioHandler.equalizerManager.setBandMode(64);
-    } else {
-      return;
-    }
-    final state = _getState();
-    _emit(state.copyWith(dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
-  }
-
-  Future<void> switchComparisonSlot(ComparisonSlot slot) async {
-    await _audioHandler.switchComparisonSlot(slot);
-    final state = _getState();
-    _emit(state.copyWith(dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
-  }
-
-  String exportPresetToJson() => _audioHandler.exportPresetToJson();
-
-  Future<bool> importPresetFromJson(String jsonStr) async {
-    final ok = await _audioHandler.importPresetFromJson(jsonStr);
-    if (ok) {
-      final state = _getState();
-      _emit(state.copyWith(
-          dsp: state.dsp.copyWith(eqPreset: _audioHandler.currentPreset)));
-    }
-    return ok;
-  }
 }

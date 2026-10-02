@@ -67,11 +67,32 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           final songs = QueueSlotCodec.mergeInPersistedOrder(
               decoded.songIds, songsMap, decoded.onlineSongsById);
           if (songs.isEmpty) continue;
+          // Cold-start race guard: if playback already began during this async
+          // restore window, do not overwrite the live active slot (the other,
+          // inactive slots are still restored).
+          final current = _getState();
+          if (slotIndex == current.activeQueueSlot &&
+              current.queue.isNotEmpty) {
+            continue;
+          }
+          // Re-anchor currentIndex by identity: mergeInPersistedOrder drops ids
+          // that no longer resolve, shifting positions, so a raw clamp of the
+          // persisted index would point at the wrong track.
+          final decodedIndex = decoded.currentIndex;
+          final anchorId =
+              (decodedIndex >= 0 && decodedIndex < decoded.songIds.length)
+                  ? decoded.songIds[decodedIndex]
+                  : null;
+          var restoredIndex =
+              anchorId != null ? songs.indexWhere((s) => s.id == anchorId) : -1;
+          if (restoredIndex == -1) {
+            restoredIndex = QueueSlotCodec.clampCurrentIndex(
+                decoded.currentIndex, songs.length);
+          }
           setQueueSlot(
             slotIndex,
             songs: songs,
-            currentIndex: QueueSlotCodec.clampCurrentIndex(
-                decoded.currentIndex, songs.length),
+            currentIndex: restoredIndex,
             position: QueueSlotCodec.clampPosition(decoded.positionMs),
             speed: QueueSlotCodec.clampSpeed(decoded.speed),
           );
@@ -82,7 +103,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       }
       if (!_isClosed()) {
         final restoredSlot = QueueSlotCodec.activeSlotFrom(data['activeSlot']);
-        if (restoredSlot != null) {
+        // Don't flip the active slot if a session already started during the
+        // restore window (cold-start race): that would swap the live queue out
+        // for stale restored data.
+        if (restoredSlot != null && _getState().queue.isEmpty) {
           final s = _getState();
           _emit(s.copyWith(
             queueSlice: s.queueSlice.copyWith(activeQueueSlot: restoredSlot),
@@ -120,6 +144,9 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
   }
 
   void restoreQueue(List<SongsTableData> previousQueue, int previousIndex) {
+    // Empty queue is a safe no-op: `clamp(0, previousQueue.length - 1)` would
+    // be clamp(0, -1) and throw ArgumentError.
+    if (previousQueue.isEmpty) return;
     final state = _getState();
     final validIndex = previousIndex.clamp(0, previousQueue.length - 1);
     setQueueSlot(
@@ -186,6 +213,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: newCurrentIndex,
       ),
     ));
+    _invalidateQueueSyncResolution();
 
     try {
       await _audioHandler.reorderQueue(oldIndex, newIndex);
@@ -223,11 +251,12 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       return;
     }
 
+    final removingCurrent = index == state.currentIndex;
     final updatedQueue = List<SongsTableData>.from(state.queue)..removeAt(index);
     int newIndex = state.currentIndex;
     if (index < state.currentIndex) {
       newIndex = state.currentIndex - 1;
-    } else if (index == state.currentIndex) {
+    } else if (removingCurrent) {
       newIndex = index.clamp(0, updatedQueue.length - 1);
     }
 
@@ -240,12 +269,20 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
+    // When the current track itself is removed, advance currentSong to whatever
+    // now occupies newIndex so the UI stops showing the removed song until the
+    // audio handler emits the next track-changed event.
+    final playback = (removingCurrent && updatedQueue.isNotEmpty)
+        ? state.playback.copyWith(currentSong: updatedQueue[newIndex])
+        : state.playback;
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
         queue: updatedQueue,
         currentIndex: newIndex,
       ),
+      playback: playback,
     ));
+    _invalidateQueueSyncResolution();
 
     try {
       await _audioHandler.removeQueueItemAt(index);
@@ -311,6 +348,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           playbackSpeed: targetSlot.speed,
         ),
       ));
+      _invalidateQueueSyncResolution();
       try {
         await _audioHandler.setSpeed(targetSlot.speed);
         await _audioHandler.loadQueue(
@@ -324,10 +362,16 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         ErrorLogger.log('Failed to switch queue slot $slot',
             error: e, stackTrace: st, category: 'PlayerQueueController');
         if (!_isClosed()) {
-          final s = _getState();
-          _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: 'Failed to switch queue slot'),
+          // Roll the UI back to the pre-switch slice (slot, queue, current
+          // song, index, position) so a failed engine load doesn't strand the
+          // UI on a slot that never loaded. `state` is the pre-optimistic
+          // snapshot captured at the top of this method.
+          _bumpQueueVersion();
+          _emit(state.copyWith(
+            playback:
+                state.playback.copyWith(errorMessage: 'Failed to switch queue slot'),
           ));
+          _invalidateQueueSyncResolution();
         }
       }
     } finally {
@@ -384,22 +428,25 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   Future<void> addToQueue(SongsTableData song) async {
     final state = _getState();
-    if (state.queue.length >= PlayerQueueController.maxQueueSize) {
-      _emit(state.copyWith(
-        playback: state.playback.copyWith(
-            errorMessage:
-                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
-      ));
-      return;
-    }
     final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
     if (existingIdx != -1) {
+      // Reordering an already-present song doesn't grow the queue, so handle it
+      // before the capacity check — which would otherwise wrongly block it at
+      // exactly-full.
       if (existingIdx == state.currentIndex ||
           existingIdx == state.queue.length - 1) {
         return;
       }
       // Reorder existing song to end instead of enqueuing duplicate into audio handler
       await reorderQueue(existingIdx, state.queue.length - 1);
+      return;
+    }
+    if (state.queue.length >= PlayerQueueController.maxQueueSize) {
+      _emit(state.copyWith(
+        playback: state.playback.copyWith(
+            errorMessage:
+                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+      ));
       return;
     }
 
@@ -427,9 +474,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
-    _emit(state.copyWith(
-      queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
+    // Re-fetch state after the await: the track may have advanced during
+    // addToQueueEnd, so emit the new queue onto the fresh playback snapshot
+    // rather than reverting currentSong/currentIndex/position to the stale one.
+    final s = _getState();
+    _emit(s.copyWith(
+      queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
     ));
+    _invalidateQueueSyncResolution();
     _updateWidgetThrottled();
   }
 
@@ -439,23 +491,26 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       await addToQueue(song);
       return;
     }
-    if (state.queue.length >= PlayerQueueController.maxQueueSize) {
-      _emit(state.copyWith(
-        playback: state.playback.copyWith(
-            errorMessage:
-                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
-      ));
-      return;
-    }
     final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
     final targetSlot = (state.currentIndex + 1).clamp(0, state.queue.length);
     if (existingIdx != -1) {
+      // Reordering an already-present song doesn't grow the queue, so handle it
+      // before the capacity check — which would otherwise wrongly block it at
+      // exactly-full.
       if (existingIdx == state.currentIndex || existingIdx == targetSlot) {
         return;
       }
       final adjustedTarget =
           targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
       await reorderQueue(existingIdx, adjustedTarget);
+      return;
+    }
+    if (state.queue.length >= PlayerQueueController.maxQueueSize) {
+      _emit(state.copyWith(
+        playback: state.playback.copyWith(
+            errorMessage:
+                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+      ));
       return;
     }
 
@@ -484,9 +539,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
-    _emit(state.copyWith(
-      queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
+    // Re-fetch state after the await: the track may have advanced during
+    // insertNextInQueue, so emit the new queue onto the fresh playback snapshot
+    // rather than reverting currentSong/currentIndex/position to the stale one.
+    final s = _getState();
+    _emit(s.copyWith(
+      queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
     ));
+    _invalidateQueueSyncResolution();
   }
 
   Future<void> addAllToQueue(List<SongsTableData> songs) async {
@@ -529,13 +589,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _bumpQueueVersion();
     final s = _getState();
     _emit(s.copyWith(
-      queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
+      queueSlice: s.queueSlice.copyWith(queue: updatedQueue),
       playback: s.playback.copyWith(
         errorMessage: added.length < toAdd.length
             ? 'Added ${added.length} of ${toAdd.length} songs'
             : null,
       ),
     ));
+    _invalidateQueueSyncResolution();
   }
 
   void _findNextLocalMatch(

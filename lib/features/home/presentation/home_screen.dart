@@ -54,13 +54,15 @@ double _scaledTitleBoxHeight(BuildContext context) {
   return MediaQuery.textScalerOf(context).scale(base).clamp(base, 78.0);
 }
 
-/// Grows a fixed-height horizontal card carousel just enough to fit scaled
-/// two-line titles. Pixel-identical at the 1.0x scale.
+/// Dynamically calculates the carousel height to comfortably fit card artwork,
+/// dynamic text-scaled title box, artist line, and padding without overflowing.
 double _scaledCarouselHeight(BuildContext context, bool isTablet) {
-  final base = isTablet ? AppSpacing.s38 : 34.0;
-  final delta = (MediaQuery.textScalerOf(context).scale(base) - base)
-      .clamp(0.0, AppSpacing.s44);
-  return (isTablet ? 232.0 : 212.0) + delta;
+  final cardWidth = context.responsive
+      .value(compact: 138.0, medium: 150.0, expanded: 158.0);
+  final titleHeight = _scaledTitleBoxHeight(context);
+  final textScale = MediaQuery.textScalerOf(context).scale(14.0);
+  final artistHeight = textScale * 1.35;
+  return cardWidth + AppSpacing.xs + titleHeight + AppSpacing.s2 + artistHeight + 12.0;
 }
 
 class HomeScreen extends StatelessWidget {
@@ -1235,12 +1237,14 @@ class _TrendingCard extends StatelessWidget {
           width: size,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Stack(
                 children: [
                   CachedArtwork(
                     id: song.id,
-                    remoteUrl: song.remoteArtworkUrl,
+                    remoteUrl:
+                        song.remoteArtworkUrl ?? song.artworkUri,
                     type: ArtworkType.AUDIO,
                     size: size,
                     borderRadius: AppRadii.r18,

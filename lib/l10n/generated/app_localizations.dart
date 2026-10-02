@@ -14141,6 +14141,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'High boost may cause distortion or hearing fatigue.'**
   String get conflictHighBoostDistortion;
+
+  /// Gesture hint shown on a song row teaching swipe actions
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe to play next / favorite'**
+  String get swipeToPlayNextFavoriteHint;
+
+  /// Confirmation prompt when removing selected downloads
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Remove 1 selected download?} other{Remove {count} selected downloads?}}'**
+  String removeSelectedDownloadsConfirm(int count);
+
+  /// Accessibility label for the EQ curve visualizer
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer response curve'**
+  String get equalizerResponseCurve;
+
+  /// Tooltip/label for the maximum-volume indicator
+  ///
+  /// In en, this message translates to:
+  /// **'Max volume'**
+  String get maxVolume;
+
+  /// Accessibility label for a web page loading progress indicator
+  ///
+  /// In en, this message translates to:
+  /// **'Page loading progress'**
+  String get pageLoadingProgress;
+
+  /// Accessibility label for album artwork images
+  ///
+  /// In en, this message translates to:
+  /// **'Album artwork'**
+  String get albumArtworkLabel;
+
+  /// Error toast when applying a named setting fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to apply {label}'**
+  String failedToApplyLabel(String label);
 }
 
 class _AppLocalizationsDelegate

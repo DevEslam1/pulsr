@@ -16,6 +16,17 @@ class AbLoopManager {
   Duration? _b;
   bool _enabled = false;
   int? _scopeSongId;
+  // On an un-throttled position stream, every tick inside the B window used to
+  // fire its own seek (seek-storm). This latch is raised when a wrap target is
+  // handed out and lowered once playback drops back below the window (the seek
+  // landed) or a short safety timeout elapses, so only one seek fires per pass.
+  bool _wrapping = false;
+  DateTime? _wrapAt;
+
+  void _resetWrapLatch() {
+    _wrapping = false;
+    _wrapAt = null;
+  }
 
   final StreamController<bool> _changeSubject =
       StreamController<bool>.broadcast();
@@ -37,6 +48,7 @@ class AbLoopManager {
     _scopeSongId = songId;
     if (_b != null && _b! <= _a!) _b = null;
     _enabled = _a != null && _b != null ? _enabled : false;
+    _resetWrapLatch();
     _emit();
     unawaited(persist());
   }
@@ -47,6 +59,7 @@ class AbLoopManager {
     _b = pos;
     _scopeSongId ??= songId;
     _enabled = true;
+    _resetWrapLatch();
     _emit();
     unawaited(persist());
   }
@@ -54,6 +67,7 @@ class AbLoopManager {
   void toggle() {
     if (_a == null || _b == null) return;
     _enabled = !_enabled;
+    _resetWrapLatch();
     _emit();
     unawaited(persist());
   }
@@ -63,24 +77,50 @@ class AbLoopManager {
     _b = null;
     _enabled = false;
     _scopeSongId = null;
+    _resetWrapLatch();
     _emit();
     if (persistDeletion) unawaited(persistCleared());
   }
 
   /// Returns the seek target when [pos] ran past B, else null.
   /// Automatically invalidates when the song changes.
-  Duration? wrapTarget(Duration pos, {int? songId}) {
+  ///
+  /// [speed] defaults to 1.0 so the existing call site (audio_handler) keeps
+  /// working unchanged; it can pass the real playback speed later to widen the
+  /// look-ahead and avoid overshooting B at 2–4x.
+  Duration? wrapTarget(Duration pos, {int? songId, double speed = 1.0}) {
     if (!isEnabled) return null;
     if (_scopeSongId != null && songId != null && songId != _scopeSongId) {
       return null;
     }
-    // BUG-20: tighter 20ms tolerance reduces premature wraps, and requiring
-    // pos > A avoids wrapping when the reported position is still before A.
-    if (_b != null &&
-        _a != null &&
-        pos >= _b! - const Duration(milliseconds: 20) &&
-        pos > _a!) {
-      return _a;
+    final a = _a;
+    final b = _b;
+    if (a == null || b == null) return null;
+
+    // Scale the look-ahead tolerance with playback speed. At 1x keep the tight
+    // 20ms window (avoids premature wraps); at 2–4x a single position tick
+    // jumps far enough that a fixed 20ms window is overshot before it triggers,
+    // so widen it by roughly the distance one ~150ms tick travels at `speed`.
+    final clampedSpeed = (speed.isFinite && speed > 0) ? speed : 1.0;
+    final toleranceMs =
+        (20 + (clampedSpeed - 1.0) * 150).clamp(20, 600).round();
+    final tolerance = Duration(milliseconds: toleranceMs);
+
+    // Lower the latch once playback has returned below the wrap window (the
+    // seek landed) or a safety timeout elapses, re-arming the next wrap.
+    if (_wrapping) {
+      final leftWindow = pos < b - tolerance;
+      final timedOut = _wrapAt != null &&
+          DateTime.now().difference(_wrapAt!) > const Duration(seconds: 2);
+      if (leftWindow || timedOut) _resetWrapLatch();
+    }
+
+    // Requiring pos > A avoids wrapping when the reported position is still
+    // before A; the latch avoids a seek-storm from repeated ticks in the window.
+    if (!_wrapping && pos >= b - tolerance && pos > a) {
+      _wrapping = true;
+      _wrapAt = DateTime.now();
+      return a;
     }
     return null;
   }
@@ -123,6 +163,7 @@ class AbLoopManager {
       _b = Duration(milliseconds: bMs);
       _scopeSongId = songId;
       _enabled = (entry['enabled'] as bool?) ?? false;
+      _resetWrapLatch();
       _emit();
     } catch (_) {}
   }

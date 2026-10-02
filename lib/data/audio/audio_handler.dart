@@ -296,10 +296,32 @@ class PulsrAudioHandler extends BaseAudioHandler
       _cachedHeadsetConfig = value;
   double? _preDuckVolume;
   double? _preDuckInactiveVolume;
+  // Captured at duck-begin so duck-end can tell whether the track or its
+  // ReplayGain target changed during the duck and, if not, restore the exact
+  // pre-duck level instead of snapping to the RG target (preserves a mid-fade).
+  int? _preDuckSongId;
+  double? _preDuckRgTarget;
   @override
   bool _duckActive = false;
   int _duckDepthCounter = 0;
   Timer? _duckSafetyTimer;
+  // Single sleep-fade multiplier (0..1; 1.0 = not fading) owned by the handler
+  // so the three volume paths (ducking, sleep-fade, crossfade) stop clobbering
+  // each other. The SleepTimerManager reports its stepped fade progress here
+  // (via its onFadeFactor hook) instead of writing the player volume directly;
+  // the handler then composes it with the duck-aware ReplayGain/user target in
+  // [_reapplyActiveVolume] / [setVolume]. The native sample-accurate gain-curve
+  // fade path leaves this at 1.0 (that curve multiplies the player's base
+  // volume inside the sink, so it already composes).
+  double _sleepFadeFactor = 1.0;
+  // Transient system-sound duck restore timer; tracked so dispose() can cancel
+  // it (previously it was an untracked Timer that could fire after dispose).
+  Timer? _systemSoundTimer;
+  // When a gapless load is suppressing broadcasts, the time it started, so the
+  // suppression is bounded and a stalled/failed load cannot freeze the
+  // notification forever (see _broadcastState).
+  @override
+  DateTime? _gaplessSuppressionSince;
 
   /// Pure, testable interruption bookkeeping (B-1). Replaces the previous pair
   /// of loose booleans whose begin/end bookkeeping was asymmetric.
@@ -309,6 +331,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // Auto-resume bookkeeping: a becoming-noisy pause arms a one-shot resume
   // window; a reconnect on a headset/BT/USB route within the timeout resumes.
   DateTime? _noisyPauseTime;
+  @override
   bool _pausedForNoisy = false;
   @override
   int _consecutiveFailures = 0;
@@ -577,6 +600,19 @@ class PulsrAudioHandler extends BaseAudioHandler
       getActivePlayer: () => _activePlayer,
       getInactivePlayer: () => _inactivePlayer,
     );
+    // Volume coordination: the sleep fade reports its progress as a FACTOR
+    // instead of writing the active player's volume itself, so it composes with
+    // ducking (and defers to the crossfade manager) through the handler's
+    // single [_reapplyActiveVolume] re-apply point. [baseVolumeProvider] gives
+    // the manager the clean (un-faded) target for its fallback path so it never
+    // snapshots a ducked level as its fade baseline.
+    _sleepTimerManager.baseVolumeProvider =
+        () => _calculateReplayGainVolume(currentSong);
+    _sleepTimerManager.onFadeFactor = (factor) {
+      _sleepFadeFactor =
+          factor.isFinite ? factor.clamp(0.0, 1.0) : 1.0;
+      unawaited(_reapplyActiveVolume());
+    };
     // Backstop: if _init() throws before reaching its restore block, the
     // effects-ready signal must still fire so listeners aren't left waiting.
     _init().whenComplete(() {
@@ -1097,7 +1133,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       ErrorLogger.log('Failed to update loudness volume in setVolume',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
-    await _activePlayer.setVolume(target);
+    await _activePlayer.setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
 
     final now = DateTime.now();
     if (_lastNativeRgPush == null ||
@@ -1106,6 +1142,28 @@ class PulsrAudioHandler extends BaseAudioHandler
       _lastNativeRgPush = now;
       _lastNativeRgSongId = song?.id;
       unawaited(_pushNativeReplayGain(song));
+    }
+  }
+
+  /// Single re-apply point for the ACTIVE player's volume, composing the
+  /// duck-aware ReplayGain/user target ([_calculateReplayGainVolume] already
+  /// folds in the active duck factor via the volume controller) with the
+  /// current sleep-fade factor. Routing duck-end and each sleep-fade tick
+  /// through here means a duck-end can no longer wipe an in-flight fade for a
+  /// tick, and a fade tick can no longer undo the duck.
+  ///
+  /// No-op while a crossfade is running: the CrossfadeManager owns both
+  /// players' live volume ramps then (same contract the duck-end guard uses),
+  /// so this must not fight it.
+  Future<void> _reapplyActiveVolume() async {
+    if (_crossfadeManager.isCrossfading) return;
+    final target = _calculateReplayGainVolume(currentSong);
+    try {
+      await _activePlayer
+          .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to re-apply active player volume',
+          error: e, stackTrace: st, category: 'AudioHandler');
     }
   }
 
@@ -1441,7 +1499,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     // (via PlaybackAnalytics -> _maybeAdaptiveStepDown) to avoid duplicate drops or thrashing.
 
     _subscriptions.add(
-      Stream.periodic(const Duration(seconds: 45)).listen((_) async {
+      // Battery-aware playback only needs the level while audio is actually
+      // playing. Skip the native platform round-trip when paused/idle, and widen
+      // the tick from 45s to 120s, so this subscription stops waking the CPU and
+      // querying the OS every 45s forever while the app is idle/backgrounded.
+      // The subscription stays registered in _subscriptions, so it is still
+      // cancelled on dispose exactly as before.
+      Stream.periodic(const Duration(seconds: 120)).listen((_) async {
+        if (!_activePlayer.playing) return;
         final level = await BatteryOptimizationService.getBatteryLevel();
         if (level != null) {
           _batteryAwarePlayback.onBatteryLevelChanged(level);
@@ -1579,9 +1644,11 @@ class PulsrAudioHandler extends BaseAudioHandler
               // a paused track keeps rewriting the same position forever.
               if (player.playing) {
                 _saveCurrentPosition();
-                // F1: AB loop wrap.
-                final wrap =
-                    abLoopManager.wrapTarget(pos, songId: currentSong?.id);
+                // F1: AB loop wrap. Pass the live playback speed so the
+                // look-ahead widens at 2–4x (a single ~150ms position tick
+                // jumps far enough to overshoot the fixed 1x window otherwise).
+                final wrap = abLoopManager.wrapTarget(pos,
+                    songId: currentSong?.id, speed: _activePlayer.speed);
                 if (wrap != null) {
                   unawaited(_activePlayer.seek(wrap));
                 }
@@ -1656,13 +1723,30 @@ class PulsrAudioHandler extends BaseAudioHandler
               }
               final compensatedPos = _dspPipeline.getCompensatedPosition(pos);
               if (_crossfadeManager.duration > Duration.zero &&
-                  duration > _crossfadeManager.duration &&
-                  compensatedPos >= duration - _crossfadeManager.duration &&
                   !_crossfadeManager.isCrossfading &&
                   !_gaplessMode) {
-                final nextIdx = _getNextIndex();
-                if (nextIdx != null && nextIdx != _currentIndex) {
-                  _startCrossfade(nextIdx);
+                // Peek the next index (item 10): the mutating _getNextIndex()
+                // appends to shuffle history and draws a fresh random pick on
+                // every qualifying tick before the crossfade latches.
+                final nextIdx = _getNextIndex(peek: true);
+                if (nextIdx != null &&
+                    nextIdx != _currentIndex &&
+                    nextIdx >= 0 &&
+                    nextIdx < _songs.length) {
+                  // Trigger early enough for the WHOLE fade to fit before the
+                  // outgoing track ends (item 9): the effective fade can exceed
+                  // the base duration (BPM alignment clamps up to 20s), and
+                  // _startCrossfade needs a resolve + ~1.25s settle before the
+                  // ramp opens. Firing at `duration - crossfadeDuration` (base)
+                  // opened the fade too late, so the outgoing track could reach
+                  // ProcessingState.completed mid-fade (one-sided fade).
+                  final effFade = _crossfadeManager.effectiveFadeDuration(
+                      trackId: _songs[nextIdx].id.toString());
+                  const settleMargin = Duration(milliseconds: 1500);
+                  if (duration > effFade + settleMargin &&
+                      compensatedPos >= duration - effFade - settleMargin) {
+                    _startCrossfade(nextIdx);
+                  }
                 }
               }
             }
@@ -1753,16 +1837,29 @@ class PulsrAudioHandler extends BaseAudioHandler
                 // navigation prompt during a crossfade doesn't blast the fade-in.
                 _duckDepthCounter++;
                 if (!_duckActive && _activePlayer.playing) {
+                  // Capture the clean (un-ducked) RG target and song identity
+                  // first so a later duck-end can restore the EXACT pre-duck
+                  // level when nothing changed during the duck.
+                  _preDuckRgTarget = _calculateReplayGainVolume(currentSong);
+                  _preDuckSongId = currentSong?.id;
                   _duckActive = true;
                   _duckSafetyTimer?.cancel();
+                  // Safety net ONLY: if a duck-end event is never delivered this
+                  // must NOT restore full volume (that would blast music over a
+                  // still-active navigation prompt). It merely re-asserts the
+                  // ducked level so a stuck state stays quiet; the real duck-end
+                  // event remains the sole path that restores volume.
                   _duckSafetyTimer =
-                      Timer(const Duration(seconds: 3), () async {
+                      Timer(const Duration(seconds: 30), () async {
                     if (_duckActive) {
-                      _duckActive = false;
-                      _duckDepthCounter = 0;
-                      final target = _calculateReplayGainVolume(currentSong);
+                      final rf = duckingController.duckFactor;
                       try {
-                        await _activePlayer.setVolume(target);
+                        await _activePlayer
+                            .setVolume(rf * (_preDuckVolume ?? 1.0));
+                        if (_crossfadeManager.isCrossfading) {
+                          await _inactivePlayer
+                              .setVolume(rf * (_preDuckInactiveVolume ?? 0.0));
+                        }
                       } catch (_) {}
                     }
                   });
@@ -1822,13 +1919,31 @@ class PulsrAudioHandler extends BaseAudioHandler
                 if (_duckActive && _duckDepthCounter == 0) {
                   _duckActive = false;
                   _volumeController?.updateSettings(isDucked: false);
-                  // Restore to the CURRENT ReplayGain-compensated target, not
-                  // the stale pre-duck snapshot: gain settings or a track
-                  // change during the duck would otherwise leave the level
-                  // permanently ducked (tolerance check) or jumping.
-                  final target = _calculateReplayGainVolume(currentSong);
+                  // If neither the track nor the effective ReplayGain target
+                  // changed during the duck, restore the EXACT captured pre-duck
+                  // volume (preserving e.g. a mid-fade-in). Otherwise fall back
+                  // to the current RG target (gain/track changed, or nothing was
+                  // captured). This avoids both leaving the level permanently
+                  // ducked and discarding an in-progress fade.
+                  final currentTarget = _calculateReplayGainVolume(currentSong);
+                  final sameTrack = _preDuckSongId == currentSong?.id;
+                  final gainUnchanged = _preDuckRgTarget != null &&
+                      (currentTarget - _preDuckRgTarget!).abs() < 0.001;
+                  // When a sleep fade is in flight the captured pre-duck level
+                  // is a stale faded value; restore from the clean target scaled
+                  // by the LIVE fade factor so the duck-end composes with the
+                  // fade instead of wiping it for a tick (Fight: duck-end vs
+                  // sleep fade). With no fade (_sleepFadeFactor == 1.0) this is
+                  // identical to the previous behaviour.
+                  final sleepFading = _sleepFadeFactor < 0.999;
+                  final restoreActive = (!sleepFading &&
+                          _preDuckVolume != null &&
+                          sameTrack &&
+                          gainUnchanged)
+                      ? _preDuckVolume!
+                      : (currentTarget * _sleepFadeFactor).clamp(0.0, 1.0);
                   try {
-                    await _activePlayer.setVolume(target);
+                    await _activePlayer.setVolume(restoreActive.clamp(0.0, 1.0));
                   } catch (e, st) {
                     ErrorLogger.log(
                         'Failed to restore active player volume after duck',
@@ -1836,28 +1951,28 @@ class PulsrAudioHandler extends BaseAudioHandler
                         stackTrace: st,
                         category: 'AudioHandler');
                   }
-                  if (_crossfadeManager.isCrossfading) {
+                  // During a crossfade the CrossfadeManager owns the inactive
+                  // player's live volume ramp; forcing a value here (previously
+                  // the OUTGOING track's RG applied to the INCOMING player) used
+                  // the wrong gain AND overwrote the ramp. Only restore the
+                  // inactive player when NOT crossfading, and then only to its
+                  // captured pre-duck level.
+                  if (!_crossfadeManager.isCrossfading &&
+                      _preDuckInactiveVolume != null) {
                     try {
-                      await _inactivePlayer.setVolume(
-                          _calculateReplayGainVolume(_currentIndex >= 0 &&
-                                  _currentIndex < _songs.length
-                              ? _songs[_currentIndex]
-                              : null));
+                      await _inactivePlayer.setVolume(_preDuckInactiveVolume!);
                     } catch (e, st) {
                       ErrorLogger.log(
-                          'Failed to restore inactive volume during crossfade duck',
+                          'Failed to restore inactive volume after duck',
                           error: e,
                           stackTrace: st,
                           category: 'AudioHandler');
                     }
                   }
-                  // The correct ReplayGain-compensated target was applied above.
-                  // Do NOT recompute through _volumeController.setDucked(): that
-                  // path uses the controller's own ReplayGain mode/preamps, which
-                  // this handler never feeds, so it would overwrite the target
-                  // with raw duck-only user volume on every duck end.
                   _preDuckVolume = null;
                   _preDuckInactiveVolume = null;
+                  _preDuckSongId = null;
+                  _preDuckRgTarget = null;
                 } else if (shouldResumeAfterInterruption(
                   wasPlayingBeforeInterruption: wasPlayingBeforeDuck,
                   resumeAfterInterruption: _cachedPrefs
@@ -1867,8 +1982,12 @@ class PulsrAudioHandler extends BaseAudioHandler
                 )) {
                   // Pause-mode duck: playback was running when the navigation
                   // prompt began, so resume it now that the prompt ended. It was
-                  // previously left paused permanently.
-                  unawaited(_activePlayer.play());
+                  // previously left paused permanently. Route through the public
+                  // play() so the resume also runs AudioSession.setActive(true),
+                  // the completed-replay guard, the DVC gain-curve clear and the
+                  // fade-in convergence guard (a bare _activePlayer.play() skips
+                  // all of them).
+                  unawaited(play());
                 }
                 break;
               case AudioInterruptionType.pause:
@@ -1883,7 +2002,11 @@ class PulsrAudioHandler extends BaseAudioHandler
                       true,
                   currentlyPlaying: _activePlayer.playing,
                 )) {
-                  unawaited(_activePlayer.play());
+                  // Route through the public play() (not a bare
+                  // _activePlayer.play()) so the resume runs setActive(true),
+                  // the completed-replay guard, the DVC clear and the fade-in
+                  // guard.
+                  unawaited(play());
                 }
                 _preDuckVolume = null;
                 _preDuckInactiveVolume = null;
@@ -1923,11 +2046,12 @@ class PulsrAudioHandler extends BaseAudioHandler
             await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
                 restoreVolume: _preCrossfadeVolume ?? _volume);
           }
-          // Arm the auto-resume window before pausing so a quick reconnect
-          // can pick up where the unplug interrupted.
+          // Pause first (pause() clears _pausedForNoisy, like a user pause),
+          // THEN arm the auto-resume window so ONLY a becoming-noisy pause keeps
+          // it armed for a quick reconnect.
+          await pause();
           _noisyPauseTime = now;
           _pausedForNoisy = true;
-          await pause();
         }),
       );
 
@@ -2524,6 +2648,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     _fadeInGuardTimer = null;
     _crossfadeSwitchDebounce?.cancel();
     _crossfadeSwitchDebounce = null;
+    _duckSafetyTimer?.cancel();
+    _duckSafetyTimer = null;
+    _systemSoundTimer?.cancel();
+    _systemSoundTimer = null;
     for (final sub in List.of(_subscriptions)) {
       try {
         await sub.cancel();
@@ -2603,14 +2731,18 @@ class PulsrAudioHandler extends BaseAudioHandler
       final f = duckingController.duckFactor;
       final curVol = _activePlayer.volume;
       await _activePlayer.setVolume(f * curVol);
-      Timer(const Duration(milliseconds: 500), () async {
+      _systemSoundTimer?.cancel();
+      _systemSoundTimer = Timer(const Duration(milliseconds: 500), () async {
         if (_duckActive &&
             _interruption.activeKind == InterruptionKind.systemUiSound) {
           _duckActive = false;
           _interruption.end(InterruptionKind.systemUiSound);
+          // Compose with any in-flight sleep fade so this transient duck's
+          // restore doesn't wipe the fade for a tick.
           final target = _calculateReplayGainVolume(currentSong);
           try {
-            await _activePlayer.setVolume(target);
+            await _activePlayer
+                .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
           } catch (_) {}
         }
       });

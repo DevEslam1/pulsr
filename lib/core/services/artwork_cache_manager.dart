@@ -193,6 +193,15 @@ class ArtworkCacheManager {
     }
   }
 
+  /// Clears only the in-memory caches on transient memory pressure, leaving the
+  /// persistent disk cache intact so artwork does not have to be re-fetched and
+  /// re-decoded once the pressure subsides.
+  void trimMemoryForPressure() {
+    _memoryCache.clear();
+    _weakMemoryCache.clear();
+    _currentMemoryBytes = 0;
+  }
+
   /// Automatic LRU eviction executed in a background isolate to keep UI frame-rate fluid.
   Future<void> _enforceDiskLimit() async {
     if (_isCleaning) return;

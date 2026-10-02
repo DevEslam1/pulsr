@@ -4343,5 +4343,12 @@
   "conflictAaudioDirectCrossfade": "Desactivado: AAudio Direct está activado — el crossfade se aplica en la cadena DSP de ExoPlayer que omite. Desactiva AAudio Direct para usar el crossfade.",
   "conflictOemDoubleProcessing": "Advertencia: Dolby/Dirac del sistema está activo — ejecutar el DSP de Pulsr encima provoca doble procesamiento. Prefiere Preferencia de DSP = Nativo y desactiva los efectos del sistema.",
   "conflictVolumeBoostClipping": "Riesgo de clipping: preamplificador del EQ ({preampDb} dB) + refuerzo (+{boostDb} dB) = +{totalDb} dB > 6 dB de margen.",
-  "conflictHighBoostDistortion": "Un refuerzo alto puede causar distorsión o fatiga auditiva."
+  "conflictHighBoostDistortion": "Un refuerzo alto puede causar distorsión o fatiga auditiva.",
+  "swipeToPlayNextFavoriteHint": "Desliza para reproducir a continuación o marcar como favorito",
+  "removeSelectedDownloadsConfirm": "{count, plural, =1{¿Quitar 1 descarga seleccionada?} other{¿Quitar {count} descargas seleccionadas?}}",
+  "equalizerResponseCurve": "Curva de respuesta del ecualizador",
+  "maxVolume": "Volumen máximo",
+  "pageLoadingProgress": "Progreso de carga de la página",
+  "albumArtworkLabel": "Carátula del álbum",
+  "failedToApplyLabel": "No se pudo aplicar {label}"
 }

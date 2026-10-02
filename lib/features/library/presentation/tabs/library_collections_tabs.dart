@@ -53,7 +53,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       groupKey: '${state.sortBy}-${state.ascending}',
                       child: InkWell(
                         borderRadius: BorderRadius.circular(AppRadii.r18),
-                        onTap: () => context.push('/album', extra: album),
+                        onTap: () => context.pushDebounced('/album', extra: album),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -129,7 +129,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.label)),
                             trailing: Icon(Icons.chevron_right_rounded,
                                 color: p.textTertiary),
-                            onTap: () => context.push('/album', extra: album),
+                            onTap: () => context.pushDebounced('/album', extra: album),
                           ),
                         ),
                       ));
@@ -190,7 +190,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       groupKey: '${state.sortBy}-${state.ascending}',
                       child: InkWell(
                         borderRadius: BorderRadius.circular(AppRadii.r18),
-                        onTap: () => context.push('/artist', extra: artist),
+                        onTap: () => context.pushDebounced('/artist', extra: artist),
                         child: Column(
                           children: [
                             Expanded(
@@ -261,7 +261,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                     fontSize: AppFontSize.label)),
                             trailing: Icon(Icons.chevron_right_rounded,
                                 color: p.textTertiary),
-                            onTap: () => context.push('/artist', extra: artist),
+                            onTap: () => context.pushDebounced('/artist', extra: artist),
                           ),
                         ),
                       ));
@@ -326,7 +326,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       title: g.name,
                       subtitle: Formatters.formatTrackCount(g.songCount),
                       color: p.accent,
-                      onTap: () => context.push('/genre', extra: g),
+                      onTap: () => context.pushDebounced('/genre', extra: g),
                     );
                   },
                 ),
@@ -390,7 +390,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           title: '${y.year}',
           subtitle: Formatters.formatTrackCount(y.songCount),
           color: AppColors.skyBlue,
-          onTap: () => context.push('/year', extra: y),
+          onTap: () => context.pushDebounced('/year', extra: y),
         );
       },
     );

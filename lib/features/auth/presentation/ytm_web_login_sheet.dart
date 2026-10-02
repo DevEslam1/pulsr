@@ -1902,7 +1902,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           return const SizedBox.shrink();
                         }
                         return Semantics(
-                          label: 'Page loading progress',
+                          label: context.l10n.pageLoadingProgress,
                           value: _isLoading
                               ? null
                               : '${(progress * 100).round()}%',

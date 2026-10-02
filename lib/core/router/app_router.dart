@@ -334,6 +334,7 @@ GoRouter createRouter(MediaScannerService scannerService,
   final repo = musicRepository ?? getIt<IMusicRepository>();
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    restorationScopeId: 'pulsr-router',
     observers: [PulsrModalObserver()],
     initialLocation: '/splash',
     redirect: (context, state) {
@@ -387,7 +388,6 @@ GoRouter createRouter(MediaScannerService scannerService,
         branches: [
           // Tab 1: Home
           StatefulShellBranch(
-            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/',
@@ -402,7 +402,6 @@ GoRouter createRouter(MediaScannerService scannerService,
 
           // Tab 2: Library
           StatefulShellBranch(
-            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/library',
@@ -420,7 +419,6 @@ GoRouter createRouter(MediaScannerService scannerService,
 
           // Tab 3: Search
           StatefulShellBranch(
-            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/search',
@@ -437,7 +435,6 @@ GoRouter createRouter(MediaScannerService scannerService,
 
           // Tab 4: Playlists
           StatefulShellBranch(
-            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/playlists',
@@ -452,7 +449,6 @@ GoRouter createRouter(MediaScannerService scannerService,
 
           // Tab 5: Settings
           StatefulShellBranch(
-            observers: [PulsrModalObserver()],
             routes: [
               GoRoute(
                 path: '/settings',

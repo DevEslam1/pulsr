@@ -12,6 +12,8 @@ import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../core/responsive/detail_scaffold.dart';
+import '../../../core/responsive/breakpoints.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../core/errors/failures.dart';
@@ -131,21 +133,41 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         : PulsrLayoutMetrics.heroHeight(context);
     final artworkSize = (expandedHeight * 0.55).clamp(120.0, 220.0);
 
-    return PulsrPagePopScope(
-      child: Scaffold(
-        body: StreamBuilder<Result<List<SongsTableData>>>(
-          stream: _useCase.watchAlbumSongs(album.id).distinct(),
-          builder: (context, snapshot) {
-            final loadFailed = snapshot.hasError ||
-                (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-            if (loadFailed) {
-              return _AlbumErrorView(onRetry: () => setState(() {}));
-            }
-            final rawSongs =
-                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-            final songs = _sorted(rawSongs);
+    final shouldSplit = PulsrBreakpoint.isLandscape(context) ||
+        (Adaptive.isTablet(context) && context.screenWidth >= 800);
 
-            return Center(
+    return StreamBuilder<Result<List<SongsTableData>>>(
+      stream: _useCase.watchAlbumSongs(album.id).distinct(),
+      builder: (context, snapshot) {
+        final loadFailed = snapshot.hasError ||
+            (snapshot.data?.fold((l) => true, (_) => false) ?? false);
+        if (loadFailed) {
+          return _AlbumErrorView(onRetry: () => setState(() {}));
+        }
+        final rawSongs =
+            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+        final songs = _sorted(rawSongs);
+
+        // Tablet / landscape: adopt the shared adaptive master-detail split so the
+        // horizontal space shows artwork + actions beside the track list. The
+        // breakpoint mirrors DetailScaffold's own split condition so it engages at
+        // exactly the same point as the Genre/Year sibling screens.
+        if (shouldSplit) {
+          return DetailScaffold(
+            titleText: album.title,
+            onRefresh: () async {
+              if (mounted) setState(() {});
+            },
+            hero: _buildSplitHero(context, album, songs),
+            body: _buildTrackListBody(context, songs),
+          );
+        }
+
+        // Phone / portrait: preserve the existing collapsing SliverAppBar layout
+        // exactly (unchanged appearance and behavior).
+        return PulsrPagePopScope(
+          child: Scaffold(
+            body: Center(
               child: ConstrainedBox(
                 constraints: PulsrLayoutMetrics.contentConstraints(context),
                 child: RefreshIndicator(
@@ -206,124 +228,14 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         child: Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: Adaptive.pagePadding(context)),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: songs.isEmpty
-                                      ? null
-                                      : () => context
-                                          .read<PlayerCubit>()
-                                          .playSong(songs.first, queue: songs),
-                                  icon: const Icon(Icons.play_arrow_rounded),
-                                  label: Text(context.l10n.playAll),
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: songs.isEmpty
-                                      ? null
-                                      : () {
-                                          final shuffled =
-                                              List<SongsTableData>.from(songs)
-                                                ..shuffle();
-                                          context.read<PlayerCubit>().playSong(
-                                              shuffled.first,
-                                              queue: shuffled);
-                                        },
-                                  icon: Icon(Icons.shuffle_rounded,
-                                      color: p.accent),
-                                  label: Text(context.l10n.shuffle),
-                                ),
-                              ),
-                            ],
-                          ),
+                          child: _actionButtons(context, songs),
                         ),
                       ),
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: Adaptive.pagePadding(context)),
-                          child: Row(
-                            children: [
-                              Text(
-                                context.l10n.queue,
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w700),
-                              ),
-                              const Spacer(),
-                              // In-list sort (gap 07-01, persisted per session).
-                              DropdownButton<_AlbumSort>(
-                                value: _sort,
-                                underline: const SizedBox.shrink(),
-                                icon: Icon(Icons.sort_rounded,
-                                    color: p.textSecondary, size: 18),
-                                items: [
-                                  DropdownMenuItem(
-                                      value: _AlbumSort.track,
-                                      child:
-                                          Text(context.l10n.sortTrackNumber)),
-                                  DropdownMenuItem(
-                                      value: _AlbumSort.title,
-                                      child: Text(context.l10n.sortAZ)),
-                                  DropdownMenuItem(
-                                      value: _AlbumSort.duration,
-                                      child: Text(context.l10n.sortDuration)),
-                                ],
-                                onChanged: (v) {
-                                  if (v != null) {
-                                    setState(() => _sort = v);
-                                    _persistSort(v);
-                                  }
-                                },
-                              ),
-                              // Album-level queue actions (gap 07-03).
-                              PopupMenuButton<String>(
-                                icon: Icon(Icons.more_horiz_rounded,
-                                    color: p.textSecondary),
-                                onSelected: (v) async {
-                                  final cubit = context.read<PlayerCubit>();
-                                  final target = _selectedIds.isEmpty
-                                      ? songs
-                                      : songs
-                                          .where((s) =>
-                                              _selectedIds.contains(s.id))
-                                          .toList();
-                                  if (v == 'add') {
-                                    await cubit.addAllToQueue(target);
-                                    if (mounted) {
-                                      setState(() => _selectedIds.clear());
-                                    }
-                                  } else if (v == 'next' && target.isNotEmpty) {
-                                    for (final s in target.reversed) {
-                                      await cubit.playNext(s);
-                                    }
-                                    if (mounted) {
-                                      setState(() => _selectedIds.clear());
-                                    }
-                                  } else if (v == 'clear') {
-                                    setState(() => _selectedIds.clear());
-                                  }
-                                },
-                                itemBuilder: (c) => [
-                                  PopupMenuItem(
-                                      value: 'add',
-                                      child: Text(context.l10n.addToQueue)),
-                                  PopupMenuItem(
-                                      value: 'next',
-                                      child: Text(context.l10n.playNext)),
-                                  if (_selectedIds.isNotEmpty)
-                                    PopupMenuItem(
-                                        value: 'clear',
-                                        child: Text(
-                                            '${context.l10n.clear} (${_selectedIds.length})')),
-                                ],
-                              ),
-                            ],
-                          ),
+                          child: _queueActionsHeader(context, songs),
                         ),
                       ),
                       SliverPadding(
@@ -335,66 +247,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           addRepaintBoundaries: true,
                           itemCount: songs.length,
                           itemBuilder: (context, index) {
-                            // Disc grouping (gap 07-02): data is already ordered by
-                            // discNumber/trackNumber; render a header on change.
-                            final song = songs[index];
-                            final showDiscHeader = index == 0 ||
-                                (song.discNumber ?? 1) !=
-                                    (songs[index - 1].discNumber ?? 1);
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (showDiscHeader &&
-                                    songs.any((s) => (s.discNumber ?? 1) > 1))
-                                  Padding(
-                                    padding:
-                                        const EdgeInsetsDirectional.fromSTEB(
-                                            AppSpacing.md,
-                                            AppSpacing.sm,
-                                            AppSpacing.md,
-                                            AppSpacing.xxs),
-                                    child: Text(
-                                      '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
-                                      style: TextStyle(
-                                          color: p.textSecondary,
-                                          fontSize: AppFontSize.label,
-                                          fontWeight: FontWeight.w800),
-                                    ),
-                                  ),
-                                SongTile(
-                                  song: song,
-                                  index: index,
-                                  showArtwork: false,
-                                  // Batch multi-select (gap 07-04): long-press toggles,
-                                  // tap plays (or toggles when selection active).
-                                  selected: _selectedIds.contains(song.id),
-                                  onLongPress: () => setState(() {
-                                    if (_selectedIds.contains(song.id)) {
-                                      _selectedIds.remove(song.id);
-                                    } else {
-                                      _selectedIds.add(song.id);
-                                    }
-                                  }),
-                                  onTap: () {
-                                    if (_selectedIds.isNotEmpty) {
-                                      setState(() {
-                                        if (_selectedIds.contains(song.id)) {
-                                          _selectedIds.remove(song.id);
-                                        } else {
-                                          _selectedIds.add(song.id);
-                                        }
-                                      });
-                                    } else {
-                                      context
-                                          .read<PlayerCubit>()
-                                          .playSong(song, queue: songs);
-                                    }
-                                  },
-                                  onMorePressed: () =>
-                                      SongInfoSheet.show(context, song: song),
-                                ),
-                              ],
-                            );
+                            return _buildSongItem(context, songs, index);
                           },
                         ),
                       ),
@@ -402,10 +255,237 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _actionButtons(BuildContext context, List<SongsTableData> songs) {
+    final p = context.palette;
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: songs.isEmpty
+                ? null
+                : () => context
+                    .read<PlayerCubit>()
+                    .playSong(songs.first, queue: songs),
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(context.l10n.playAll),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: songs.isEmpty
+                ? null
+                : () {
+                    final shuffled = List<SongsTableData>.from(songs)
+                      ..shuffle();
+                    context
+                        .read<PlayerCubit>()
+                        .playSong(shuffled.first, queue: shuffled);
+                  },
+            icon: Icon(Icons.shuffle_rounded, color: p.accent),
+            label: Text(context.l10n.shuffle),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _queueActionsHeader(BuildContext context, List<SongsTableData> songs) {
+    final p = context.palette;
+    return Row(
+      children: [
+        Text(
+          context.l10n.queue,
+          style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.label,
+              fontWeight: FontWeight.w700),
+        ),
+        const Spacer(),
+        // In-list sort (gap 07-01, persisted per session).
+        DropdownButton<_AlbumSort>(
+          value: _sort,
+          underline: const SizedBox.shrink(),
+          icon: Icon(Icons.sort_rounded, color: p.textSecondary, size: 18),
+          items: [
+            DropdownMenuItem(
+                value: _AlbumSort.track,
+                child: Text(context.l10n.sortTrackNumber)),
+            DropdownMenuItem(
+                value: _AlbumSort.title, child: Text(context.l10n.sortAZ)),
+            DropdownMenuItem(
+                value: _AlbumSort.duration,
+                child: Text(context.l10n.sortDuration)),
+          ],
+          onChanged: (v) {
+            if (v != null) {
+              setState(() => _sort = v);
+              _persistSort(v);
+            }
+          },
+        ),
+        // Album-level queue actions (gap 07-03).
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_horiz_rounded, color: p.textSecondary),
+          onSelected: (v) async {
+            final cubit = context.read<PlayerCubit>();
+            final target = _selectedIds.isEmpty
+                ? songs
+                : songs.where((s) => _selectedIds.contains(s.id)).toList();
+            if (v == 'add') {
+              await cubit.addAllToQueue(target);
+              if (mounted) {
+                setState(() => _selectedIds.clear());
+              }
+            } else if (v == 'next' && target.isNotEmpty) {
+              for (final s in target.reversed) {
+                await cubit.playNext(s);
+              }
+              if (mounted) {
+                setState(() => _selectedIds.clear());
+              }
+            } else if (v == 'clear') {
+              setState(() => _selectedIds.clear());
+            }
+          },
+          itemBuilder: (c) => [
+            PopupMenuItem(value: 'add', child: Text(context.l10n.addToQueue)),
+            PopupMenuItem(value: 'next', child: Text(context.l10n.playNext)),
+            if (_selectedIds.isNotEmpty)
+              PopupMenuItem(
+                  value: 'clear',
+                  child:
+                      Text('${context.l10n.clear} (${_selectedIds.length})')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSongItem(
+      BuildContext context, List<SongsTableData> songs, int index) {
+    final p = context.palette;
+    // Disc grouping (gap 07-02): data is already ordered by
+    // discNumber/trackNumber; render a header on change.
+    final song = songs[index];
+    final showDiscHeader = index == 0 ||
+        (song.discNumber ?? 1) != (songs[index - 1].discNumber ?? 1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showDiscHeader && songs.any((s) => (s.discNumber ?? 1) > 1))
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xxs),
+            child: Text(
+              '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
+              style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.label,
+                  fontWeight: FontWeight.w800),
+            ),
+          ),
+        SongTile(
+          song: song,
+          index: index,
+          showArtwork: false,
+          // Batch multi-select (gap 07-04): long-press toggles,
+          // tap plays (or toggles when selection active).
+          selected: _selectedIds.contains(song.id),
+          onLongPress: () => setState(() {
+            if (_selectedIds.contains(song.id)) {
+              _selectedIds.remove(song.id);
+            } else {
+              _selectedIds.add(song.id);
+            }
+          }),
+          onTap: () {
+            if (_selectedIds.isNotEmpty) {
+              setState(() {
+                if (_selectedIds.contains(song.id)) {
+                  _selectedIds.remove(song.id);
+                } else {
+                  _selectedIds.add(song.id);
+                }
+              });
+            } else {
+              context.read<PlayerCubit>().playSong(song, queue: songs);
+            }
+          },
+          onMorePressed: () => SongInfoSheet.show(context, song: song),
+        ),
+      ],
+    );
+  }
+
+  // Left pane (tablet/landscape split): artwork, title, metadata and the
+  // play/shuffle actions. The artwork keeps the same Hero tag used by the phone
+  // SliverAppBar so list->detail and mini->player hero flights are unaffected.
+  Widget _buildSplitHero(
+      BuildContext context, AlbumsTableData album, List<SongsTableData> songs) {
+    final p = context.palette;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: AppSpacing.sm),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Scale the primary artwork to the pane while staying crisp.
+            final artSize = (constraints.maxWidth * 0.7).clamp(140.0, 280.0);
+            return Hero(
+              tag: widget.heroTag ?? 'album_${album.id}',
+              child: CachedArtwork(
+                id: album.id,
+                type: ArtworkType.ALBUM,
+                size: artSize,
+                borderRadius: 24,
+                highQuality: true,
+              ),
             );
           },
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        Text(album.title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          child: _actionButtons(context, songs),
+        ),
+      ],
+    );
+  }
+
+  // Right pane (tablet/landscape split): queue header + track list, reusing the
+  // same item builder as the phone sliver list.
+  Widget _buildTrackListBody(BuildContext context, List<SongsTableData> songs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding:
+              EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+          child: _queueActionsHeader(context, songs),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        for (int i = 0; i < songs.length; i++)
+          _buildSongItem(context, songs, i),
+      ],
     );
   }
 }

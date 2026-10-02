@@ -7876,4 +7876,36 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get conflictHighBoostDistortion =>
       'قد يسبب التعزيز العالي تشوهًا أو إجهادًا سمعيًا.';
+
+  @override
+  String get swipeToPlayNextFavoriteHint =>
+      'اسحب للتشغيل التالي أو الإضافة إلى المفضلة';
+
+  @override
+  String removeSelectedDownloadsConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'إزالة $count تنزيلات محددة؟',
+      one: 'إزالة التنزيل المحدد؟',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get equalizerResponseCurve => 'منحنى استجابة المُعادِل';
+
+  @override
+  String get maxVolume => 'الحد الأقصى للصوت';
+
+  @override
+  String get pageLoadingProgress => 'تقدّم تحميل الصفحة';
+
+  @override
+  String get albumArtworkLabel => 'صورة الألبوم';
+
+  @override
+  String failedToApplyLabel(String label) {
+    return 'تعذّر تطبيق $label';
+  }
 }

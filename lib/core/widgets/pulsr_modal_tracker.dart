@@ -62,15 +62,15 @@ class PulsrModalObserver extends NavigatorObserver {
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 
+  // Detect modals by ROUTE TYPE rather than a brittle name-substring heuristic.
+  // This reliably catches bottom sheets and dialogs regardless of their route
+  // name. (DialogRoute/RawDialogRoute/ModalBottomSheetRoute all extend
+  // PopupRoute, but they are listed explicitly for clarity.)
   bool _isModal(Route route) =>
-      route is PopupRoute ||
+      route is ModalBottomSheetRoute ||
       route is DialogRoute ||
       route is RawDialogRoute ||
-      route is ModalBottomSheetRoute ||
-      (route.settings.name != null &&
-          (route.settings.name!.contains('dialog') ||
-              route.settings.name!.contains('sheet') ||
-              route.settings.name!.contains('modal')));
+      route is PopupRoute;
 
   bool _isNowPlaying(Route route) =>
       route.settings.name == 'now-playing' ||

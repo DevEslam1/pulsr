@@ -5,6 +5,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> play() {
     _userPlaybackInitiated = true;
+    // A user/system-initiated play clears the becoming-noisy auto-resume
+    // arming so only a becoming-noisy pause keeps it armed (item 2).
+    _pausedForNoisy = false;
     unawaited(() async {
       try {
         final s = await AudioSession.instance;
@@ -59,6 +62,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // later call can still pause us (B-1); the previous code only cleared the
     // "was playing" half, leaving the active flag set.
     _interruption.onUserPause();
+    // A user pause clears the becoming-noisy auto-resume arming; the
+    // becoming-noisy handler re-arms it AFTER calling pause() (item 2).
+    _pausedForNoisy = false;
     ErrorLogger.addBreadcrumb('Playback paused', category: 'player');
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _preCrossfadeVolume ?? _volume);
@@ -635,10 +641,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
     final insertIdx =
         _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
-    _songs.insert(insertIdx, song);
+    // Route through the state machine so _shuffleHistory is reindexed. The
+    // insert sits after the current track, so the playing index never shifts.
+    _queueStateMachine.insertSong(insertIdx, song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
-    // Insert sits after the current track, so the playing index never shifts.
     if (_gaplessMode && _gaplessLoaded) {
       await _activePlayer.insertAudioSource(
           insertIdx, _buildGaplessChild(song));
@@ -705,7 +712,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     final wasGaplessLoaded = _gaplessLoaded;
     final wasPlaying = _activePlayer.playing;
 
-    _songs.removeAt(index);
+    // Route through the state machine so _shuffleHistory is reindexed and
+    // _currentIndex is adjusted consistently (fixes a stale "Previous" after a
+    // queue edit under shuffle). It decrements the current index when a track
+    // before it is removed and clamps it into range, so no hand-adjustment is
+    // needed below.
+    _queueStateMachine.removeSongAt(index);
     _queueDirty = true;
 
     if (_songs.isEmpty) {
@@ -719,11 +731,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
     if (_gaplessMode) {
       if (wasPlayingCurrent) {
-        // Removing the playing track changes the current song. Rebuild the
-        // playlist at the clamped index so the new current starts cleanly,
-        // rather than leaning on ExoPlayer's silent same-index auto-advance
-        // (which would leave the notification and play history stale).
-        _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+        // Removing the playing track changes the current song (the state
+        // machine already clamped _currentIndex). Rebuild the playlist at that
+        // index so the new current starts cleanly, rather than leaning on
+        // ExoPlayer's silent same-index auto-advance (which would leave the
+        // notification and play history stale).
         if (wasGaplessLoaded && _activePlayer.audioSources.isNotEmpty) {
           await _loadGaplessQueue(preload: wasPlaying);
         } else {
@@ -735,8 +747,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
               .add(PulsrAudioHandler._songToMediaItem(nextSong, fastArtUri));
         }
       } else {
-        if (index < _currentIndex) _currentIndex--;
-        // Pre-set so the shift emit from currentIndexStream is a no-op.
+        // _currentIndex was already decremented by removeSongAt when the
+        // removed track preceded it. Pre-set so the shift emit from
+        // currentIndexStream is a no-op.
         _lastGaplessIndex = _currentIndex;
         if (wasGaplessLoaded && index < _activePlayer.audioSources.length) {
           try {
@@ -754,10 +767,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         }
       }
     } else {
-      if (index < _currentIndex) {
-        _currentIndex--;
-      } else if (wasPlayingCurrent) {
-        _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+      if (wasPlayingCurrent) {
+        // The current track was removed; the state machine clamped
+        // _currentIndex to the new occupant of that slot. Load it. (A removal
+        // before the current index was already handled by removeSongAt's
+        // decrement — nothing else to do.)
         if (wasPlaying) {
           await playSongAt(_currentIndex);
         } else {
@@ -786,17 +800,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
     if (oldIndex == newIndex) return;
 
-    final song = _songs.removeAt(oldIndex);
-    _songs.insert(newIndex, song);
+    // Route through the state machine so the list move, _currentIndex
+    // adjustment and _shuffleHistory remap all stay consistent (fixes a stale
+    // "Previous" after a reorder under shuffle).
+    _queueStateMachine.reorder(oldIndex, newIndex);
     _queueDirty = true;
-
-    if (_currentIndex == oldIndex) {
-      _currentIndex = newIndex;
-    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
-      _currentIndex--;
-    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
-      _currentIndex++;
-    }
 
     // moveAudioSource() replays remove(oldIndex)+insert(newIndex) on the playlist's
     // layout, reaching the same order as _songs. Pre-set _lastGaplessIndex so a
@@ -927,4 +935,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   HeadsetControlConfig? get cachedHeadsetConfig;
   set cachedHeadsetConfig(HeadsetControlConfig? value);
+
+  bool get _pausedForNoisy;
+  set _pausedForNoisy(bool value);
 }

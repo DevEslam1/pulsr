@@ -394,11 +394,43 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
           final active = _activePlayer;
           final inactive = _inactivePlayer;
 
-          // BPM-synced crossfade: when enabled and the incoming track has a
-          // known BPM, align the fade to the nearest 2/4/8/16/32 beats.
-          final fadeDuration = _crossfadeManager.effectiveFadeDuration(
-            trackId: nextSong.id.toString(),
+          // Arbitrate the transition now that the incoming player is ready
+          // (item 9). The arbiter clamps the effective fade (BPM alignment can
+          // make it longer than the base duration) to `remaining - 0.5s` so the
+          // ramp can never outlast the outgoing track and leave it to hit
+          // ProcessingState.completed mid-fade (one-sided fade); it also falls
+          // back to a hard switch when < 1s of the track remains. The incoming-
+          // buffer guard is intentionally bypassed (null): streaming players
+          // buffer incrementally and never reach the 50%-ahead the arbiter's
+          // fraction guard expects — readiness is already enforced above by
+          // _canStartCrossfade.
+          final outDuration = _activePlayer.duration;
+          final remaining = (outDuration != null && outDuration > Duration.zero)
+              ? outDuration - _activePlayer.position
+              : Duration.zero;
+          final decision = CrossfadeManager.arbitrateTransition(
+            configuredCrossfade: _crossfadeManager.effectiveFadeDuration(
+              trackId: nextSong.id.toString(),
+            ),
+            remainingTrackDuration: remaining,
+            isSameDecoderConfig: true,
+            isRepeatOne: _activePlayer.loopMode == LoopMode.one,
+            nextTrackBufferedFraction: null,
           );
+          if (decision.isGapless) {
+            ErrorLogger.log(
+                'Crossfade arbitration chose a hard transition: ${decision.reason}',
+                category: 'AudioHandler');
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
+            try {
+              await _activePlayer.setVolume(initialActiveVolume);
+            } catch (_) {}
+            await playSongAt(nextIndex);
+            return;
+          }
+          final fadeDuration = decision.effectiveDuration;
 
           final targetNextVolume = _calculateReplayGainVolume(nextSong);
           final isRepeatOne = _activePlayer.loopMode == LoopMode.one;
@@ -569,19 +601,37 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         !_gaplessLoaded &&
         _userPlaybackInitiated &&
         _gaplessTargetIndex != null) {
-      final tEarly = DateTime.now().toIso8601String();
-      ErrorLogger.addBreadcrumb(
-        '[$tEarly] _broadcastState: early-return (gapless loading target=$_gaplessTargetIndex)',
+      // A gapless load that stalls or fails before it sets _gaplessLoaded would
+      // otherwise suppress EVERY broadcast indefinitely and freeze the
+      // notification. Bound the suppression: once it has been active too long,
+      // clear the stuck target and fall through so state flows again. The
+      // load's own failure paths reset the target immediately (see
+      // _loadGaplessQueue / playSongAt); this is the backstop for any they miss.
+      final since = _gaplessSuppressionSince ??= DateTime.now();
+      if (DateTime.now().difference(since) < const Duration(seconds: 8)) {
+        final tEarly = DateTime.now().toIso8601String();
+        ErrorLogger.addBreadcrumb(
+          '[$tEarly] _broadcastState: early-return (gapless loading target=$_gaplessTargetIndex)',
+          category: 'AudioHandler',
+          data: {
+            'ts': tEarly,
+            'gaplessMode': _gaplessMode,
+            'gaplessLoaded': _gaplessLoaded,
+            'userPlaybackInitiated': _userPlaybackInitiated,
+            'gaplessTargetIndex': _gaplessTargetIndex,
+          },
+        );
+        return;
+      }
+      ErrorLogger.log(
+        'Gapless load suppression exceeded 8s without completing; clearing '
+        'stuck target=$_gaplessTargetIndex to unfreeze the notification',
         category: 'AudioHandler',
-        data: {
-          'ts': tEarly,
-          'gaplessMode': _gaplessMode,
-          'gaplessLoaded': _gaplessLoaded,
-          'userPlaybackInitiated': _userPlaybackInitiated,
-          'gaplessTargetIndex': _gaplessTargetIndex,
-        },
       );
-      return;
+      _gaplessTargetIndex = null;
+      _gaplessSuppressionSince = null;
+    } else {
+      _gaplessSuppressionSince = null;
     }
 
     final isCompleted =
@@ -673,8 +723,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         playing: isPlaying,
         // Report the latency-compensated position so the notification shade's
         // scrubber matches what the user actually hears (matches the in-app
-        // UI/lyrics, which already use compensatedPosition).
-        updatePosition: compensatedPosition,
+        // UI/lyrics, which already use compensatedPosition). Clamp to zero:
+        // compensation can push it slightly negative near track start.
+        updatePosition: compensatedPosition.isNegative
+            ? Duration.zero
+            : compensatedPosition,
         bufferedPosition: _activePlayer.bufferedPosition,
         speed: _activePlayer.speed,
         queueIndex: _currentIndex,
@@ -980,6 +1033,30 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
             : null;
         mediaItem.add(PulsrAudioHandler._songToMediaItem(newSong, fastArtUri));
       }
+      // Keep the gapless concat in step with _songs so the reconciled source
+      // actually plays when reached (item 11). Only swap UPCOMING children
+      // (idx > current): a remove/insert at or before the current index shifts
+      // ExoPlayer's current index and emits transient currentIndex changes that
+      // would corrupt the live track, and the current item keeps its already-
+      // decoding source (reconciling it mid-play would restart it).
+      if (_gaplessMode &&
+          _gaplessLoaded &&
+          idx > _currentIndex &&
+          idx < _activePlayer.audioSources.length) {
+        final child = _buildGaplessChild(newSong);
+        unawaited(() async {
+          try {
+            await _activePlayer.removeAudioSourceAt(idx);
+            await _activePlayer.insertAudioSource(idx, child);
+          } catch (e, st) {
+            ErrorLogger.log(
+                'Failed to swap reconciled gapless source at index $idx',
+                error: e,
+                stackTrace: st,
+                category: 'AudioHandler');
+          }
+        }());
+      }
     }
   }
 
@@ -1066,8 +1143,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       if (firstSong.source != SongSource.youtube &&
           !PulsrAudioHandler._isStreamUrl(firstSong.path)) {
         try {
-          final measuredTrim =
-              GaplessTrimHandler.readHeaderGaplessTrimSync(firstSong.path);
+          final measuredTrim = GaplessTrimHandler.readHeaderGaplessTrimSync(
+              firstSong.path,
+              sampleRate: firstSong.sampleRate ?? 44100);
           if (measuredTrim != null && measuredTrim.preSkip.inMilliseconds > 2) {
             final currentSrc = sources[targetIndex];
             if (currentSrc is UriAudioSource &&
@@ -1171,6 +1249,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       }).catchError((_) {});
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
+      // This load failed before setting _gaplessLoaded; clear the target so the
+      // _broadcastState suppression lifts immediately and the notification does
+      // not freeze (item 13).
+      _gaplessTargetIndex = null;
       final info = YtmErrorClassifier.classify(e);
       _errorSubject.add(info.message);
       ErrorLogger.log(
@@ -1200,6 +1282,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       }
     } catch (e, st) {
       if (generation != _playGeneration) return;
+      // This load failed before setting _gaplessLoaded; clear the target so the
+      // _broadcastState suppression lifts immediately (item 13).
+      _gaplessTargetIndex = null;
       final errStr = e.toString().toLowerCase();
       // Ignore loading interrupted / abort errors resulting from newer play actions
       if (errStr.contains('interrupted') || errStr.contains('abort')) {
@@ -1353,12 +1438,40 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     }).catchError((_) {});
   }
 
+  /// The single track the NEXT advance will actually play in the non-gapless
+  /// shuffle case — the state machine's pre-committed pick (see
+  /// [PlaybackQueueStateMachine.peekNextIndex]). The pre-resolver and preload
+  /// scheduler warm this instead of the linear neighbour (which shuffle skips)
+  /// or an independent random guess (which the advance would not match).
+  ///
+  /// Null when gapless (the shuffleIndices concat order already drives warming),
+  /// when not shuffling, or when no valid next exists. Peeking is idempotent and
+  /// does not record shuffle history, so repeated calls return the SAME pick the
+  /// real advance later consumes.
+  SongsTableData? _nonGaplessShuffleNextSong() {
+    if (_gaplessMode || !_activePlayer.shuffleModeEnabled) return null;
+    final idx = _getNextIndex(peek: true);
+    if (idx == null || idx < 0 || idx >= _songs.length) return null;
+    return _songs[idx];
+  }
+
   void _planNextStreamResolution() {
     if (_songs.isEmpty) return;
     _streamPreResolver.onTrackStarted(
       queue: _songs,
       currentIndex: _currentIndex,
       isShuffle: _activePlayer.shuffleModeEnabled,
+      // Thread the real gapless shuffle order so the shuffle successor is warmed
+      // instead of the linear currentIndex+1 (item 7). Only meaningful in
+      // gapless mode, where the concat carries the whole queue; the crossfade
+      // engine holds a single source on the active player (shuffleIndices=[0]).
+      shuffleIndices: (_activePlayer.shuffleModeEnabled && _gaplessMode)
+          ? _activePlayer.shuffleIndices
+          : null,
+      // Non-gapless shuffle: pin the pre-committed next pick so the warmed track
+      // is exactly the one the next advance plays (the state machine now hands
+      // peek and advance the SAME index) instead of the linear fallback.
+      explicitNextSong: _nonGaplessShuffleNextSong(),
     );
   }
 
@@ -1366,6 +1479,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     _userPlaybackInitiated = true;
     if (index < 0 || index >= _songs.length) return;
     cancelPrefetches();
+    // playSongAt takes over the active player with a single source; clear any
+    // in-flight gapless load target so a stalled one cannot keep
+    // _broadcastState suppressed and freeze the notification (item 13).
+    _gaplessTargetIndex = null;
     // A YouTube resolve below can await for seconds; a second skip during that
     // window must win. Capture a generation token FIRST so a pre-resolve
     // failure can bail without touching current playback at all.
@@ -1439,9 +1556,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       }
     }).catchError((_) {});
 
-    // Kick off background prefetch for next track immediately so next skip is instant
-    if (index + 1 < _songs.length) {
-      _prefetchStream(_songs[index + 1]);
+    // Kick off background prefetch for next track immediately so next skip is
+    // instant. In non-gapless shuffle the next advance is the pre-committed
+    // pick, not the linear neighbour, so warm that exact track instead.
+    final warmIdx = (!_gaplessMode && _activePlayer.shuffleModeEnabled)
+        ? _getNextIndex(peek: true)
+        : (index + 1 < _songs.length ? index + 1 : null);
+    if (warmIdx != null && warmIdx >= 0 && warmIdx < _songs.length) {
+      _prefetchStream(_songs[warmIdx]);
     }
 
     // Keep notification controls alive during track transition
@@ -1606,6 +1728,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   List<AudioSource> _buildAudioSources(List<SongsTableData> songs);
 
+  AudioSource _buildGaplessChild(SongsTableData song);
+
   double _calculateReplayGainVolume(SongsTableData? song);
 
   int get _consecutiveFailures;
@@ -1636,6 +1760,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   bool get _gaplessTargetReached;
   set _gaplessTargetReached(bool value);
+
+  DateTime? get _gaplessSuppressionSince;
+  set _gaplessSuppressionSince(DateTime? value);
 
   int get _generationCounter;
   set _generationCounter(int value);

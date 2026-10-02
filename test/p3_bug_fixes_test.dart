@@ -128,7 +128,11 @@ void main() {
       expect(state.dsp.isVirtualizerEnabled, isTrue);
       expect(state.playback.errorMessage, isNull);
 
-      // Error handling and syncAudioEffects trigger
+      // On a native failure applyDspEffect rolls the DSP slice back to the
+      // pre-attempt snapshot and surfaces the error. It intentionally does NOT
+      // re-read the engine via syncAudioEffects — the snapshot is the
+      // authoritative known-good state, so a mid-failure re-sync (which could
+      // emit a half-applied slice) is avoided.
       await controller.applyDspEffect(
         featureName: 'Spatializer',
         requiresGuard: false,
@@ -138,7 +142,8 @@ void main() {
         },
       );
 
-      expect(syncCalled, isTrue);
+      expect(syncCalled, isFalse);
+      expect(state.dsp.isSpatializerEnabled, isFalse);
       expect(
         state.playback.errorMessage,
         contains(

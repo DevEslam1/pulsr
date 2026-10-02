@@ -420,14 +420,25 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       final trim = GaplessTrimHandler.trimFor(
         path: song.path,
         codec: song.codec,
+        // Thread the real sample rate so header sample-count→duration math is
+        // correct for 48kHz content (item 15); 44100 stays the documented
+        // default when the scanner left it unknown.
+        sampleRate: song.sampleRate,
       );
       if (!trim.isEmpty) {
         final trackLen = Duration(milliseconds: song.durationMs);
         final clamped = trim.clampedTo(trackLen);
-        final start = GaplessTrimHandler.startOffset(clamped);
+        var start = GaplessTrimHandler.startOffset(clamped);
         final end = trackLen > Duration.zero
             ? GaplessTrimHandler.effectiveEnd(trackLen, clamped)
             : null;
+        // When the real duration is unknown (durationMs == 0) clampedTo cannot
+        // cap the trim, so a corrupt header could seek far into (or past) the
+        // track. Real encoder pre-skip is tens of ms, never seconds — cap the
+        // start (item 15).
+        if (trackLen <= Duration.zero && start > const Duration(seconds: 1)) {
+          start = const Duration(seconds: 1);
+        }
         if (start > Duration.zero || (end != null && end < trackLen)) {
           return ClippingAudioSource(
             start: start == Duration.zero ? null : start,
@@ -899,6 +910,14 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       isShuffle: _activePlayer.shuffleModeEnabled,
       position: _activePlayer.position,
       duration: _activePlayer.duration ?? Duration.zero,
+      // Thread the real gapless shuffle order so gapless shuffle preloads the
+      // actual successor (item 7). Only in gapless mode: the crossfade engine
+      // holds a single source on the active player.
+      shuffleIndices: _gaplessMode ? _activePlayer.shuffleIndices : null,
+      // Non-gapless shuffle: pin the pre-committed next pick so the scheduler
+      // preloads exactly the track the next advance plays instead of its own
+      // independent random guess.
+      explicitNextSong: _nonGaplessShuffleNextSong(),
       preloadCount: _preloadCountForCurrentBucket,
     );
   }
@@ -946,6 +965,12 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   String _currentStreamingQuality();
 
   bool get _duckActive;
+
+  bool get _gaplessMode;
+
+  /// Supplied by [PulsrAudioQueueEngine]: the pre-committed non-gapless shuffle
+  /// successor to warm, or null (gapless / not shuffling / no next).
+  SongsTableData? _nonGaplessShuffleNextSong();
 
   EqualizerManager get _equalizerManager;
 

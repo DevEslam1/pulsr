@@ -83,17 +83,37 @@ class PositionCrashGuard {
 
       final jsonStr = jsonEncode(snapshot.toJson());
       await tmpFile.writeAsString(jsonStr, flush: true);
-      if (await file.exists()) {
-        await file.delete();
+      try {
+        // Atomic commit on POSIX targets (Android/iOS/macOS/Linux): rename
+        // overwrites the destination in a single syscall, so a crash can never
+        // leave the final file deleted-but-not-yet-renamed — the old pre-delete
+        // step opened exactly that window. No pre-delete anymore.
+        await tmpFile.rename(file.path);
+      } on FileSystemException {
+        // Platforms that reject rename-over-existing (e.g. Windows): fall back
+        // to copy + delete. The valid .tmp survives until the copy succeeds, so
+        // readSnapshot's .tmp fallback still covers an interrupted write.
+        await tmpFile.copy(file.path);
+        try {
+          await tmpFile.delete();
+        } catch (_) {}
       }
-      await tmpFile.rename(file.path);
     } catch (_) {}
   }
 
-  /// Reads crash recovery snapshot if it exists.
+  /// Reads the crash recovery snapshot. Prefers the committed file, then falls
+  /// back to the surviving `.tmp`: if the process died between writing `.tmp`
+  /// and committing it to the final path, the only valid snapshot lives in
+  /// `.tmp` — recovering it is exactly what the crash guard exists for.
   static Future<PositionCrashSnapshot?> readSnapshot() async {
+    final committed = await _readFrom(tmp: false);
+    if (committed != null) return committed;
+    return _readFrom(tmp: true);
+  }
+
+  static Future<PositionCrashSnapshot?> _readFrom({required bool tmp}) async {
     try {
-      final file = await _getFile();
+      final file = await _getFile(tmp: tmp);
       if (file != null && await file.exists()) {
         final content = await file.readAsString();
         if (content.isNotEmpty) {

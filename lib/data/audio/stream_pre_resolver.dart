@@ -73,11 +73,17 @@ class StreamPreResolver {
   Set<String> get inFlightVideoIds => Set.unmodifiable(_inFlightVideoIds);
 
   /// Called immediately when a track starts playing.
+  ///
+  /// [explicitNextSong] pins the single track to warm, overriding the queue
+  /// lookahead. The non-gapless shuffle path uses it to warm the state
+  /// machine's pre-committed next pick (which neither the linear fallback nor a
+  /// fresh random guess would match).
   void onTrackStarted({
     required List<SongsTableData> queue,
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    SongsTableData? explicitNextSong,
     Duration? position,
     Duration? duration,
   }) {
@@ -88,6 +94,7 @@ class StreamPreResolver {
       currentIndex: currentIndex,
       isShuffle: isShuffle,
       shuffleIndices: shuffleIndices,
+      explicitNextSong: explicitNextSong,
     );
   }
 
@@ -97,6 +104,7 @@ class StreamPreResolver {
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    SongsTableData? explicitNextSong,
     Duration? position,
     Duration? duration,
   }) {
@@ -114,6 +122,7 @@ class StreamPreResolver {
         currentIndex: currentIndex,
         isShuffle: isShuffle,
         shuffleIndices: shuffleIndices,
+        explicitNextSong: explicitNextSong,
       );
     } else {
       _debounceTimer = Timer(debounceDuration, () {
@@ -123,6 +132,7 @@ class StreamPreResolver {
           currentIndex: currentIndex,
           isShuffle: isShuffle,
           shuffleIndices: shuffleIndices,
+          explicitNextSong: explicitNextSong,
         );
       });
     }
@@ -153,6 +163,7 @@ class StreamPreResolver {
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    SongsTableData? explicitNextSong,
   }) {
     if (queue.isEmpty || currentIndex < 0) return;
 
@@ -162,6 +173,7 @@ class StreamPreResolver {
       currentIndex: currentIndex,
       isShuffle: isShuffle,
       shuffleIndices: shuffleIndices,
+      explicitNextSong: explicitNextSong,
       repeatQueue: repeatQueue,
       count: preResolveWindowSize,
     );
@@ -240,10 +252,20 @@ class StreamPreResolver {
     required int currentIndex,
     required bool isShuffle,
     List<int>? shuffleIndices,
+    SongsTableData? explicitNextSong,
     bool repeatQueue = false,
     int count = defaultPreResolveCount,
   }) {
     if (queue.isEmpty) return const [];
+
+    // An explicit next pick (non-gapless shuffle's pre-committed successor)
+    // overrides the queue lookahead: shuffle visits exactly this track next, so
+    // the linear/random fallback below would warm the wrong one. Only one track
+    // can be known ahead of a random shuffle advance.
+    if (explicitNextSong != null) {
+      return [explicitNextSong];
+    }
+
     final results = <SongsTableData>[];
 
     if (isShuffle && shuffleIndices != null && shuffleIndices.isNotEmpty) {

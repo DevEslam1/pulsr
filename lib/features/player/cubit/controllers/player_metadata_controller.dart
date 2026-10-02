@@ -108,6 +108,14 @@ class PlayerMetadataController {
     }
   }
 
+  /// Evaluates the current playback [pos] against the loaded SponsorBlock
+  /// segments and returns the position to seek to when it lands inside a
+  /// skippable segment (null otherwise). Delegates to the manager's throttled,
+  /// de-duplicated skip logic.
+  Duration? sponsorBlockSkipTarget(Duration pos, {required bool isPlaying}) {
+    return _sponsorBlockManager.checkSkipTarget(pos, isPlaying: isPlaying);
+  }
+
   Future<void> loadCueChapters(SongsTableData song) async {
     if (song.cueFile == null || song.cueStartMs == null) {
       final state = _getState();

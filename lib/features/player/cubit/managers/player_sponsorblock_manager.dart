@@ -34,6 +34,7 @@ class PlayerSponsorBlockManager {
     _currentSegments = const [];
     _currentVideoId = null;
     _lastSkippedSegmentEnd = null;
+    _lastSkipTime = null;
   }
 
   Future<List<SponsorBlockSegment>> loadSegmentsForSong(

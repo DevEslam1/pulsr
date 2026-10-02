@@ -81,6 +81,10 @@ class SmartPreloadScheduler {
   }
 
   /// Evaluates the current playback progress and schedules ahead-of-time preloads.
+  ///
+  /// [explicitNextSong] pins the single track to preload for the non-gapless
+  /// shuffle case: the state machine's pre-committed next pick, which neither
+  /// the gapless [shuffleIndices] path nor the random fallback would match.
   void schedulePreloads({
     required List<SongsTableData> queue,
     required int currentIndex,
@@ -88,6 +92,7 @@ class SmartPreloadScheduler {
     required Duration position,
     required Duration duration,
     List<int>? shuffleIndices,
+    SongsTableData? explicitNextSong,
     int preloadCount = 3,
   }) {
     if (networkPolicy == PreloadNetworkPolicy.never) return;
@@ -116,12 +121,14 @@ class SmartPreloadScheduler {
         currentIndex: currentIndex,
         isShuffle: isShuffle,
         shuffleIndices: shuffleIndices,
+        explicitNextSong: explicitNextSong,
         preloadCount: preloadCount,
         isMetered: _meteredCache,
       );
       return;
     }
 
+    final gen = _generation;
     unawaited(() async {
       bool isMetered;
       try {
@@ -129,11 +136,15 @@ class SmartPreloadScheduler {
       } catch (_) {
         isMetered = false;
       }
+      // A queue change (clear()) bumps _generation while the probe awaited;
+      // bail so we don't dispatch preloads for a stale queue (item 14).
+      if (gen != _generation) return;
       _dispatchPreloads(
         queue: queue,
         currentIndex: currentIndex,
         isShuffle: isShuffle,
         shuffleIndices: shuffleIndices,
+        explicitNextSong: explicitNextSong,
         preloadCount: preloadCount,
         isMetered: isMetered,
       );
@@ -155,6 +166,7 @@ class SmartPreloadScheduler {
     required int currentIndex,
     required bool isShuffle,
     required List<int>? shuffleIndices,
+    SongsTableData? explicitNextSong,
     required int preloadCount,
     required bool isMetered,
   }) {
@@ -183,6 +195,13 @@ class SmartPreloadScheduler {
           }
           return;
         }
+      }
+      // Non-gapless shuffle: warm the state machine's pre-committed next pick
+      // (the track the next advance will actually play) instead of a random
+      // guess that would almost never match.
+      if (explicitNextSong != null) {
+        _preloadTrack(explicitNextSong, priority: 1, isMetered: isMetered);
+        return;
       }
       _preloadRandomTracks(queue, currentIndex,
           count: effectiveCount, isMetered: isMetered);

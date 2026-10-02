@@ -319,6 +319,8 @@ class PlayerTransportController {
         _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: failure.message)));
       },
       (isFav) {
+        // Mirror the favorite change to the media session / OS notification.
+        _audioHandler.updateFavorite(songId, isFav);
         final state = _getState();
         final updatedQueue = state.queue
             .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)

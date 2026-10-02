@@ -18,6 +18,12 @@ class PlaybackQueueStateMachine {
   final List<SongsTableData> _songs = [];
   int _currentIndex = 0;
   final List<int> _shuffleHistory = [];
+  // Pre-committed next shuffle pick (queues of 3+). Computed once, then both a
+  // peek ([peekNextIndex]) and the subsequent real advance ([getNextIndex]
+  // non-peek) resolve to this SAME index, so the streaming pre-resolver /
+  // preload scheduler warm exactly the track the next advance will play.
+  // Invalidated on any queue/navigation change and consumed by a real advance.
+  int? _pendingShuffleNext;
   bool _queueDirty = false;
   int _savedQueueIndex = -1;
   final math.Random _random;
@@ -82,11 +88,16 @@ class PlaybackQueueStateMachine {
     _currentIndex =
         _songs.isEmpty ? 0 : initialIndex.clamp(0, _songs.length - 1);
     _shuffleHistory.clear();
+    _pendingShuffleNext = null;
     _queueDirty = true;
   }
 
   /// Updates current track index within bounds.
   void setCurrentIndex(int index) {
+    // A current-index change (a manual jump, a load, a crossfade swap) voids
+    // any pre-committed shuffle pick: it was computed relative to the old
+    // current, so the next peek/advance must recompute from the new position.
+    _pendingShuffleNext = null;
     if (_songs.isEmpty) {
       _currentIndex = 0;
       return;
@@ -107,6 +118,14 @@ class PlaybackQueueStateMachine {
     if (target <= _currentIndex && _songs.length > 1) {
       _currentIndex++;
     }
+    // Reindex shuffle history: entries at/after the insertion slot shift up by
+    // one so "Previous" keeps pointing at the same songs after an insert.
+    for (int i = 0; i < _shuffleHistory.length; i++) {
+      if (_shuffleHistory[i] >= target) {
+        _shuffleHistory[i]++;
+      }
+    }
+    _pendingShuffleNext = null;
     _queueDirty = true;
   }
 
@@ -115,6 +134,7 @@ class PlaybackQueueStateMachine {
     if (index < 0 || index >= _songs.length) return null;
     final removed = _songs.removeAt(index);
     _shuffleHistory.removeWhere((i) => i == index);
+    _pendingShuffleNext = null;
     for (int i = 0; i < _shuffleHistory.length; i++) {
       if (_shuffleHistory[i] > index) {
         _shuffleHistory[i]--;
@@ -149,6 +169,19 @@ class PlaybackQueueStateMachine {
     } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
       _currentIndex++;
     }
+    // Remap shuffle history the same way the current index is remapped, per
+    // entry, so "Previous" still points at the same songs after a reorder.
+    for (int i = 0; i < _shuffleHistory.length; i++) {
+      final h = _shuffleHistory[i];
+      if (h == oldIndex) {
+        _shuffleHistory[i] = newIndex;
+      } else if (oldIndex < h && newIndex >= h) {
+        _shuffleHistory[i] = h - 1;
+      } else if (oldIndex > h && newIndex <= h) {
+        _shuffleHistory[i] = h + 1;
+      }
+    }
+    _pendingShuffleNext = null;
     _queueDirty = true;
     return true;
   }
@@ -165,6 +198,7 @@ class PlaybackQueueStateMachine {
     _songs.clear();
     _currentIndex = 0;
     _shuffleHistory.clear();
+    _pendingShuffleNext = null;
     _queueDirty = true;
     _savedQueueIndex = -1;
   }
@@ -172,6 +206,7 @@ class PlaybackQueueStateMachine {
   /// Clears the shuffle history.
   void clearShuffleHistory() {
     _shuffleHistory.clear();
+    _pendingShuffleNext = null;
   }
 
   /// Computes the next track index given playback configuration.
@@ -198,32 +233,19 @@ class PlaybackQueueStateMachine {
         }
       }
       if (_songs.length == 2) {
-        // In a 2-song queue with shuffle enabled, alternate to the other song
+        // In a 2-song queue with shuffle enabled, alternate to the other song.
+        // Already deterministic, so no pre-commit is needed here.
         return _currentIndex == 0 ? 1 : 0;
       }
-      if (_songs.length == 1) {
-        return 0;
-      }
-      final recentWindow = math.min(_songs.length - 1, 10);
-      final recent = _shuffleHistory.length >= recentWindow
-          ? _shuffleHistory.sublist(_shuffleHistory.length - recentWindow)
-          : _shuffleHistory;
-
-      int next = _random.nextInt(_songs.length);
-      int attempts = 0;
-      final maxAttempts = _songs.length * 2;
-      while ((next == _currentIndex || recent.contains(next)) &&
-          attempts < maxAttempts &&
-          _songs.length > 1) {
-        next = _random.nextInt(_songs.length);
-        attempts++;
-      }
-      if (next == _currentIndex && _songs.length > 1) {
-        final candidates = [
-          for (int i = 0; i < _songs.length; i++)
-            if (i != _currentIndex) i
-        ];
-        next = candidates[_random.nextInt(candidates.length)];
+      // _songs.length > 2: return the PRE-COMMITTED shuffle pick so that a peek
+      // ([peekNextIndex]) and the subsequent real advance resolve to the SAME
+      // index — the pre-resolver/scheduler then warm exactly the track that
+      // will play. The pick is computed once (via [_shufflePendingNext]) and
+      // cached; a real advance (offset == 1, !peek) consumes it so the NEXT
+      // advance draws a fresh pick, preserving shuffle variety.
+      final next = _shufflePendingNext();
+      if (offset == 1 && !peek) {
+        _pendingShuffleNext = null;
       }
       return next;
     }
@@ -233,6 +255,69 @@ class PlaybackQueueStateMachine {
       return (_currentIndex + offset) % _songs.length;
     }
     return null;
+  }
+
+  /// Returns the index the next advance will play WITHOUT recording shuffle
+  /// history or otherwise mutating navigation state, honoring the active
+  /// loop/shuffle mode. For shuffle (queues of 3+) this is the pre-committed
+  /// pick, so a caller can warm precisely the track [getNextIndex] will return
+  /// on the real advance. Returns null at a non-looping end of queue.
+  int? peekNextIndex({
+    int offset = 1,
+    bool shuffleModeEnabled = false,
+    LoopMode loopMode = LoopMode.off,
+  }) {
+    return getNextIndex(
+      offset: offset,
+      peek: true,
+      shuffleModeEnabled: shuffleModeEnabled,
+      loopMode: loopMode,
+    );
+  }
+
+  /// Lazily computes and caches the next shuffle pick for a queue of 3+. Both a
+  /// peek and the real advance route through here, so they always agree. The
+  /// cache is invalidated by any queue/current-index change and consumed by a
+  /// real advance (see [getNextIndex]).
+  int _shufflePendingNext() {
+    final cached = _pendingShuffleNext;
+    if (cached != null &&
+        cached >= 0 &&
+        cached < _songs.length &&
+        cached != _currentIndex) {
+      return cached;
+    }
+    final next = _computeShuffleNext();
+    _pendingShuffleNext = next;
+    return next;
+  }
+
+  /// The recent-window-avoiding random shuffle pick, extracted so the peek and
+  /// the real advance share identical selection logic. Caller guarantees
+  /// `_songs.length > 2`.
+  int _computeShuffleNext() {
+    final recentWindow = math.min(_songs.length - 1, 10);
+    final recent = _shuffleHistory.length >= recentWindow
+        ? _shuffleHistory.sublist(_shuffleHistory.length - recentWindow)
+        : _shuffleHistory;
+
+    int next = _random.nextInt(_songs.length);
+    int attempts = 0;
+    final maxAttempts = _songs.length * 2;
+    while ((next == _currentIndex || recent.contains(next)) &&
+        attempts < maxAttempts &&
+        _songs.length > 1) {
+      next = _random.nextInt(_songs.length);
+      attempts++;
+    }
+    if (next == _currentIndex && _songs.length > 1) {
+      final candidates = [
+        for (int i = 0; i < _songs.length; i++)
+          if (i != _currentIndex) i
+      ];
+      next = candidates[_random.nextInt(candidates.length)];
+    }
+    return next;
   }
 
   /// Computes the previous track index given playback configuration.

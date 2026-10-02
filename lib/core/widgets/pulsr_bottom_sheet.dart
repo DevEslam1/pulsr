@@ -78,7 +78,10 @@ class PulsrSheetHelper {
       );
     }
 
-    PulsrModalTracker.push();
+    // Modal counting is handled exclusively by the root [PulsrModalObserver]
+    // (see pulsr_modal_tracker.dart). Sheets opened here use the root navigator,
+    // so the observer's didPush/didPop already registers them — counting again
+    // here would double-count and could strand the dock hidden on any asymmetry.
     final p = context.palette;
 
     return showModalBottomSheet<T>(
@@ -100,7 +103,7 @@ class PulsrSheetHelper {
           child: built,
         );
       },
-    ).whenComplete(PulsrModalTracker.pop);
+    );
   }
 }
 

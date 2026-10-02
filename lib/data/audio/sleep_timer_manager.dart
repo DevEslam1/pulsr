@@ -40,6 +40,34 @@ class SleepTimerManager {
   AudioPlayer Function()? _lastPlayerGetter;
   Future<void> Function()? _onTimerExpiredCallback;
 
+  /// Volume-coordination hooks installed by the audio handler (both optional).
+  ///
+  /// When [onFadeFactor] is set the manager reports its stepped fade progress
+  /// as a FACTOR (0..1, 1.0 = no attenuation) instead of writing the active
+  /// player's volume itself. The handler is then the single volume writer and
+  /// composes this factor with the duck-aware ReplayGain/user target (and
+  /// defers to the crossfade manager), so a duck-end can no longer wipe the
+  /// fade for a tick and the fade can no longer undo a duck.
+  ///
+  /// [baseVolumeProvider] returns the handler's clean (un-faded) target volume
+  /// so the standalone fallback path derives its baseline from the real target
+  /// instead of snapshotting whatever the player happens to read — which may be
+  /// a ducked level. When both are null the manager behaves exactly as before
+  /// (drives the player volume directly), which keeps it usable without a
+  /// handler (e.g. unit tests).
+  void Function(double factor)? onFadeFactor;
+  double Function()? baseVolumeProvider;
+
+  /// Clean baseline for the standalone fade path: the handler's un-faded target
+  /// when available (never a ducked snapshot), else the player's live volume.
+  double _resolveFadeBaseline(AudioPlayer player) {
+    final provided = baseVolumeProvider?.call();
+    if (provided != null && provided.isFinite) {
+      return provided.clamp(0.0, 1.0);
+    }
+    return player.volume.clamp(0.0, 1.0);
+  }
+
   bool countDownWhilePaused = false;
   List<Duration> _queuedDurations = [];
 
@@ -319,7 +347,7 @@ class SleepTimerManager {
 
   void _applyFadeOut(AudioPlayer? player, int remainingSeconds) {
     if (player == null || !player.playing) return;
-    _preFadeVolume ??= player.volume;
+    _preFadeVolume ??= _resolveFadeBaseline(player);
 
     if (!_nativeCurveArmed && remainingSeconds <= 15 && remainingSeconds > 0) {
       final totalMs = remainingSeconds * 1000;
@@ -345,12 +373,38 @@ class SleepTimerManager {
 
   void _applyFadeOutStep(AudioPlayer? player, double fraction) {
     if (player == null || !player.playing) return;
-    _preFadeVolume ??= player.volume;
+    final f = fraction.clamp(0.0, 1.0);
+    // Coordinated path: report the fade as a FACTOR and let the handler perform
+    // the single volume write (composing with ducking/ReplayGain, deferring to
+    // crossfade). Avoids this manager and the duck path both writing setVolume.
+    final sink = onFadeFactor;
+    if (sink != null) {
+      sink(f);
+      return;
+    }
+    // Standalone fallback: drive the player directly from a clean baseline.
+    _preFadeVolume ??= _resolveFadeBaseline(player);
     try {
-      final target =
-          (_preFadeVolume! * fraction.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+      final target = (_preFadeVolume! * f).clamp(0.0, 1.0);
       player.setVolume(target);
     } catch (_) {}
+  }
+
+  /// Short volume ramp used by the track/queue sleep modes at their boundary,
+  /// where the duration-mode countdown's gradual fade never runs. Reuses the
+  /// same per-step ramp primitive as [_applyFadeOut] ([_applyFadeOutStep]) and
+  /// aborts early if the timer is cancelled or re-armed, or playback stops,
+  /// mid-fade. The pre-fade volume is restored by [_executeExpiration]'s
+  /// finally block once the pause completes.
+  Future<void> _fadeBeforePause(AudioPlayer player, int token) async {
+    _preFadeVolume ??= _resolveFadeBaseline(player);
+    const steps = 16;
+    const stepDelay = Duration(milliseconds: 100); // ~1.6s total ramp
+    for (var i = steps - 1; i >= 0; i--) {
+      if (_sleepFadeToken != token || !player.playing) return;
+      _applyFadeOutStep(player, i / steps);
+      await Future.delayed(stepDelay);
+    }
   }
 
   Future<void> _executeExpiration(int token) async {
@@ -365,6 +419,18 @@ class SleepTimerManager {
       } catch (_) {}
       _nativeCurveArmed = false;
     }
+    // The track/queue modes (endOfTrack/afterNTracks/endOfQueue) expire at a
+    // playback boundary via onTrackCompleted/onQueueCompleted and have no
+    // countdown, so the duration ticker's final-15s fade never runs for them.
+    // Honor their `fadeOut` request with a short ramp here, right before the
+    // pause callback, instead of silently hard-pausing (fixes: fadeOut ignored
+    // for non-duration modes).
+    if (_isFadeOutEnabled &&
+        _mode != SleepTimerMode.duration &&
+        player != null &&
+        player.playing) {
+      await _fadeBeforePause(player, token);
+    }
     try {
       if (_onTimerExpiredCallback != null) {
         await _onTimerExpiredCallback!();
@@ -373,18 +439,26 @@ class SleepTimerManager {
       ErrorLogger.log('Error triggering sleep timer callback',
           error: e, stackTrace: st, category: 'SleepTimer');
     } finally {
-      // Restore pre-fade volume cleanly — but only if the player is still
-      // sitting at (or below) the faded level. If the user touched volume
-      // mid-fade, don't clobber their choice.
-      if (_preFadeVolume != null && player != null) {
+      if (onFadeFactor != null) {
+        // Coordinated mode: hand volume authority back to the handler by
+        // releasing the fade factor; it re-applies the clean, duck-aware
+        // target itself (the player is paused by now, so this just leaves the
+        // right level for the next resume). Never a stale/ducked snapshot.
+        try {
+          onFadeFactor!(1.0);
+        } catch (_) {}
+      } else if (_preFadeVolume != null && player != null) {
+        // Standalone mode: restore the pre-fade volume cleanly — but only if
+        // the player is still sitting at (or below) the faded level. If the
+        // user touched volume mid-fade, don't clobber their choice.
         try {
           final current = player.volume;
           if (current <= _preFadeVolume! + 0.02) {
             await player.setVolume(_preFadeVolume!.clamp(0.0, 1.0));
           }
         } catch (_) {}
-        _preFadeVolume = null;
       }
+      _preFadeVolume = null;
       _clearPersistedState();
     }
   }
@@ -418,21 +492,40 @@ class SleepTimerManager {
         } catch (_) {}
         _nativeCurveArmed = false;
       }
-      if (_preFadeVolume != null) {
+      if (onFadeFactor != null) {
+        // Coordinated mode: release the fade factor so the handler restores the
+        // clean, duck-aware target (not a possibly-ducked snapshot).
+        try {
+          onFadeFactor!(1.0);
+        } catch (_) {}
+        _preFadeVolume = null;
+      } else if (_preFadeVolume != null) {
         try {
           player.setVolume(_preFadeVolume!);
         } catch (_) {}
         _preFadeVolume = null;
       }
+    } else if (onFadeFactor != null) {
+      try {
+        onFadeFactor!(1.0);
+      } catch (_) {}
+      _preFadeVolume = null;
     }
     _clearPersistedState();
   }
 
+  // Persisted alongside [PrefsKeys.sleepTimerTarget] so restore can tell whether
+  // the saved wall-clock target is a real deadline (duration mode) or only an
+  // estimate of a track/queue boundary that must NOT be re-armed as a clock.
+  static const String _modeKey = 'sleep_timer_mode_v1';
+
   void _persistTimerState([Duration? duration]) {
     final dur = duration ?? _remainingDuration;
     final targetMs = DateTime.now().add(dur).millisecondsSinceEpoch;
+    final modeName = _mode.name;
     SharedPreferences.getInstance().then((prefs) {
       prefs.setInt(PrefsKeys.sleepTimerTarget, targetMs);
+      prefs.setString(_modeKey, modeName);
     }).catchError((_) {});
   }
 
@@ -448,9 +541,30 @@ class SleepTimerManager {
       final prefs = await SharedPreferences.getInstance();
       final targetMs = prefs.getInt(PrefsKeys.sleepTimerTarget);
       if (targetMs == null) return false;
+
+      // Only pure duration timers represent a real fixed deadline. The
+      // track/queue modes (afterNTracks/endOfTrack/endOfQueue) persist a
+      // wall-clock ESTIMATE of their boundary; re-arming that as a duration
+      // timer would resurrect e.g. "stop after 3 tracks" as an unrelated clock
+      // countdown (the bug this guards). Refuse to restore them. A missing mode
+      // means an older payload — treat it as duration for backward compat.
+      final modeName = prefs.getString(_modeKey);
+      final persistedMode = modeName == null
+          ? SleepTimerMode.duration
+          : SleepTimerMode.values.firstWhere(
+              (m) => m.name == modeName,
+              orElse: () => SleepTimerMode.duration,
+            );
+      if (persistedMode != SleepTimerMode.duration) {
+        await prefs.remove(PrefsKeys.sleepTimerTarget);
+        await prefs.remove(_modeKey);
+        return false;
+      }
+
       final remainingMs = targetMs - DateTime.now().millisecondsSinceEpoch;
       if (remainingMs <= 0) {
         await prefs.remove(PrefsKeys.sleepTimerTarget);
+        await prefs.remove(_modeKey);
         return false;
       }
       // Cap at 24h to guard against clock-skew garbage.
@@ -470,6 +584,7 @@ class SleepTimerManager {
   void _clearPersistedState() {
     SharedPreferences.getInstance().then((prefs) {
       prefs.remove(PrefsKeys.sleepTimerTarget);
+      prefs.remove(_modeKey);
     }).catchError((_) {});
   }
 
@@ -478,6 +593,10 @@ class SleepTimerManager {
     _isArmed = false;
     _countdownTicker?.cancel();
     _oneShotTimer?.cancel();
+    // Drop coordination hooks so no late fade-factor callback fires into a
+    // handler that is tearing down.
+    onFadeFactor = null;
+    baseVolumeProvider = null;
     if (!_sleepTimerRemainingSubject.isClosed) {
       _sleepTimerRemainingSubject.close();
     }

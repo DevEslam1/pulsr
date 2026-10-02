@@ -20,6 +20,7 @@ import '../queue_slot_codec.dart';
 import 'queue_slot_data.dart';
 
 part 'player_queue_slots.dart';
+part 'player_queue_warming.dart';
 
 /// Controls playback queue management, slot switching, and reordering.
 class PlayerQueueController {
@@ -43,6 +44,11 @@ class PlayerQueueController {
   /// A-01: Invoked when a track is resumed (initialPosition provided) so the
   /// per-song speed/pitch/volume/EQ memory can be re-applied.
   final void Function(SongsTableData song)? _onResumePerSongMemory;
+
+  /// Invalidates any in-flight restored-queue resolver on the owning cubit so a
+  /// slow DB lookup for an older engine-queue snapshot cannot clobber a
+  /// just-applied programmatic queue mutation. No-op when not wired.
+  final void Function() _invalidateQueueSyncResolution;
 
   Timer? _persistQueueDebounce;
 
@@ -75,6 +81,7 @@ class PlayerQueueController {
     required bool Function(SongsTableData? a, SongsTableData? b) isSameTrack,
     PlaybackLatencyTracker? latencyTracker,
     void Function(SongsTableData song)? onResumePerSongMemory,
+    void Function()? invalidateQueueSyncResolution,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _getState = getState,
@@ -89,7 +96,9 @@ class PlayerQueueController {
         _bumpQueueVersion = bumpQueueVersion,
         _isSameTrack = isSameTrack,
         _latencyTracker = latencyTracker,
-        _onResumePerSongMemory = onResumePerSongMemory;
+        _onResumePerSongMemory = onResumePerSongMemory,
+        _invalidateQueueSyncResolution =
+            invalidateQueueSyncResolution ?? (() {});
 
   void setQueueSlot(
     int slot, {
@@ -105,51 +114,6 @@ class PlayerQueueController {
       position: position,
       speed: speed,
     );
-  }
-
-  /// Fire-and-forget stream pre-resolution for a track the user is likely to
-  /// play next — e.g. the first item of a freshly rendered list. Fills the
-  /// shared YtmUrlCache so the eventual tap skips the network resolve entirely
-  /// instead of paying it at tap-to-sound time. Idempotent and non-throwing.
-  void warmStream(SongsTableData song) {
-    try {
-      _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
-    } catch (_) {}
-  }
-
-  /// Gap between successive speculative warms in [warmStreams], so opening a
-  /// list never stacks several full multi-engine resolves on the native thread
-  /// pool — or bursts enough googlevideo requests to trip bot detection — at
-  /// once. Mirrors the search screen's own speculative-warm stagger.
-  static const Duration _warmStreamStagger = Duration(milliseconds: 400);
-
-  /// Fire-and-forget pre-resolution of the first [count] streaming-eligible
-  /// tracks of a freshly rendered list — the taps a user is most likely to
-  /// make near the top. Each warm is staggered by [_warmStreamStagger], skips
-  /// tracks that aren't online-streamable (local, already downloaded, or
-  /// missing a remote id), is a no-op when the URL is already cached fresh, and
-  /// short-circuits cheaply while YTM is bot-cooling (the underlying
-  /// [resolveStream] skips the native tiers). Idempotent and non-throwing;
-  /// safe to call on every render.
-  void warmStreams(List<SongsTableData> songs, {int count = 3}) {
-    if (songs.isEmpty || count <= 0) return;
-    var warmed = 0;
-    for (final song in songs) {
-      if (warmed >= count) break;
-      if (song.source != SongSource.youtube ||
-          song.isDownloaded == true ||
-          (song.remoteId?.isEmpty ?? true)) {
-        continue;
-      }
-      final delay = _warmStreamStagger * warmed;
-      warmed++;
-      unawaited(Future<void>.delayed(delay, () {
-        if (_isClosed()) return;
-        try {
-          _audioHandler.streamPreResolver.onTrackEnqueuedOrTapped(song);
-        } catch (_) {}
-      }));
-    }
   }
 
   Future<void> playRadioStation(RadioStation station) async {

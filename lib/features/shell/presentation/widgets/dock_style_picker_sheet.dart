@@ -31,6 +31,9 @@ class DockStylePickerSheet extends StatelessWidget {
   }) {
     return showModalBottomSheet<void>(
       context: context,
+      // Root navigator so the single root PulsrModalObserver tracks it and the
+      // dock hides even when opened from inside a shell branch.
+      useRootNavigator: true,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => DockStylePickerSheet(

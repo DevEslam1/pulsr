@@ -32,6 +32,9 @@ class DownloadQualityPickerSheet extends StatefulWidget {
   }) {
     return showModalBottomSheet<YtmAudioQuality>(
       context: context,
+      // Push on the root navigator so the single root PulsrModalObserver tracks
+      // it and the dock/mini-player hides regardless of which tab opened it.
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DownloadQualityPickerSheet(

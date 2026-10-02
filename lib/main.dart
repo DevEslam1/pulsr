@@ -67,6 +67,9 @@ import 'features/downloads/cubit/downloads_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Cap the framework's decoded-image cache so artwork bitmaps cannot balloon
+  // RAM under heavy scrolling (80 MB ceiling).
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 80 << 20;
   HttpOverrides.global = AppHttpOverrides.instance;
   try {
     AppConfig.validateConfiguration();
@@ -415,11 +418,13 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
   @override
   void didHaveMemoryPressure() {
-    // Trim artwork and stream caches on GC pressure (LOG-14 14MB/59MB)
+    // Trim artwork and stream caches on GC pressure (LOG-14 14MB/59MB).
+    // Clear only the in-memory bytes; the persistent disk cache is kept so a
+    // transient memory warning does not force a full re-fetch + re-decode.
     try {
-      getIt<ArtworkCacheManager>().clearAllCache();
+      getIt<ArtworkCacheManager>().trimMemoryForPressure();
     } catch (e, st) {
-      ErrorLogger.log('Failed to clear artwork cache on memory pressure',
+      ErrorLogger.log('Failed to trim artwork memory cache on memory pressure',
           error: e, stackTrace: st, category: 'PulsrApp');
     }
     try {
@@ -796,6 +801,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                         child: MaterialApp.router(
                           title: AppConfig.appTitle,
                           debugShowCheckedModeBanner: false,
+                          restorationScopeId: 'pulsr',
                           themeMode: flutterThemeMode,
                           theme: lightTheme,
                           darkTheme: darkTheme,

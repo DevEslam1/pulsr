@@ -102,6 +102,7 @@ class PlayerWidgetBridge {
   void dispose() {
     _widgetClickSub?.cancel();
     _scrobbleCoordinator.dispose();
+    _widgetCoordinator.dispose();
   }
 }
 

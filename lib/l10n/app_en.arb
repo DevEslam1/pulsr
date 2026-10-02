@@ -5161,5 +5161,19 @@
   "conflictVolumeBoostClipping": "Clipping risk: EQ preamp ({preampDb} dB) + boost (+{boostDb} dB) = +{totalDb} dB > 6 dB headroom.",
   "@conflictVolumeBoostClipping": {"description":"Audio conflict reason warning about volume boost clipping risk","placeholders":{"preampDb":{"type":"String"},"boostDb":{"type":"String"},"totalDb":{"type":"String"}}},
   "conflictHighBoostDistortion": "High boost may cause distortion or hearing fatigue.",
-  "@conflictHighBoostDistortion": {"description":"Audio conflict reason message"}
+  "@conflictHighBoostDistortion": {"description":"Audio conflict reason message"},
+  "swipeToPlayNextFavoriteHint": "Swipe to play next / favorite",
+  "@swipeToPlayNextFavoriteHint": {"description":"Gesture hint shown on a song row teaching swipe actions"},
+  "removeSelectedDownloadsConfirm": "{count, plural, =1{Remove 1 selected download?} other{Remove {count} selected downloads?}}",
+  "@removeSelectedDownloadsConfirm": {"description":"Confirmation prompt when removing selected downloads","placeholders":{"count":{"type":"int"}}},
+  "equalizerResponseCurve": "Equalizer response curve",
+  "@equalizerResponseCurve": {"description":"Accessibility label for the EQ curve visualizer"},
+  "maxVolume": "Max volume",
+  "@maxVolume": {"description":"Tooltip/label for the maximum-volume indicator"},
+  "pageLoadingProgress": "Page loading progress",
+  "@pageLoadingProgress": {"description":"Accessibility label for a web page loading progress indicator"},
+  "albumArtworkLabel": "Album artwork",
+  "@albumArtworkLabel": {"description":"Accessibility label for album artwork images"},
+  "failedToApplyLabel": "Failed to apply {label}",
+  "@failedToApplyLabel": {"description":"Error toast when applying a named setting fails","placeholders":{"label":{"type":"String"}}}
 }

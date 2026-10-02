@@ -89,6 +89,9 @@ class StudioBridgeFooter extends StatelessWidget {
 Future<void> showStudioExplainerSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
+    // Root navigator so the single root PulsrModalObserver tracks it and the
+    // dock hides even when opened from inside the Settings branch.
+    useRootNavigator: true,
     showDragHandle: true,
     isScrollControlled: true,
     builder: (sheetContext) {

@@ -7,6 +7,7 @@ import '../../data/db/app_database.dart';
 import '../../core/utils/formatters.dart';
 import '../theme/aura_theme.dart';
 import 'cached_artwork.dart';
+import '../utils/l10n_extensions.dart';
 import 'gesture_hint_overlay.dart';
 import 'pulsr_pressable.dart';
 import '../../features/player/cubit/player_cubit.dart';
@@ -74,7 +75,7 @@ class SongTile extends StatelessWidget {
         final isPlaying = playback.isPlaying;
 
         final tile = Semantics(
-          label: '${song.title} by ${song.artist}',
+          label: context.l10n.songByArtist(song.title, song.artist),
           button: true,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -255,9 +256,9 @@ class SongTile extends StatelessWidget {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const GestureHintOverlay(
+              GestureHintOverlay(
                 hintKey: 'song_tile_swipe',
-                message: 'Swipe to play next / favorite',
+                message: context.l10n.swipeToPlayNextFavoriteHint,
                 padding: EdgeInsets.symmetric(
                     horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                 icon: Icons.swipe_rounded,

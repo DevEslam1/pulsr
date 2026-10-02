@@ -664,7 +664,7 @@ class _PlaybackPresetsTile extends StatelessWidget {
         if (context.mounted) {
           PulsrToast.show(
             context,
-            message: 'Failed to apply $label',
+            message: context.l10n.failedToApplyLabel(label),
             isError: true,
           );
         }

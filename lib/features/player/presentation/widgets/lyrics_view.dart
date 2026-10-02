@@ -65,8 +65,12 @@ class _LyricsViewState extends State<LyricsView> {
   bool get _isSynced {
     if (!identical(_syncedCheckSource, widget.lyrics)) {
       _syncedCheckSource = widget.lyrics;
-      _syncedCache =
-          widget.lyrics.any((line) => line.timestamp > Duration.zero);
+      // Synced when any line carries a positive timestamp, OR any line has
+      // word-level (enhanced LRC) timing — the latter rescues a synced set
+      // whose only/first line sits exactly at 0:00 (which a bare
+      // `timestamp > 0` check would misclassify as plain text).
+      _syncedCache = widget.lyrics
+          .any((line) => line.timestamp > Duration.zero || line.words.isNotEmpty);
     }
     return _syncedCache;
   }
@@ -196,7 +200,22 @@ class _LyricsViewState extends State<LyricsView> {
     final path = _offsetSongPath;
     if (path == null || path.isEmpty) return;
     final next = (_manualOffsetMs + deltaMs).clamp(-5000, 5000);
-    _applyManualOffset(next);
+    if (next == _manualOffsetMs) return;
+    // Commit synchronously (this runs from a button handler, not build) so
+    // rapid consecutive taps accumulate instead of all reading the same stale
+    // value while _applyManualOffset's post-frame commit is still pending.
+    if (mounted) {
+      setState(() => _manualOffsetMs = next);
+      Duration? pos = widget.currentPosition;
+      if (pos == null) {
+        try {
+          pos = context.read<PlayerCubit>().state.position;
+        } catch (_) {}
+      }
+      if (pos != null) _updateProgress(pos);
+    } else {
+      _manualOffsetMs = next;
+    }
     await _offsetStore.setOffsetMs(path, next);
   }
 

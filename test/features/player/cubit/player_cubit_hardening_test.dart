@@ -155,6 +155,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   double get volumeBoost => 0.0;
 
   @override
+  double get preampDb => 0.0;
+
+  @override
   Future<void> setVolumeBoost(double value) async {}
 
   @override

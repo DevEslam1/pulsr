@@ -71,6 +71,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   double get volumeBoost => 0.0;
   @override
+  double get preampDb => 0.0;
+  @override
   bool get isCrossfeedEnabled => false;
   @override
   double get crossfeedDelayUs => 350.0;
