@@ -296,7 +296,7 @@ class _BatchEditBanner extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: p.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(color: p.accent.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -413,7 +413,7 @@ class _AutoFetchButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
         ),
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md, vertical: AppSpacing.s10),
@@ -457,7 +457,7 @@ class _MetadataMatchSheet extends StatelessWidget {
                 return ListTile(
                   leading: item.artworkUrl != null
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          borderRadius: AppRadii.r8All,
                           child: Image.network(
                             item.artworkUrl!,
                             width: 44,

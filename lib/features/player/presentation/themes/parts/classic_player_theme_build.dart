@@ -221,8 +221,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                                 Curves.easeOutCubic),
                                             decoration: BoxDecoration(
                                               borderRadius:
-                                                  BorderRadius.circular(
-                                                      artRadius),
+                                                  AppRadii.circular(artRadius),
                                               border: Border.all(
                                                 color: Colors.white
                                                     .withValues(alpha: 0.14),
@@ -251,8 +250,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                             ),
                                             child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(
-                                                      artRadius),
+                                                  AppRadii.circular(artRadius),
                                               child: song != null
                                                   ? CachedArtwork(
                                                       id: song.id,

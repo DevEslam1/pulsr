@@ -100,7 +100,7 @@ class PulsrTwoPaneScaffold extends StatelessWidget {
                 margin: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.surfaceContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(AppRadii.r20),
+                  borderRadius: AppRadii.r20All,
                   border: Border.all(color: p.hairline),
                 ),
                 clipBehavior: Clip.antiAlias,

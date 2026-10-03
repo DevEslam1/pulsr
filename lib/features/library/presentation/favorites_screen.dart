@@ -218,7 +218,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(AppRadii.r24),
+                              borderRadius: AppRadii.r24All,
                               boxShadow: [
                                 BoxShadow(
                                   color: (_favTabFilter == 0
@@ -240,8 +240,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                       height: 48,
                                       decoration: BoxDecoration(
                                         color: AppColors.specularAt(0.22),
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r14),
+                                        borderRadius: AppRadii.r14All,
                                       ),
                                       child: Icon(
                                         _favTabFilter == 0
@@ -308,9 +307,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                             padding: const EdgeInsets.symmetric(
                                                 vertical: AppSpacing.sm),
                                             shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      AppRadii.r14),
+                                              borderRadius: AppRadii.r14All,
                                             ),
                                           ),
                                           icon: const Icon(
@@ -340,8 +337,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                           padding: const EdgeInsets.all(
                                               AppSpacing.sm),
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                                AppRadii.r14),
+                                            borderRadius: AppRadii.r14All,
                                           ),
                                         ),
                                         icon: const Icon(Icons.shuffle_rounded,

@@ -315,8 +315,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                     decoration: BoxDecoration(
                                       color:
                                           context.palette.surfaceContainerHigh,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r8),
+                                      borderRadius: AppRadii.r8All,
                                       border: Border.all(
                                           color: context.palette.hairline),
                                       boxShadow: [
@@ -378,8 +377,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                               decoration: BoxDecoration(
                                 color: context.palette.accent
                                     .withValues(alpha: 0.15),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r6),
+                                borderRadius: AppRadii.r6All,
                                 border: Border.all(
                                   color: context.palette.accent
                                       .withValues(alpha: 0.4),

@@ -294,7 +294,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: p.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: p.accent.withValues(alpha: 0.35)),
               ),
               child: Text(

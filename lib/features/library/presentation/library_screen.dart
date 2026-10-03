@@ -763,7 +763,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                  borderRadius: AppRadii.r10All,
                 ),
                 child: Text(
                   '$count',
@@ -1055,7 +1055,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 color: Colors.transparent,
                 elevation: 6,
                 shadowColor: Colors.black45,
-                borderRadius: BorderRadius.circular(AppRadii.r18),
+                borderRadius: AppRadii.r18All,
                 child: child,
               );
             },
@@ -1152,7 +1152,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         border: Border.all(
           color: p.hairline,
           width: 1.0,
@@ -1160,7 +1160,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       ),
       child: InkWell(
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
@@ -1186,7 +1186,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: itemColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                 ),
                 child: Icon(item.icon, color: itemColor, size: 20),
               ),
@@ -1254,7 +1254,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         border: Border.all(
           color: p.hairline.withValues(alpha: 0.5),
           width: 1.0,
@@ -1262,7 +1262,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       ),
       child: InkWell(
         onTap: onAdd,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         child: Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.sm,
@@ -1285,7 +1285,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: itemColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                 ),
                 child: Icon(item.icon,
                     color: itemColor.withValues(alpha: 0.7), size: 20),
@@ -1356,7 +1356,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       child: InkWell(
         onTap: onToggle,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         child: AnimatedContainer(
           duration: context.motionMs(180),
           curve: Curves.easeOutCubic,
@@ -1366,7 +1366,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             color: isActive
                 ? itemColor.withValues(alpha: 0.12)
                 : p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r18),
+            borderRadius: AppRadii.r18All,
             border: Border.all(
               color: isActive ? itemColor.withValues(alpha: 0.65) : p.hairline,
               width: isActive ? 1.5 : 1.0,
@@ -1378,7 +1378,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: itemColor.withValues(alpha: isActive ? 0.25 : 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                 ),
                 child: Icon(item.icon, color: itemColor, size: 20),
               ),
@@ -1508,9 +1508,9 @@ class _LayoutToggleButton extends StatelessWidget {
     final p = context.palette;
     return Material(
       color: selected ? p.accent : p.surfaceContainer,
-      borderRadius: BorderRadius.circular(AppRadii.r12),
+      borderRadius: AppRadii.r12All,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(

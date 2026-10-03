@@ -191,7 +191,7 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                           const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,

@@ -781,6 +781,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   /// Resampler quality (0=Fast/linear, 1=Standard, 2=High, 3=Ultra).
   Future<void> setSincResamplerQuality(int quality) async {
+    if (!AudioEffectsChannel().isPlaybackSincResamplerSupported) return;
     markDirty('sincResamplerQuality');
     final clamped = quality.clamp(0, 3);
     safeEmit(state.copyWith(sincResamplerQuality: clamped));

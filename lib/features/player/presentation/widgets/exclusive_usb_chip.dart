@@ -98,7 +98,7 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => SyncDiagnosticsSheet.show(context),
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         child: Container(
           padding: EdgeInsets.symmetric(
             horizontal: widget.compact ? 8 : 10,
@@ -106,7 +106,7 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
           ),
           decoration: BoxDecoration(
             color: AppColors.dacGold.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             border: Border.all(
               color: AppColors.dacGold.withValues(alpha: 0.5),
               width: 1.0,

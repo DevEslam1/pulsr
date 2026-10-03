@@ -129,7 +129,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                           height: size,
                           decoration: BoxDecoration(
                             color: p.surfaceCard.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(AppRadii.r18),
+                            borderRadius: AppRadii.r18All,
                             border: Border.all(color: p.hairline),
                           ),
                           child: Center(
@@ -156,7 +156,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                         padding: const EdgeInsetsDirectional.only(
                             end: AppSpacing.s14),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(AppRadii.r20),
+                          borderRadius: AppRadii.r20All,
                           onTap: () => playerCubit.playSong(song, queue: songs),
                           child: SizedBox(
                             width: size,

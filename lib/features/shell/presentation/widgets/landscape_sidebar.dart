@@ -556,7 +556,7 @@ class _SidebarNavItem extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
                 splashColor: activeColor.withValues(alpha: 0.15),
                 highlightColor: Colors.transparent,
                 child: AnimatedContainer(
@@ -568,7 +568,7 @@ class _SidebarNavItem extends StatelessWidget {
                     color: isSelected
                         ? activeColor.withValues(alpha: p.isDark ? 0.18 : 0.12)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                    borderRadius: AppRadii.r14All,
                     border: isSelected
                         ? Border.all(
                             color: activeColor.withValues(alpha: 0.35),
@@ -656,7 +656,7 @@ class _SidebarNavItem extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           splashColor: activeColor.withValues(alpha: 0.12),
           highlightColor: Colors.transparent,
           child: AnimatedContainer(
@@ -668,7 +668,7 @@ class _SidebarNavItem extends StatelessWidget {
               color: isSelected
                   ? activeColor.withValues(alpha: p.isDark ? 0.14 : 0.08)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               border: isSelected
                   ? Border.all(
                       color: activeColor.withValues(alpha: 0.30),
@@ -686,7 +686,7 @@ class _SidebarNavItem extends StatelessWidget {
                     height: isSelected ? 18 : 0,
                     decoration: BoxDecoration(
                       color: isSelected ? activeColor : Colors.transparent,
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
@@ -735,7 +735,7 @@ class _SidebarNavItem extends StatelessWidget {
                           horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: activeColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppRadii.r6),
+                        borderRadius: AppRadii.r6All,
                       ),
                       child: Text(
                         trailingBadge ??
@@ -802,7 +802,7 @@ class _SidebarBottomSection extends StatelessWidget {
                         height: 44,
                         margin: const EdgeInsets.only(bottom: AppSpacing.s10),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          borderRadius: AppRadii.r12All,
                           border: Border.all(
                             color: state.isPlaying
                                 ? p.accent.withValues(alpha: 0.6)
@@ -819,7 +819,7 @@ class _SidebarBottomSection extends StatelessWidget {
                               : null,
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          borderRadius: AppRadii.r12All,
                           child: CachedArtwork(
                             id: song.id,
                             remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
@@ -840,7 +840,7 @@ class _SidebarBottomSection extends StatelessWidget {
                           horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
+                        borderRadius: AppRadii.r10All,
                         border: Border.all(
                           color: p.hairline.withValues(alpha: 0.4),
                           width: 1,

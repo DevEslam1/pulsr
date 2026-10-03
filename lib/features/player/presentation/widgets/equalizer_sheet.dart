@@ -237,7 +237,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.hairline,
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -319,7 +319,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               child: Material(
                 color: p.surface,
                 borderRadius: context.isLandscape
-                    ? BorderRadius.circular(AppRadii.r24)
+                    ? AppRadii.r24All
                     : const BorderRadius.vertical(
                         top: Radius.circular(AppRadii.r28)),
                 clipBehavior: Clip.antiAlias,

@@ -350,7 +350,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: p.surfaceCard,
-            borderRadius: BorderRadius.circular(AppRadii.r16),
+            borderRadius: AppRadii.r16All,
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -375,7 +375,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                         horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Text(
                       context.l10n.tracksCount(group.songs.length),
@@ -402,7 +402,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                               vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: p.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r8),
+                            borderRadius: AppRadii.r8All,
                           ),
                           child: Text(
                             context.l10n.kept,

@@ -317,11 +317,11 @@ void main() {
       expect(calls, equals(1), reason: 'the answer is fixed at compile time');
     });
 
-    test('dispose cancels the bot-cooldown timer and disposes the notifier', () {
+    test('dispose cancels the bot-cooldown timer and disposes the notifier',
+        () {
       final service = YtmService();
       // Arms the 45s cooldown timer via the public failure path.
-      service.recordFailure(
-          'dQw4w9WgXcQ', const YtmException('BOT_CHALLENGE'));
+      service.recordFailure('dQw4w9WgXcQ', const YtmException('BOT_CHALLENGE'));
       expect(service.isBotCoolingDown, isTrue);
 
       service.dispose();
@@ -329,8 +329,7 @@ void main() {
       // A leaked timer would be reported as a pending timer at test teardown;
       // a leaked notifier would still accept listeners.
       expect(
-        () => service.botCooldownNotifier
-            .addListener(() {}),
+        () => service.botCooldownNotifier.addListener(() {}),
         throwsA(isA<AssertionError>()),
       );
     });

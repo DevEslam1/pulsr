@@ -488,7 +488,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadii.r20),
+          borderRadius: AppRadii.r20All,
           border: Border.all(
             color:
                 (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
@@ -510,7 +510,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.r20),
+          borderRadius: AppRadii.r20All,
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -526,7 +526,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: p.error.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Text(
                         context.l10n.browseExcludeFromScan,
@@ -575,7 +575,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       padding: EdgeInsets.symmetric(horizontal: hPadding, vertical: vPadding),
       decoration: BoxDecoration(
         color: (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(
           color:
               (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
@@ -708,9 +708,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   ? p.accent.withValues(alpha: 0.16)
                   : (p.isDark ? Colors.white : Colors.black)
                       .withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(AppRadii.r8),
+              borderRadius: AppRadii.r8All,
               child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadii.r8),
+                borderRadius: AppRadii.r8All,
                 onTap: isLast
                     ? null
                     : () {
@@ -798,7 +798,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           Container(
                             decoration: BoxDecoration(
                               color: AppColors.scrimAt(0.52),
-                              borderRadius: BorderRadius.circular(AppRadii.r10),
+                              borderRadius: AppRadii.r10All,
                             ),
                             child: Center(
                               child: NowPlayingIndicator(
@@ -844,6 +844,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     constraints: const BoxConstraints(
                         minWidth: AppSpacing.minTouchTarget,
                         minHeight: AppSpacing.minTouchTarget),
+                    tooltip:
+                        MaterialLocalizations.of(context).moreButtonTooltip,
                     icon: Icon(
                       Icons.more_horiz_rounded,
                       size: 20,

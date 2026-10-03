@@ -14,12 +14,19 @@ endif()
 add_compile_options(-fno-strict-aliasing)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-# Opt-in ASan/UBSan for the sanitizer pass (host only). Enabled by the gradle
+# Opt-in ASan/UBSan for the sanitizer pass. Enabled by the gradle
 # testNative task via -DPULSR_TEST_SANITIZERS=ON; not part of the parity build.
 option(PULSR_TEST_SANITIZERS "Build native DSP tests with ASan/UBSan" OFF)
 if(PULSR_TEST_SANITIZERS)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
+    # Android's uninstrumented libc++ exposes std::__ndk1 RTTI while the vptr
+    # instrumentation expects std::ostream RTTI. This aborts before test code
+    # runs; retain ASan and the other UB checks on Android, and full vptr
+    # checking on host builds.
+    if(ANDROID)
+        add_compile_options(-fno-sanitize=vptr)
+    endif()
 endif()
 
 enable_testing()
@@ -94,4 +101,10 @@ pulsr_add_test(test_dsp_effects
     ${MAIN_CPP}/Crossfeed.cpp
     ${MAIN_CPP}/ParametricEQ.cpp
     ${MAIN_CPP}/DsdDecoder.cpp
+    ${MAIN_CPP}/MultibandCompressor.cpp
+    ${MAIN_CPP}/HarmonicSaturation.cpp
+    ${MAIN_CPP}/StereoWidth.cpp
+    ${MAIN_CPP}/DynamicEQ.cpp
+    ${MAIN_CPP}/SubCrossover.cpp
+    ${MAIN_CPP}/DynamicBass.cpp
 )

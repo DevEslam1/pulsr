@@ -2915,7 +2915,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sincResampler => 'Remuestreador Sinc';
 
   @override
-  String get sincDesc => 'Remuestreo de alta calidad';
+  String get sincDesc =>
+      'Android gestiona la conversión durante la reproducción';
 
   @override
   String get wetDryMix => 'Mezcla Wet/Dry';
@@ -5200,7 +5201,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsResamplerQualityDesc =>
-      'Calidad de conversión de frecuencia. Ultra es la sinc polifásica completa de 64 derivaciones (predeterminado histórico); Rápida es interpolación lineal para un uso mínimo de CPU';
+      'Android convierte la frecuencia de muestreo durante la reproducción. Los controles de calidad sinc nativos no están disponibles en esta salida.';
 
   @override
   String get settingsResamplerStandard => 'Estándar (16 derivaciones)';
@@ -8034,4 +8035,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bitPerfectDisableAndEnable => 'Desactivar y activar';
+
+  @override
+  String get lyricsShiftEarlier => 'Adelantar';
+
+  @override
+  String get lyricsShiftLater => 'Atrasar';
 }

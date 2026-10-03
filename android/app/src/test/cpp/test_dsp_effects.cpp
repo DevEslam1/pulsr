@@ -88,12 +88,19 @@ void testLookaheadLimiterCeiling() {
 void testMultibandCompressor() {
     MultibandCompressor mbc;
     mbc.setSampleRate(48000.0);
-    mbc.setEnabled(true);
-    mbc.setCrossovers(160.0, 1000.0, 5000.0);
+    MultibandCompressorParamSet mbcParams;
+    mbcParams.enabled = true;
+    mbcParams.crossoverFreqs[0] = 160.0;
+    mbcParams.crossoverFreqs[1] = 1000.0;
+    mbcParams.crossoverFreqs[2] = 5000.0;
     // Set 4 bands with threshold -20 dB, ratio 4:1, fast attack/release
     for (int b = 0; b < 4; ++b) {
-        mbc.setBand(b, -20.0, 4.0, 5.0, 50.0, 3.0, 0.0, true);
+        mbcParams.bands[b].thresholdDb = -20.0;
+        mbcParams.bands[b].ratio = 4.0;
+        mbcParams.bands[b].attackMs = 5.0;
+        mbcParams.bands[b].releaseMs = 50.0;
     }
+    mbc.applyParams(mbcParams);
     mbc.reset();
 
     const int numFrames = 4800; // 100 ms
@@ -133,7 +140,7 @@ void testHarmonicSaturationModes() {
     const int numFrames = 4800;
 
     // Test Mode 0: Tape
-    sat.setParams(0.8, 1.0, 0.0, SaturationMode::Tape);
+    sat.configure(0.8, 1.0, 0.0, 0);
     sat.reset();
     std::vector<float> tapeBuf(numFrames * 2);
     for (int i = 0; i < numFrames; ++i) {
@@ -144,7 +151,7 @@ void testHarmonicSaturationModes() {
     sat.processInterleaved(tapeBuf.data(), numFrames);
 
     // Test Mode 1: Tube (Triode asymmetric)
-    sat.setParams(0.8, 1.0, 0.0, SaturationMode::Tube);
+    sat.configure(0.8, 1.0, 0.0, 1);
     sat.reset();
     std::vector<float> tubeBuf(numFrames * 2);
     for (int i = 0; i < numFrames; ++i) {
@@ -174,7 +181,8 @@ void testStereoWidthBassMono() {
     sw.setSampleRate(48000.0);
     sw.setEnabled(true);
     // Multiband mode: low width = 0.0 (pure mono), mid = 1.0, high = 1.0, low crossover = 200 Hz
-    sw.setParams(1.0, true, 0.0, 1.0, 1.0, 200.0, 2500.0);
+    sw.configure(1.0);
+    sw.configureMultiband(true, 0.0, 1.0, 1.0, 200.0, 2500.0);
     sw.reset();
 
     const int numFrames = 4800;
@@ -210,7 +218,16 @@ void testDynamicEqBoostMode() {
     deq.setEnabled(true);
     deq.setBandCount(1);
     // Band 0: 1000 Hz, Q=2, threshold -30 dB, ratio 3:1, attack 2ms, release 50ms, maxCut 0, maxBoost 12dB, Mode 1 (Boost)
-    deq.setBand(0, 1000.0, 2.0, -30.0, 3.0, 2.0, 50.0, 0.0, 12.0, 1, 0, true);
+    DynamicEqBandParam boostBand;
+    boostBand.frequency = 1000.0;
+    boostBand.q = 2.0;
+    boostBand.thresholdDb = -30.0;
+    boostBand.attackMs = 2.0;
+    boostBand.releaseMs = 50.0;
+    boostBand.maxCutDb = 0.0;
+    boostBand.maxBoostDb = 12.0;
+    boostBand.mode = 1;
+    deq.setBand(0, boostBand);
     deq.reset();
 
     const int numFrames = 4800;

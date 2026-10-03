@@ -45,7 +45,7 @@ class ArtworkPicker extends StatelessWidget {
                 width: 150,
                 height: 150,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadii.r20),
+                  borderRadius: AppRadii.r20All,
                   color: p.surfaceContainer,
                   boxShadow: [
                     BoxShadow(
@@ -89,7 +89,7 @@ class ArtworkPicker extends StatelessWidget {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(AppRadii.r20),
+                    borderRadius: AppRadii.r20All,
                     color: Colors.black.withAlpha(70),
                   ),
                 ),

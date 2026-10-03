@@ -45,7 +45,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       index: index,
                       groupKey: '${state.sortBy}-${state.ascending}',
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(AppRadii.r18),
+                        borderRadius: AppRadii.r18All,
                         onTap: () =>
                             context.pushDebounced('/album', extra: album),
                         child: Column(
@@ -103,7 +103,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                         child: Material(
                           color: p.surfaceContainer,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
+                            borderRadius: AppRadii.r16All,
                             side: BorderSide(color: p.hairline),
                           ),
                           child: ListTile(
@@ -180,7 +180,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                       index: index,
                       groupKey: '${state.sortBy}-${state.ascending}',
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(AppRadii.r18),
+                        borderRadius: AppRadii.r18All,
                         onTap: () =>
                             context.pushDebounced('/artist', extra: artist),
                         child: Column(
@@ -231,7 +231,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                         child: Material(
                           color: p.surfaceContainer,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
+                            borderRadius: AppRadii.r16All,
                             side: BorderSide(color: p.hairline),
                           ),
                           child: ListTile(

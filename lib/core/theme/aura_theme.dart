@@ -369,7 +369,7 @@ class AuraTheme {
     );
 
     final outlineBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppRadii.r16),
+      borderRadius: AppRadii.r16All,
       borderSide: BorderSide(color: p.hairline),
     );
 
@@ -543,8 +543,7 @@ class AuraTheme {
             fontWeight: FontWeight.w600,
             fontSize: AppFontSize.bodySmall),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.r14)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadii.r14All),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -591,7 +590,7 @@ class AuraTheme {
         border: outlineBorder,
         enabledBorder: outlineBorder,
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadii.r16),
+          borderRadius: AppRadii.r16All,
           borderSide: BorderSide(color: p.accent, width: 1.5),
         ),
       ),

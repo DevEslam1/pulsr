@@ -186,19 +186,20 @@ extension EqualizerPresetOps on EqualizerManager {
     String? eqString,
     bool? linearPhase,
   }) async {
-    isArbitraryEqEnabled = enabled;
     if (eqString != null) arbitraryEqString = eqString;
     if (linearPhase != null) arbitraryEqLinearPhase = linearPhase;
     if (PlatformCapabilities.isAndroid) {
       if ((eqString != null && eqString.isNotEmpty) ||
           (linearPhase != null && arbitraryEqString.isNotEmpty)) {
-        await _effectsChannel.loadArbitraryEq(
+        final loaded = await _effectsChannel.loadArbitraryEq(
           eqString: arbitraryEqString,
           linearPhase: arbitraryEqLinearPhase,
         );
+        if (!loaded) throw StateError('Arbitrary EQ response was rejected');
       }
       await _effectsChannel.setArbitraryEqEnabled(enabled);
     }
+    isArbitraryEqEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -207,14 +208,15 @@ extension EqualizerPresetOps on EqualizerManager {
     bool enabled, {
     String? code,
   }) async {
-    isLiveProgEnabled = enabled;
     if (code != null) liveProgCode = code;
     if (PlatformCapabilities.isAndroid) {
       if (code != null && code.isNotEmpty) {
-        await _effectsChannel.loadLiveProgCode(code);
+        final status = await _effectsChannel.loadLiveProgCode(code);
+        if (status != 'OK') throw StateError(status);
       }
       await _effectsChannel.setLiveProgEnabled(enabled);
     }
+    isLiveProgEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -238,7 +240,6 @@ extension EqualizerPresetOps on EqualizerManager {
     double? lowCrossoverHz,
     double? highCrossoverHz,
   }) async {
-    isStereoWidthEnabled = enabled;
     if (width != null) stereoWidth = width.clamp(0.0, 2.0);
     if (multiband != null) stereoWidthMultiband = multiband;
     if (lowWidth != null) stereoWidthLow = lowWidth.clamp(0.0, 2.0);
@@ -270,6 +271,7 @@ extension EqualizerPresetOps on EqualizerManager {
       );
       await _effectsChannel.setStereoWidthEnabled(enabled);
     }
+    isStereoWidthEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }

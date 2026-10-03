@@ -123,7 +123,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.r20),
+                borderRadius: AppRadii.r20All,
                 child: widget.themeWidget,
               ),
             ),
@@ -299,7 +299,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
                               color: AppColors.specularAt(0.08),
-                              borderRadius: BorderRadius.circular(AppRadii.r20),
+                              borderRadius: AppRadii.r20All,
                               border: Border.all(
                                 color: AppColors.specularAt(0.12),
                                 width: 0.8,
@@ -314,8 +314,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               indicator: BoxDecoration(
                                 color:
                                     widget.activeColor.withValues(alpha: 0.28),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r16),
+                                borderRadius: AppRadii.r16All,
                                 border: Border.all(
                                   color: widget.activeColor
                                       .withValues(alpha: 0.45),

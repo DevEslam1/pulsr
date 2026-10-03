@@ -184,7 +184,7 @@ class _EmptyLibraryState extends State<EmptyLibrary> {
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 280),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                   child: LinearProgressIndicator(
                     value: _scanProgress.clamp(0.0, 1.0),
                     minHeight: 6,

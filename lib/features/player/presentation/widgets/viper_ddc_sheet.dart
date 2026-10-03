@@ -278,7 +278,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -323,7 +323,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                   padding: const EdgeInsets.all(AppSpacing.s14),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     border: Border.all(
                       color: state.isViperDdcEnabled
                           ? p.primary.withValues(alpha: 0.3)
@@ -388,7 +388,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
@@ -413,7 +413,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                         padding: const EdgeInsets.all(AppSpacing.s14),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          borderRadius: AppRadii.r16All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Column(
@@ -518,8 +518,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                       : p.hairline,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r12),
+                                  borderRadius: AppRadii.r12All,
                                 ),
                               ),
                             ),
@@ -560,8 +559,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   color: _abBypassed ? p.accent : p.hairline,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r12),
+                                  borderRadius: AppRadii.r12All,
                                 ),
                               ),
                             ),
@@ -606,7 +604,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           coeffs: entry.value,
                         );
                       },
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
@@ -615,7 +613,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                           color: isSelected
                               ? p.primary.withValues(alpha: 0.12)
                               : p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                          borderRadius: AppRadii.r14All,
                           border: Border.all(
                             color: isSelected ? p.primary : p.hairline,
                           ),
@@ -651,8 +649,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                     vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.primary,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r8),
+                                  borderRadius: AppRadii.r8All,
                                 ),
                                 child: Text(
                                   context.l10n.activeLabel,

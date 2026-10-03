@@ -79,7 +79,7 @@ mixin TabletLayoutSection
                           color: isSelected
                               ? p.accent.withValues(alpha: 0.14)
                               : Colors.transparent,
-                          borderRadius: BorderRadius.circular(AppRadii.card),
+                          borderRadius: AppRadii.cardRadius,
                           border: Border.all(
                             color: isSelected
                                 ? p.accent.withValues(alpha: 0.45)
@@ -95,8 +95,7 @@ mixin TabletLayoutSection
                               decoration: BoxDecoration(
                                 color: cat.tintColor.withValues(
                                     alpha: isSelected ? 0.22 : 0.12),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r12),
+                                borderRadius: AppRadii.r12All,
                               ),
                               child: Icon(
                                 cat.icon,
@@ -239,7 +238,7 @@ mixin TabletLayoutSection
           horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(AppRadii.card),
+        borderRadius: AppRadii.cardRadius,
         border: Border.all(color: p.hairline),
       ),
       child: Row(
@@ -249,7 +248,7 @@ mixin TabletLayoutSection
             height: 44,
             decoration: BoxDecoration(
               color: cat.tintColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
             child: Icon(cat.icon, color: cat.tintColor, size: 22),
           ),

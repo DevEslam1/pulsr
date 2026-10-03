@@ -163,7 +163,7 @@ class _ThemePreviewThumbnail extends StatelessWidget {
                 .colorScheme
                 .surfaceContainerHighest
                 .withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         border: Border.all(
           color: isSelected
               ? primaryColor.withValues(alpha: 0.4)
@@ -415,7 +415,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                           ? widget.primaryColor.withValues(alpha: 0.12)
                           : widget.cardColor,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r16),
+                        borderRadius: AppRadii.r16All,
                         side: BorderSide(
                           color: isSelected
                               ? widget.primaryColor
@@ -495,7 +495,7 @@ class _ThemeMockupCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(
           color: isSelected ? primaryColor : p.hairline,
           width: isSelected ? 2 : 1,
@@ -578,7 +578,7 @@ class _ThemeMockupCard extends StatelessWidget {
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: p.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(AppRadii.r6),
+            borderRadius: AppRadii.r6All,
             border: Border.all(color: primaryColor.withValues(alpha: 0.5)),
           ),
           child: Row(
@@ -601,7 +601,7 @@ class _ThemeMockupCard extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 2),
               decoration: BoxDecoration(
                 color: primaryColor,
-                borderRadius: BorderRadius.circular(AppRadii.r2),
+                borderRadius: AppRadii.r2All,
               ),
             );
           }),
@@ -634,7 +634,7 @@ class _ThemeMockupCard extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.25),
-            borderRadius: BorderRadius.circular(AppRadii.r8),
+            borderRadius: AppRadii.r8All,
             border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
           ),
           child: Center(
@@ -663,7 +663,7 @@ class _ThemeMockupCard extends StatelessWidget {
           height: 50,
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(AppRadii.r6),
+            borderRadius: AppRadii.r6All,
             border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
           ),
           child: Icon(Icons.play_arrow_rounded, color: primaryColor, size: 28),
@@ -749,7 +749,7 @@ void showLanguagePickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -863,7 +863,7 @@ void showColorSourcePickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -1013,7 +1013,7 @@ void showVisualizerStylePickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -1053,7 +1053,7 @@ void showVisualizerStylePickerSheet(
                 child: Material(
                   color: cardColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     side: BorderSide(color: outlineColor),
                   ),
                   child: ListTile(
@@ -1092,7 +1092,7 @@ void showVisualizerStylePickerSheet(
                 child: Material(
                   color: cardColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     side: BorderSide(color: outlineColor),
                   ),
                   child: ListTile(

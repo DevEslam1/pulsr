@@ -1555,7 +1555,7 @@
   "@sincResampler": {
     "description": "tranche6 eq l10n"
   },
-  "sincDesc": "High-quality resampling when rates differ",
+  "sincDesc": "Playback conversion is handled by Android",
   "@sincDesc": {
     "description": "tranche6 eq l10n"
   },
@@ -3947,7 +3947,7 @@
   "settingsResamplerFast": "Fast (Linear)",
   "settingsResamplerHigh": "High (32-tap)",
   "settingsResamplerQuality": "Resampler Quality",
-  "settingsResamplerQualityDesc": "Sample-rate conversion quality. Ultra is the full 64-tap polyphase sinc (historical default); Fast is linear interpolation for minimal CPU on battery",
+  "settingsResamplerQualityDesc": "Android handles playback sample-rate conversion. Native sinc quality controls are unavailable for this output path.",
   "settingsResamplerStandard": "Standard (16-tap)",
   "settingsResamplerUltra": "Ultra (64-tap)",
   "settingsResetToDefaultValue": "Reset to default ({value})",
@@ -5185,5 +5185,9 @@
   "bitPerfectConflictBody": "Bit-Perfect sends the original, unaltered audio to your USB DAC. These features change the sound and are not compatible:",
   "@bitPerfectConflictBody": {"description":"Body of the Bit-Perfect conflict dialog"},
   "bitPerfectDisableAndEnable": "Disable & enable",
-  "@bitPerfectDisableAndEnable": {"description":"Confirm button that disables conflicting DSP features and enables Bit-Perfect"}
+  "@bitPerfectDisableAndEnable": {"description":"Confirm button that disables conflicting DSP features and enables Bit-Perfect"},
+  "lyricsShiftEarlier": "Shift earlier",
+  "@lyricsShiftEarlier": {"description":"Tooltip for the button that moves a lyric line earlier"},
+  "lyricsShiftLater": "Shift later",
+  "@lyricsShiftLater": {"description":"Tooltip for the button that moves a lyric line later"}
 }

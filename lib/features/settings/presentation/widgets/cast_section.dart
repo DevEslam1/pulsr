@@ -302,7 +302,7 @@ class _CastSectionState extends State<CastSection> {
             padding: const EdgeInsets.all(AppSpacing.s14),
             decoration: BoxDecoration(
               color: p.accentContainer.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(AppRadii.tile),
+              borderRadius: AppRadii.tileRadius,
               border: Border.all(color: p.accent.withValues(alpha: 0.35)),
             ),
             child: Column(
@@ -315,7 +315,7 @@ class _CastSectionState extends State<CastSection> {
                       height: 42,
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                       ),
                       child: Icon(Icons.cast_connected_rounded,
                           color: p.accent, size: 22),
@@ -352,7 +352,7 @@ class _CastSectionState extends State<CastSection> {
                           horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r6),
+                        borderRadius: AppRadii.r6All,
                       ),
                       child: Text(
                         context.l10n.settingsActiveBadge,
@@ -375,7 +375,7 @@ class _CastSectionState extends State<CastSection> {
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                           ),
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.s10),
@@ -395,7 +395,7 @@ class _CastSectionState extends State<CastSection> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: p.hairline),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                         ),
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
@@ -469,8 +469,7 @@ class _CastSectionState extends State<CastSection> {
                                     vertical: AppSpacing.xxs),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.15),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r6),
+                                  borderRadius: AppRadii.r6All,
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -554,7 +553,7 @@ class _CastSectionState extends State<CastSection> {
               horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.surfaceContainerHigh.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(AppRadii.r10),
+            borderRadius: AppRadii.r10All,
             border: Border.all(color: p.hairline),
           ),
           child: Row(

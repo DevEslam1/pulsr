@@ -1,6 +1,7 @@
 // lib/core/widgets/waveform_logo.dart
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
 class WaveformLogo extends StatefulWidget {
@@ -131,7 +132,7 @@ class _WaveformLogoState extends State<WaveformLogo>
       height: effectiveSize * barHeightRatio,
       decoration: BoxDecoration(
         color: themeColor,
-        borderRadius: BorderRadius.circular(effectiveSize * 0.06),
+        borderRadius: AppRadii.circular(effectiveSize * 0.06),
         boxShadow: [
           BoxShadow(
             color: themeColor.withValues(alpha: 0.3),

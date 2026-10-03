@@ -8,6 +8,7 @@ import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
 import '../utils/l10n_extensions.dart';
 import 'artwork_placeholder.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
 /// LRU Memory Bitmap Cache for Artwork images.
@@ -605,7 +606,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
         );
 
         return ClipRRect(
-          borderRadius: BorderRadius.circular(effectiveBorderRadius),
+          borderRadius: AppRadii.circular(effectiveBorderRadius),
           child: SizedBox(
             width: extent,
             height: extent,

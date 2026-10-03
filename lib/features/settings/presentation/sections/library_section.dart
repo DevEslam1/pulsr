@@ -47,7 +47,7 @@ mixin SettingsLibrarySection
                           horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
+                        borderRadius: AppRadii.r10All,
                       ),
                       child: Text(
                         '${(progress * 100).round()}%',
@@ -73,7 +73,7 @@ mixin SettingsLibrarySection
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  borderRadius: AppRadii.r4All,
                   child: LinearProgressIndicator(
                     value: progress > 0 ? progress : null,
                     minHeight: 4,

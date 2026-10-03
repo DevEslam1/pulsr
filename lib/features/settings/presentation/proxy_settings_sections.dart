@@ -33,7 +33,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: p.accentContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Text(
                         '${proxyList.length}',
@@ -63,7 +63,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                       context.read<SettingsCubit>().clearProxyList();
                     }
                   },
-                  borderRadius: BorderRadius.circular(AppRadii.r6),
+                  borderRadius: AppRadii.r6All,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
@@ -80,7 +80,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
         Material(
           color: p.surfaceContainer,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             side: BorderSide(color: p.hairline),
           ),
           clipBehavior: Clip.antiAlias,
@@ -101,7 +101,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                         backgroundColor: p.accent,
                         foregroundColor: p.onAccent,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10)),
+                            borderRadius: AppRadii.r10All),
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
                             vertical: AppSpacing.xs),
@@ -123,8 +123,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           foregroundColor: p.accent,
                           side: BorderSide(color: p.hairline),
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadii.r10)),
+                              borderRadius: AppRadii.r10All),
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                               vertical: AppSpacing.xs),
@@ -155,8 +154,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           foregroundColor: p.textPrimary,
                           side: BorderSide(color: p.hairline),
                           shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadii.r10)),
+                              borderRadius: AppRadii.r10All),
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                               vertical: AppSpacing.xs),
@@ -180,7 +178,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: p.surface,
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -250,7 +248,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
     return Material(
       color: isActive ? p.accentContainer.withValues(alpha: 0.3) : p.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.r14),
+        borderRadius: AppRadii.r14All,
         side: BorderSide(
           color: isActive ? p.accent : p.hairline,
           width: isActive ? 1.5 : 1.0,
@@ -317,7 +315,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                                 vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: p.accent,
-                              borderRadius: BorderRadius.circular(AppRadii.r4),
+                              borderRadius: AppRadii.r4All,
                             ),
                             child: Text(
                               context.l10n.activeLabel,
@@ -416,7 +414,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                           horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                       decoration: BoxDecoration(
                         color: p.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(AppRadii.r4),
+                        borderRadius: AppRadii.r4All,
                       ),
                       child: Text(
                         item.type == AppProxyType.socks5
@@ -435,7 +433,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                             horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                         decoration: BoxDecoration(
                           color: p.accentContainer.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(AppRadii.r4),
+                          borderRadius: AppRadii.r4All,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -470,7 +468,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
             horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.accentContainer.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(AppRadii.r6),
+          borderRadius: AppRadii.r6All,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -502,7 +500,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
             horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadii.r6),
+          borderRadius: AppRadii.r6All,
           border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
@@ -534,7 +532,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
             horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadii.r6),
+          borderRadius: AppRadii.r6All,
           border: Border.all(color: p.error.withValues(alpha: 0.35)),
         ),
         child: Row(
@@ -559,7 +557,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
           horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppRadii.r6),
+        borderRadius: AppRadii.r6All,
       ),
       child: Text(
         context.l10n.unverifiedLabel,
@@ -628,8 +626,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                   }),
                   side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
                   shape: WidgetStatePropertyAll(
-                    RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12)),
+                    RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                   ),
                 ),
               ),
@@ -685,15 +682,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     filled: true,
                     fillColor: p.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       borderSide: BorderSide(color: p.accent, width: 2),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -730,15 +727,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     filled: true,
                     fillColor: p.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       borderSide: BorderSide(color: p.accent, width: 2),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -882,15 +879,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 filled: true,
                 fillColor: p.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 2),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -930,15 +927,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 filled: true,
                 fillColor: p.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 2),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -993,15 +990,15 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 filled: true,
                 fillColor: p.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 2),
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -1042,13 +1039,13 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
   Widget _bypassChip(String host, PulsrPalette p) {
     return InkWell(
       onTap: () => _appendBypassHost(host),
-      borderRadius: BorderRadius.circular(AppRadii.r6),
+      borderRadius: AppRadii.r6All,
       child: Container(
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.surface,
-          borderRadius: BorderRadius.circular(AppRadii.r6),
+          borderRadius: AppRadii.r6All,
           border: Border.all(color: p.hairline),
         ),
         child: Row(

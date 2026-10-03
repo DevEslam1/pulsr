@@ -289,7 +289,7 @@ class _ClickActionTile extends StatelessWidget {
                     color: isSelected
                         ? p.accent.withValues(alpha: 0.12)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                    borderRadius: AppRadii.r12All,
                     child: ListTile(
                       title: Text(
                         _labels(context)[action] ?? action.wireValue,

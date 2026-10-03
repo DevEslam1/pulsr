@@ -234,7 +234,7 @@ class _PulsrSliderState extends State<PulsrSlider>
         child: Container(
           decoration: _isFocused
               ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                   border: Border.all(
                     color:
                         (widget.activeColor ?? p.accent).withValues(alpha: 0.6),

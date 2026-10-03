@@ -37,7 +37,7 @@ class CategoryCard extends StatelessWidget {
       selected: isSelected,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         child: AnimatedContainer(
           duration: context.motionMs(180),
           curve: Curves.easeOutCubic,
@@ -45,7 +45,7 @@ class CategoryCard extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 isSelected ? color.withValues(alpha: 0.12) : p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r18),
+            borderRadius: AppRadii.r18All,
             border: Border.all(
               color: isSelected ? color.withValues(alpha: 0.6) : p.hairline,
               width: isSelected ? 1.5 : 1.0,
@@ -57,7 +57,7 @@ class CategoryCard extends StatelessWidget {
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
                     color: color.withValues(alpha: isSelected ? 0.25 : 0.15),
-                    borderRadius: BorderRadius.circular(AppRadii.r12)),
+                    borderRadius: AppRadii.r12All),
                 child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: AppSpacing.sm),

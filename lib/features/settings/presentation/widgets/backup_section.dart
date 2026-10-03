@@ -39,7 +39,7 @@ class _BackupSectionState extends State<BackupSection> {
       height: 40,
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         border: Border.all(color: outlineColor, width: 1),
       ),
       child: Icon(icon, color: primaryColor, size: 20),

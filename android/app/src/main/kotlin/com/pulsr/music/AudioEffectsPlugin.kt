@@ -51,6 +51,16 @@ data class DynamicsPresetConfig(
 )
 
 class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
+    private val nativeOnlyMethods = setOf(
+        "setCrossfeedEnabled", "setCrossfeedParams", "setCrossfeedMode",
+        "setReverbEnabled", "setReverbPreset", "setReverbWetDry", "setReverbParams", "setReverbCrossChannel", "loadImpulseResponse",
+        "setStereoBalance", "setMonoMix", "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
+        "setStereoWidthEnabled", "setStereoWidthParams", "setLoudnessContourEnabled", "setLoudnessContourParams",
+        "setSubCrossoverEnabled", "setSubCrossoverParams", "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
+        "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers", "setDynamicBassParams",
+        "setViperDdcEnabled", "loadViperDdc", "setArbitraryEqEnabled", "loadArbitraryEq",
+        "setLiveProgEnabled", "loadLiveProgCode", "setLiveProgSlider", "setHeadphoneSafetyParams"
+    )
     private lateinit var methodChannel: MethodChannel
     private var context: Context? = null
 
@@ -332,6 +342,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeGetLastAppliedGeneration(): Long
     private external fun nativeGetPublishedGeneration(): Long
     private external fun nativeGetPipelineLatencyFrames(): Int
+    private external fun nativeIsLimiterActive(): Boolean
     private external fun nativeSetEqEnabled(enabled: Boolean)
     private external fun nativeSetEqBandCount(count: Int)
     private external fun nativeSetEqBand(index: Int, freq: Double, gainDb: Double, q: Double, type: Int, enabled: Boolean)
@@ -1351,6 +1362,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
+            // Playback uses a fixed-frame processor; its in-place resampler
+            // cannot convert rates. Keep platform conversion explicit instead
+            // of accepting an inaudible native quality/enable setting.
+            if (call.method == "setSincResamplerQuality" ||
+                call.method == "setSincResamplerRates" ||
+                (call.method == "setSincResamplerEnabled" && call.argument<Boolean>("enabled") == true)) {
+                result.error("DSP_UNSUPPORTED", "Playback rate conversion is handled by Android; native sinc playback is unavailable", null)
+                return
+            }
+            if (!isNativeDspLoaded && call.method in nativeOnlyMethods) {
+                result.error("DSP_UNAVAILABLE", "${call.method} requires the native audio engine", null)
+                return
+            }
             when (call.method) {
                 // Group 1: Core session, HAL effects & basic EQ
                 "setAudioSessionId", "setVirtualizerEnabled", "setVirtualizerStrength",
@@ -3305,13 +3329,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         ))
 
         // 6. Lookahead Limiter (Native C++)
-        val limActive = isLimiterEnabled && !isBitPerfectBypassActive
+        val automaticLimiterActive = isNativeDspLoaded &&
+            try { nativeIsLimiterActive() } catch (_: Throwable) { false }
+        val limActive = (isLimiterEnabled || automaticLimiterActive) && !isBitPerfectBypassActive
         if (limActive) activeNames.add("Lookahead Limiter (Thresh: ${limiterThresholdDb}dB, Lookahead: ${limiterLookaheadMs}ms)")
         stagesList.add(buildDspStage(
             name = "True-Peak Lookahead Limiter",
             category = "Native C++ Engine",
             isSupported = isNativeDspLoaded,
-            isEnabled = isLimiterEnabled,
+            isEnabled = isLimiterEnabled || automaticLimiterActive,
             isBypassed = isBitPerfectBypassActive,
             isDegraded = ((autoDegraded and STAGE_LIMITER) != 0),
             parameters = mapOf(
@@ -3319,7 +3345,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "lookaheadMs" to limiterLookaheadMs,
                 "releaseMs" to limiterReleaseMs
             ),
-            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLimiterEnabled) "Threshold: ${limiterThresholdDb} dB, Lookahead: ${limiterLookaheadMs} ms" else "Disabled"
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (automaticLimiterActive && !isLimiterEnabled) "Automatic gain protection" else if (isLimiterEnabled) "Threshold: ${limiterThresholdDb} dB, Lookahead: ${limiterLookaheadMs} ms" else "Disabled"
         ))
 
         // 7. Convolution Reverb (Native C++)

@@ -312,17 +312,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         selected: isActive,
                         label: 'Page ${index + 1} of $_pageCount',
                         child: AnimatedContainer(
-                        duration: context.motionMs(300),
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xxs),
-                        height: isLandscape ? 6 : 8,
-                        width: isActive
-                            ? (isLandscape ? 18 : 24)
-                            : (isLandscape ? 6 : 8),
-                        decoration: BoxDecoration(
-                          color: isActive ? p.accent : p.hairline,
-                          borderRadius: BorderRadius.circular(AppRadii.r4),
-                        ),
+                          duration: context.motionMs(300),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xxs),
+                          height: isLandscape ? 6 : 8,
+                          width: isActive
+                              ? (isLandscape ? 18 : 24)
+                              : (isLandscape ? 6 : 8),
+                          decoration: BoxDecoration(
+                            color: isActive ? p.accent : p.hairline,
+                            borderRadius: AppRadii.r4All,
+                          ),
                         ),
                       );
                     }),
@@ -423,8 +423,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 height: isLandscape ? 68 : 104,
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(
-                      isLandscape ? AppRadii.r20 : AppRadii.r28),
+                  borderRadius: isLandscape ? AppRadii.r20All : AppRadii.r28All,
                   border: Border.all(color: p.hairline, width: 1.5),
                   boxShadow: [
                     BoxShadow(
@@ -528,8 +527,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     horizontal: AppSpacing.s20),
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(
-                      isLandscape ? AppRadii.r18 : AppRadii.r24),
+                  borderRadius: isLandscape ? AppRadii.r18All : AppRadii.r24All,
                   border: Border.all(
                       color: p.accent.withValues(alpha: 0.3), width: 1.5),
                   boxShadow: [
@@ -622,8 +620,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     isLandscape ? AppSpacing.sm : AppSpacing.s20),
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(
-                      isLandscape ? AppRadii.r18 : AppRadii.r24),
+                  borderRadius: isLandscape ? AppRadii.r18All : AppRadii.r24All,
                   border: Border.all(color: p.hairline, width: 1.5),
                   boxShadow: [
                     BoxShadow(
@@ -864,8 +861,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.all(AppSpacing.s20),
                 decoration: BoxDecoration(
                   color: p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(
-                      isLandscape ? AppRadii.r18 : AppRadii.r24),
+                  borderRadius: isLandscape ? AppRadii.r18All : AppRadii.r24All,
                   border: Border.all(color: p.hairline, width: 1.5),
                   boxShadow: [
                     BoxShadow(
@@ -888,39 +884,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       selected: isSelected,
                       label: '${context.l10n.customAccentColor} ${index + 1}',
                       child: GestureDetector(
-                      onTap: () {
-                        PulsrHaptics.selection();
-                        SoundFeedbackService.playClick();
-                        cubit.setCustomAccentColor(color);
-                      },
-                      child: AnimatedContainer(
-                        duration: context.motionMs(200),
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color:
-                                isSelected ? p.textPrimary : Colors.transparent,
-                            width: isSelected ? 3 : 1,
+                        onTap: () {
+                          PulsrHaptics.selection();
+                          SoundFeedbackService.playClick();
+                          cubit.setCustomAccentColor(color);
+                        },
+                        child: AnimatedContainer(
+                          duration: context.motionMs(200),
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? p.textPrimary
+                                  : Colors.transparent,
+                              width: isSelected ? 3 : 1,
+                            ),
                           ),
+                          child: isSelected
+                              ? Icon(
+                                  Icons.check_rounded,
+                                  color: color.computeLuminance() > 0.5
+                                      ? Colors.black
+                                      : Colors.white,
+                                  size: 22,
+                                )
+                              : null,
                         ),
-                        child: isSelected
-                            ? Icon(
-                                Icons.check_rounded,
-                                color: color.computeLuminance() > 0.5
-                                    ? Colors.black
-                                    : Colors.white,
-                                size: 22,
-                              )
-                            : null,
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            )
+                    );
+                  }).toList(),
+                ),
+              )
                   .animate()
                   .fadeIn(duration: context.motionMs(500))
                   .scale(begin: const Offset(0.9, 0.9)),
@@ -1039,7 +1036,7 @@ class _FeatureBadge extends StatelessWidget {
           horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         border: Border.all(color: p.hairline),
       ),
       child: Text(

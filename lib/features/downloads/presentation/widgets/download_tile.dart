@@ -85,7 +85,7 @@ class DownloadTile extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       padding: const EdgeInsets.symmetric(
@@ -99,7 +99,7 @@ class DownloadTile extends StatelessWidget {
             children: [
               if (hasArtwork)
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   child: SizedBox(
                     width: 44,
                     height: 44,
@@ -137,7 +137,7 @@ class DownloadTile extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                    borderRadius: AppRadii.r12All,
                   ),
                   child: Icon(statusIcon, color: statusColor, size: 22),
                 ),
@@ -178,7 +178,7 @@ class DownloadTile extends StatelessWidget {
                                 horizontal: AppSpacing.xs, vertical: 1.5),
                             decoration: BoxDecoration(
                               color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Text(
                               statusLabel,
@@ -315,7 +315,7 @@ class DownloadTile extends StatelessWidget {
               task.status == DownloadStatus.tagging) ...[
             const SizedBox(height: AppSpacing.sm),
             ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.r4),
+              borderRadius: AppRadii.r4All,
               child: TweenAnimationBuilder<double>(
                 duration: PulsrMotion.standard,
                 curve: Curves.easeOut,

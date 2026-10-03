@@ -97,7 +97,7 @@ class AudioQualitySheet extends StatelessWidget {
                       height: 4,
                       decoration: BoxDecoration(
                         color: p.hairline,
-                        borderRadius: BorderRadius.circular(AppRadii.r2),
+                        borderRadius: AppRadii.r2All,
                       ),
                     ),
                   ),
@@ -117,7 +117,7 @@ class AudioQualitySheet extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(AppRadii.r20),
+                      borderRadius: AppRadii.r20All,
                       border: Border.all(
                         color: info.badgeColor.withValues(alpha: 0.4),
                         width: 1.2,
@@ -253,7 +253,7 @@ class AudioQualitySheet extends StatelessWidget {
                             color: const Color(
                               0xFFFFD700,
                             ).withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                            borderRadius: AppRadii.r6All,
                           ),
                           child: Text(
                             context.l10n.usbDacAttached,
@@ -427,7 +427,7 @@ class AudioQualitySheet extends StatelessWidget {
                   Container(
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -525,7 +525,7 @@ class AudioQualitySheet extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             vertical: AppSpacing.s14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                          borderRadius: AppRadii.r14All,
                         ),
                       ),
                       onPressed: () => Navigator.of(context).pop(),
@@ -563,7 +563,7 @@ class AudioQualitySheet extends StatelessWidget {
             horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
           color: activeColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadii.r14),
+          borderRadius: AppRadii.r14All,
           border: Border.all(color: activeColor, width: 1.5),
         ),
         child: Row(
@@ -629,7 +629,7 @@ class AudioQualitySheet extends StatelessWidget {
                 color: isSelected
                     ? activeColor.withValues(alpha: 0.12)
                     : p.surfaceContainer,
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
                 border: Border.all(
                   color: isSelected ? activeColor : p.hairline,
                   width: isSelected ? 1.5 : 1.0,
@@ -647,7 +647,7 @@ class AudioQualitySheet extends StatelessWidget {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadii.r14),
+                  borderRadius: AppRadii.r14All,
                   onTap: () {
                     HapticFeedback.selectionClick();
                     cubit?.selectOutputDevice(dev.id);
@@ -792,14 +792,14 @@ class AudioQualitySheet extends StatelessWidget {
                   ? activeColor.withValues(alpha: 0.16)
                   : p.surfaceContainer,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r12),
+                borderRadius: AppRadii.r12All,
                 side: BorderSide(
                   color: isSelected ? activeColor : p.hairline,
                   width: isSelected ? 1.5 : 1.0,
                 ),
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadii.r12),
+                borderRadius: AppRadii.r12All,
                 onTap: () {
                   HapticFeedback.selectionClick();
                   cubit?.setStreamingQuality(opt.quality);
@@ -844,7 +844,7 @@ class AudioQualitySheet extends StatelessWidget {
     final isConnected = session.connected;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(AppRadii.r14),
+      borderRadius: AppRadii.r14All,
       onTap: () => PulsrCastSheet.show(context),
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -853,7 +853,7 @@ class AudioQualitySheet extends StatelessWidget {
           color: isConnected
               ? activeColor.withValues(alpha: 0.14)
               : p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r14),
+          borderRadius: AppRadii.r14All,
           border: Border.all(
             color: isConnected ? activeColor : p.hairline,
             width: isConnected ? 1.5 : 1.0,
@@ -954,7 +954,7 @@ class AudioQualitySheet extends StatelessWidget {
                 horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
             decoration: BoxDecoration(
               color: goldAccent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.r8),
+              borderRadius: AppRadii.r8All,
               border: Border.all(color: goldAccent.withValues(alpha: 0.3)),
             ),
             child: Row(
@@ -1040,7 +1040,7 @@ class AudioQualitySheet extends StatelessWidget {
                 horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
             decoration: BoxDecoration(
               color: goldAccent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.r8),
+              borderRadius: AppRadii.r8All,
               border: Border.all(color: goldAccent.withValues(alpha: 0.3)),
             ),
             child: Row(
@@ -1096,7 +1096,7 @@ class AudioQualitySheet extends StatelessWidget {
             color: isBitPerfectEnabled
                 ? goldAccent.withValues(alpha: 0.12)
                 : p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r14),
+            borderRadius: AppRadii.r14All,
             border: Border.all(
               color: isBitPerfectEnabled
                   ? goldAccent.withValues(alpha: 0.7)
@@ -1155,7 +1155,7 @@ class AudioQualitySheet extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: goldAccent.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(AppRadii.r4),
+                              borderRadius: AppRadii.r4All,
                             ),
                             child: Text(
                               context.l10n.activeLabel,
@@ -1175,7 +1175,7 @@ class AudioQualitySheet extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(AppRadii.r4),
+                              borderRadius: AppRadii.r4All,
                             ),
                             child: Text(
                               context.l10n.armedLabel,
@@ -1337,7 +1337,7 @@ class AudioQualitySheet extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surface,
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
             ),
             child: Icon(icon, size: 18, color: p.textPrimary),
           ),
@@ -1435,7 +1435,7 @@ class AudioQualitySheet extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(
           color: isBitPerfect
               ? AppColors.dacGold.withValues(alpha: 0.4)
@@ -1452,7 +1452,7 @@ class AudioQualitySheet extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: AppSpacing.sm),
               decoration: BoxDecoration(
                 color: AppColors.dacGold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadii.r8),
+                borderRadius: AppRadii.r8All,
                 border: Border.all(
                   color: AppColors.dacGold.withValues(alpha: 0.3),
                 ),
@@ -1664,7 +1664,7 @@ class _OptionPill extends StatelessWidget {
           color: isSelected
               ? activeColor.withValues(alpha: 0.16)
               : palette.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r14),
+          borderRadius: AppRadii.r14All,
           border: Border.all(
             color: isSelected ? activeColor : palette.hairline,
             width: isSelected ? 1.5 : 1.0,
@@ -1682,7 +1682,7 @@ class _OptionPill extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.r14),
+            borderRadius: AppRadii.r14All,
             onTap: isEnabled ? onTap : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(
@@ -1894,7 +1894,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(AppRadii.r16),
+            borderRadius: AppRadii.r16All,
             border: Border.all(
               color: _btAccent.withValues(alpha: connected ? 0.45 : 0.2),
             ),
@@ -2031,7 +2031,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           color: isActive
                               ? accent.withValues(alpha: 0.18)
                               : p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                           border: Border.all(
                             color: isActive ? accent : p.hairline,
                             width: isActive ? 1.5 : 1.0,
@@ -2123,7 +2123,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                         ),
                         decoration: BoxDecoration(
                           color: _btAccent.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                           border: Border.all(
                             color: _btAccent.withValues(alpha: 0.3),
                           ),
@@ -2188,7 +2188,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                         ),
                         decoration: BoxDecoration(
                           color: _btAccent.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                           border: Border.all(
                             color: _btAccent.withValues(alpha: 0.3),
                           ),
@@ -2252,7 +2252,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: _ldacAccent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: _ldacAccent.withValues(alpha: 0.35)),
               ),
               child: Row(
@@ -2335,7 +2335,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
                 border: Border.all(color: _btAccent.withValues(alpha: 0.35)),
               ),
               child: Row(
@@ -2475,7 +2475,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: _warnAccent.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: _warnAccent.withValues(alpha: 0.4)),
       ),
       child: Column(
@@ -2529,7 +2529,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                   horizontal: AppSpacing.md, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                 color: _warnAccent.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: _warnAccent.withValues(alpha: 0.5)),
               ),
               child: Row(
@@ -2597,7 +2597,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           padding: const EdgeInsets.all(AppSpacing.s14),
           decoration: BoxDecoration(
             color: _btAccent.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(AppRadii.r16),
+            borderRadius: AppRadii.r16All,
             border: Border.all(color: _btAccent.withValues(alpha: 0.3)),
           ),
           child: Row(
@@ -2654,7 +2654,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: _btAccent.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: _btAccent.withValues(alpha: 0.2)),
       ),
       child: Row(

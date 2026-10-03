@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../theme/aura_theme.dart';
 import 'waveform_logo.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
 class ArtworkPlaceholder extends StatelessWidget {
@@ -36,7 +37,7 @@ class ArtworkPlaceholder extends StatelessWidget {
           width: isBounded ? effectiveSize : null,
           height: isBounded ? effectiveSize : null,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(effectiveBorderRadius),
+            borderRadius: AppRadii.circular(effectiveBorderRadius),
             gradient: LinearGradient(
               colors: [
                 p.surfaceContainer,

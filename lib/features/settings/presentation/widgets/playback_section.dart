@@ -831,7 +831,7 @@ class _PresetPill extends StatelessWidget {
           color: isSelected
               ? p.accent.withValues(alpha: 0.16)
               : p.surfaceContainerHigh.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           border: Border.all(
             color: isSelected ? p.accent : p.hairline,
             width: isSelected ? 1.4 : 1.0,

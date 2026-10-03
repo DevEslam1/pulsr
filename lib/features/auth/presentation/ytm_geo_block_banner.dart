@@ -61,7 +61,7 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
       padding: const EdgeInsets.all(AppSpacing.s10),
       decoration: BoxDecoration(
         color: Colors.amber.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
       ),
       child: Column(

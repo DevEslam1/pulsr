@@ -139,7 +139,7 @@ class _SuperSectionCardState extends State<_SuperSectionCard>
                   color: isExpanded
                       ? p.surfaceContainer
                       : p.surfaceContainer.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  borderRadius: AppRadii.cardRadius,
                   border: Border.all(
                     color: isExpanded
                         ? p.accent.withValues(alpha: 0.45)
@@ -156,7 +156,7 @@ class _SuperSectionCardState extends State<_SuperSectionCard>
                         color: isExpanded
                             ? p.accent.withValues(alpha: 0.16)
                             : p.accentContainer.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
+                        borderRadius: AppRadii.r10All,
                       ),
                       child: Icon(widget.icon, color: p.accent, size: 18),
                     ),

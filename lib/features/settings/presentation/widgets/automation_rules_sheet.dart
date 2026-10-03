@@ -186,7 +186,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(AppRadii.r16),
+          borderRadius: AppRadii.r16All,
         ),
         child: Icon(Icons.delete_outline_rounded, color: p.error),
       ),
@@ -195,7 +195,7 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
         margin: const EdgeInsets.only(bottom: AppSpacing.s10),
         decoration: BoxDecoration(
           color: p.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(AppRadii.r16),
+          borderRadius: AppRadii.r16All,
           border: Border.all(color: p.hairline),
         ),
         child: PulsrSwitchListTile(

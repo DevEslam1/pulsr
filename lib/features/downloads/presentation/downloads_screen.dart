@@ -90,7 +90,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         color: isSelected ? p.accent.withValues(alpha: 0.4) : p.hairline,
       ),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
       ),
       onSelected: (_) {
         setState(() {
@@ -342,8 +342,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                         vertical: AppSpacing.xs),
                                     decoration: BoxDecoration(
                                       color: p.accent.withValues(alpha: 0.12),
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r12),
+                                      borderRadius: AppRadii.r12All,
                                       border: Border.all(
                                           color:
                                               p.accent.withValues(alpha: 0.25)),
@@ -463,7 +462,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                 horizontal: AppSpacing.md,
                                 vertical: AppSpacing.xxs),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(AppRadii.r16),
+                              borderRadius: AppRadii.r16All,
                               onLongPress: () {
                                 Feedback.forLongPress(context);
                                 setState(() {
@@ -494,8 +493,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                       value: isSelected,
                                       activeColor: p.accent,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r4),
+                                        borderRadius: AppRadii.r4All,
                                       ),
                                       onChanged: (val) {
                                         setState(() {

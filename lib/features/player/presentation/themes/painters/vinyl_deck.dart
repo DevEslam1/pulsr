@@ -87,7 +87,7 @@ class _VinylTurntableDeck extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF14151C),
-                      borderRadius: BorderRadius.circular(AppRadii.r22),
+                      borderRadius: AppRadii.r22All,
                       border: Border.all(
                         color: const Color(0xFF282B37),
                         width: 1.5,
@@ -297,8 +297,7 @@ class _VinylTurntableDeck extends StatelessWidget {
                                   color: state.isPlaying
                                       ? activeColor.withValues(alpha: 0.15)
                                       : const Color(0xFF181A22),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r6),
+                                  borderRadius: AppRadii.r6All,
                                   border: Border.all(
                                     color: state.isPlaying
                                         ? activeColor.withValues(alpha: 0.5)

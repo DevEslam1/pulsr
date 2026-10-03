@@ -148,7 +148,7 @@ class _AuthSheetState extends State<AuthSheet> {
                             height: 4,
                             decoration: BoxDecoration(
                               color: p.textTertiary.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(AppRadii.r2),
+                              borderRadius: AppRadii.r2All,
                             ),
                           ),
                         ),
@@ -208,7 +208,7 @@ class _AuthSheetState extends State<AuthSheet> {
                             padding: const EdgeInsets.symmetric(
                                 vertical: AppSpacing.s14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r14),
+                              borderRadius: AppRadii.r14All,
                               side: BorderSide(color: p.hairline),
                             ),
                           ),
@@ -289,13 +289,11 @@ class _AuthSheetState extends State<AuthSheet> {
                                 filled: true,
                                 fillColor: p.surface,
                                 border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r14),
+                                  borderRadius: AppRadii.r14All,
                                   borderSide: BorderSide(color: p.hairline),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r14),
+                                  borderRadius: AppRadii.r14All,
                                   borderSide: BorderSide(color: p.hairline),
                                 ),
                               ),
@@ -340,13 +338,11 @@ class _AuthSheetState extends State<AuthSheet> {
                                 filled: true,
                                 fillColor: p.surface,
                                 border: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r14),
+                                  borderRadius: AppRadii.r14All,
                                   borderSide: BorderSide(color: p.hairline),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r14),
+                                  borderRadius: AppRadii.r14All,
                                   borderSide: BorderSide(color: p.hairline),
                                 ),
                               ),
@@ -433,7 +429,7 @@ class _AuthSheetState extends State<AuthSheet> {
                             padding: const EdgeInsets.symmetric(
                                 vertical: AppSpacing.s14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r14),
+                              borderRadius: AppRadii.r14All,
                             ),
                           ),
                           child: isLoading
@@ -539,8 +535,7 @@ class _AuthSheetState extends State<AuthSheet> {
                                       vertical: AppSpacing.sm),
                                   side: BorderSide(color: p.hairline),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r14),
+                                    borderRadius: AppRadii.r14All,
                                   ),
                                 ),
                               );

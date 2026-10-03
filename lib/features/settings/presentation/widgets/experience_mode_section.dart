@@ -92,7 +92,7 @@ class ExperienceModeSection extends StatelessWidget {
               horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.surfaceContainerHigh.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(AppRadii.r10),
+            borderRadius: AppRadii.r10All,
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -125,7 +125,7 @@ class ExperienceModeSection extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: (isPro ? p.accent : p.textTertiary)
                           .withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadii.r6),
+                      borderRadius: AppRadii.r6All,
                     ),
                     child: Text(
                       isPro ? 'PRO' : l10n.experienceModeNormal.toUpperCase(),
@@ -296,7 +296,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
       margin: const EdgeInsets.only(top: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         border: Border.all(color: p.hairline.withValues(alpha: 0.5)),
       ),
       child: Column(
@@ -305,7 +305,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
             button: true,
             expanded: _expanded,
             child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
               onTap: () {
                 HapticFeedback.selectionClick();
                 setState(() {

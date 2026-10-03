@@ -50,7 +50,7 @@ class PulsrSegmentedControl extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.xxs),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r16),
+          borderRadius: AppRadii.r16All,
           border: Border.all(color: p.hairline),
         ),
         child: LayoutBuilder(
@@ -71,7 +71,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: p.accent,
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       boxShadow: [
                         BoxShadow(
                           color: p.accent.withValues(alpha: 0.35),
@@ -154,7 +154,7 @@ class PulsrSegmentedControl extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Row(
@@ -201,7 +201,7 @@ class _SegmentButton extends StatelessWidget {
           horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
       decoration: BoxDecoration(
         color: isSelected ? p.accentContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(
           color: isSelected
               ? p.accent.withValues(alpha: 0.38)

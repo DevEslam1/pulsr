@@ -38,7 +38,7 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
               decoration: BoxDecoration(
                 color: p.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: p.hairline),
               ),
               child: Row(
@@ -163,13 +163,13 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
 
     return InkWell(
       onTap: () => _navigateTo(url),
-      borderRadius: BorderRadius.circular(AppRadii.r8),
+      borderRadius: AppRadii.r8All,
       child: Container(
         padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
         decoration: BoxDecoration(
           color: isCurrent ? p.accentContainer : p.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(AppRadii.r8),
+          borderRadius: AppRadii.r8All,
           border: Border.all(
             color: isCurrent ? p.accent : p.hairline,
           ),

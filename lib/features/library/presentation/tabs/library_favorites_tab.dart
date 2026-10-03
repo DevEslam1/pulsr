@@ -506,7 +506,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -576,11 +576,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     filled: true,
                     fillColor: p.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                   ),
@@ -670,8 +670,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     foregroundColor: p.onAccent,
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r14)),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: AppRadii.r14All),
                   ),
                   child: isLoading
                       ? SizedBox(
@@ -703,7 +703,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     PlayerCubit playerCubit,
   ) {
     return InkWell(
-      borderRadius: BorderRadius.circular(AppRadii.r18),
+      borderRadius: AppRadii.r18All,
       onTap: () => playerCubit.playSong(song, queue: currentFavorites),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

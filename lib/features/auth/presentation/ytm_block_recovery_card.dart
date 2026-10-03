@@ -269,7 +269,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(AppRadii.r14),
+              borderRadius: AppRadii.r14All,
               border: Border.all(color: p.error.withValues(alpha: 0.35)),
             ),
             child: Column(
@@ -322,8 +322,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
               backgroundColor: p.accent,
               foregroundColor: p.onAccent,
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12)),
+              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -336,8 +335,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
               backgroundColor: p.surfaceContainerHigh,
               foregroundColor: p.textPrimary,
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12)),
+              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -350,8 +348,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12)),
+              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -367,8 +364,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12)),
+              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -381,8 +377,7 @@ extension _YtmBlockRecoveryCard on _YtmWebLoginSheetState {
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12)),
+              shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
             ),
           ),
           const SizedBox(height: AppSpacing.s10),

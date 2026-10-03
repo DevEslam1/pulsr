@@ -3,6 +3,7 @@
 // clamp or reject out-of-range values so the stored Dart state never diverges
 // from what the native engine actually applies.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/reverb_preset.dart';
@@ -13,6 +14,16 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'),
+            (call) async => call.method.startsWith('set') ? true : null);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'), null);
   });
 
   group('DSP input validation', () {

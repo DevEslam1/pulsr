@@ -1,6 +1,7 @@
 // LiveProg slider positions were session-only; this verifies they now persist
 // and restore, and that corrupt/out-of-range data is rejected on restore.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +10,18 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'), (call) async {
+      if (call.method == 'loadLiveProgCode') return 'OK';
+      return call.method.startsWith('set') ? true : null;
+    });
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'), null);
   });
 
   test('LiveProg slider values round-trip through prefs', () async {

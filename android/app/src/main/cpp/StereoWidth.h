@@ -21,6 +21,11 @@ public:
                             double lowCrossoverHz, double highCrossoverHz);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        return !enabled_ && (std::abs(smoothedWidth_ - 1.0) > 1e-4 ||
+            (multiband_ && (std::abs(smoothedLowWidth_ - 1.0) > 1e-4 ||
+             std::abs(smoothedMidWidth_ - 1.0) > 1e-4 || std::abs(smoothedHighWidth_ - 1.0) > 1e-4)));
+    }
     void applyParams(const StereoWidthParamSet& params);
     void reset();
 

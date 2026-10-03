@@ -113,6 +113,7 @@ public:
     uint64_t getLastAppliedGeneration() const { return lastAppliedGeneration_.load(); }
     uint64_t getPublishedGeneration() const { return snapshotGeneration_.load(); }
     bool wasLastBlockBitPerfect() const { return lastBlockBitPerfect_.load(std::memory_order_relaxed); }
+    bool isLimiterActive() const { return limiterActive_.load(std::memory_order_relaxed); }
 
     void resyncForTrack(double sampleRate, int channels = 2);
 
@@ -144,21 +145,9 @@ public:
     ArbitraryResponseEq& arbitraryEq() { return arbitraryEq_; }
     LiveProg& liveProg() { return liveProg_; }
 
-    // Combined pipeline latency (lookahead + resampler group delay + reverb partitioned delay) in frames
+    // Render-observed delay. Control threads never read mutable DSP objects.
     int getPipelineLatencyFrames() const {
-        int latency = 0;
-        auto snap = getParams();
-        if (!snap) return 0;
-        if (snap->limiter.enabled) {
-            latency += limiter_.getLatencyFrames();
-        }
-        if (snap->resampler.enabled) {
-            latency += resampler_.getLatencyFrames();
-        }
-        if (snap->reverb.enabled) {
-            latency += reverb_.getReverbLatencyFrames();
-        }
-        return latency;
+        return effectiveLatencyFrames_.load(std::memory_order_acquire);
     }
 
     // Auto-Degrade Safety Net: tracks stages bypassed due to budget exhaustion
@@ -242,6 +231,12 @@ private:
     void retireAndDrain(std::shared_ptr<const DspParamSnapshot> old);
 
     std::atomic<double> sampleRate_{48000.0};
+    std::atomic<int> effectiveLatencyFrames_{0};
+    std::atomic<bool> limiterActive_{false};
+    // A reset is a command, not a replaceable parameter. Publications may
+    // supersede its snapshot but cannot remove its acknowledgement token.
+    std::atomic<uint64_t> resetRequestGeneration_{0};
+    uint64_t lastResetGeneration_ = 0; // render thread only
     std::atomic<uint64_t> snapshotGeneration_{1};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
     std::atomic<uint32_t> autoDegradedStages_{0};
@@ -384,6 +379,7 @@ public:
     int getMaxPipelineLatencyFrames();
 
     float getLimiterGrDb();
+    bool isLimiterActive();
     float getDynEqGrDb(int band);
     float getMultibandGrDb(int band);
     double getRollingRtf();

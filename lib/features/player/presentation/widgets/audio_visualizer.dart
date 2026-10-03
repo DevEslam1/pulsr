@@ -604,7 +604,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: AppColors.scrimAt(0.55),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -633,7 +633,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: AppColors.scrimAt(0.55),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(

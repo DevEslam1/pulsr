@@ -23,16 +23,14 @@ extension _EqSheetShell on _EqualizerSheetState {
   double _getBassGain(PlayerState state) {
     final gains = state.eqPreset.gains;
     if (gains.isEmpty) return 0.0;
-    if (gains.length >= 3) {
-      return ((gains[0] + gains[1] + gains[2]) / 3.0).clamp(-12.0, 12.0);
-    }
-    return gains.first.clamp(-12.0, 12.0);
+    return gains[0].clamp(-12.0, 12.0);
   }
 
   double _getMidGain(PlayerState state) {
     final gains = state.eqPreset.gains;
-    if (gains.length >= 7) {
-      return ((gains[4] + gains[5] + gains[6]) / 3.0).clamp(-12.0, 12.0);
+    if (gains.isEmpty) return 0.0;
+    if (gains.length >= 10) {
+      return gains[5].clamp(-12.0, 12.0);
     } else if (gains.length >= 3) {
       return gains[gains.length ~/ 2].clamp(-12.0, 12.0);
     }
@@ -41,8 +39,9 @@ extension _EqSheetShell on _EqualizerSheetState {
 
   double _getTrebleGain(PlayerState state) {
     final gains = state.eqPreset.gains;
+    if (gains.isEmpty) return 0.0;
     if (gains.length >= 10) {
-      return ((gains[7] + gains[8] + gains[9]) / 3.0).clamp(-12.0, 12.0);
+      return gains[8].clamp(-12.0, 12.0);
     } else if (gains.length >= 3) {
       return gains.last.clamp(-12.0, 12.0);
     }
@@ -50,8 +49,8 @@ extension _EqSheetShell on _EqualizerSheetState {
   }
 
   void _setBassMacro(PlayerCubit cubit, PlayerState state, double val) {
-    if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
-    final count = state.eqPreset.gains.length;
+    if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final count = cubit.state.eqPreset.gains.length;
     if (count >= 10) {
       cubit.setBandGain(0, val);
       cubit.setBandGain(1, (val * 0.85).clamp(-12.0, 12.0));
@@ -59,14 +58,12 @@ extension _EqSheetShell on _EqualizerSheetState {
     } else if (count > 0) {
       cubit.setBandGain(0, val);
     }
-    if (val >= 0) {
-      cubit.setBassBoost((val / 12.0).clamp(0.0, 1.0));
-    }
+    cubit.setBassBoost(val > 0 ? (val / 12.0).clamp(0.0, 1.0) : 0.0);
   }
 
   void _setMidMacro(PlayerCubit cubit, PlayerState state, double val) {
-    if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
-    final count = state.eqPreset.gains.length;
+    if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final count = cubit.state.eqPreset.gains.length;
     if (count >= 10) {
       cubit.setBandGain(3, (val * 0.5).clamp(-12.0, 12.0));
       cubit.setBandGain(4, (val * 0.8).clamp(-12.0, 12.0));
@@ -78,8 +75,8 @@ extension _EqSheetShell on _EqualizerSheetState {
   }
 
   void _setTrebleMacro(PlayerCubit cubit, PlayerState state, double val) {
-    if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
-    final count = state.eqPreset.gains.length;
+    if (!cubit.state.isEqEnabled) cubit.setEqualizerEnabled(true);
+    final count = cubit.state.eqPreset.gains.length;
     if (count >= 10) {
       cubit.setBandGain(7, (val * 0.75).clamp(-12.0, 12.0));
       cubit.setBandGain(8, val);
@@ -240,7 +237,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                       color: p.warning.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                       border:
                           Border.all(color: p.warning.withValues(alpha: 0.4))),
                   child: Row(
@@ -265,7 +262,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                       color: p.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                       border:
                           Border.all(color: p.error.withValues(alpha: 0.4))),
                   child: Row(
@@ -300,7 +297,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadii.r10),
+          borderRadius: AppRadii.r10All,
           border: Border.all(color: p.error.withValues(alpha: 0.3))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(Icons.block_rounded, color: p.error, size: 16),
@@ -384,7 +381,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     height: 38,
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r20),
+                      borderRadius: AppRadii.r20All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: TabBar(
@@ -392,7 +389,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       tabAlignment: TabAlignment.fill,
                       indicator: BoxDecoration(
                         color: p.accent,
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        borderRadius: AppRadii.r20All,
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
                       labelColor: p.onAccent,
@@ -491,8 +488,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                               height: 34,
                               decoration: BoxDecoration(
                                 color: p.surfaceContainer,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r20),
+                                borderRadius: AppRadii.r20All,
                                 border: Border.all(color: p.hairline),
                               ),
                               child: TabBar(
@@ -500,8 +496,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 tabAlignment: TabAlignment.fill,
                                 indicator: BoxDecoration(
                                   color: p.accent,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r20),
+                                  borderRadius: AppRadii.r20All,
                                 ),
                                 indicatorSize: TabBarIndicatorSize.tab,
                                 labelColor: p.onAccent,
@@ -579,7 +574,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             height: 4,
             decoration: BoxDecoration(
               color: p.hairline,
-              borderRadius: BorderRadius.circular(AppRadii.r2),
+              borderRadius: AppRadii.r2All,
             ),
           ),
           const Spacer(),
@@ -587,8 +582,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             tooltip: context.l10n.dspPresetOptions,
             icon: Icon(Icons.more_vert_rounded, color: p.accent, size: 20),
             color: p.surfaceContainer,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r16)),
+            shape: RoundedRectangleBorder(borderRadius: AppRadii.r16All),
             onSelected: (value) {
               switch (value) {
                 case 'save':
@@ -680,7 +674,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           color: state.isEqEnabled
               ? p.accent.withValues(alpha: 0.08)
               : p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           border: Border.all(
             color: state.isEqEnabled
                 ? p.accent.withValues(alpha: 0.35)
@@ -688,7 +682,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           ),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           onTap: dspBlockedGlobal != null && !state.isEqEnabled
               ? null
               : () {
@@ -706,7 +700,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     color: state.isEqEnabled
                         ? p.accent.withValues(alpha: 0.2)
                         : p.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                   ),
                   child: Icon(
                     Icons.graphic_eq_rounded,
@@ -744,7 +738,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                       ? p.error.withValues(alpha: 0.15)
                                       : p.accent.withValues(alpha: 0.2))
                                   : p.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(AppRadii.r4),
+                              borderRadius: AppRadii.r4All,
                             ),
                             child: Text(
                               dspBlockedGlobal != null
@@ -833,7 +827,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           color: state.isDspEffectsActive
               ? p.accent.withValues(alpha: 0.08)
               : p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           border: Border.all(
             color: state.isDspEffectsActive
                 ? p.accent.withValues(alpha: 0.35)
@@ -841,7 +835,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           ),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           onTap: dspBlockedGlobal != null && !state.isDspEffectsActive
               ? null
               : () {
@@ -859,7 +853,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     color: state.isDspEffectsActive
                         ? p.accent.withValues(alpha: 0.2)
                         : p.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                   ),
                   child: Icon(
                     Icons.multitrack_audio_rounded,
@@ -898,7 +892,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                       ? p.error.withValues(alpha: 0.15)
                                       : p.accent.withValues(alpha: 0.2))
                                   : p.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(AppRadii.r4),
+                              borderRadius: AppRadii.r4All,
                             ),
                             child: Text(
                               dspBlockedGlobal != null
@@ -1088,61 +1082,75 @@ extension _EqSheetShell on _EqualizerSheetState {
     PulsrPalette p,
     String? dspBlocked,
   ) {
-    final bassVal = _getBassGain(state);
-    final midVal = _getMidGain(state);
-    final trebleVal = _getTrebleGain(state);
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md, vertical: AppSpacing.xs),
       physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            context.l10n.eqQuickToneDials,
-            style: TextStyle(
-              fontSize: AppFontSize.tiny,
-              fontWeight: FontWeight.w800,
-              letterSpacing: AppTracking.wide,
-              color: p.textTertiary,
-            ),
+      child: _buildMacroSliders(context, cubit, p, spacing: AppSpacing.s8),
+    );
+  }
+
+  Widget _buildMacroSliders(
+    BuildContext context,
+    PlayerCubit cubit,
+    PulsrPalette p, {
+    double spacing = AppSpacing.s10,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.l10n.eqQuickToneDials,
+          style: TextStyle(
+            fontSize: AppFontSize.tiny,
+            fontWeight: FontWeight.w800,
+            letterSpacing: AppTracking.wide,
+            color: p.textTertiary,
           ),
-          const SizedBox(height: AppSpacing.s8),
-          _buildMacroSliderRow(
+        ),
+        SizedBox(height: spacing),
+        BlocSelector<PlayerCubit, PlayerState, double>(
+          selector: _getBassGain,
+          builder: (context, val) => _buildMacroSliderRow(
             context: context,
             icon: Icons.speaker_rounded,
             title: context.l10n.eqMacroBassTitle,
             subtitle: context.l10n.eqMacroBassDesc,
-            value: bassVal,
+            value: val,
             accentColor: p.accent,
             p: p,
-            onChanged: (val) => _setBassMacro(cubit, state, val),
+            onChanged: (v) => _setBassMacro(cubit, cubit.state, v),
           ),
-          const SizedBox(height: AppSpacing.s8),
-          _buildMacroSliderRow(
+        ),
+        SizedBox(height: spacing),
+        BlocSelector<PlayerCubit, PlayerState, double>(
+          selector: _getMidGain,
+          builder: (context, val) => _buildMacroSliderRow(
             context: context,
             icon: Icons.mic_rounded,
             title: context.l10n.eqMacroMidTitle,
             subtitle: context.l10n.eqMacroMidDesc,
-            value: midVal,
+            value: val,
             accentColor: AppColors.accentCyan,
             p: p,
-            onChanged: (val) => _setMidMacro(cubit, state, val),
+            onChanged: (v) => _setMidMacro(cubit, cubit.state, v),
           ),
-          const SizedBox(height: AppSpacing.s8),
-          _buildMacroSliderRow(
+        ),
+        SizedBox(height: spacing),
+        BlocSelector<PlayerCubit, PlayerState, double>(
+          selector: _getTrebleGain,
+          builder: (context, val) => _buildMacroSliderRow(
             context: context,
             icon: Icons.auto_awesome_rounded,
             title: context.l10n.eqMacroTrebleTitle,
             subtitle: context.l10n.eqMacroTrebleDesc,
-            value: trebleVal,
+            value: val,
             accentColor: AppColors.warning,
             p: p,
-            onChanged: (val) => _setTrebleMacro(cubit, state, val),
+            onChanged: (v) => _setTrebleMacro(cubit, cubit.state, v),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1158,7 +1166,7 @@ extension _EqSheetShell on _EqualizerSheetState {
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
-          borderRadius: BorderRadius.circular(AppRadii.r20),
+          borderRadius: AppRadii.r20All,
           border: Border.all(color: p.hairline),
         ),
         child: Row(
@@ -1173,7 +1181,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   duration: context.motionMs(200),
                   decoration: BoxDecoration(
                     color: !isStudio ? p.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     boxShadow: !isStudio
                         ? [
                             BoxShadow(
@@ -1219,7 +1227,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   duration: context.motionMs(200),
                   decoration: BoxDecoration(
                     color: isStudio ? p.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     boxShadow: isStudio
                         ? [
                             BoxShadow(
@@ -1272,10 +1280,6 @@ extension _EqSheetShell on _EqualizerSheetState {
     String? dspBlocked,
   ) {
     final preset = state.eqPreset;
-
-    final bassVal = _getBassGain(state);
-    final midVal = _getMidGain(state);
-    final trebleVal = _getTrebleGain(state);
 
     final simplifiedPresets = <(String, EqPreset)>[
       ('Flat', EqPreset.defaultPresets.firstWhere((p) => p.name == 'Flat')),
@@ -1371,51 +1375,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           const SizedBox(height: AppSpacing.lg),
 
           // 2. Three Macro Sliders (Bass, Mid, Treble)
-          Text(
-            context.l10n.eqQuickToneDials,
-            style: TextStyle(
-              fontSize: AppFontSize.tiny,
-              fontWeight: FontWeight.w800,
-              letterSpacing: AppTracking.wide,
-              color: p.textTertiary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.s10),
-
-          _buildMacroSliderRow(
-            context: context,
-            icon: Icons.speaker_rounded,
-            title: context.l10n.eqMacroBassTitle,
-            subtitle: context.l10n.eqMacroBassDesc,
-            value: bassVal,
-            accentColor: p.accent,
-            p: p,
-            onChanged: (val) => _setBassMacro(cubit, state, val),
-          ),
-          const SizedBox(height: AppSpacing.s10),
-
-          _buildMacroSliderRow(
-            context: context,
-            icon: Icons.mic_rounded,
-            title: context.l10n.eqMacroMidTitle,
-            subtitle: context.l10n.eqMacroMidDesc,
-            value: midVal,
-            accentColor: AppColors.accentCyan,
-            p: p,
-            onChanged: (val) => _setMidMacro(cubit, state, val),
-          ),
-          const SizedBox(height: AppSpacing.s10),
-
-          _buildMacroSliderRow(
-            context: context,
-            icon: Icons.auto_awesome_rounded,
-            title: context.l10n.eqMacroTrebleTitle,
-            subtitle: context.l10n.eqMacroTrebleDesc,
-            value: trebleVal,
-            accentColor: AppColors.warning,
-            p: p,
-            onChanged: (val) => _setTrebleMacro(cubit, state, val),
-          ),
+          _buildMacroSliders(context, cubit, p, spacing: AppSpacing.s10),
 
           const SizedBox(height: AppSpacing.xl),
 
@@ -1455,7 +1415,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           AppSpacing.s14, AppSpacing.sm, AppSpacing.s14, AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -1466,7 +1426,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                 padding: const EdgeInsets.all(AppSpacing.s6),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                 ),
                 child: Icon(icon, color: accentColor, size: 16),
               ),
@@ -1498,7 +1458,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                   border: Border.all(color: accentColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
@@ -1707,8 +1667,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -1729,8 +1688,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: () {
                     final blocked = _dspBlockedReason(context);
                     if (blocked != null) {
@@ -1763,8 +1721,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: dspBlocked != null
                       ? null
                       : () => _showRoomCorrectionActions(cubit),
@@ -1794,8 +1751,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   side: BorderSide(
                     color: state.isViperDdcEnabled ? p.accent : p.hairline,
                   ),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -1828,8 +1784,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   side: BorderSide(
                     color: state.isArbitraryEqEnabled ? p.accent : p.hairline,
                   ),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -1860,8 +1815,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   side: BorderSide(
                     color: state.isLiveProgEnabled ? p.accent : p.hairline,
                   ),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: () {
                     PulsrSheetHelper.showPulsrSheet<void>(
                       context: context,
@@ -1894,8 +1848,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   side: BorderSide(
                     color: state.isDynamicBassEnabled ? p.accent : p.hairline,
                   ),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: dspBlocked != null || !_nativePcmEffectsAvailable
                       ? null
                       : () {
@@ -1915,8 +1868,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           fontWeight: FontWeight.w700)),
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   onPressed: () => DspInspectorSheet.show(context),
                 ),
               ],
@@ -2079,7 +2031,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     padding: const EdgeInsets.all(AppSpacing.s2),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Row(
@@ -2087,7 +2039,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       children: [
                         for (final bandCount in const [10, 32, 64])
                           InkWell(
-                            borderRadius: BorderRadius.circular(AppRadii.r8),
+                            borderRadius: AppRadii.r8All,
                             onTap: dspBlocked != null
                                 ? null
                                 : () async {
@@ -2107,8 +2059,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 color: _activeBandCount(state) == bandCount
                                     ? p.accent
                                     : Colors.transparent,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r8),
+                                borderRadius: AppRadii.r8All,
                               ),
                               child: Text(
                                 '$bandCount',
@@ -2135,7 +2086,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                             vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: p.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          borderRadius: AppRadii.r8All,
                           border: Border.all(
                               color: p.accent.withValues(alpha: 0.25)),
                         ),
@@ -2161,7 +2112,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       Tooltip(
                         message: context.l10n.resetToFlat,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          borderRadius: AppRadii.r8All,
                           onTap: dspBlocked != null
                               ? null
                               : () {
@@ -2176,7 +2127,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                             ),
                             decoration: BoxDecoration(
                               color: p.surfaceContainer,
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                               border: Border.all(color: p.hairline),
                             ),
                             child: Row(
@@ -2207,7 +2158,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       Tooltip(
                         message: context.l10n.frequencies,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(AppRadii.r8),
+                          borderRadius: AppRadii.r8All,
                           onTap: dspBlocked != null
                               ? null
                               : () {
@@ -2222,7 +2173,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                             ),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                               border: Border.all(
                                   color: p.accent.withValues(alpha: 0.3)),
                             ),
@@ -2348,7 +2299,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                             decoration: BoxDecoration(
                               color: (clipRisk ? p.error : p.accent)
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(
                               Icons.vertical_align_center_rounded,
@@ -2391,7 +2342,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                           ? p.accent
                                           : p.surface))
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                               border: Border.all(
                                 color: clipRisk
                                     ? p.error.withValues(alpha: 0.4)
@@ -2508,7 +2459,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                               vertical: AppSpacing.xs),
                           decoration: BoxDecoration(
                             color: p.error.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                             border: Border.all(
                                 color: p.error.withValues(alpha: 0.4)),
                           ),
@@ -2556,7 +2507,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.speaker_group_rounded,
                           color: p.accent, size: 20),
@@ -2609,7 +2560,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           decoration: BoxDecoration(
                             color: (preset.bassBoost > 0 ? p.accent : p.surface)
                                 .withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r8),
+                            borderRadius: AppRadii.r8All,
                             border: Border.all(
                               color: preset.bassBoost > 0
                                   ? p.accent.withValues(alpha: 0.3)
@@ -2708,7 +2659,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       decoration: BoxDecoration(
                         color: (isOverSafe ? p.error : p.accent)
                             .withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(
                         Icons.volume_up_rounded,
@@ -2767,7 +2718,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                         ? p.accent
                                         : p.surface))
                                 .withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r8),
+                            borderRadius: AppRadii.r8All,
                             border: Border.all(
                               color: isOverSafe
                                   ? p.error.withValues(alpha: 0.4)
@@ -2909,7 +2860,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   padding: const EdgeInsets.all(AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: p.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                   ),
                   child: Icon(Icons.spatial_tracking_rounded,
                       color: p.accent, size: 20),
@@ -2944,7 +2895,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                       ? p.accent
                                       : p.textTertiary)
                                   .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              borderRadius: AppRadii.r6All,
                             ),
                             child: Text(
                               state.isSpatializerSupported
@@ -3016,7 +2967,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             height: 40,
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               border: Border.all(color: p.hairline),
             ),
             child: TextField(
@@ -3146,7 +3097,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                         border: Border.all(color: p.hairline),
                       ),
                       child: Text(
@@ -3286,8 +3237,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                         vertical: AppSpacing.s6),
                                     decoration: BoxDecoration(
                                       color: p.accent,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r12),
+                                      borderRadius: AppRadii.r12All,
                                       boxShadow: [
                                         BoxShadow(
                                           color:
@@ -3321,8 +3271,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                         vertical: AppSpacing.s6),
                                     decoration: BoxDecoration(
                                       color: p.surfaceContainerHigh,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r12),
+                                      borderRadius: AppRadii.r12All,
                                       border: Border.all(color: p.hairline),
                                     ),
                                     child: Text(
@@ -3382,7 +3331,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: LayoutBuilder(
@@ -3458,7 +3407,7 @@ extension _EqSheetShell on _EqualizerSheetState {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.r12),
+      borderRadius: AppRadii.r12All,
       child: AnimatedContainer(
         duration: context.motionMs(200),
         padding: const EdgeInsets.symmetric(
@@ -3466,7 +3415,7 @@ extension _EqSheetShell on _EqualizerSheetState {
         decoration: BoxDecoration(
           color:
               isActive ? p.accent.withValues(alpha: 0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           border: Border.all(
             color: isActive ? p.accent : Colors.transparent,
             width: 1,

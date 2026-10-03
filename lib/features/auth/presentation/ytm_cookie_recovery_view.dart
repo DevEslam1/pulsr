@@ -147,7 +147,7 @@ extension _YtmCookieRecoveryView on _YtmWebLoginSheetState {
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                  borderRadius: AppRadii.r10All,
                 ),
                 child: Icon(Icons.vpn_key_rounded, color: p.accent, size: 20),
               ),
@@ -191,7 +191,7 @@ extension _YtmCookieRecoveryView on _YtmWebLoginSheetState {
                     fillColor: p.surfaceContainer,
                     errorText: errorText,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                       borderSide: BorderSide(color: p.hairline),
                     ),
                   ),

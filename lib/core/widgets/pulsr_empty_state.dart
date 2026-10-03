@@ -172,7 +172,7 @@ class PulsrEmptyState extends StatelessWidget {
                           vertical: AppSpacing.sm,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.button),
+                          borderRadius: AppRadii.buttonRadius,
                         ),
                       ),
                       icon: isPrimaryLoading

@@ -618,6 +618,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetTelemetry(
 
 // ---- Feature 4: Headphone Safety & Sound Dose Tracking (EN 62368-1 / WHO-ITU H.870) ----
 
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeIsLimiterActive(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().isLimiterActive() ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jdouble JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetWeeklyDose(
         JNIEnv* /* env */, jobject /* thiz */) {

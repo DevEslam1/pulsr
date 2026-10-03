@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'pulsr_static_grid.dart';
 
 /// {@category DesignSystem}
 /// Coordinates the shimmer sweep for every [SkeletonBox] beneath it.
@@ -61,6 +63,11 @@ class _SkeletonShimmerState extends State<SkeletonShimmer>
         return ShaderMask(
           blendMode: BlendMode.srcATop,
           shaderCallback: (bounds) {
+            if (bounds.isEmpty) {
+              return const LinearGradient(
+                colors: [Colors.transparent, Colors.transparent],
+              ).createShader(bounds);
+            }
             return LinearGradient(
               begin: Alignment(-1.6 + 3.2 * t, 0),
               end: Alignment(-0.6 + 3.2 * t, 0),
@@ -156,7 +163,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
         height: widget.height,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.radius),
+            borderRadius: AppRadii.circular(widget.radius),
             color: base,
           ),
         ),
@@ -164,7 +171,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(widget.radius),
+      borderRadius: AppRadii.circular(widget.radius),
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
@@ -265,7 +272,11 @@ Widget _cascade(int index, Widget child, bool enabled) {
       );
 }
 
-/// A vertical list of [SkeletonSongRow]s for full-screen loading states.
+/// A vertical list of [SkeletonSongRow]s for loading states.
+///
+/// Uses a static [Column] rather than a nested [ListView] so it never causes
+/// "Vertical viewport was given unbounded height" or broken RenderBox sizing
+/// when placed inside parent scrollables, slivers, or flex layouts.
 class SkeletonList extends StatelessWidget {
   final int itemCount;
   final double artworkSize;
@@ -281,20 +292,25 @@ class SkeletonList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = context.motionEnabled;
-    final list = ListView.builder(
+    final content = Padding(
       padding: padding,
-      physics: const NeverScrollableScrollPhysics(),
-      addAutomaticKeepAlives: false,
-      addRepaintBoundaries: true,
-      itemCount: itemCount,
-      itemBuilder: (context, i) =>
-          _cascade(i, SkeletonSongRow(artworkSize: artworkSize), enabled),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int i = 0; i < itemCount; i++)
+            _cascade(i, SkeletonSongRow(artworkSize: artworkSize), enabled),
+        ],
+      ),
     );
-    return SkeletonShimmer(child: list);
+    return SkeletonShimmer(child: content);
   }
 }
 
 /// A grid of square art skeletons (albums/artists/playlists loading state).
+///
+/// Implemented via [PulsrStaticGrid] to eliminate internal [Scrollable] and
+/// [RenderViewport] creation, ensuring safe rendering inside any layout context.
 class SkeletonGrid extends StatelessWidget {
   final int itemCount;
   final int columns;
@@ -311,18 +327,13 @@ class SkeletonGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final grid = GridView.builder(
+    final grid = PulsrStaticGrid(
       padding: padding,
-      physics: const NeverScrollableScrollPhysics(),
-      addAutomaticKeepAlives: false,
-      addRepaintBoundaries: true,
+      crossAxisCount: columns,
+      childAspectRatio: aspectRatio,
+      crossAxisSpacing: 14,
+      mainAxisSpacing: 14,
       itemCount: itemCount,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        childAspectRatio: aspectRatio,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-      ),
       itemBuilder: (context, i) {
         return _cascade(
           i,

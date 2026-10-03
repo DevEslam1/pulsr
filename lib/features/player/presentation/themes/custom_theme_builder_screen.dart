@@ -120,7 +120,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 filled: true,
                 fillColor: p.surfaceCard,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
               ),
@@ -268,7 +268,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: p.bg,
-                  borderRadius: BorderRadius.circular(_cornerRadius),
+                  borderRadius: AppRadii.circular(_cornerRadius),
                   border: Border.all(
                     color: Color(_accentColor).withValues(alpha: 0.4),
                     width: 1.5,
@@ -314,7 +314,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: AppColors.darkSurface,
-                  borderRadius: BorderRadius.circular(_cornerRadius),
+                  borderRadius: AppRadii.circular(_cornerRadius),
                   border: Border.all(
                       color: Color(_accentColor).withValues(alpha: 0.4),
                       width: 1.5),
@@ -337,8 +337,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                           height: 64,
                           decoration: BoxDecoration(
                             color: Color(_accentColor).withValues(alpha: 0.2),
-                            borderRadius:
-                                BorderRadius.circular(_cornerRadius / 2),
+                            borderRadius: AppRadii.circular(_cornerRadius / 2),
                           ),
                           child: Icon(Icons.music_note_rounded,
                               color: Color(_accentColor), size: 32),

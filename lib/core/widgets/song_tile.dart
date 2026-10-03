@@ -88,7 +88,7 @@ class SongTile extends StatelessWidget {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadii.r16),
+                  borderRadius: AppRadii.r16All,
                   boxShadow: isPlaying
                       ? [
                           BoxShadow(
@@ -103,10 +103,10 @@ class SongTile extends StatelessWidget {
                       (selected
                           ? p.accentContainer
                           : (isActive ? p.surfaceContainer : p.surface)),
-                  borderRadius: BorderRadius.circular(AppRadii.r16),
+                  borderRadius: AppRadii.r16All,
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     onTap: onTap,
                     onLongPress: onLongPress,
                     child: Container(
@@ -144,8 +144,7 @@ class SongTile extends StatelessWidget {
                                   ? Container(
                                       decoration: BoxDecoration(
                                         color: p.accent,
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r12),
+                                        borderRadius: AppRadii.r12All,
                                       ),
                                       child: Icon(Icons.check_rounded,
                                           color: p.onAccent, size: 24),
@@ -167,9 +166,7 @@ class SongTile extends StatelessWidget {
                                             decoration: BoxDecoration(
                                               color: Colors.black
                                                   .withValues(alpha: 0.45),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                      AppRadii.r12),
+                                              borderRadius: AppRadii.r12All,
                                             ),
                                             child: Center(
                                               child: NowPlayingIndicator(
@@ -364,7 +361,7 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
                 height: h,
                 decoration: BoxDecoration(
                   color: widget.color,
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
+                  borderRadius: AppRadii.r2All,
                 ),
               );
             }),

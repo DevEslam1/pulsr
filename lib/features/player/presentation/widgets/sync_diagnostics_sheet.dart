@@ -136,7 +136,7 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
                       margin: const EdgeInsets.only(bottom: AppSpacing.md),
                       decoration: BoxDecoration(
                         color: p.hairline,
-                        borderRadius: BorderRadius.circular(AppRadii.r2),
+                        borderRadius: AppRadii.r2All,
                       ),
                     ),
                   ),
@@ -217,7 +217,7 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Row(
@@ -227,7 +227,7 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
             padding: const EdgeInsets.all(AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.accentContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r8),
+              borderRadius: AppRadii.r8All,
             ),
             child: Icon(icon, color: p.accent, size: 20),
           ),

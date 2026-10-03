@@ -50,6 +50,33 @@ abstract class AppRadii {
       BorderRadius.all(Radius.circular(dialog));
   static const BorderRadius full = BorderRadius.all(Radius.circular(999.0));
 
+  static const BorderRadius bottomSheetAllRadius =
+      BorderRadius.all(Radius.circular(bottomSheet));
+
+  // Pre-built [BorderRadius] values for the numeric scale so call sites can
+  // reference a single const token instead of constructing a radius inline.
+  static const BorderRadius r1_5All =
+      BorderRadius.all(Radius.circular(r1_5));
+  static const BorderRadius r2All = BorderRadius.all(Radius.circular(r2));
+  static const BorderRadius r4All = BorderRadius.all(Radius.circular(r4));
+  static const BorderRadius r6All = BorderRadius.all(Radius.circular(r6));
+  static const BorderRadius r8All = BorderRadius.all(Radius.circular(r8));
+  static const BorderRadius r10All = BorderRadius.all(Radius.circular(r10));
+  static const BorderRadius r12All = BorderRadius.all(Radius.circular(r12));
+  static const BorderRadius r14All = BorderRadius.all(Radius.circular(r14));
+  static const BorderRadius r16All = BorderRadius.all(Radius.circular(r16));
+  static const BorderRadius r18All = BorderRadius.all(Radius.circular(r18));
+  static const BorderRadius r20All = BorderRadius.all(Radius.circular(r20));
+  static const BorderRadius r22All = BorderRadius.all(Radius.circular(r22));
+  static const BorderRadius r24All = BorderRadius.all(Radius.circular(r24));
+  static const BorderRadius r26All = BorderRadius.all(Radius.circular(r26));
+  static const BorderRadius r28All = BorderRadius.all(Radius.circular(r28));
+  static const BorderRadius r32All = BorderRadius.all(Radius.circular(r32));
+
+  /// Builds a circular [BorderRadius] for a computed (non-token) radius.
+  static BorderRadius circular(double radius) =>
+      BorderRadius.all(Radius.circular(radius));
+
   // ── Continuous Curvature / Squircles (iOS HIG) ──────────────────────────
   /// Multiplier to match visual curvature of continuous superellipses to circular radii.
   static const double squircleMultiplier = 2.2;

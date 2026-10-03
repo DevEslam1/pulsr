@@ -175,7 +175,7 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
         message: tooltip,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.r4),
+          borderRadius: AppRadii.r4All,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1.5, vertical: 3),
             child: Container(
@@ -186,7 +186,7 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
                 color: active
                     ? activeColor.withValues(alpha: 0.18)
                     : Colors.transparent,
-                borderRadius: BorderRadius.circular(AppRadii.r4),
+                borderRadius: AppRadii.r4All,
                 border: Border.all(
                   color: active ? activeColor : context.palette.hairline,
                 ),
@@ -290,7 +290,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
             decoration: BoxDecoration(
               color: (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor)
                   .withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppRadii.r6),
+              borderRadius: AppRadii.r6All,
             ),
             child: Text(
               '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',

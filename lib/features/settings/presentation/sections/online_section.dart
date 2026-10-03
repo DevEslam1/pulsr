@@ -154,7 +154,7 @@ mixin SettingsOnlineSection
                   margin: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: p.success.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadii.r6),
+                    borderRadius: AppRadii.r6All,
                   ),
                   child: Text(
                     context.l10n.activeLabel,

@@ -2884,7 +2884,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sincResampler => 'Sinc Resampler';
 
   @override
-  String get sincDesc => 'High-quality resampling when rates differ';
+  String get sincDesc => 'Playback conversion is handled by Android';
 
   @override
   String get wetDryMix => 'Wet / Dry Mix';
@@ -5199,7 +5199,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResamplerQualityDesc =>
-      'Sample-rate conversion quality. Ultra is the full 64-tap polyphase sinc (historical default); Fast is linear interpolation for minimal CPU on battery';
+      'Android handles playback sample-rate conversion. Native sinc quality controls are unavailable for this output path.';
 
   @override
   String get settingsResamplerStandard => 'Standard (16-tap)';
@@ -7975,4 +7975,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bitPerfectDisableAndEnable => 'Disable & enable';
+
+  @override
+  String get lyricsShiftEarlier => 'Shift earlier';
+
+  @override
+  String get lyricsShiftLater => 'Shift later';
 }

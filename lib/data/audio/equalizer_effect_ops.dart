@@ -38,8 +38,7 @@ extension EqualizerEffectOps on EqualizerManager {
     if (!_effectsChannel.isVirtualizerSupported) return;
 
     // Finite-guard before clamp so a NaN strength can't survive clamp().
-    virtualizerStrength =
-        DspParamRanges.virtualizerStrength.clamp(strength);
+    virtualizerStrength = DspParamRanges.virtualizerStrength.clamp(strength);
     final applied = await _effectsChannel.setVirtualizerStrength(
       virtualizerStrength,
     );
@@ -145,7 +144,6 @@ extension EqualizerEffectOps on EqualizerManager {
     double? fcut,
     int? mode,
   }) async {
-    isCrossfeedEnabled = enabled;
     // Finite-guard each knob before clamp (clamp alone passes NaN through).
     if (delayUs != null) {
       crossfeedDelayUs = DspParamRanges.crossfeedDelayUs.clamp(delayUs);
@@ -166,6 +164,7 @@ extension EqualizerEffectOps on EqualizerManager {
       await _effectsChannel.setCrossfeedMode(crossfeedMode);
       await _effectsChannel.setCrossfeedEnabled(enabled);
     }
+    isCrossfeedEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -185,21 +184,18 @@ extension EqualizerEffectOps on EqualizerManager {
     double? releaseMs,
     double? lookaheadMs,
   }) async {
-    isLimiterEnabled = enabled;
     // Clamp + finite-guard every knob before it reaches native (every other
     // setter already clamps; the limiter path previously forwarded raw values).
     // Ranges live in the central contract (DspParamRanges), which mirrors the
     // native sanitizer (AudioDspEngine.cpp / DspParams.h).
     if (thresholdDb != null) {
-      limiterThresholdDb =
-          DspParamRanges.limiterThresholdDb.clamp(thresholdDb);
+      limiterThresholdDb = DspParamRanges.limiterThresholdDb.clamp(thresholdDb);
     }
     if (releaseMs != null) {
       limiterReleaseMs = DspParamRanges.limiterReleaseMs.clamp(releaseMs);
     }
     if (lookaheadMs != null) {
-      limiterLookaheadMs =
-          DspParamRanges.limiterLookaheadMs.clamp(lookaheadMs);
+      limiterLookaheadMs = DspParamRanges.limiterLookaheadMs.clamp(lookaheadMs);
     }
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLimiterParams(
@@ -209,6 +205,7 @@ extension EqualizerEffectOps on EqualizerManager {
       );
       await _effectsChannel.setLimiterEnabled(enabled);
     }
+    isLimiterEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -224,8 +221,7 @@ extension EqualizerEffectOps on EqualizerManager {
     // HAL call and were previously forwarded raw). Ranges live in the central
     // contract (DspParamRanges), per DspParams.h / AudioDspEngine.cpp.
     if (thresholdDb != null) {
-      limiterThresholdDb =
-          DspParamRanges.limiterThresholdDb.clamp(thresholdDb);
+      limiterThresholdDb = DspParamRanges.limiterThresholdDb.clamp(thresholdDb);
     }
     if (ratio != null) {
       compressorRatio = DspParamRanges.compressorRatio.clamp(ratio);
@@ -265,7 +261,6 @@ extension EqualizerEffectOps on EqualizerManager {
     double? predelayMs,
     double? damping,
   }) async {
-    isReverbEnabled = enabled;
     if (preset != null) {
       // Wire values are ReverbPreset ordinals (0..N); anything else has no
       // synthesizable IR on the native side, so clamp instead of forwarding
@@ -296,6 +291,7 @@ extension EqualizerEffectOps on EqualizerManager {
       );
       await _effectsChannel.setReverbEnabled(enabled);
     }
+    isReverbEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -363,10 +359,10 @@ extension EqualizerEffectOps on EqualizerManager {
   }
 
   Future<void> setSincResampler(bool enabled) async {
-    isSincResamplerEnabled = enabled;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSincResamplerEnabled(enabled);
     }
+    isSincResamplerEnabled = enabled;
     _debouncedSavePreferences();
   }
 }

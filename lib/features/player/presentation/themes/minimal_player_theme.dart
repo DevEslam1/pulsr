@@ -16,6 +16,7 @@ import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 part 'parts/minimal_player_theme_build.dart';
 
 class MinimalPlayerTheme extends StatelessWidget {

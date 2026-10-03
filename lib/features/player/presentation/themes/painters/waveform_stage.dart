@@ -103,7 +103,7 @@ class _WaveformHeroStage extends StatelessWidget {
                 width: artSize,
                 height: artSize,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(
+                  borderRadius: AppRadii.circular(
                       resolveCustomRadius(context, AppRadii.r28)),
                   boxShadow: [
                     BoxShadow(

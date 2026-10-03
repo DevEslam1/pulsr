@@ -382,7 +382,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                          borderRadius: AppRadii.r14All,
                         ),
                         side: BorderSide(color: p.hairline),
                       ),
@@ -404,7 +404,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                          borderRadius: AppRadii.r14All,
                         ),
                         side: BorderSide(color: p.hairline),
                       ),
@@ -449,7 +449,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                       padding:
                           const EdgeInsets.symmetric(vertical: AppSpacing.s14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r14),
+                        borderRadius: AppRadii.r14All,
                       ),
                     ),
                     onPressed: () {
@@ -489,7 +489,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -514,7 +514,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                 SnackBar(content: Text(context.l10n.dspSavedAlbum)),
               );
             },
-            borderRadius: BorderRadius.circular(AppRadii.r8),
+            borderRadius: AppRadii.r8All,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
               child: Row(
@@ -754,15 +754,15 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 1.5),
                 ),
               ),
@@ -795,7 +795,7 @@ class _BpmOverrideDialogState extends State<_BpmOverrideDialog> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(context.l10n.save),
@@ -973,7 +973,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -1001,23 +1001,24 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
                     selected: isFilled,
                     label: '${context.l10n.trackRating} $starNum / 5',
                     child: GestureDetector(
-                    onTap: () async {
-                      final newRating = currentRating == starNum ? 0 : starNum;
-                      await _ratingStore.setRating(trackKey, newRating);
-                      playerCubit?.setSongRating(widget.song.id, newRating);
-                      if (mounted) setState(() {});
-                    },
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: AppSpacing.s2),
-                      child: Icon(
-                        isFilled
-                            ? Icons.star_rounded
-                            : Icons.star_outline_rounded,
-                        size: 22,
-                        color: isFilled ? p.warning : p.textTertiary,
+                      onTap: () async {
+                        final newRating =
+                            currentRating == starNum ? 0 : starNum;
+                        await _ratingStore.setRating(trackKey, newRating);
+                        playerCubit?.setSongRating(widget.song.id, newRating);
+                        if (mounted) setState(() {});
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s2),
+                        child: Icon(
+                          isFilled
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 22,
+                          color: isFilled ? p.warning : p.textTertiary,
+                        ),
                       ),
-                    ),
                     ),
                   );
                 }),
@@ -1146,7 +1147,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
           // Per-Track BPM (feeds BPM-synced crossfade)
           InkWell(
             onTap: () => _showBpmDialog(context, playerCubit, currentBpm),
-            borderRadius: BorderRadius.circular(AppRadii.r8),
+            borderRadius: AppRadii.r8All,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
               child: Row(

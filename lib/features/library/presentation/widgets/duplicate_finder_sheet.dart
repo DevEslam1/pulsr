@@ -195,7 +195,7 @@ class _DuplicateFinderSheetState extends State<DuplicateFinderSheet> {
                       child: Material(
                         color: p.surfaceContainer,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          borderRadius: AppRadii.r16All,
                           side: BorderSide(color: p.hairline),
                         ),
                         child: Padding(
@@ -247,8 +247,7 @@ class _DuplicateFinderSheetState extends State<DuplicateFinderSheet> {
                                           color: ext == 'FLAC'
                                               ? p.accent.withValues(alpha: 0.15)
                                               : p.hairline,
-                                          borderRadius: BorderRadius.circular(
-                                              AppRadii.r4),
+                                          borderRadius: AppRadii.r4All,
                                         ),
                                         child: Text(
                                           ext,

@@ -1091,7 +1091,10 @@ void runEngineSubCrossoverRampOutTest() {
     std::cout << "  ✓ Engine successfully ramped SubCrossover even when STAGE_CROSSOVER bit was dropped." << std::endl;
 }
 
+#include "test_engine_contracts.h"
+
 int main() {
+    runEngineCommandContractsTest();
     std::cout << "====================================================" << std::endl;
     std::cout << "  Pulsr Music Native DSP Full Test Suite (21/21)" << std::endl;
     std::cout << "====================================================" << std::endl;

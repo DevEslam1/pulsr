@@ -44,7 +44,7 @@ class PulsrToast {
         behavior: SnackBarBehavior.floating,
         duration: duration,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
         ),
         action: action,
       ),
@@ -85,7 +85,7 @@ class PulsrToast {
         behavior: SnackBarBehavior.floating,
         duration: duration,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
         ),
       ),
     );
@@ -116,7 +116,7 @@ class PulsrToast {
         behavior: SnackBarBehavior.floating,
         duration: duration,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
         ),
         action: action,
       ),

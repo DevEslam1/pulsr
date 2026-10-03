@@ -76,7 +76,7 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
                         const EdgeInsetsDirectional.only(end: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadii.r6),
+                      borderRadius: AppRadii.r6All,
                     ),
                     child: Text(
                       trailingBadge,

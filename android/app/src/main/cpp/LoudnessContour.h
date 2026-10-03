@@ -26,6 +26,7 @@ public:
     void configure(double intensity, double volumeLinear);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const { return !enabled_ && (std::abs(currentBassDb_) >= 1e-4 || std::abs(currentTrebleDb_) >= 1e-4); }
     void applyParams(const LoudnessContourParamSet& params);
     void reset();
 

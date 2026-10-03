@@ -1270,7 +1270,7 @@
   "@sincResampler": {
     "description": "tranche6 eq l10n"
   },
-  "sincDesc": "اعادة تشكيل عالية الجودة",
+  "sincDesc": "يتولى Android تحويل معدل العينات أثناء التشغيل",
   "@sincDesc": {
     "description": "tranche6 eq l10n"
   },
@@ -3533,7 +3533,7 @@
   "settingsResamplerFast": "سريع (خطي)",
   "settingsResamplerHigh": "عالٍ (32 منقّحاً)",
   "settingsResamplerQuality": "جودة مُعيد أخذ العينات",
-  "settingsResamplerQualityDesc": "جودة تحويل معدّل العينات. Ultra هو sync متعدّد الأطوار كامل بـ64 منقّحاً (الافتراضي التاريخي)؛ السريع هو استيفاء خطي لأقل استخدام للمعالج",
+  "settingsResamplerQualityDesc": "يتولى Android تحويل معدل العينات أثناء التشغيل. إعدادات جودة sinc الأصلية غير متاحة لمسار الإخراج هذا.",
   "settingsResamplerStandard": "قياسي (16 منقّحاً)",
   "settingsResamplerUltra": "فائق (64 منقّحاً)",
   "settingsResetToDefaultValue": "إعادة الضبط إلى الافتراضي ({value})",
@@ -4357,5 +4357,7 @@
   "failedToApplyLabel": "تعذّر تطبيق {label}",
   "bitPerfectConflictTitle": "تعطيل هذه الميزات لاستخدام Bit-Perfect؟",
   "bitPerfectConflictBody": "يرسل Bit-Perfect الصوت الأصلي دون تعديل إلى DAC عبر USB. هذه الميزات تغيّر الصوت وهي غير متوافقة:",
-  "bitPerfectDisableAndEnable": "تعطيل وتفعيل"
+  "bitPerfectDisableAndEnable": "تعطيل وتفعيل",
+  "lyricsShiftEarlier": "تقديم",
+  "lyricsShiftLater": "تأخير"
 }

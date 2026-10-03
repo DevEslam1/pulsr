@@ -145,7 +145,7 @@ class _DockStyleOption extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.r16),
+          borderRadius: AppRadii.r16All,
           child: AnimatedContainer(
             duration: context.motion(PulsrDurations.state),
             curve: context.motionCurve(Curves.easeOutCubic),
@@ -155,7 +155,7 @@ class _DockStyleOption extends StatelessWidget {
               color: selected
                   ? p.accentContainer
                   : p.surfaceContainer.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(AppRadii.r16),
+              borderRadius: AppRadii.r16All,
               border: Border.all(
                 color: selected ? p.accent : p.hairline,
                 width: selected ? 1.5 : 1,
@@ -247,7 +247,7 @@ class _DockPreview extends StatelessWidget {
           height: 12,
           decoration: BoxDecoration(
             color: miniColor.withValues(alpha: opacity),
-            borderRadius: BorderRadius.circular(AppRadii.r6),
+            borderRadius: AppRadii.r6All,
           ),
         );
     Widget nav({double opacity = 1.0, double scale = 1.0}) => Container(
@@ -255,7 +255,7 @@ class _DockPreview extends StatelessWidget {
           height: 12,
           decoration: BoxDecoration(
             color: navColor.withValues(alpha: opacity),
-            borderRadius: BorderRadius.circular(AppRadii.r6),
+            borderRadius: AppRadii.r6All,
           ),
         );
 

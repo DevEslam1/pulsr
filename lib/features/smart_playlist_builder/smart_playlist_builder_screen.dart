@@ -477,7 +477,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                               vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
                             color: p.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                           child: Text(
                             context.l10n

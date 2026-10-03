@@ -148,7 +148,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
       height: fieldHeight,
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.card),
+        borderRadius: AppRadii.cardRadius,
         border: widget.showBorder
             ? Border.all(
                 color: hasText ? p.accent.withValues(alpha: 0.55) : p.hairline,

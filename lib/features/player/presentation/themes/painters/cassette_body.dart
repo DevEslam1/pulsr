@@ -30,7 +30,7 @@ class _CassetteBody extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.s14),
             decoration: BoxDecoration(
               color: const Color(0xFF1E2028),
-              borderRadius: BorderRadius.circular(AppRadii.r20),
+              borderRadius: AppRadii.r20All,
               border: Border.all(color: const Color(0xFF323646), width: 3),
               boxShadow: [
                 BoxShadow(
@@ -49,7 +49,7 @@ class _CassetteBody extends StatelessWidget {
                       horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
                   decoration: BoxDecoration(
                     color: activeColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -84,7 +84,7 @@ class _CassetteBody extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F1116),
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                       border: Border.all(color: Colors.white12),
                     ),
                     child: Row(
@@ -98,7 +98,7 @@ class _CassetteBody extends StatelessWidget {
                           height: 36,
                           decoration: BoxDecoration(
                             color: AppColors.specularAt(0.05),
-                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                            borderRadius: AppRadii.r6All,
                             border: Border.all(color: Colors.white10),
                           ),
                           child: Center(

@@ -311,7 +311,7 @@ class _ControlButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(AppRadii.r20),
+          borderRadius: AppRadii.r20All,
           child: Padding(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s10, vertical: AppSpacing.xs),

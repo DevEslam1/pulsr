@@ -50,7 +50,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                     horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
                 child: Material(
                   color: context.palette.warning.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   child: ListTile(
                     dense: true,
                     leading:

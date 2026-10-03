@@ -22,7 +22,7 @@ class SectionError extends StatelessWidget {
             horizontal: AppSpacing.md, vertical: AppSpacing.s14),
         decoration: BoxDecoration(
           color: p.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(AppRadii.r14),
+          borderRadius: AppRadii.r14All,
           border: Border.all(color: p.error.withValues(alpha: 0.3)),
         ),
         child: Row(

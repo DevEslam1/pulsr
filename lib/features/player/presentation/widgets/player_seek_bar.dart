@@ -215,7 +215,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
               horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
           decoration: BoxDecoration(
             color: AppColors.highlightSoft,
-            borderRadius: BorderRadius.circular(AppRadii.r12),
+            borderRadius: AppRadii.r12All,
             border: Border.all(
               color: AppColors.specularAt(0.08),
               width: 0.8,

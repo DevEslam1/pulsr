@@ -39,7 +39,7 @@ extension _EqAbCompareBar on _EqualizerSheetState {
                 horizontal: AppSpacing.s8, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: _isAbComparing ? p.accent : p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
               border: Border.all(color: _isAbComparing ? p.accent : p.hairline),
             ),
             child: Text(
@@ -64,7 +64,7 @@ extension _EqAbCompareBar on _EqualizerSheetState {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         border: Border.all(color: p.hairline),
       ),
       child: Row(
@@ -72,13 +72,13 @@ extension _EqAbCompareBar on _EqualizerSheetState {
           for (final slot in ComparisonSlot.values) ...[
             InkWell(
               onTap: () => cubit.switchComparisonSlot(slot),
-              borderRadius: BorderRadius.circular(AppRadii.r8),
+              borderRadius: AppRadii.r8All,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                 decoration: BoxDecoration(
                   color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                 ),
                 child: Text(
                   slot.name.toUpperCase(),

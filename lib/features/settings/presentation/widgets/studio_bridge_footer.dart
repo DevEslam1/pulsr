@@ -38,7 +38,7 @@ class StudioBridgeFooter extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           onTap: () {
             HapticFeedback.selectionClick();
             showStudioExplainerSheet(context);
@@ -50,7 +50,7 @@ class StudioBridgeFooter extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               color: p.accentContainer.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               border: Border.all(color: p.accent.withValues(alpha: 0.25)),
             ),
             child: Row(

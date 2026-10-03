@@ -347,7 +347,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                 margin: const EdgeInsets.only(bottom: AppSpacing.md),
                 decoration: BoxDecoration(
                   color: p.textSecondary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(AppRadii.r2),
+                  borderRadius: AppRadii.r2All,
                 ),
               ),
             ),
@@ -427,7 +427,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.textTertiary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                  borderRadius: AppRadii.r10All,
                 ),
                 child: Row(
                   children: [
@@ -454,7 +454,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r18),
+                  borderRadius: AppRadii.r18All,
                   border: Border.all(color: p.accent.withValues(alpha: 0.35)),
                 ),
                 child: Column(
@@ -510,7 +510,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           backgroundColor: p.accent,
                           foregroundColor: p.onAccent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.sm),
@@ -533,7 +533,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           side: BorderSide(
                               color: p.accent.withValues(alpha: 0.5)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.xs),
@@ -608,9 +608,9 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
               const SizedBox(height: AppSpacing.xs),
               Material(
                 color: p.surfaceContainer,
-                borderRadius: BorderRadius.circular(AppRadii.r18),
+                borderRadius: AppRadii.r18All,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r18),
+                  borderRadius: AppRadii.r18All,
                   side: BorderSide(color: p.hairline),
                 ),
                 clipBehavior: Clip.antiAlias,

@@ -168,7 +168,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.hairline,
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -184,7 +184,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: p.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                         ),
                         child: Icon(Icons.sensors_rounded,
                             color: p.accent, size: 20),
@@ -323,8 +323,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                                           ? AppColors.studioGreen
                                               .withValues(alpha: 0.15)
                                           : p.surfaceContainerHigh,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r6),
+                                      borderRadius: AppRadii.r6All,
                                     ),
                                     child: Text(
                                       context.l10n.dspActiveEffectsCount(
@@ -355,8 +354,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                                   padding: const EdgeInsets.all(AppSpacing.md),
                                   decoration: BoxDecoration(
                                     color: p.surfaceContainer,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
+                                    borderRadius: AppRadii.r12All,
                                     border: Border.all(color: p.hairline),
                                   ),
                                   child: Center(
@@ -426,7 +424,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(
           color: isBypassed
               ? AppColors.dacGold.withValues(alpha: 0.4)
@@ -498,7 +496,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                           : (isPendingNoSession || isOemSoftDetached
                               ? p.warning.withValues(alpha: 0.15)
                               : p.error.withValues(alpha: 0.15))),
-                  borderRadius: BorderRadius.circular(AppRadii.r6),
+                  borderRadius: AppRadii.r6All,
                 ),
                 child: Text(
                   isBypassed
@@ -531,7 +529,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
               padding: const EdgeInsets.all(AppSpacing.s10),
               decoration: BoxDecoration(
                 color: p.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: p.warning.withValues(alpha: 0.35)),
               ),
               child: Row(
@@ -680,7 +678,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
             : (isHighlight
                 ? p.accent.withValues(alpha: 0.12)
                 : p.surfaceContainerHigh),
-        borderRadius: BorderRadius.circular(AppRadii.r8),
+        borderRadius: AppRadii.r8All,
         border: Border.all(
           color: isWarning
               ? p.warning.withValues(alpha: 0.4)
@@ -730,7 +728,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(
           color: isActive ? statusColor.withValues(alpha: 0.4) : p.hairline,
         ),
@@ -764,7 +762,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                     horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: p.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  borderRadius: AppRadii.r4All,
                 ),
                 child: Text(
                   stage.category,
@@ -781,7 +779,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                     horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  borderRadius: AppRadii.r4All,
                 ),
                 child: Text(
                   isBypassed

@@ -151,7 +151,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainerHigh.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -180,7 +180,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
           ),
           const SizedBox(height: AppSpacing.s10),
           ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.r6),
+            borderRadius: AppRadii.r6All,
             child: SizedBox(
               height: 10,
               child: totalBytes == 0 || _isLoading
@@ -265,7 +265,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
             height: 38,
             decoration: BoxDecoration(
               color: p.accentContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
             child: Icon(Icons.photo_size_select_actual_rounded,
                 color: p.accent, size: 20),
@@ -321,7 +321,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
               height: 38,
               decoration: BoxDecoration(
                 color: p.error.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(AppRadii.r12),
+                borderRadius: AppRadii.r12All,
               ),
               child:
                   Icon(Icons.cloud_download_rounded, color: p.error, size: 20),
@@ -379,7 +379,7 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
             height: 38,
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
             child:
                 Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 20),

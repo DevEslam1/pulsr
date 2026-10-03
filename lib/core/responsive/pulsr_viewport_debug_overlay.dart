@@ -49,7 +49,7 @@ class _PulsrViewportDebugOverlayState extends State<PulsrViewportDebugOverlay> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.scrimStrong,
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                   border: Border.all(color: Colors.white24, width: 0.8),
                 ),
                 child: _minimized

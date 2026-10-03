@@ -29,6 +29,7 @@ public:
     void configure(double drive, double mix, double tilt, int mode = 0, bool multiband = false);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    int getLatencyFrames() const { return enabled_ && k_ > 1e-9 ? DRY_DELAY : 0; }
     bool isMultiband() const { return multiband_; }
     void applyParams(const SaturationParamSet& params);
     void reset();

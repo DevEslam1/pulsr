@@ -5270,7 +5270,7 @@ abstract class AppLocalizations {
   /// tranche6 eq l10n
   ///
   /// In en, this message translates to:
-  /// **'High-quality resampling when rates differ'**
+  /// **'Playback conversion is handled by Android'**
   String get sincDesc;
 
   /// tranche6 eq l10n
@@ -9278,7 +9278,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsResamplerQualityDesc.
   ///
   /// In en, this message translates to:
-  /// **'Sample-rate conversion quality. Ultra is the full 64-tap polyphase sinc (historical default); Fast is linear interpolation for minimal CPU on battery'**
+  /// **'Android handles playback sample-rate conversion. Native sinc quality controls are unavailable for this output path.'**
   String get settingsResamplerQualityDesc;
 
   /// No description provided for @settingsResamplerStandard.
@@ -14207,6 +14207,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Disable & enable'**
   String get bitPerfectDisableAndEnable;
+
+  /// Tooltip for the button that moves a lyric line earlier
+  ///
+  /// In en, this message translates to:
+  /// **'Shift earlier'**
+  String get lyricsShiftEarlier;
+
+  /// Tooltip for the button that moves a lyric line later
+  ///
+  /// In en, this message translates to:
+  /// **'Shift later'**
+  String get lyricsShiftLater;
 }
 
 class _AppLocalizationsDelegate

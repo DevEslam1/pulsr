@@ -88,7 +88,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
             ),
             decoration: BoxDecoration(
               color: p.surfaceContainer.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(AppRadii.r16),
+              borderRadius: AppRadii.r16All,
               border: Border.all(
                 color: telemetry.isThrottling
                     ? p.error.withValues(alpha: 0.7)
@@ -120,7 +120,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
 
     return InkWell(
       onTap: _toggleExpanded,
-      borderRadius: BorderRadius.circular(AppRadii.r16),
+      borderRadius: AppRadii.r16All,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s14,
@@ -149,7 +149,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: p.error.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(AppRadii.r4),
+                  borderRadius: AppRadii.r4All,
                   border: Border.all(color: p.error, width: 0.8),
                 ),
                 child: Text(
@@ -239,7 +239,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
         ),
         const SizedBox(height: 4),
         ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadii.r4),
+          borderRadius: AppRadii.r4All,
           child: LinearProgressIndicator(
             value: ratio,
             minHeight: 6,
@@ -278,7 +278,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                 child: Column(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadii.r4),
+                      borderRadius: AppRadii.r4All,
                       child: LinearProgressIndicator(
                         value: ratio,
                         minHeight: 5,
@@ -330,7 +330,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                 child: Column(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(AppRadii.r4),
+                      borderRadius: AppRadii.r4All,
                       child: LinearProgressIndicator(
                         value: ratio,
                         minHeight: 4,

@@ -69,8 +69,8 @@ class _LyricsViewState extends State<LyricsView> {
       // word-level (enhanced LRC) timing — the latter rescues a synced set
       // whose only/first line sits exactly at 0:00 (which a bare
       // `timestamp > 0` check would misclassify as plain text).
-      _syncedCache = widget.lyrics
-          .any((line) => line.timestamp > Duration.zero || line.words.isNotEmpty);
+      _syncedCache = widget.lyrics.any(
+          (line) => line.timestamp > Duration.zero || line.words.isNotEmpty);
     }
     return _syncedCache;
   }
@@ -361,7 +361,7 @@ class _LyricsViewState extends State<LyricsView> {
           horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
       decoration: BoxDecoration(
         color: widget.activeColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(
           color: widget.activeColor.withValues(alpha: 0.3),
           width: 1,
@@ -641,8 +641,7 @@ class _LyricsViewState extends State<LyricsView> {
                   foregroundColor: widget.activeColor,
                   side: BorderSide(
                       color: widget.activeColor.withValues(alpha: 0.4)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                 ),

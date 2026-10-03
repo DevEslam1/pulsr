@@ -28,10 +28,10 @@ class QuickCard extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.r18),
+      borderRadius: AppRadii.r18All,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         child: Container(
           padding: EdgeInsets.symmetric(
             horizontal: isCompact ? 10 : 12,
@@ -47,7 +47,7 @@ class QuickCard extends StatelessWidget {
               end: Alignment.bottomRight,
             ),
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r18),
+            borderRadius: AppRadii.r18All,
             border: Border.all(color: p.hairline),
           ),
           child: Column(

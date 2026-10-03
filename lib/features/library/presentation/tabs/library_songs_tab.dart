@@ -81,7 +81,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
               selected: isSelected,
               label: '${song.title}, ${song.artist}',
               child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadii.r18),
+                borderRadius: AppRadii.r18All,
                 onTap: () {
                   if (state.isMultiSelectMode) {
                     cubit.toggleSongSelection(song.id);
@@ -112,8 +112,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.45),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r18),
+                                  borderRadius: AppRadii.r18All,
                                 ),
                                 child: const Center(
                                   child: Icon(Icons.check_circle_rounded,
@@ -354,7 +353,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(AppRadii.r20),
+                borderRadius: AppRadii.r20All,
                 border: Border.all(color: p.accent.withValues(alpha: 0.25)),
               ),
               child: Row(

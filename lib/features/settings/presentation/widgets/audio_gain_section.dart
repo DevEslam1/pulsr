@@ -213,6 +213,7 @@ class _GainSection extends StatelessWidget {
         settingsCardDivider(p),
         SettingSliderRow(
           label: context.l10n.settingsResamplerQuality,
+          enabled: false,
           subtitle: context.l10n.settingsResamplerQualityDesc,
           value: state.sincResamplerQuality.toDouble(),
           min: 0,

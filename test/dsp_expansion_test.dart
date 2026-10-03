@@ -3,6 +3,7 @@
 // persistence round-trips, OptimizedDspPipeline stage ordering/flags, and the
 // AudioFeatureInfo conflict-matrix entries for the 5 new stages.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/audio_feature_info.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/data/audio/optimized_dsp_pipeline.dart';
@@ -14,6 +15,16 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'),
+            (call) async => call.method.startsWith('set') ? true : null);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'), null);
   });
 
   group('OptimizedDspPipeline DSP-expansion stages', () {

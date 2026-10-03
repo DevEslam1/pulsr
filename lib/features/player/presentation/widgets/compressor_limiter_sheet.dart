@@ -153,7 +153,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: p.textSecondary.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(AppRadii.r2),
+                    borderRadius: AppRadii.r2All,
                   ),
                 ),
               ),
@@ -198,7 +198,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                     color: p.surfaceCard,
-                    borderRadius: BorderRadius.circular(AppRadii.r10),
+                    borderRadius: AppRadii.r10All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -306,8 +306,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     side: BorderSide(color: p.primary.withValues(alpha: 0.4)),
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r14)),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: AppRadii.r14All),
                   ),
                   onPressed: () {
                     setState(() {
@@ -428,7 +428,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: ExpansionTile(
@@ -526,7 +526,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                     color: p.surfaceCard,
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                    borderRadius: AppRadii.r12All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(

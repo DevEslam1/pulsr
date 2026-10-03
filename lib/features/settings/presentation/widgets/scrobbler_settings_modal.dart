@@ -217,8 +217,7 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                   labelText: context.l10n.userToken,
                   hintText: context.l10n.enterListenBrainzUserToken,
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12)),
+                  border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
                 ),
               ),
@@ -249,8 +248,7 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                 decoration: InputDecoration(
                   labelText: context.l10n.lastFmApiKey,
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12)),
+                  border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
                 ),
               ),
@@ -262,8 +260,7 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                 decoration: InputDecoration(
                   labelText: context.l10n.lastFmSharedSecret,
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12)),
+                  border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
                 ),
               ),
@@ -275,8 +272,7 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                 decoration: InputDecoration(
                   labelText: context.l10n.lastFmSessionKey,
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r12)),
+                  border: OutlineInputBorder(borderRadius: AppRadii.r12All),
                   isDense: true,
                 ),
               ),
@@ -289,8 +285,7 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
                 style: FilledButton.styleFrom(
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r14)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r14All),
                 ),
                 onPressed: _saveScrobblerPrefs,
                 child: Text(context.l10n.saveSettings,

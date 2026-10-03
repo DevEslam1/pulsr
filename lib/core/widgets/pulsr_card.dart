@@ -115,7 +115,7 @@ class _PulsrCardState extends State<PulsrCard> {
       color: widget.borderColor ?? p.hairline,
       width: 1.0,
     );
-    final radius = BorderRadius.circular(widget.borderRadius);
+    final radius = AppRadii.circular(widget.borderRadius);
     final shadows = _resolveShadows(p);
 
     Widget card = AnimatedContainer(

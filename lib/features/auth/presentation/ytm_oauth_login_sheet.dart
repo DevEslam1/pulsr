@@ -152,7 +152,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -213,7 +213,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.r14),
+        borderRadius: AppRadii.r14All,
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
@@ -245,8 +245,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r12)),
+            shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
           ),
         ),
       ],
@@ -282,7 +281,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.s18),
           decoration: BoxDecoration(
             color: p.surface,
-            borderRadius: BorderRadius.circular(AppRadii.r14),
+            borderRadius: AppRadii.r14All,
             border: Border.all(color: p.hairline),
           ),
           child: Center(
@@ -307,8 +306,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             foregroundColor: p.textPrimary,
             side: BorderSide(color: p.hairline),
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r12)),
+            shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
           ),
         ),
         const SizedBox(height: AppSpacing.s14),
@@ -338,7 +336,7 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
           AppSpacing.s14, AppSpacing.xxs, AppSpacing.xxs, AppSpacing.xxs),
       decoration: BoxDecoration(
         color: p.surface,
-        borderRadius: BorderRadius.circular(AppRadii.r14),
+        borderRadius: AppRadii.r14All,
         border: Border.all(color: p.hairline),
       ),
       child: Row(

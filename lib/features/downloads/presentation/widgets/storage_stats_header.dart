@@ -29,7 +29,7 @@ class StorageStatsHeader extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -65,7 +65,7 @@ class StorageStatsHeader extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.r4),
+            borderRadius: AppRadii.r4All,
             child: Semantics(
               label: l10n.storageUsed,
               value:

@@ -344,7 +344,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                         height: 56,
                         decoration: BoxDecoration(
                           color: p.surface.withValues(alpha: 0.88),
-                          borderRadius: BorderRadius.circular(AppRadii.r24),
+                          borderRadius: AppRadii.r24All,
                           border: Border.all(
                             color: p.hairline,
                             width: 1.2,
@@ -359,7 +359,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadii.r24),
+                          borderRadius: AppRadii.r24All,
                           child: Row(
                             children: [
                               if (hasSong) ...[

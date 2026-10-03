@@ -185,12 +185,11 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                           label: '${album.title}, ${album.artist}',
                           child: InkWell(
                             onTap: () => context.push('/album', extra: album),
-                            borderRadius: BorderRadius.circular(AppRadii.r14),
+                            borderRadius: AppRadii.r14All,
                             child: Container(
                               decoration: BoxDecoration(
                                 color: p.surfaceCard,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r14),
+                                borderRadius: AppRadii.r14All,
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: Column(

@@ -28,18 +28,18 @@ class DiscoveryChip extends StatelessWidget {
       label: label,
       child: Material(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r14),
+        borderRadius: AppRadii.r14All,
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
             onTap();
           },
-          borderRadius: BorderRadius.circular(AppRadii.r14),
+          borderRadius: AppRadii.r14All,
           child: Container(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadii.r14),
+              borderRadius: AppRadii.r14All,
               border: Border.all(color: p.hairline),
             ),
             child: Row(

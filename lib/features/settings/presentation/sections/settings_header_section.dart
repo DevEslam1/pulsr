@@ -91,7 +91,7 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
                     horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: p.accentContainer,
-                  borderRadius: BorderRadius.circular(AppRadii.r6),
+                  borderRadius: AppRadii.r6All,
                 ),
                 child: Text(
                   'v${AppConfig.appVersion}',

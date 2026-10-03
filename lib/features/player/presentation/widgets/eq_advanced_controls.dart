@@ -96,7 +96,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     padding: const EdgeInsets.all(AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Icon(Icons.spatial_tracking_rounded,
                         color: p.accent, size: 20),
@@ -126,8 +126,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                   vertical: AppSpacing.s2),
                               decoration: BoxDecoration(
                                 color: p.accent.withValues(alpha: 0.15),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r6),
+                                borderRadius: AppRadii.r6All,
                               ),
                               child: Text(
                                 context.l10n.spatialApi,
@@ -203,7 +202,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.surround_sound_rounded,
                                 color: p.accent, size: 20),
@@ -368,7 +367,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.compress_rounded,
                                 color: p.accent, size: 20),
@@ -463,7 +462,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                       ? () => cubit.setDynamicsPreset(preset,
                                           enabled: true)
                                       : null),
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.sm,
@@ -472,7 +471,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               color: isSelected
                                   ? p.accent.withValues(alpha: 0.15)
                                   : p.surface,
-                              borderRadius: BorderRadius.circular(AppRadii.r10),
+                              borderRadius: AppRadii.r10All,
                               border: Border.all(
                                 color: isSelected
                                     ? p.accent.withValues(alpha: 0.5)
@@ -548,7 +547,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.headphones_rounded,
                                 color: p.accent, size: 20),
@@ -725,7 +724,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                           horizontal: AppSpacing.s10, vertical: AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
+                        borderRadius: AppRadii.r10All,
                       ),
                       child: Row(
                         children: [
@@ -928,7 +927,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.security_rounded,
                                 color: p.accent, size: 20),
@@ -1144,7 +1143,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.compare_arrows_rounded,
                                 color: p.accent, size: 20),
@@ -1357,7 +1356,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.meeting_room_rounded,
                                 color: p.accent, size: 20),
@@ -1707,7 +1706,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child:
                           Icon(Icons.waves_rounded, color: p.accent, size: 20),
@@ -1867,7 +1866,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.compare_arrows_rounded,
                           color: p.accent, size: 20),
@@ -2027,7 +2026,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.speaker_rounded,
                           color: p.accent, size: 20),
@@ -2188,7 +2187,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.graphic_eq_rounded,
                           color: p.accent, size: 20),
@@ -2288,10 +2287,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
         tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
         collapsedBackgroundColor: p.surfaceContainerHigh,
         backgroundColor: p.surfaceContainerHigh,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.r8)),
-        collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.r8)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadii.r8All),
+        collapsedShape: RoundedRectangleBorder(borderRadius: AppRadii.r8All),
         title: Text(context.l10n.eqBandLabel(index + 1),
             style: TextStyle(
                 fontSize: AppFontSize.body,
@@ -2363,8 +2360,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                               vertical: AppSpacing.xs),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r8)),
+                          border:
+                              OutlineInputBorder(borderRadius: AppRadii.r8All),
                         ),
                         items: [
                           DropdownMenuItem(
@@ -2537,7 +2534,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.volume_up_rounded,
                           color: p.accent, size: 20),
@@ -2638,7 +2635,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child:
                           Icon(Icons.grain_rounded, color: p.accent, size: 20),
@@ -2738,7 +2735,9 @@ extension _EqAdvancedControls on _EqualizerSheetState {
   /// Sinc Resampler toggle (auto-bypasses when track and device rates match).
   Widget _buildSincResamplerCard(BuildContext context, PlayerState state,
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
-    final available = dspBlocked == null && _nativePcmEffectsAvailable;
+    final available = dspBlocked == null &&
+        _nativePcmEffectsAvailable &&
+        AudioEffectsChannel().isPlaybackSincResamplerSupported;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -2759,7 +2758,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.sync_alt_rounded,
                           color: p.accent, size: 20),
@@ -2842,7 +2841,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.headphones_rounded,
                           color: p.accent, size: 20),
@@ -2947,7 +2946,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 foregroundColor: p.accent,
                 side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                  borderRadius: AppRadii.r10All,
                 ),
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
@@ -2988,7 +2987,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.auto_graph_rounded,
                           color: p.accent, size: 20),
@@ -3090,7 +3089,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 foregroundColor: p.accent,
                 side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                  borderRadius: AppRadii.r10All,
                 ),
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
@@ -3131,7 +3130,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child:
                           Icon(Icons.code_rounded, color: p.accent, size: 20),
@@ -3234,7 +3233,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 foregroundColor: p.accent,
                 side: BorderSide(color: p.accent.withValues(alpha: 0.5)),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+                  borderRadius: AppRadii.r10All,
                 ),
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
@@ -3275,7 +3274,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
                         color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(Icons.speaker_group_rounded,
                           color: p.accent, size: 20),

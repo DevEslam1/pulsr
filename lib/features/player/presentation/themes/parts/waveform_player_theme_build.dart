@@ -115,7 +115,7 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                   horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
               decoration: BoxDecoration(
                 color: activeColor.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(AppRadii.r6),
+                borderRadius: AppRadii.r6All,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

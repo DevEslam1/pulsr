@@ -81,7 +81,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                         decoration: BoxDecoration(
                           color: context.palette.surfaceContainer
                               .withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(AppRadii.r20),
+                          borderRadius: AppRadii.r20All,
                           border: Border.all(
                             color: AppColors.specularAt(0.08),
                             width: 1,
@@ -128,7 +128,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                                     aspectRatio: 1.0,
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(
+                                        borderRadius: AppRadii.circular(
                                             resolveCustomRadius(context, 20)),
                                         boxShadow: [
                                           BoxShadow(
@@ -168,7 +168,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                   horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
               decoration: BoxDecoration(
                 color: activeColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(AppRadii.r6),
+                borderRadius: AppRadii.r6All,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

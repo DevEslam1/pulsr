@@ -49,7 +49,7 @@ class SettingsSection extends StatelessWidget {
                         const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Icon(icon, size: 13, color: p.accent),
                   ),
@@ -93,7 +93,7 @@ class SettingsSection extends StatelessWidget {
                 ? p.accentContainer.withValues(alpha: p.isDark ? 0.35 : 0.6)
                 : p.surfaceContainer,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.card),
+              borderRadius: AppRadii.cardRadius,
               side: BorderSide(
                 color:
                     isProminent ? p.accent.withValues(alpha: 0.45) : p.hairline,

@@ -90,13 +90,19 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
   }
 
   Future<void> _toggleSafety(bool enabled) async {
-    setState(() => _safetyEnabled = enabled);
-    await _channel.setHeadphoneSafetyParams(
-      enabled: enabled,
-      doseThreshold: 1.0,
-      safetyCeilingDb: -6.0,
-    );
-    await _refreshState();
+    try {
+      await _channel.setHeadphoneSafetyParams(
+        enabled: enabled,
+        doseThreshold: 1.0,
+        safetyCeilingDb: -6.0,
+      );
+      if (!mounted) return;
+      setState(() => _safetyEnabled = enabled);
+      await _refreshState();
+    } catch (e, st) {
+      ErrorLogger.log('Headphone safety was not applied',
+          error: e, stackTrace: st, category: 'HeadphoneSafetySheet');
+    }
   }
 
   Future<void> _confirmResetDose() async {
@@ -151,7 +157,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                   padding: const EdgeInsets.all(AppSpacing.s10),
                   decoration: BoxDecoration(
                     color: doseColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                    borderRadius: AppRadii.r12All,
                   ),
                   child: Icon(
                     Icons.health_and_safety_rounded,
@@ -191,7 +197,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
                 color: p.surfaceContainer.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(AppRadii.r16),
+                borderRadius: AppRadii.r16All,
                 border: Border.all(
                   color: _attenuationActive
                       ? AppColors.error
@@ -225,7 +231,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                   ),
                   const SizedBox(height: AppSpacing.s10),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                     child: LinearProgressIndicator(
                       value: (_weeklyDose).clamp(0.0, 1.0),
                       minHeight: 10,
@@ -292,7 +298,7 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                 side: BorderSide(color: AppColors.error.withValues(alpha: 0.4)),
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                 ),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 20),

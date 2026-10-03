@@ -162,7 +162,7 @@ mixin SettingsSearchResults
           child: Material(
             color: p.surfaceContainer,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.tile),
+              borderRadius: AppRadii.tileRadius,
               side: BorderSide(color: p.hairline),
             ),
             clipBehavior: Clip.antiAlias,
@@ -181,7 +181,7 @@ mixin SettingsSearchResults
                             horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                         decoration: BoxDecoration(
                           color: p.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(AppRadii.r6),
+                          borderRadius: AppRadii.r6All,
                         ),
                         child: Text(
                           r.category.toUpperCase(),
@@ -207,7 +207,7 @@ mixin SettingsSearchResults
                                 p.accent.withValues(alpha: 0.7)
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                            borderRadius: AppRadii.r6All,
                           ),
                           child: Text(
                             "PRO",

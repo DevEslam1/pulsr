@@ -53,7 +53,7 @@ class SettingsHeroCard extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: AppSpacing.lg),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.card),
+            borderRadius: AppRadii.cardRadius,
             border: Border.all(color: p.hairline),
             boxShadow: [
               BoxShadow(
@@ -65,7 +65,7 @@ class SettingsHeroCard extends StatelessWidget {
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.card),
+            borderRadius: AppRadii.cardRadius,
             child: Stack(
               children: [
                 // Subtle accent gradient glow on top-right corner
@@ -201,8 +201,7 @@ class SettingsHeroCard extends StatelessWidget {
                                           decoration: BoxDecoration(
                                             color: p.accent
                                                 .withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(
-                                                AppRadii.r6),
+                                            borderRadius: AppRadii.r6All,
                                           ),
                                           child: Text(
                                             context.l10n.syncedLabel,
@@ -246,8 +245,7 @@ class SettingsHeroCard extends StatelessWidget {
                                     fontSize: AppFontSize.bodySmall,
                                   ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.button),
+                                    borderRadius: AppRadii.buttonRadius,
                                   ),
                                 ),
                               )
@@ -307,7 +305,7 @@ class SettingsHeroCard extends StatelessWidget {
                                 vertical: AppSpacing.s6),
                             decoration: BoxDecoration(
                               color: p.error.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                               border: Border.all(
                                   color: p.error.withValues(alpha: 0.3)),
                             ),
@@ -367,7 +365,7 @@ class SettingsHeroCard extends StatelessWidget {
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.r12),
+            borderRadius: AppRadii.r12All,
             onTap: () async {
               if (isLoggedIn) {
                 await showYtmAccountDisconnectDialog(context);
@@ -460,8 +458,7 @@ class SettingsHeroCard extends StatelessWidget {
                                     vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.success.withValues(alpha: 0.15),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r6),
+                                  borderRadius: AppRadii.r6All,
                                 ),
                                 child: Builder(
                                   builder: (_) {
@@ -524,7 +521,7 @@ class SettingsHeroCard extends StatelessWidget {
                           fontSize: AppFontSize.bodySmall,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.button),
+                          borderRadius: AppRadii.buttonRadius,
                         ),
                       ),
                     )

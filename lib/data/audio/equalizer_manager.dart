@@ -149,7 +149,7 @@ class EqualizerManager {
 
   double stereoBalance = 0.0; // -1.0 to +1.0
   bool monoMix = false;
-  bool isSincResamplerEnabled = true;
+  bool isSincResamplerEnabled = false;
 
   // Phase 1 DSP expansion stages
   bool isSaturationEnabled = false;
@@ -553,7 +553,8 @@ class EqualizerManager {
       stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
       monoMix = prefs.getBool(PrefsKeys.monoMix) ?? false;
       isSincResamplerEnabled =
-          prefs.getBool(PrefsKeys.sincResamplerEnabled) ?? true;
+          _effectsChannel.isPlaybackSincResamplerSupported &&
+              (prefs.getBool(PrefsKeys.sincResamplerEnabled) ?? false);
 
       // Phase 1 DSP expansion stages (missing keys = neutral defaults)
       isSaturationEnabled = prefs.getBool(PrefsKeys.saturationEnabled) ?? false;
@@ -659,19 +660,6 @@ class EqualizerManager {
           ditherTargetBitDepth != 32) {
         ditherTargetBitDepth = 16;
       }
-      if (PlatformCapabilities.isAndroid) {
-        await _effectsChannel.setDspPreference(dspPreference);
-        await _effectsChannel.setBypassDspForBitPerfect(isBitPerfectBypass);
-        // Restore dither too: it was previously loaded into in-memory state
-        // but never pushed, so a saved-ON dither did nothing until toggled.
-        if (isDitherEnabled) {
-          await _effectsChannel.setDitherParams(
-            enabled: true,
-            targetBitDepth: ditherTargetBitDepth,
-            isBluetooth: isBluetoothRoute,
-          );
-        }
-      }
       // Hydrate stored dynamic-EQ bands and the selected headphone profile into
       // memory BEFORE the bit-perfect early-return. These only populate
       // in-memory state (no native push), so the stored config survives the
@@ -703,6 +691,19 @@ class EqualizerManager {
         );
       }
 
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setDspPreference(dspPreference);
+        await _effectsChannel.setBypassDspForBitPerfect(isBitPerfectBypass);
+        // Restore dither too: it was previously loaded into in-memory state
+        // but never pushed, so a saved-ON dither did nothing until toggled.
+        if (isDitherEnabled) {
+          await _effectsChannel.setDitherParams(
+            enabled: true,
+            targetBitDepth: ditherTargetBitDepth,
+            isBluetooth: isBluetoothRoute,
+          );
+        }
+      }
       if (isBitPerfectBypass) {
         _syncPipeline();
         return;
@@ -1432,8 +1433,7 @@ class EqualizerManager {
     final preampDb = selectedHeadphoneProfile?.preampGain ?? 0.0;
     var safeValue = DspParamRanges.volumeBoost.clampRaw(value);
     if ((preampDb + safeValue * 10.0) > 6.0) {
-      safeValue =
-          DspParamRanges.volumeBoost.clampRaw((6.0 - preampDb) / 10.0);
+      safeValue = DspParamRanges.volumeBoost.clampRaw((6.0 - preampDb) / 10.0);
     }
     volumeBoost = safeValue;
     final milliBels = (volumeBoost * 1000).round();
@@ -1497,9 +1497,8 @@ class EqualizerManager {
         await setBassBoost(profile.bassBoost);
         // Prefer the filter-derived safe headroom; fall back to the stored
         // preamp for legacy gain-curve profiles.
-        final preamp = isParametric
-            ? profile.computeSafePreamp()
-            : profile.preampGain;
+        final preamp =
+            isParametric ? profile.computeSafePreamp() : profile.preampGain;
         await setPreamp(preamp);
       } else {
         selectedHeadphoneProfile = null;
@@ -1723,7 +1722,6 @@ class EqualizerManager {
     int? mode,
     bool? multiband,
   }) async {
-    isSaturationEnabled = enabled;
     if (drive != null) {
       saturationDrive = DspParamRanges.saturationDrive.clampRaw(drive);
     }
@@ -1731,7 +1729,9 @@ class EqualizerManager {
     if (tilt != null) {
       saturationTilt = DspParamRanges.saturationTilt.clampRaw(tilt);
     }
-    if (mode != null) saturationMode = DspParamRanges.saturationMode.clamp(mode);
+    if (mode != null) {
+      saturationMode = DspParamRanges.saturationMode.clamp(mode);
+    }
     if (multiband != null) saturationMultiband = multiband;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSaturationParams(
@@ -1743,6 +1743,7 @@ class EqualizerManager {
       await _effectsChannel.setSaturationMultiband(saturationMultiband);
       await _effectsChannel.setSaturationEnabled(enabled);
     }
+    isSaturationEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -1764,7 +1765,6 @@ class EqualizerManager {
     List<double>? coeffs,
     String? ddcContent,
   }) async {
-    isViperDdcEnabled = enabled;
     if (profileName != null) viperDdcProfileName = profileName;
     final resolvedContent = ddcContent ??
         (coeffs != null && coeffs.isNotEmpty ? coeffs.join(' ') : null);
@@ -1773,18 +1773,21 @@ class EqualizerManager {
     }
     if (PlatformCapabilities.isAndroid) {
       if (viperDdcContent.isNotEmpty && enabled) {
-        await _effectsChannel.loadViperDdc(
+        final loaded = await _effectsChannel.loadViperDdc(
           ddcContent: viperDdcContent,
           profileName: viperDdcProfileName,
         );
+        if (!loaded) throw StateError('ViPER-DDC profile was rejected');
       } else if (resolvedContent != null && resolvedContent.isNotEmpty) {
-        await _effectsChannel.loadViperDdc(
+        final loaded = await _effectsChannel.loadViperDdc(
           ddcContent: resolvedContent,
           profileName: profileName ?? viperDdcProfileName,
         );
+        if (!loaded) throw StateError('ViPER-DDC profile was rejected');
       }
       await _effectsChannel.setViperDdcEnabled(enabled);
     }
+    isViperDdcEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -1793,7 +1796,6 @@ class EqualizerManager {
   /// [loudnessVolumeLinear], which is kept in sync with the playback volume
   /// stage via [updateLoudnessVolume].
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {
-    isLoudnessContourEnabled = enabled;
     if (intensity != null) {
       loudnessContourIntensity =
           DspParamRanges.loudnessContourIntensity.clampRaw(intensity);
@@ -1805,6 +1807,7 @@ class EqualizerManager {
       );
       await _effectsChannel.setLoudnessContourEnabled(enabled);
     }
+    isLoudnessContourEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -1846,7 +1849,6 @@ class EqualizerManager {
     bool? bassMono,
     bool? antiPop,
   }) async {
-    isSubCrossoverEnabled = enabled;
     if (cornerHz != null) {
       subCrossoverCornerHz =
           DspParamRanges.subCrossoverCornerHz.clampRaw(cornerHz);
@@ -1869,16 +1871,17 @@ class EqualizerManager {
       );
       await _effectsChannel.setSubCrossoverEnabled(enabled);
     }
+    isSubCrossoverEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
 
   Future<void> setDynamicEq(bool enabled) async {
-    isDynamicEqEnabled = enabled;
     if (PlatformCapabilities.isAndroid) {
       await _pushDynamicEqConfig();
       await _effectsChannel.setDynamicEqEnabled(enabled);
     }
+    isDynamicEqEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -1976,7 +1979,6 @@ class EqualizerManager {
     double? f1,
     double? f2,
   }) async {
-    isMultibandCompressorEnabled = enabled;
     if (bands != null) multibandCompressorBands = List.from(bands);
     if (f0 != null) {
       multibandCompressorF0 = DspParamRanges.multibandCompressorF0.clampRaw(f0);
@@ -2011,6 +2013,7 @@ class EqualizerManager {
       await _pushMultibandCompressorConfig();
       await _effectsChannel.setMultibandCompressorEnabled(enabled);
     }
+    isMultibandCompressorEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }
@@ -2080,9 +2083,9 @@ class EqualizerManager {
     double? sideGainHigh,
     int? preset,
   }) async {
-    isDynamicBassEnabled = enabled;
     if (strength != null) {
-      dynamicBassStrength = DspParamRanges.dynamicBassStrength.clampRaw(strength);
+      dynamicBassStrength =
+          DspParamRanges.dynamicBassStrength.clampRaw(strength);
     }
     if (preset != null) {
       dynamicBassPreset = DspParamRanges.dynamicBassPreset.clamp(preset);
@@ -2110,11 +2113,15 @@ class EqualizerManager {
       dynamicBassSideGainLow = p.sideGainLow;
       dynamicBassSideGainHigh = p.sideGainHigh;
     } else {
-      if (xLow != null) dynamicBassXLow = DspParamRanges.dynamicBassXLow.clamp(xLow);
+      if (xLow != null) {
+        dynamicBassXLow = DspParamRanges.dynamicBassXLow.clamp(xLow);
+      }
       if (xHigh != null) {
         dynamicBassXHigh = DspParamRanges.dynamicBassXHigh.clamp(xHigh);
       }
-      if (yLow != null) dynamicBassYLow = DspParamRanges.dynamicBassYLow.clamp(yLow);
+      if (yLow != null) {
+        dynamicBassYLow = DspParamRanges.dynamicBassYLow.clamp(yLow);
+      }
       if (yHigh != null) {
         dynamicBassYHigh = DspParamRanges.dynamicBassYHigh.clamp(yHigh);
       }
@@ -2130,7 +2137,7 @@ class EqualizerManager {
 
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setDynamicBassParams(
-        enabled: isDynamicBassEnabled,
+        enabled: enabled,
         strength: dynamicBassStrength,
         xLow: dynamicBassXLow,
         xHigh: dynamicBassXHigh,
@@ -2141,6 +2148,7 @@ class EqualizerManager {
         devicePreset: dynamicBassPreset,
       );
     }
+    isDynamicBassEnabled = enabled;
     _debouncedSavePreferences();
     _syncPipeline();
   }

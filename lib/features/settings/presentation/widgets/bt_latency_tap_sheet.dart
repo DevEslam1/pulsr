@@ -256,7 +256,7 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadii.r16),
+                  borderRadius: AppRadii.r16All,
                   border: Border.all(color: p.accent.withValues(alpha: 0.4)),
                 ),
                 child: Icon(

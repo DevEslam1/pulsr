@@ -44,7 +44,7 @@ class QuranModeDockButton extends StatelessWidget {
           HapticFeedback.lightImpact();
           QuranModeSheet.show(context);
         },
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         child: Tooltip(
           message: label,
           child: Center(

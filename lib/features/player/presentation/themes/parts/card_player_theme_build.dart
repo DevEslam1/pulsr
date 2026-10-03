@@ -148,7 +148,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                                     tag: 'now_playing_art_full',
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(
+                                        borderRadius: AppRadii.circular(
                                             resolveCustomRadius(
                                                 context, AppRadii.r28)),
                                         boxShadow: [
@@ -183,9 +183,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                                           : Container(
                                               decoration: BoxDecoration(
                                                 color: p.surfaceContainer,
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        AppRadii.r28),
+                                                borderRadius: AppRadii.r28All,
                                               ),
                                               child: Icon(
                                                 Icons.music_note_rounded,
@@ -243,7 +241,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
               );
 
               final bottomGlassCard = GlassContainer(
-                borderRadius: BorderRadius.circular(
+                borderRadius: AppRadii.circular(
                     resolveCustomRadius(context, AppRadii.r28)),
                 blur: 24,
                 color: cardBgColor,

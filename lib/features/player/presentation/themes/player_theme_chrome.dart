@@ -151,7 +151,7 @@ class PlayerSwitcherItem extends StatelessWidget {
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.r20),
+          borderRadius: AppRadii.r20All,
           child: AnimatedContainer(
             duration: context.motionMs(200),
             curve: context.motionCurve(Curves.easeOutCubic),
@@ -160,7 +160,7 @@ class PlayerSwitcherItem extends StatelessWidget {
               color: isSelected
                   ? activeColor.withValues(alpha: 0.22)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadii.r20),
+              borderRadius: AppRadii.r20All,
               border: isSelected
                   ? Border.all(
                       color: activeColor.withValues(alpha: 0.45),
@@ -202,7 +202,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                       color: isSelected
                           ? activeColor
                           : p.textPrimary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Text(
                       '$badgeCount',
@@ -349,7 +349,7 @@ class PlayerDockIconButton extends StatelessWidget {
                     horizontal: style.badgeHPadding, vertical: AppSpacing.s2),
                 decoration: BoxDecoration(
                   color: activeColor,
-                  borderRadius: BorderRadius.circular(style.badgeRadius),
+                  borderRadius: AppRadii.circular(style.badgeRadius),
                   boxShadow: style.badgeShadow
                       ? [
                           BoxShadow(
@@ -382,14 +382,14 @@ class PlayerDockIconButton extends StatelessWidget {
         excludeFromSemantics: true,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(style.inkWellRadius),
+          borderRadius: AppRadii.circular(style.inkWellRadius),
           child: inner,
         ),
       );
     } else {
       body = InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(style.inkWellRadius),
+        borderRadius: AppRadii.circular(style.inkWellRadius),
         child: Tooltip(
           message: tooltip,
           excludeFromSemantics: true,
@@ -470,7 +470,7 @@ class PlayerViewSwitcher extends StatelessWidget {
           minHeight: barHeight,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(barRadius),
+          borderRadius: AppRadii.circular(barRadius),
           child: Builder(
             builder: (context) {
               final pillContainer = Container(
@@ -479,7 +479,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                   color: GpuBudget.isGpuSaverActive
                       ? surfaceBase
                       : surfaceBase.withValues(alpha: surfaceFillAlpha),
-                  borderRadius: BorderRadius.circular(barRadius),
+                  borderRadius: AppRadii.circular(barRadius),
                   border: Border.all(
                     color: surfaceBase.withValues(alpha: borderAlpha),
                     width: 1.0,
@@ -640,7 +640,7 @@ class PlayerBottomActionDock extends StatelessWidget {
           minHeight: barHeight,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(barRadius),
+          borderRadius: AppRadii.circular(barRadius),
           child: Builder(
             builder: (context) {
               final dockContainer = Container(
@@ -650,7 +650,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       ? p.surface
                       : (p.isDark ? Colors.white : Colors.black)
                           .withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(barRadius),
+                  borderRadius: AppRadii.circular(barRadius),
                   border: Border.all(
                     color: (p.isDark ? Colors.white : Colors.black)
                         .withValues(alpha: 0.12),
@@ -830,7 +830,7 @@ class PlayerPlayHandle extends StatelessWidget {
           height: 4,
           decoration: BoxDecoration(
             color: AppColors.specularAt(0.22),
-            borderRadius: BorderRadius.circular(AppRadii.r2),
+            borderRadius: AppRadii.r2All,
           ),
         ),
       ),

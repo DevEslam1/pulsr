@@ -74,7 +74,7 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r8),
+                borderRadius: AppRadii.r8All,
               ),
             ),
           ),
@@ -93,7 +93,7 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r8),
+                borderRadius: AppRadii.r8All,
                 side: BorderSide(color: p.hairline),
               ),
             ),
@@ -190,7 +190,7 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.success.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         border: Border.all(color: p.success.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -220,7 +220,7 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: Colors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(AppRadii.r8),
+        borderRadius: AppRadii.r8All,
         border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -247,7 +247,7 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.r8),
+        borderRadius: AppRadii.r8All,
         border: Border.all(color: p.accent.withValues(alpha: 0.4)),
       ),
       child: Row(

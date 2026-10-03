@@ -165,7 +165,7 @@ class _PulsrPressableState extends State<PulsrPressable>
                     decoration: BoxDecoration(
                       border:
                           Border.all(color: context.palette.accent, width: 2),
-                      borderRadius: BorderRadius.circular(AppRadii.r12),
+                      borderRadius: AppRadii.r12All,
                     ),
                   ),
                 ),

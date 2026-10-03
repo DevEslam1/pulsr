@@ -166,7 +166,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                     padding: const EdgeInsets.all(AppSpacing.s18),
                     decoration: BoxDecoration(
                       color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(AppRadii.r20),
+                      borderRadius: AppRadii.r20All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -235,7 +235,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                     padding: const EdgeInsets.all(AppSpacing.s18),
                     decoration: BoxDecoration(
                       color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(AppRadii.r20),
+                      borderRadius: AppRadii.r20All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -283,7 +283,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                       padding: const EdgeInsets.all(AppSpacing.s18),
                       decoration: BoxDecoration(
                         color: p.surfaceCard,
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        borderRadius: AppRadii.r20All,
                         border: Border.all(color: p.hairline),
                       ),
                       child: Column(

@@ -337,7 +337,7 @@ class _OnlinePlaylistDetailScreenState
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r14)),
+                            borderRadius: AppRadii.r14All),
                       ),
                     ),
                   ),
@@ -354,7 +354,7 @@ class _OnlinePlaylistDetailScreenState
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r14)),
+                            borderRadius: AppRadii.r14All),
                       ),
                     ),
                   ),
@@ -385,7 +385,7 @@ class _OnlinePlaylistDetailScreenState
                         padding: const EdgeInsets.symmetric(
                             vertical: AppSpacing.s10),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12)),
+                            borderRadius: AppRadii.r12All),
                       ),
                     ),
                   ),
@@ -404,7 +404,7 @@ class _OnlinePlaylistDetailScreenState
                         padding: const EdgeInsets.symmetric(
                             vertical: AppSpacing.s10),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12)),
+                            borderRadius: AppRadii.r12All),
                       ),
                     ),
                   ),
@@ -445,11 +445,11 @@ class _OnlinePlaylistDetailScreenState
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md, vertical: AppSpacing.s10),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                    borderRadius: AppRadii.r14All,
                     borderSide: BorderSide(color: p.hairline),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                    borderRadius: AppRadii.r14All,
                     borderSide: BorderSide(color: p.hairline),
                   ),
                 ),
@@ -587,7 +587,7 @@ class _OnlinePlaylistDetailScreenState
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r24),
+        borderRadius: AppRadii.r24All,
         border: Border.all(color: p.hairline),
       ),
       clipBehavior: Clip.antiAlias,
@@ -640,7 +640,7 @@ class _OnlinePlaylistDetailScreenState
                             vertical: AppSpacing.xxs),
                         decoration: BoxDecoration(
                           color: AppColors.ytRed,
-                          borderRadius: BorderRadius.circular(AppRadii.r6),
+                          borderRadius: AppRadii.r6All,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,

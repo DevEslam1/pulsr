@@ -24,7 +24,7 @@ class SettingsIconBox extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         color: p.accentContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
       ),
       child: Icon(icon, color: p.accent, size: 20),
     );
@@ -265,7 +265,7 @@ void showAudioFeatureInfoDialog(BuildContext context, AudioFeatureInfo info,
             padding: const EdgeInsets.all(AppSpacing.s10),
             decoration: BoxDecoration(
                 color: Colors.amber.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: Colors.amber.withValues(alpha: 0.4))),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,7 +289,7 @@ void showAudioFeatureInfoDialog(BuildContext context, AudioFeatureInfo info,
             padding: const EdgeInsets.all(AppSpacing.s10),
             decoration: BoxDecoration(
                 color: p.error.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadii.r10),
+                borderRadius: AppRadii.r10All,
                 border: Border.all(color: p.error.withValues(alpha: 0.4))),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +338,7 @@ class SettingsSectionCard extends StatelessWidget {
     final content = Material(
       color: p.surfaceContainer,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         side: BorderSide(color: p.hairline),
       ),
       clipBehavior: Clip.antiAlias,

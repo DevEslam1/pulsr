@@ -194,7 +194,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                 horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
               border: Border.all(color: p.error.withValues(alpha: 0.3)),
             ),
             child: Row(
@@ -245,7 +245,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                 horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -278,7 +278,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                       decoration: BoxDecoration(
                         color: (isAuto ? p.accent : p.textTertiary)
                             .withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppRadii.r6),
+                        borderRadius: AppRadii.r6All,
                       ),
                       child: Text(
                         isAuto ? l10n.smartAudioAuto : l10n.smartAudioManual,
@@ -324,7 +324,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                 horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
               border: Border.all(color: p.hairline),
             ),
             child: Row(

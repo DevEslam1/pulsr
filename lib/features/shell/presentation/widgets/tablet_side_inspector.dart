@@ -137,8 +137,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                               padding: const EdgeInsets.all(3),
                               decoration: BoxDecoration(
                                 color: p.surfaceContainer,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r12),
+                                borderRadius: AppRadii.r12All,
                                 border: Border.all(color: p.hairline),
                               ),
                               child: Row(
@@ -158,8 +157,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                             color: _selectedTabIndex == 0
                                                 ? p.accent
                                                 : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(
-                                                AppRadii.r8),
+                                            borderRadius: AppRadii.r8All,
                                           ),
                                           alignment: Alignment.center,
                                           child: Row(
@@ -223,8 +221,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                             color: _selectedTabIndex == 1
                                                 ? p.accent
                                                 : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(
-                                                AppRadii.r8),
+                                            borderRadius: AppRadii.r8All,
                                           ),
                                           alignment: Alignment.center,
                                           child: Row(
@@ -368,7 +365,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                             color: _isDragging
                                 ? p.accent
                                 : p.textTertiary.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(AppRadii.r4),
+                            borderRadius: AppRadii.r4All,
                           ),
                         ),
                       ),

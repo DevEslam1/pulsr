@@ -1026,7 +1026,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             height: 4,
                             decoration: BoxDecoration(
                               color: p.textTertiary.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(AppRadii.r2),
+                              borderRadius: AppRadii.r2All,
                             ),
                           ),
                         ),

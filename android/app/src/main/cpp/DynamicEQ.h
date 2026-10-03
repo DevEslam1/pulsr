@@ -25,6 +25,13 @@ public:
     void setBand(int idx, const DynamicEqBandParam& params);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const {
+        if (enabled_) return false;
+        for (int b = 0; b < bandCount_; ++b) {
+            if (std::abs(bands_[b].currentGainDb) > 1e-4) return true;
+        }
+        return false;
+    }
     void applyParams(const DynamicEqParamSet& params);
     void reset();
 

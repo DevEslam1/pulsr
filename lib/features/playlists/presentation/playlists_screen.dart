@@ -697,7 +697,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     onTap: () async {
                       await context.push('/smart-playlist-builder');
                     },
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
@@ -1098,7 +1098,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       padding: const EdgeInsets.all(AppSpacing.s20),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        borderRadius: AppRadii.r20All,
                         border: Border.all(color: p.hairline),
                       ),
                       child: Row(
@@ -1149,8 +1149,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                   horizontal: AppSpacing.s14,
                                   vertical: AppSpacing.xs),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r12)),
+                                  borderRadius: AppRadii.r12All),
                             ),
                             child: Text(context.l10n.signIn,
                                 style: const TextStyle(
@@ -1240,7 +1239,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          borderRadius: AppRadii.r16All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -1274,7 +1273,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         padding: const EdgeInsets.all(AppSpacing.s18),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r18),
+                          borderRadius: AppRadii.r18All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -1348,7 +1347,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         padding: const EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          borderRadius: AppRadii.r16All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -1411,7 +1410,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       0),
                   child: InkWell(
                     onTap: onAddPlaylist,
-                    borderRadius: BorderRadius.circular(AppRadii.r18),
+                    borderRadius: AppRadii.r18All,
                     child: DashedBorderCard(
                       color: AppColors.ytRed,
                       child: Row(
@@ -1467,11 +1466,11 @@ class _AccountPlaylistCard extends StatelessWidget {
       label: playlist.title,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         child: Container(
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -1646,7 +1645,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                           error!.toLowerCase().contains('expired'))
                   ? () => YtmWebLoginSheet.show(context)
                   : onFetch)),
-      borderRadius: BorderRadius.circular(AppRadii.r22),
+      borderRadius: AppRadii.r22All,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.s20),
         decoration: BoxDecoration(
@@ -1655,7 +1654,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(AppRadii.r22),
+          borderRadius: AppRadii.r22All,
           boxShadow: [
             BoxShadow(
               color: gradientColors.first.withValues(alpha: 0.35),
@@ -1785,11 +1784,11 @@ class _OnlinePlaylistCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         onLongPress: onRemove,
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         child: Container(
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -1905,7 +1904,7 @@ class _PlaylistHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.r22),
+      borderRadius: AppRadii.r22All,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.s20),
         decoration: BoxDecoration(
@@ -1913,7 +1912,7 @@ class _PlaylistHeroCard extends StatelessWidget {
               colors: colors,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(AppRadii.r22),
+          borderRadius: AppRadii.r22All,
           boxShadow: [
             BoxShadow(
               color: colors.first.withValues(alpha: 0.35),
@@ -1981,13 +1980,13 @@ class _SuggestionCard extends StatelessWidget {
       label: suggestion.title,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         child: Container(
           width: 230,
           padding: const EdgeInsets.all(AppSpacing.s14),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r16),
+            borderRadius: AppRadii.r16All,
             border: Border.all(color: p.hairline),
           ),
           child: Column(
@@ -2088,11 +2087,11 @@ class _PlaylistCard extends StatelessWidget {
       label: name,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         child: Container(
           decoration: BoxDecoration(
             color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             border: Border.all(
               color: isSelected ? p.accent : p.hairline,
               width: isSelected ? 2.2 : 1.0,
@@ -2138,7 +2137,7 @@ class _PlaylistCard extends StatelessWidget {
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.scrimLight,
-                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              borderRadius: AppRadii.r6All,
                               border: Border.all(
                                 color: AppColors.specularAt(0.35),
                                 width: 0.8,
@@ -2241,7 +2240,7 @@ class DashedBorderCard extends StatelessWidget {
       height: 64,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1.4),
         color: color.withValues(alpha: 0.05),
       ),

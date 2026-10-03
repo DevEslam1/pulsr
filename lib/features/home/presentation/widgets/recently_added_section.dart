@@ -195,7 +195,7 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
                           side: BorderSide(
                               color: p.accent.withValues(alpha: 0.3)),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r20),
+                            borderRadius: AppRadii.r20All,
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.md,

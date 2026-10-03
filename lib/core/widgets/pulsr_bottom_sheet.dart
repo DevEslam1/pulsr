@@ -207,9 +207,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                   : (p.isDark
                       ? p.surface.withValues(alpha: 0.92)
                       : p.surface.withValues(alpha: 0.96)),
-              borderRadius: isTablet
-                  ? BorderRadius.circular(AppRadii.r28)
-                  : AppRadii.bottomSheetRadius,
+              borderRadius:
+                  isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius,
               border: Border.all(
                 color: p.hairline,
                 width: 1.0,
@@ -228,9 +227,8 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                     AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.lg)
                 : EdgeInsets.zero,
             child: ClipRRect(
-              borderRadius: isTablet
-                  ? BorderRadius.circular(AppRadii.r28)
-                  : AppRadii.bottomSheetRadius,
+              borderRadius:
+                  isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius,
               child: Builder(
                 builder: (context) {
                   final sheetContent = _PulsrBottomSheetScope(

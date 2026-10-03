@@ -127,7 +127,7 @@ class PulsrDialogHelper {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(
@@ -243,7 +243,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
             Container(
               decoration: BoxDecoration(
                 color: p.surfaceContainerHigh.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(AppRadii.r12),
+                borderRadius: AppRadii.r12All,
                 border: Border.all(color: p.hairline),
               ),
               child: TextField(
@@ -288,7 +288,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(

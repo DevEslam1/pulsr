@@ -177,7 +177,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
                       decoration: BoxDecoration(
                         color: Colors.amber.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppRadii.r10),
+                        borderRadius: AppRadii.r10All,
                         border: Border.all(color: Colors.amber),
                       ),
                       child: Row(
@@ -202,7 +202,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                         horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
                     decoration: BoxDecoration(
                       color: p.primary.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                       border: Border.all(color: p.primary),
                     ),
                     child: Row(
@@ -224,8 +224,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
               ),
               body: Builder(
                 builder: (context) {
-                  final isLandscape =
-                      MediaQuery.orientationOf(context) == Orientation.landscape;
+                  final isLandscape = MediaQuery.orientationOf(context) ==
+                      Orientation.landscape;
 
                   final lyricsWidget = Column(
                     mainAxisSize: MainAxisSize.min,
@@ -233,8 +233,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     children: [
                       if (effectiveLyrics.isEmpty)
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xl),
                           child: Text(
                             state.isLoadingLyrics
                                 ? context.l10n.dspLoadingLyrics
@@ -250,8 +250,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                       // Active Lyric Line with Glow & Tap-to-Seek
                       if (activeLine != null)
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xl),
                           child: InkWell(
                             onTap: () {
                               HapticFeedback.selectionClick();
@@ -259,7 +259,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                   .read<PlayerCubit>()
                                   .seek(activeLine.timestamp);
                             },
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
+                            borderRadius: AppRadii.r16All,
                             splashColor: p.primary.withValues(alpha: 0.2),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -291,7 +291,9 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                             i++) ...[
                                           TextSpan(
                                             text: words[i] +
-                                                (i < words.length - 1 ? ' ' : ''),
+                                                (i < words.length - 1
+                                                    ? ' '
+                                                    : ''),
                                             style: TextStyle(
                                               color: i < highlightedCount
                                                   ? p.primary
@@ -304,7 +306,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                                   ? [
                                                       Shadow(
                                                         color: p.primary
-                                                            .withValues(alpha: 0.8),
+                                                            .withValues(
+                                                                alpha: 0.8),
                                                         blurRadius: 28,
                                                       ),
                                                     ]
@@ -328,8 +331,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                         )
                       else if (effectiveLyrics.isNotEmpty)
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xl),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -357,9 +360,11 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           child: InkWell(
                             onTap: () {
                               HapticFeedback.selectionClick();
-                              context.read<PlayerCubit>().seek(nextLine.timestamp);
+                              context
+                                  .read<PlayerCubit>()
+                                  .seek(nextLine.timestamp);
                             },
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                             splashColor: p.primary.withValues(alpha: 0.15),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -369,7 +374,12 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                 nextLine.text,
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: math.max(13.0, (isLandscape ? math.min(_fontSize, 22.0) : _fontSize) * 0.65),
+                                  fontSize: math.max(
+                                      13.0,
+                                      (isLandscape
+                                              ? math.min(_fontSize, 22.0)
+                                              : _fontSize) *
+                                          0.65),
                                   fontWeight: FontWeight.w600,
                                   color: p.textTertiary,
                                 ),
@@ -382,7 +392,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
 
                   Widget buildKaraokeBar({required bool compact}) {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                       child: Wrap(
                         alignment: WrapAlignment.center,
                         crossAxisAlignment: WrapCrossAlignment.center,
@@ -393,22 +404,27 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           IconButton.filledTonal(
                             tooltip: context.l10n.karaokePracticeMode,
                             isSelected: _practiceMode,
-                            icon: const Icon(Icons.repeat_one_rounded, size: 18),
-                            visualDensity: compact ? VisualDensity.compact : null,
+                            icon:
+                                const Icon(Icons.repeat_one_rounded, size: 18),
+                            visualDensity:
+                                compact ? VisualDensity.compact : null,
                             onPressed: () =>
                                 setState(() => _practiceMode = !_practiceMode),
                           ),
                           // Pitch Down
                           IconButton(
                             tooltip: context.l10n.dspPitchDownSemitone,
-                            icon: const Icon(Icons.remove_circle_outline_rounded,
+                            icon: const Icon(
+                                Icons.remove_circle_outline_rounded,
                                 size: 18),
-                            visualDensity: compact ? VisualDensity.compact : null,
+                            visualDensity:
+                                compact ? VisualDensity.compact : null,
                             onPressed: _pitchSemitones > _minPitchSemitones
                                 ? () {
                                     setState(() => _pitchSemitones--);
-                                    context.read<PlayerCubit>().setPlaybackPitch(
-                                        math
+                                    context
+                                        .read<PlayerCubit>()
+                                        .setPlaybackPitch(math
                                             .pow(2.0, _pitchSemitones / 12.0)
                                             .toDouble());
                                   }
@@ -427,12 +443,14 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                             tooltip: context.l10n.dspPitchUpSemitone,
                             icon: const Icon(Icons.add_circle_outline_rounded,
                                 size: 18),
-                            visualDensity: compact ? VisualDensity.compact : null,
+                            visualDensity:
+                                compact ? VisualDensity.compact : null,
                             onPressed: _pitchSemitones < _maxPitchSemitones
                                 ? () {
                                     setState(() => _pitchSemitones++);
-                                    context.read<PlayerCubit>().setPlaybackPitch(
-                                        math
+                                    context
+                                        .read<PlayerCubit>()
+                                        .setPlaybackPitch(math
                                             .pow(2.0, _pitchSemitones / 12.0)
                                             .toDouble());
                                   }
@@ -441,8 +459,10 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           // Font Size Cycle
                           IconButton(
                             tooltip: context.l10n.karaokeLyricsFontSize,
-                            icon: const Icon(Icons.format_size_rounded, size: 18),
-                            visualDensity: compact ? VisualDensity.compact : null,
+                            icon:
+                                const Icon(Icons.format_size_rounded, size: 18),
+                            visualDensity:
+                                compact ? VisualDensity.compact : null,
                             onPressed: () {
                               setState(() {
                                 _fontSize =
@@ -463,12 +483,14 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                               ),
                               onPressed: () =>
                                   _recordTapTiming(pos, activeLine.timestamp),
-                              icon: const Icon(Icons.touch_app_rounded, size: 14),
+                              icon:
+                                  const Icon(Icons.touch_app_rounded, size: 14),
                               label: Text(
                                 _lastScore != null
                                     ? context.l10n.karaokeScore(_lastScore!)
                                     : context.l10n.karaokeTapRhythm,
-                                style: const TextStyle(fontSize: AppFontSize.caption),
+                                style: const TextStyle(
+                                    fontSize: AppFontSize.caption),
                               ),
                             ),
                         ],
@@ -476,7 +498,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                     );
                   }
 
-                  Widget buildPlayerControlsSection({required bool isLandscape}) {
+                  Widget buildPlayerControlsSection(
+                      {required bool isLandscape}) {
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -622,4 +645,3 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     }
   }
 }
-

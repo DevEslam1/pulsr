@@ -53,9 +53,9 @@ class _OutputSection extends StatelessWidget {
               AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.s6),
           child: Material(
             color: p.surfaceContainer.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(AppRadii.r14),
+            borderRadius: AppRadii.r14All,
             child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadii.r14),
+              borderRadius: AppRadii.r14All,
               onTap: () {
                 final playerState = context.read<PlayerCubit>().state;
                 final currentSong = playerState.currentSong ??
@@ -78,7 +78,7 @@ class _OutputSection extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadii.r14),
+                  borderRadius: AppRadii.r14All,
                   border: Border.all(
                     color: state.currentOutputDevice?.isUsbDac == true
                         ? p.warning.withValues(alpha: 0.5)
@@ -121,7 +121,7 @@ class _OutputSection extends StatelessWidget {
                                 vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: AppColors.dacGold.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              borderRadius: AppRadii.r6All,
                               border: Border.all(
                                   color:
                                       AppColors.dacGold.withValues(alpha: 0.6)),

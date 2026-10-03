@@ -84,7 +84,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
               height: 4,
               decoration: BoxDecoration(
                 color: p.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(AppRadii.r2),
+                borderRadius: AppRadii.r2All,
               ),
             ),
           ),
@@ -139,7 +139,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
               contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r16),
+                borderRadius: AppRadii.r16All,
                 borderSide: BorderSide.none,
               ),
             ),
@@ -218,15 +218,14 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                                 ),
                               );
                             },
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
+                            borderRadius: AppRadii.r16All,
                             child: Container(
                               padding: const EdgeInsets.all(AppSpacing.s14),
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? p.primary.withValues(alpha: 0.15)
                                     : p.surfaceCard,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r16),
+                                borderRadius: AppRadii.r16All,
                                 border: Border.all(
                                   color: isSelected ? p.primary : p.surfaceCard,
                                   width: 1.5,

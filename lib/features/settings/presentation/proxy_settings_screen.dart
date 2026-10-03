@@ -311,8 +311,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                                 padding: const EdgeInsets.all(AppSpacing.xs),
                                 decoration: BoxDecoration(
                                   color: p.accentContainer,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r10),
+                                  borderRadius: AppRadii.r10All,
                                 ),
                                 child: Icon(Icons.file_upload_outlined,
                                     color: p.accent, size: 20),
@@ -368,8 +367,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: p.hairline),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r10)),
+                                  borderRadius: AppRadii.r10All),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.sm,
                                   vertical: AppSpacing.xs),
@@ -423,8 +421,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(color: p.hairline),
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r10)),
+                                  borderRadius: AppRadii.r10All),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.sm,
                                   vertical: AppSpacing.xs),
@@ -450,15 +447,15 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                           filled: true,
                           fillColor: p.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                             borderSide: BorderSide(color: p.accent, width: 2),
                           ),
                         ),
@@ -504,8 +501,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                               backgroundColor: p.accent,
                               foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r12)),
+                                  borderRadius: AppRadii.r12All),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.md,
                                   vertical: AppSpacing.s10),
@@ -580,7 +576,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                       backgroundColor: p.accentContainer,
                       foregroundColor: p.accent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                       ),
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
@@ -653,7 +649,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                             padding: const EdgeInsets.symmetric(
                                 vertical: AppSpacing.s14),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r14),
+                              borderRadius: AppRadii.r14All,
                             ),
                           ),
                         ),
@@ -678,7 +674,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         border: Border.all(
           color: _enabled ? p.accent.withValues(alpha: 0.4) : p.hairline,
           width: _enabled ? 1.5 : 1.0,
@@ -696,7 +692,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                 height: AppSpacing.minTouchTarget,
                 decoration: BoxDecoration(
                   color: _enabled ? p.accentContainer : p.surface,
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   border: Border.all(
                     color:
                         _enabled ? p.accent.withValues(alpha: 0.3) : p.hairline,
@@ -732,7 +728,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                             color: _enabled
                                 ? p.success.withValues(alpha: 0.15)
                                 : p.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(AppRadii.r6),
+                            borderRadius: AppRadii.r6All,
                           ),
                           child: Text(
                             _enabled
@@ -802,7 +798,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
         Material(
           color: p.surfaceContainer,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             side: BorderSide(color: p.hairline),
           ),
           clipBehavior: Clip.antiAlias,
@@ -822,7 +818,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
     return Material(
       color: p.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.r10),
+        borderRadius: AppRadii.r10All,
         side: BorderSide(color: p.hairline),
       ),
       clipBehavior: Clip.antiAlias,
@@ -862,7 +858,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadii.r16),
+        borderRadius: AppRadii.r16All,
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(

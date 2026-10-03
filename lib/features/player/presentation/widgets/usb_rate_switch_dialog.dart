@@ -123,7 +123,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
           width: 330,
           margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: GlassContainer(
-            borderRadius: BorderRadius.circular(AppRadii.r24),
+            borderRadius: AppRadii.r24All,
             padding: const EdgeInsets.all(AppSpacing.s20),
             color: p.surface.withValues(alpha: 0.85),
             blur: 24,
@@ -179,7 +179,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surface.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                    borderRadius: AppRadii.r12All,
                     border: Border.all(
                       color: p.hairline.withValues(alpha: 0.2),
                     ),
@@ -206,7 +206,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                 InkWell(
                   onTap: () =>
                       setState(() => _rememberChoice = !_rememberChoice),
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
+                  borderRadius: AppRadii.r8All,
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
@@ -221,7 +221,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                                 setState(() => _rememberChoice = v ?? false),
                             activeColor: AppColors.dacGold,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r4),
+                              borderRadius: AppRadii.r4All,
                             ),
                           ),
                         ),
@@ -252,7 +252,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                           padding: const EdgeInsets.symmetric(
                               vertical: AppSpacing.sm),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                         ),
                         child: Text(context.l10n.cancel),
@@ -269,7 +269,7 @@ class _UsbRateSwitchDialogState extends State<UsbRateSwitchDialog> {
                               vertical: AppSpacing.sm),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                         ),
                         child: Text(

@@ -1195,7 +1195,7 @@ Widget _buildSectionHeader({
                 horizontal: AppSpacing.s8, vertical: AppSpacing.xxs),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               border: Border.all(color: p.hairline),
             ),
             child: Text(
@@ -1230,7 +1230,7 @@ Widget _buildEmptySectionCard({
     ),
     decoration: BoxDecoration(
       color: p.surfaceContainer.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(AppRadii.r12),
+      borderRadius: AppRadii.r12All,
       border: Border.all(color: p.hairline),
     ),
     child: Row(
@@ -1267,7 +1267,7 @@ Widget _buildErrorSectionCard({
     padding: const EdgeInsets.all(AppSpacing.sm),
     decoration: BoxDecoration(
       color: p.surfaceContainer.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(AppRadii.r12),
+      borderRadius: AppRadii.r12All,
       border: Border.all(color: p.hairline),
     ),
     child: Row(

@@ -21,6 +21,7 @@ public:
     CrossfeedMode getMode() const { return mode_; }
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
+    bool isRamping() const { return !enabled_ && smoothedEnabledMix_ >= 1e-4f; }
     void applyParams(const CrossfeedParamSet& params);
     void reset();
 

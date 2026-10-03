@@ -246,7 +246,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
@@ -287,8 +287,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                     materialTapTargetSize: MaterialTapTargetSize.padded,
                     backgroundColor: p.surfaceContainer,
                     side: BorderSide(color: p.hairline),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12)),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                     label: Text(
                       '${g.name} (${g.songCount})',
                       style: TextStyle(
@@ -319,7 +319,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
     return Container(
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
@@ -359,8 +359,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                     materialTapTargetSize: MaterialTapTargetSize.padded,
                     backgroundColor: p.surfaceContainer,
                     side: BorderSide(color: p.hairline),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12)),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                     label: Text(
                       '${g.name} (${g.songCount})',
                       style: TextStyle(

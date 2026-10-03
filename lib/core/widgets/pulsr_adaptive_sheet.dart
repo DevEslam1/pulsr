@@ -232,9 +232,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         color: containerColor,
         borderRadius: isDialog
             ? AppRadii.dialogRadius
-            : (vp.isTablet
-                ? BorderRadius.circular(AppRadii.r28)
-                : AppRadii.bottomSheetRadius),
+            : (vp.isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius),
         border: Border.all(color: p.hairline, width: 1.0),
         boxShadow: [
           BoxShadow(

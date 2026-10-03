@@ -8,6 +8,7 @@ import 'pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
 
 /// {@category DesignSystem}
 enum PulsrSwitchSize {
@@ -157,7 +158,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                 height: widget.height,
                 padding: const EdgeInsets.all(3.0),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(widget.height / 2.0),
+                  borderRadius: AppRadii.circular(widget.height / 2.0),
                   color: currentColor,
                   border: Border.all(
                     color: t > 0.5

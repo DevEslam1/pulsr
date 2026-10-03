@@ -149,6 +149,8 @@ class PulsrResponsiveSheetContainer extends StatelessWidget {
                         if (showCloseButton)
                           IconButton(
                             icon: const Icon(Icons.close_rounded, size: 22),
+                            tooltip: MaterialLocalizations.of(context)
+                                .closeButtonTooltip,
                             onPressed: () => Navigator.of(context).pop(),
                             constraints: const BoxConstraints(
                               minWidth: AppSpacing.minTouchTarget,

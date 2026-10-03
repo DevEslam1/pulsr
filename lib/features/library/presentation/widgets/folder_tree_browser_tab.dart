@@ -180,7 +180,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                   return Center(
                     child: InkWell(
                       onTap: isLast ? null : () => _navigateTo(crumbPath),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s6,
@@ -273,8 +273,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                                   height: 40,
                                   decoration: BoxDecoration(
                                     color: p.accentContainer,
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r10),
+                                    borderRadius: AppRadii.r10All,
                                   ),
                                   child: Icon(Icons.folder_rounded,
                                       color: p.accent, size: 20),

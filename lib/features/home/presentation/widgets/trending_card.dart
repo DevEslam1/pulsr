@@ -32,7 +32,7 @@ class TrendingCard extends StatelessWidget {
         label: '${song.title}, ${song.artist}',
         hint: context.l10n.play,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.r20),
+          borderRadius: AppRadii.r20All,
           onTap: onTap,
           child: SizedBox(
             width: size,

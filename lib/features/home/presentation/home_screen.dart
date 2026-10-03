@@ -19,7 +19,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../cubit/home_cubit.dart';
-import 'widgets/discovery_chip.dart';
+import 'widgets/hero_mix_card.dart';
+import 'widgets/quick_tile.dart';
 import 'widgets/online_category_section.dart';
 import 'widgets/quick_actions_row.dart';
 import 'widgets/quick_card.dart';
@@ -283,11 +284,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(
                         Adaptive.pagePadding(context),
-                        16,
+                        AppSpacing.md,
                         Adaptive.pagePadding(context),
                         0),
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: Column(
@@ -295,17 +296,26 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             children: [
                               Text(
                                 MaterialLocalizations.of(context)
-                                    .formatMediumDate(DateTime.now()),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: p.textTertiary),
+                                    .formatMediumDate(DateTime.now())
+                                    .toUpperCase(),
+                                style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.1,
+                                ),
                               ),
                               const SizedBox(height: AppSpacing.s6),
                               Text(
                                 _getGreeting(context),
-                                style:
-                                    Theme.of(context).textTheme.headlineMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.5),
                               ),
                             ],
                           ),
@@ -330,11 +340,24 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                               visualDensity: VisualDensity.compact,
                             ),
                           ),
-                        PulsrLogo(
-                            size: 26,
-                            color: p.accent,
-                            glowColor: p.glow,
-                            animate: false),
+                        // Logo in a soft badge so the header has a visual anchor.
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: p.accentContainer,
+                            borderRadius: AppRadii.r14All,
+                            border: Border.all(
+                                color: p.accent.withValues(alpha: 0.25)),
+                          ),
+                          child: Center(
+                            child: PulsrLogo(
+                                size: 24,
+                                color: p.accent,
+                                glowColor: p.glow,
+                                animate: false),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -355,7 +378,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         ),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.card),
+                          borderRadius: AppRadii.cardRadius,
                           border: Border.all(
                               color: p.accent.withValues(alpha: 0.3)),
                         ),
@@ -449,59 +472,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     ),
                   ],
 
-                  // ---------- Quick Discovery Tools Row ----------
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    height: 48.0,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
-                      children: [
-                        if (AppConfig.ytmEnabled && !offlineOnly) ...[
-                          DiscoveryChip(
-                            icon: Icons.explore_rounded,
-                            label: context.l10n.ytmExplore,
-                            iconColor: p.primary,
-                            onTap: () => context.push('/ytm-explore'),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                        ],
-                        DiscoveryChip(
-                          icon: Icons.radio_rounded,
-                          label: context.l10n.radioTitle,
-                          iconColor: p.warning,
-                          onTap: () => context.push('/radio'),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        DiscoveryChip(
-                          icon: Icons.queue_music_rounded,
-                          label: context.l10n.queue,
-                          iconColor: p.info,
-                          onTap: () => context.push('/queue'),
-                        ),
-                        if (AppConfig.ytmEnabled && !offlineOnly) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          DiscoveryChip(
-                            icon: Icons.downloading_rounded,
-                            label: context.l10n.downloadsTitle,
-                            iconColor: p.success,
-                            onTap: () => context.push('/downloads'),
-                          ),
-                        ],
-                        const SizedBox(width: AppSpacing.sm),
-                        DiscoveryChip(
-                          icon: Icons.apps_rounded,
-                          label: context.l10n.browseMoreTools,
-                          iconColor: p.textSecondary,
-                          onTap: () => _showDiscoveryToolsSheet(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-
                   // ---------- Content (Local vs Online) ----------
                   AnimatedSwitcher(
                     duration: PulsrMotion.standard,
@@ -570,7 +540,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             decoration: BoxDecoration(
               color: sp.surface,
-              borderRadius: BorderRadius.circular(AppRadii.r24),
+              borderRadius: AppRadii.r24All,
               border: Border.all(color: sp.hairline),
             ),
             child: Column(
@@ -582,7 +552,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   decoration: BoxDecoration(
                     color: sp.hairline,
-                    borderRadius: BorderRadius.circular(AppRadii.r2),
+                    borderRadius: AppRadii.r2All,
                   ),
                 ),
                 for (final tool in tools)
@@ -596,7 +566,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                       ),
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                     ),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
@@ -622,32 +592,29 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     PlayerCubit playerCubit,
     bool isTablet,
   ) {
+    final offlineOnly =
+        context.select<SettingsCubit, bool>((c) => c.state.offlineOnlyMode);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ---------- Quick Discovery Header (Row 2) ----------
-        const QuickDiscoveryHeader(),
-        const SizedBox(height: AppSpacing.sm),
+        // ---------- Single shortcut strip ----------
+        const SizedBox(height: AppSpacing.md),
+        QuickDiscoveryHeader(
+          showYtm: AppConfig.ytmEnabled && !offlineOnly,
+          onMore: () => _showDiscoveryToolsSheet(context),
+        ),
+        const SizedBox(height: AppSpacing.md),
 
-        // ---------- Quick actions ----------
+        // ---------- Hero action + secondary tiles ----------
         Padding(
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
-              0, Adaptive.pagePadding(context), AppSpacing.xs),
-          child: _buildQuickActionsRow(
-            context,
-            [
-              QuickCard(
-                title: context.l10n.favorites,
-                subtitle: context.l10n.likedTracks,
-                icon: Icons.favorite_rounded,
-                color: p.favorite,
-                onTap: () => context.push('/favorites'),
-              ),
-              QuickCard(
+              0, Adaptive.pagePadding(context), AppSpacing.md),
+          child: Column(
+            children: [
+              HeroMixCard(
+                overline: context.l10n.localMusic,
                 title: context.l10n.dailyDrive,
                 subtitle: context.l10n.autoMix,
-                icon: Icons.directions_car_rounded,
-                color: p.accent,
                 onTap: () async {
                   final list = await _getQuickActionSongs(getSongsUseCase);
                   if (list.isNotEmpty) {
@@ -656,19 +623,37 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   }
                 },
               ),
-              QuickCard(
-                title: context.l10n.focusFlow,
-                subtitle: context.l10n.topPlayedTracks,
-                icon: Icons.headphones_rounded,
-                color: AppColors.mint,
-                onTap: () async {
-                  final list = await _getQuickActionSongs(getSongsUseCase);
-                  final top = list.where((s) => s.playCount > 0).toList()
-                    ..sort((a, b) => b.playCount.compareTo(a.playCount));
-                  if (top.isNotEmpty) {
-                    playerCubit.playSong(top.first, queue: top);
-                  }
-                },
+              const SizedBox(height: AppSpacing.s10),
+              Row(
+                children: [
+                  Expanded(
+                    child: QuickTile(
+                      title: context.l10n.favorites,
+                      subtitle: context.l10n.likedTracks,
+                      icon: Icons.favorite_rounded,
+                      color: p.favorite,
+                      onTap: () => context.push('/favorites'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s10),
+                  Expanded(
+                    child: QuickTile(
+                      title: context.l10n.focusFlow,
+                      subtitle: context.l10n.topPlayedTracks,
+                      icon: Icons.headphones_rounded,
+                      color: AppColors.mint,
+                      onTap: () async {
+                        final list =
+                            await _getQuickActionSongs(getSongsUseCase);
+                        final top = list.where((s) => s.playCount > 0).toList()
+                          ..sort((a, b) => b.playCount.compareTo(a.playCount));
+                        if (top.isNotEmpty) {
+                          playerCubit.playSong(top.first, queue: top);
+                        }
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -706,13 +691,18 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: AppSpacing.md),
+        QuickDiscoveryHeader(
+          online: true,
+          onMore: () => _showDiscoveryToolsSheet(context),
+        ),
+        const SizedBox(height: AppSpacing.md),
         // ---------- Search YouTube Music Action Banner ----------
         Padding(
           padding:
               EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             onTap: () => context.push('/ytm-search'),
             child: Container(
               padding: const EdgeInsets.symmetric(
@@ -726,7 +716,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(AppRadii.r20),
+                borderRadius: AppRadii.r20All,
                 border: Border.all(color: p.accent.withValues(alpha: 0.3)),
               ),
               child: Row(
@@ -862,8 +852,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         color: _selectedOnlineCategory == cat
                             ? p.accent
                             : p.hairline),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r14)),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: AppRadii.r14All),
                   ),
                 ),
             ],

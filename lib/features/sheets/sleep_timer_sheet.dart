@@ -56,7 +56,7 @@ class SleepTimerSheet extends StatelessWidget {
                         horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
                     decoration: BoxDecoration(
                       color: p.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -254,7 +254,7 @@ class SleepTimerSheet extends StatelessWidget {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.surfaceContainer,
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.timer_outlined, color: p.accent),
                           ),
@@ -279,7 +279,7 @@ class SleepTimerSheet extends StatelessWidget {
                             padding: const EdgeInsets.all(AppSpacing.xs),
                             decoration: BoxDecoration(
                               color: p.surfaceContainer,
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Icon(Icons.access_time_rounded,
                                 color: p.accent),
@@ -361,7 +361,7 @@ class _CustomMinutesDialogState extends State<_CustomMinutesDialog> {
     return AlertDialog(
       backgroundColor: p.surfaceContainer,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
       ),
       title: Text(
         context.l10n.customTime,

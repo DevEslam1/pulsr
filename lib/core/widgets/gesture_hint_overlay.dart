@@ -113,7 +113,7 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
                   decoration: BoxDecoration(
                     color: (p.isDark ? p.surfaceContainerHigh : p.surface)
                         .withValues(alpha: 0.94),
-                    borderRadius: BorderRadius.circular(AppRadii.r20),
+                    borderRadius: AppRadii.r20All,
                     border: Border.all(
                       color: p.accent.withValues(alpha: 0.35),
                       width: 1.2,

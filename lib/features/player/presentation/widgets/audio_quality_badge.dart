@@ -66,7 +66,7 @@ class AudioQualityBadge extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => AudioQualitySheet.show(context, song!, activeColor),
-        borderRadius: BorderRadius.circular(AppRadii.r20),
+        borderRadius: AppRadii.r20All,
         child: Ink(
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 8 : 12,
@@ -83,7 +83,7 @@ class AudioQualityBadge extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(AppRadii.r20),
+            borderRadius: AppRadii.r20All,
             border: Border.all(
               color: (isUsb ? AppColors.dacGold : info.badgeColor)
                   .withValues(alpha: 0.45),

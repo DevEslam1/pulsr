@@ -233,7 +233,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
         width: cardWidth,
         decoration: BoxDecoration(
           color: p.surfaceCard,
-          borderRadius: BorderRadius.circular(AppRadii.r16),
+          borderRadius: AppRadii.r16All,
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

@@ -469,7 +469,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
             horizontal: AppSpacing.s14, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: p.accent.withValues(alpha: p.isDark ? 0.14 : 0.1),
-          borderRadius: BorderRadius.circular(AppRadii.r12),
+          borderRadius: AppRadii.r12All,
           border: Border.all(
             color: p.accent.withValues(alpha: 0.28),
             width: 1,

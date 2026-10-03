@@ -89,7 +89,7 @@ void showMiniPlayerSwipePickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -199,7 +199,7 @@ void showNowPlayingDoubleTapPickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -299,7 +299,7 @@ void showNowPlayingArtworkSwipePickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,
@@ -414,7 +414,7 @@ void showQualityPickerSheet(
                         ? primaryColor.withValues(alpha: 0.12)
                         : cardColor,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       side: BorderSide(
                         color: isSelected ? primaryColor : outlineColor,
                         width: isSelected ? 1.5 : 1.0,

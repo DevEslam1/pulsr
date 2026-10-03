@@ -325,8 +325,7 @@ class _ToastWidgetState extends State<_ToastWidget>
 
     final isTablet = Adaptive.isTablet(context);
     final double maxDockWidth = isTablet ? 640.0 : 540.0;
-    final snackbarRadius =
-        BorderRadius.circular(isTablet ? AppRadii.r26 : AppRadii.r20);
+    final snackbarRadius = isTablet ? AppRadii.r26All : AppRadii.r20All;
 
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -461,8 +460,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                       decoration: BoxDecoration(
                                         color: statusColor.withValues(
                                             alpha: p.isDark ? 0.18 : 0.12),
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r12),
+                                        borderRadius: AppRadii.r12All,
                                         border: Border.all(
                                           color: statusColor.withValues(
                                               alpha: 0.24),
@@ -534,8 +532,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                           decoration: BoxDecoration(
                                             color: statusColor.withValues(
                                                 alpha: p.isDark ? 0.20 : 0.14),
-                                            borderRadius: BorderRadius.circular(
-                                                AppRadii.r10),
+                                            borderRadius: AppRadii.r10All,
                                             border: Border.all(
                                               color: statusColor.withValues(
                                                   alpha: 0.32),

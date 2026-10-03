@@ -96,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadii.r24),
+                borderRadius: AppRadii.r24All,
                 boxShadow: [
                   BoxShadow(
                     color: p.favorite.withValues(alpha: 0.45),
@@ -107,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadii.r24),
+                borderRadius: AppRadii.r24All,
                 child: Image.asset(
                   'assets/app_icon/app_icon_plus.png',
                   width: 96,
@@ -152,7 +152,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                    borderRadius: AppRadii.r14All,
                   ),
                 ),
                 onPressed: () {

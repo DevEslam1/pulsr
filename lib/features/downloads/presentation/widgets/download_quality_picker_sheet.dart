@@ -140,7 +140,7 @@ class _DownloadQualityPickerSheetState
               margin: const EdgeInsets.only(bottom: AppSpacing.sm),
               decoration: BoxDecoration(
                 color: p.textTertiary.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(AppRadii.r4),
+                borderRadius: AppRadii.r4All,
               ),
             ),
           ),
@@ -203,14 +203,14 @@ class _DownloadQualityPickerSheetState
                     ? p.accent.withValues(alpha: 0.12)
                     : p.surfaceContainer,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r16),
+                  borderRadius: AppRadii.r16All,
                   side: BorderSide(
                     color: isSelected ? p.accent : p.hairline,
                     width: isSelected ? 1.8 : 1.0,
                   ),
                 ),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadii.r16),
+                  borderRadius: AppRadii.r16All,
                   onTap: () {
                     setState(() => _selectedQuality = opt.quality);
                   },
@@ -249,8 +249,7 @@ class _DownloadQualityPickerSheetState
                                       color: isSelected
                                           ? p.accent.withValues(alpha: 0.2)
                                           : p.hairline,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r4),
+                                      borderRadius: AppRadii.r4All,
                                     ),
                                     child: Text(
                                       opt.badge,
@@ -312,7 +311,7 @@ class _DownloadQualityPickerSheetState
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
               ),
             ),
             onPressed: () => widget.onConfirm(_selectedQuality),

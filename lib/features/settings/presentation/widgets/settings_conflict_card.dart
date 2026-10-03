@@ -32,7 +32,7 @@ class SettingsConflictCard extends StatelessWidget {
           horizontal: AppSpacing.sm, vertical: AppSpacing.s10),
       decoration: BoxDecoration(
         color: p.error.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(color: p.error.withValues(alpha: 0.35)),
       ),
       child: Column(

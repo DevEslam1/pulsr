@@ -150,7 +150,7 @@ class CloudBackupDashboardScreenState
               padding: const EdgeInsets.all(AppSpacing.s18),
               decoration: BoxDecoration(
                 color: p.surfaceCard,
-                borderRadius: BorderRadius.circular(AppRadii.r20),
+                borderRadius: AppRadii.r20All,
                 border: Border.all(color: p.hairline),
               ),
               child: Column(
@@ -250,8 +250,7 @@ class CloudBackupDashboardScreenState
                 style: FilledButton.styleFrom(
                   backgroundColor: p.primary,
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r16)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r16All),
                 ),
                 icon: Icon(Icons.sync_rounded, color: Colors.black),
                 label: Text(
@@ -302,7 +301,7 @@ class _SyncScopeTile extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: p.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
             child: Icon(icon, color: p.primary, size: 20),
           ),

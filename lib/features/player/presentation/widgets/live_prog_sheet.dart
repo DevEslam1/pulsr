@@ -160,7 +160,7 @@ spl1 = spl1 + lp1 * amount;''',
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -206,7 +206,7 @@ spl1 = spl1 + lp1 * amount;''',
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Column(
@@ -229,7 +229,7 @@ spl1 = spl1 + lp1 * amount;''',
                                 vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: p.primary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              borderRadius: AppRadii.r6All,
                             ),
                             child: Text(
                               context.l10n.bytecodeJit,
@@ -263,11 +263,11 @@ spl1 = spl1 + lp1 * amount;''',
                           fillColor: p.surface,
                           contentPadding: const EdgeInsets.all(AppSpacing.sm),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                             borderSide: BorderSide(color: p.primary),
                           ),
                         ),
@@ -285,8 +285,7 @@ spl1 = spl1 + lp1 * amount;''',
                               backgroundColor: p.accent,
                               foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r10),
+                                borderRadius: AppRadii.r10All,
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -344,14 +343,14 @@ spl1 = spl1 + lp1 * amount;''',
                         });
                         cubit.setLiveProgEnabled(true, code: entry.value);
                       },
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
                             vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                          borderRadius: AppRadii.r14All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -405,7 +404,7 @@ spl1 = spl1 + lp1 * amount;''',
           horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(

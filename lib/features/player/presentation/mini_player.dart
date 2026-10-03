@@ -335,8 +335,7 @@ class MiniPlayerState extends State<MiniPlayer> {
         final currentIndex = state.currentIndex.clamp(0, queue.length - 1);
 
         final isTablet = Adaptive.isTablet(context);
-        final playerRadius =
-            BorderRadius.circular(isTablet ? AppRadii.r28 : AppRadii.r24);
+        final playerRadius = isTablet ? AppRadii.r28All : AppRadii.r24All;
 
         // Screen readers cannot perform drag gestures, so expose the swipe
         // up/down actions as custom semantics actions (I9).
@@ -646,7 +645,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                           color:
                                                                               AppColors.scrim,
                                                                           borderRadius:
-                                                                              BorderRadius.circular(AppRadii.r4),
+                                                                              AppRadii.r4All,
                                                                         ),
                                                                         child:
                                                                             WaveformLogo(
@@ -814,8 +813,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                   ? Colors.white
                                                   : Colors.black)
                                               .withValues(alpha: 0.22),
-                                          borderRadius: BorderRadius.circular(
-                                              AppRadii.r1_5),
+                                          borderRadius: AppRadii.r1_5All,
                                         ),
                                       ),
                                     ),
@@ -1218,7 +1216,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
                 children: [
                   const SizedBox(width: AppSpacing.xs),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadii.r8),
+                    borderRadius: AppRadii.r8All,
                     child: CachedArtwork(
                       id: song.id,
                       albumId: song.albumId,

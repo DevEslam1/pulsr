@@ -231,7 +231,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                     padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Row(
@@ -313,7 +313,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   padding: const EdgeInsets.all(AppSpacing.s18),
                   decoration: BoxDecoration(
                     color: p.surfaceCard,
-                    borderRadius: BorderRadius.circular(AppRadii.r20),
+                    borderRadius: AppRadii.r20All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Column(
@@ -343,7 +343,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                       ),
                       const SizedBox(height: AppSpacing.s14),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                         child: Row(
                           children: [
                             if (songs.isNotEmpty) ...[
@@ -403,7 +403,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                     padding: const EdgeInsets.all(AppSpacing.s20),
                     decoration: BoxDecoration(
                       color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Center(
@@ -441,7 +441,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   Container(
                     decoration: BoxDecoration(
                       color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(AppRadii.r18),
+                      borderRadius: AppRadii.r18All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -490,8 +490,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                                     vertical: AppSpacing.xxs),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.15),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r12),
+                                  borderRadius: AppRadii.r12All,
                                 ),
                                 child: Text(
                                   '$plays ${context.l10n.browsePlays}',
@@ -558,7 +557,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
           padding: const EdgeInsets.all(AppSpacing.xs),
           decoration: BoxDecoration(
             color: p.accent.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(AppRadii.r10),
+            borderRadius: AppRadii.r10All,
           ),
           child: Icon(icon, color: p.accent, size: 20),
         ),
@@ -612,7 +611,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.r14),
+          borderRadius: AppRadii.r14All,
           onTap: () {
             context.read<PlayerCubit>().playSong(song, queue: queue);
           },
@@ -621,7 +620,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                 horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
               color: p.surfaceCard,
-              borderRadius: BorderRadius.circular(AppRadii.r14),
+              borderRadius: AppRadii.r14All,
               border: Border.all(color: p.hairline),
             ),
             child: Row(
@@ -682,7 +681,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                         horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
+                      borderRadius: AppRadii.r8All,
                     ),
                     child: Text(
                       '${song.playCount} ${context.l10n.browsePlays}',
@@ -717,7 +716,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
+        borderRadius: AppRadii.r18All,
         border: Border.all(color: p.hairline),
       ),
       child: Column(
@@ -727,7 +726,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
             padding: const EdgeInsets.all(AppSpacing.xs),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppRadii.r10),
+              borderRadius: AppRadii.r10All,
             ),
             child: Icon(icon, color: color, size: 20),
           ),

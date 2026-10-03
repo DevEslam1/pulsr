@@ -173,7 +173,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                           .clamp(48.0, cardHeight)
                       : cardHeight;
 
-                  final barRadius = BorderRadius.circular(AppRadii.r20);
+                  final barRadius = AppRadii.r20All;
 
                   return Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(

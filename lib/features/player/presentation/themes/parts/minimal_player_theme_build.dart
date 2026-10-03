@@ -108,7 +108,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                                       tag: 'now_playing_art_minimal',
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
+                                          borderRadius: AppRadii.circular(
                                               resolveCustomRadius(context, 20)),
                                           boxShadow: [
                                             BoxShadow(

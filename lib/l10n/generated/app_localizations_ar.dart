@@ -2902,7 +2902,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sincResampler => 'معيد التشكيل Sinc';
 
   @override
-  String get sincDesc => 'اعادة تشكيل عالية الجودة';
+  String get sincDesc => 'يتولى Android تحويل معدل العينات أثناء التشغيل';
 
   @override
   String get wetDryMix => 'مزيج Wet/Dry';
@@ -5155,7 +5155,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsResamplerQualityDesc =>
-      'جودة تحويل معدّل العينات. Ultra هو sync متعدّد الأطوار كامل بـ64 منقّحاً (الافتراضي التاريخي)؛ السريع هو استيفاء خطي لأقل استخدام للمعالج';
+      'يتولى Android تحويل معدل العينات أثناء التشغيل. إعدادات جودة sinc الأصلية غير متاحة لمسار الإخراج هذا.';
 
   @override
   String get settingsResamplerStandard => 'قياسي (16 منقّحاً)';
@@ -7922,4 +7922,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bitPerfectDisableAndEnable => 'تعطيل وتفعيل';
+
+  @override
+  String get lyricsShiftEarlier => 'تقديم';
+
+  @override
+  String get lyricsShiftLater => 'تأخير';
 }

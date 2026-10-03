@@ -180,7 +180,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
               height: 4,
               decoration: BoxDecoration(
                 color: p.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(AppRadii.r2),
+                borderRadius: AppRadii.r2All,
               ),
             ),
           ),
@@ -240,8 +240,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: p.primary,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r12)),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                     ),
                     onPressed: () {
                       final sorted = List<LyricsLine>.from(_lines)
@@ -269,7 +269,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceCard,
-                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                    borderRadius: AppRadii.r14All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -298,7 +298,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       // Timestamp stamp button
                       InkWell(
                         onTap: () => _stampCurrentPosition(index),
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(
                             minHeight: AppSpacing.minTouchTarget,
@@ -311,7 +311,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                                 vertical: AppSpacing.s6),
                             decoration: BoxDecoration(
                               color: p.primary.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                             ),
                             child: Text(
                               Formatters.formatDuration(line.timestamp),
@@ -352,6 +352,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget),
                         icon: const Icon(Icons.remove_rounded, size: 16),
+                        tooltip: context.l10n.lyricsShiftEarlier,
                         color: p.textSecondary,
                         onPressed: () => _adjustOffset(index, -250),
                       ),
@@ -360,6 +361,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget),
                         icon: const Icon(Icons.add_rounded, size: 16),
+                        tooltip: context.l10n.lyricsShiftLater,
                         color: p.textSecondary,
                         onPressed: () => _adjustOffset(index, 250),
                       ),

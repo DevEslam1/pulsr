@@ -308,8 +308,7 @@ class _RadioScreenState extends State<RadioScreen> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 22, vertical: AppSpacing.sm),
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r14),
+                                borderRadius: AppRadii.r14All,
                               ),
                             ),
                           ),
@@ -326,8 +325,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                   horizontal: AppSpacing.s20,
                                   vertical: AppSpacing.sm),
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r14),
+                                borderRadius: AppRadii.r14All,
                               ),
                             ),
                           ),
@@ -373,15 +371,15 @@ class _RadioScreenState extends State<RadioScreen> {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                         borderSide: BorderSide(color: p.hairline),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                         borderSide: BorderSide(color: p.hairline),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r12),
+                        borderRadius: AppRadii.r12All,
                         borderSide: BorderSide(color: p.accent, width: 1.5),
                       ),
                     ),
@@ -417,7 +415,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                 : p.hairline,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                           onSelected: (_) {
                             setState(() => _selectedGenre = g);
@@ -491,8 +489,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                               ? p.accent.withValues(alpha: 0.2)
                                               : p.accentContainer
                                                   .withValues(alpha: 0.35),
-                                          borderRadius: BorderRadius.circular(
-                                              AppRadii.r12),
+                                          borderRadius: AppRadii.r12All,
                                           border: isPlaying
                                               ? Border.all(
                                                   color: p.accent, width: 1.5)
@@ -534,9 +531,7 @@ class _RadioScreenState extends State<RadioScreen> {
                                               decoration: BoxDecoration(
                                                 color: p.accentContainer
                                                     .withValues(alpha: 0.35),
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        AppRadii.r6),
+                                                borderRadius: AppRadii.r6All,
                                               ),
                                               child: Text(
                                                 station.genre!,
@@ -725,15 +720,15 @@ class _AddStationDialogState extends State<_AddStationDialog> {
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 1.5),
                 ),
               ),
@@ -752,15 +747,15 @@ class _AddStationDialogState extends State<_AddStationDialog> {
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 1.5),
                 ),
               ),
@@ -782,15 +777,15 @@ class _AddStationDialogState extends State<_AddStationDialog> {
                 filled: true,
                 fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.hairline),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                   borderSide: BorderSide(color: p.accent, width: 1.5),
                 ),
               ),
@@ -819,7 +814,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(
@@ -873,15 +868,15 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
             filled: true,
             fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               borderSide: BorderSide(color: p.hairline),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               borderSide: BorderSide(color: p.hairline),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
               borderSide: BorderSide(color: p.accent, width: 1.5),
             ),
           ),
@@ -904,7 +899,7 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
           ),
           child: Text(

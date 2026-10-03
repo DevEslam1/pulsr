@@ -102,15 +102,15 @@ class _TagFieldWidgetState extends State<TagFieldWidget> {
               contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md, vertical: AppSpacing.s14),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
                 borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
                 borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.r14),
+                borderRadius: AppRadii.r14All,
                 borderSide: BorderSide(color: p.accent, width: 1.5),
               ),
             ),

@@ -102,7 +102,7 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
             margin: const EdgeInsetsDirectional.only(end: 6),
             decoration: BoxDecoration(
               color: p.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadii.r6),
+              borderRadius: AppRadii.r6All,
             ),
             child: Text(
               '$_value',

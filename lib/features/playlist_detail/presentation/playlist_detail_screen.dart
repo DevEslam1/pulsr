@@ -280,6 +280,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                       minWidth: AppSpacing.minTouchTarget,
                       minHeight: AppSpacing.minTouchTarget),
                   icon: Icon(Icons.edit_rounded, color: p.accent),
+                  tooltip: context.l10n.edit,
                   onPressed: () =>
                       context.push('/smart-playlist-builder', extra: playlist),
                 )

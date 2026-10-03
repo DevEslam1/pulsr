@@ -158,8 +158,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                     backgroundColor: p.accent,
                     foregroundColor: p.onAccent,
                     minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r16)),
+                    shape:
+                        RoundedRectangleBorder(borderRadius: AppRadii.r16All),
                   ),
                   icon: state.isScanning
                       ? SizedBox(
@@ -207,7 +207,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                     Material(
                       color: p.surfaceContainer,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        borderRadius: AppRadii.r20All,
                         side: BorderSide(color: p.hairline),
                       ),
                       clipBehavior: Clip.antiAlias,
@@ -226,8 +226,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               height: 38,
                               decoration: BoxDecoration(
                                 color: p.accentContainer,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r12),
+                                borderRadius: AppRadii.r12All,
                               ),
                               child: Icon(Icons.mic_off_rounded,
                                   color: p.accent, size: 20),
@@ -266,8 +265,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                           height: 38,
                                           decoration: BoxDecoration(
                                             color: p.accentContainer,
-                                            borderRadius: BorderRadius.circular(
-                                                AppRadii.r12),
+                                            borderRadius: AppRadii.r12All,
                                           ),
                                           child: Icon(Icons.timer_outlined,
                                               color: p.accent, size: 20),
@@ -301,8 +299,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                           vertical: AppSpacing.xxs),
                                       decoration: BoxDecoration(
                                         color: p.accentContainer,
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r8),
+                                        borderRadius: AppRadii.r8All,
                                       ),
                                       child: Text(
                                         state.minDurationSec > 0
@@ -357,7 +354,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       padding: const EdgeInsets.all(AppSpacing.md),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r20),
+                        borderRadius: AppRadii.r20All,
                         border: Border.all(color: p.hairline),
                       ),
                       child: Column(
@@ -373,8 +370,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                     height: 38,
                                     decoration: BoxDecoration(
                                       color: p.accentContainer,
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r12),
+                                      borderRadius: AppRadii.r12All,
                                     ),
                                     child: Icon(Icons.sd_storage_outlined,
                                         color: p.accent, size: 20),
@@ -408,8 +404,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                     vertical: AppSpacing.xxs),
                                 decoration: BoxDecoration(
                                   color: p.accentContainer,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r8),
+                                  borderRadius: AppRadii.r8All,
                                 ),
                                 child: Text(
                                   _minFileSizeKb > 0
@@ -484,7 +479,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 vertical: AppSpacing.s2),
                             decoration: BoxDecoration(
                               color: p.error.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(AppRadii.r8),
+                              borderRadius: AppRadii.r8All,
                               border: Border.all(
                                   color: p.error.withValues(alpha: 0.3)),
                             ),
@@ -505,7 +500,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       height: 42,
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppRadii.r14),
+                        borderRadius: AppRadii.r14All,
                         border: Border.all(color: p.hairline),
                       ),
                       child: TextField(
@@ -561,7 +556,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                         padding: const EdgeInsets.all(AppSpacing.xl),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r20),
+                          borderRadius: AppRadii.r20All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Center(
@@ -588,7 +583,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 ? p.error.withValues(alpha: 0.08)
                                 : p.surfaceContainer,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r16),
+                              borderRadius: AppRadii.r16All,
                               side: BorderSide(
                                 color: isHidden
                                     ? p.error.withValues(alpha: 0.35)
@@ -607,8 +602,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   color: isHidden
                                       ? p.error.withValues(alpha: 0.15)
                                       : p.accentContainer,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r12),
+                                  borderRadius: AppRadii.r12All,
                                 ),
                                 child: Icon(
                                   isHidden
@@ -659,8 +653,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                       horizontal: AppSpacing.s10,
                                       vertical: AppSpacing.s6),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r10)),
+                                      borderRadius: AppRadii.r10All),
                                 ),
                                 icon: Icon(
                                   isHidden

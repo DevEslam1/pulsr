@@ -189,7 +189,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: p.accentContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                     ),
                     child: Icon(Icons.add_rounded, color: p.accent, size: 22),
                   ),
@@ -317,8 +317,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                                         decoration: BoxDecoration(
                                           color: p.surfaceContainer
                                               .withValues(alpha: 0.6),
-                                          borderRadius: BorderRadius.circular(
-                                              AppRadii.r14),
+                                          borderRadius: AppRadii.r14All,
                                           border: Border.all(color: p.hairline),
                                         ),
                                         child: Row(
@@ -328,9 +327,7 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                                                   AppSpacing.xs),
                                               decoration: BoxDecoration(
                                                 color: p.accentContainer,
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        AppRadii.r10),
+                                                borderRadius: AppRadii.r10All,
                                               ),
                                               child: Icon(
                                                   Icons.queue_music_rounded,

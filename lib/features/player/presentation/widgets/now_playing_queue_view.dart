@@ -108,7 +108,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
         return Container(
           decoration: BoxDecoration(
             color: p.surfaceContainer.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(AppRadii.r24),
+            borderRadius: AppRadii.r24All,
             border: Border.all(color: p.hairline),
           ),
           clipBehavior: Clip.antiAlias,
@@ -140,7 +140,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                             start: AppSpacing.s6),
                         child: InkWell(
                           onTap: () => cubit.switchQueueSlot(slotIndex),
-                          borderRadius: BorderRadius.circular(AppRadii.r10),
+                          borderRadius: AppRadii.r10All,
                           child: AnimatedContainer(
                             duration: context.motionMs(180),
                             padding: const EdgeInsets.symmetric(
@@ -150,7 +150,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                               color: isSelected
                                   ? p.accent
                                   : p.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(AppRadii.r10),
+                              borderRadius: AppRadii.r10All,
                               border: Border.all(
                                 color: isSelected ? p.accent : p.hairline,
                               ),
@@ -200,8 +200,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                   color: p.surfaceContainerHigh
                                       .withValues(alpha: 0.95),
                                   shadowColor: AppColors.scrimAt(0.35),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r16),
+                                  borderRadius: AppRadii.r16All,
                                   child: child,
                                 ),
                               );
@@ -261,8 +260,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                       height: 42,
                                       decoration: BoxDecoration(
                                         color: AppColors.scrimAt(0.5),
-                                        borderRadius:
-                                            BorderRadius.circular(AppRadii.r10),
+                                        borderRadius: AppRadii.r10All,
                                       ),
                                       child: Center(
                                         child: NowPlayingIndicator(

@@ -187,7 +187,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: p.accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(AppRadii.r12),
+                  borderRadius: AppRadii.r12All,
                 ),
                 child: Text(
                   '$_matchingCount matches',
@@ -210,7 +210,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppRadii.r16),
+              borderRadius: AppRadii.r16All,
               border: Border.all(color: p.hairline),
             ),
             child: Column(
@@ -227,7 +227,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                           ),
                         ),
                         items: SmartRuleField.values.map((f) {
@@ -252,7 +252,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                           ),
                         ),
                         items: SmartRuleOperator.values.map((op) {
@@ -294,7 +294,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                     ),
                   ),
                   onChanged: (val) {
@@ -314,7 +314,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r12),
+              borderRadius: AppRadii.r12All,
             ),
           ),
           onPressed: () {

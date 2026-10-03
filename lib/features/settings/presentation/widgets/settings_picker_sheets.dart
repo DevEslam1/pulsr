@@ -33,7 +33,7 @@ void showYtmWebOptionsSheet(BuildContext context) {
                     padding: const EdgeInsets.all(AppSpacing.xs),
                     decoration: BoxDecoration(
                       color: p.accentContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                      borderRadius: AppRadii.r10All,
                     ),
                     child:
                         Icon(Icons.language_rounded, color: p.accent, size: 22),
@@ -150,7 +150,7 @@ Widget _ytmWebOptionTile(
         height: AppSpacing.s40,
         decoration: BoxDecoration(
           color: p.surface,
-          borderRadius: BorderRadius.circular(AppRadii.r10),
+          borderRadius: AppRadii.r10All,
           border: Border.all(color: p.hairline),
         ),
         child: Icon(icon, color: p.accent, size: 20),
@@ -301,7 +301,7 @@ void showAboutSheet(BuildContext context) {
               height: 64,
               decoration: BoxDecoration(
                 color: p.accentContainer,
-                borderRadius: BorderRadius.circular(AppRadii.r18),
+                borderRadius: AppRadii.r18All,
               ),
               child: Icon(Icons.graphic_eq_rounded, color: p.accent, size: 34),
             ),
@@ -461,7 +461,7 @@ void showWhatsNewSheet(BuildContext context) {
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
                         color: p.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                        borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(h.$1, size: 16, color: p.accent),
                     ),

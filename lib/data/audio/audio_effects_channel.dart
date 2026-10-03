@@ -45,6 +45,18 @@ class AudioEffectsChannel {
   /// effect was applied, so callers can gate the UI truthfully.
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
+  Future<dynamic> _invokeNativeSetter(String method,
+      [Map<String, dynamic>? arguments]) async {
+    final result = await _channel.invokeMethod<dynamic>(method, arguments);
+    if (result == false) {
+      throw PlatformException(
+        code: 'DSP_NOT_APPLIED',
+        message: '$method was rejected by the native audio engine',
+      );
+    }
+    return result;
+  }
+
   /// Drops the singleton and closes its route stream (BUG-25).
   ///
   /// In production this is never called, so the app keeps one long-lived
@@ -104,6 +116,9 @@ class AudioEffectsChannel {
 
   /// Whether the native C++ DSP chain is in ExoPlayer's audible path.
   bool get hasPcmDspPath => _hasPcmDspPath;
+  // The playback processor cannot emit a variable number of output frames.
+  // Planar sinc conversion remains available internally to the reverb.
+  bool get isPlaybackSincResamplerSupported => false;
   bool get hasOemAudio => _hasOemAudio;
   List<String> get detectedOemEngines => List.unmodifiable(_detectedOemEngines);
 
@@ -858,8 +873,8 @@ class AudioEffectsChannel {
   Future<void> setCrossfeedEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setCrossfeedEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setCrossfeedEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set crossfeed enabled ($enabled)',
@@ -867,6 +882,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -877,7 +893,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setCrossfeedParams', {
+      await _invokeNativeSetter('setCrossfeedParams', {
         'delayUs': delayUs,
         'feedDb': feedDb,
         // Custom-mode cutoff (Hz). Omitted keeps the native 650 Hz default.
@@ -890,6 +906,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -898,8 +915,8 @@ class AudioEffectsChannel {
   Future<void> setLimiterEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLimiterEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setLimiterEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set limiter enabled ($enabled)',
@@ -907,6 +924,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -920,7 +938,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLimiterParams', {
+      await _invokeNativeSetter('setLimiterParams', {
         'lookaheadMs': lookaheadMs,
         'thresholdDb': thresholdDb,
         'releaseMs': releaseMs,
@@ -937,6 +955,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -945,8 +964,8 @@ class AudioEffectsChannel {
   Future<void> setReverbEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setReverbEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set reverb enabled ($enabled)',
@@ -954,14 +973,15 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setReverbPreset(int preset) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbPreset',
-          {'preset': preset}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setReverbPreset', {'preset': preset})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set reverb preset ($preset)',
@@ -969,14 +989,15 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setReverbWetDry(double wetRatio) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbWetDry',
-          {'wetRatio': wetRatio}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setReverbWetDry', {'wetRatio': wetRatio})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set reverb wet/dry ($wetRatio)',
@@ -984,6 +1005,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1027,7 +1049,7 @@ class AudioEffectsChannel {
   Future<void> setStereoBalance(double balance) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setStereoBalance', {
+      await _invokeNativeSetter('setStereoBalance', {
         'balance': balance.clamp(-1.0, 1.0),
       }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -1037,14 +1059,15 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setMonoMix(bool mono) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod(
-          'setMonoMix', {'mono': mono}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setMonoMix', {'mono': mono})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set mono mix ($mono)',
@@ -1052,6 +1075,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1060,7 +1084,7 @@ class AudioEffectsChannel {
   Future<void> setSincResamplerEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSincResamplerEnabled', {
+      await _invokeNativeSetter('setSincResamplerEnabled', {
         'enabled': enabled,
       }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -1070,13 +1094,14 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setSincResamplerRates(double inRate, double outRate) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSincResamplerRates', {
+      await _invokeNativeSetter('setSincResamplerRates', {
         'inRate': inRate,
         'outRate': outRate,
       }).timeout(const Duration(seconds: 3));
@@ -1087,6 +1112,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1095,7 +1121,7 @@ class AudioEffectsChannel {
   Future<void> setSincResamplerQuality(int quality) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSincResamplerQuality', {
+      await _invokeNativeSetter('setSincResamplerQuality', {
         'quality': quality.clamp(0, 3),
       });
     } catch (e, st) {
@@ -1105,6 +1131,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1113,8 +1140,8 @@ class AudioEffectsChannel {
   Future<void> setSaturationEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSaturationEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setSaturationEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set saturation enabled ($enabled)',
@@ -1122,6 +1149,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1133,7 +1161,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSaturationParams', {
+      await _invokeNativeSetter('setSaturationParams', {
         'drive': drive,
         'mix': mix,
         'tilt': tilt,
@@ -1146,6 +1174,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1154,8 +1183,8 @@ class AudioEffectsChannel {
   Future<void> setStereoWidthEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setStereoWidthEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setStereoWidthEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set stereo width enabled ($enabled)',
@@ -1163,6 +1192,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1177,7 +1207,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setStereoWidthParams', {
+      await _invokeNativeSetter('setStereoWidthParams', {
         'width': width,
         'multiband': multiband,
         'lowWidth': lowWidth,
@@ -1193,6 +1223,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1201,7 +1232,7 @@ class AudioEffectsChannel {
   Future<void> setLoudnessContourEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLoudnessContourEnabled', {
+      await _invokeNativeSetter('setLoudnessContourEnabled', {
         'enabled': enabled,
       }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
@@ -1211,6 +1242,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1220,7 +1252,7 @@ class AudioEffectsChannel {
   ) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLoudnessContourParams', {
+      await _invokeNativeSetter('setLoudnessContourParams', {
         'intensity': intensity,
         'volumeLinear': volumeLinear,
       }).timeout(const Duration(seconds: 3));
@@ -1231,6 +1263,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1239,8 +1272,8 @@ class AudioEffectsChannel {
   Future<void> setSubCrossoverEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSubCrossoverEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setSubCrossoverEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set sub crossover enabled ($enabled)',
@@ -1248,6 +1281,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1260,7 +1294,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSubCrossoverParams', {
+      await _invokeNativeSetter('setSubCrossoverParams', {
         'cornerHz': cornerHz,
         'slopeDbPerOct': slopeDbPerOct,
         'subGain': subGain,
@@ -1274,6 +1308,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1282,8 +1317,8 @@ class AudioEffectsChannel {
   Future<void> setDynamicEqEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDynamicEqEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setDynamicEqEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set dynamic EQ enabled ($enabled)',
@@ -1291,14 +1326,15 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
   Future<void> setDynamicEqBandCount(int count) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDynamicEqBandCount',
-          {'count': count}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setDynamicEqBandCount', {'count': count})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set dynamic EQ band count ($count)',
@@ -1306,6 +1342,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1325,7 +1362,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDynamicEqBand', {
+      await _invokeNativeSetter('setDynamicEqBand', {
         'index': index,
         'frequency': frequency,
         'q': q,
@@ -1346,6 +1383,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1354,8 +1392,9 @@ class AudioEffectsChannel {
   Future<void> setMultibandCompressorEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setMultibandCompressorEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter(
+              'setMultibandCompressorEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set multiband compressor enabled ($enabled)',
@@ -1363,6 +1402,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1378,7 +1418,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setMultibandCompressorBand', {
+      await _invokeNativeSetter('setMultibandCompressorBand', {
         'bandIndex': bandIndex,
         'thresholdDb': thresholdDb,
         'ratio': ratio,
@@ -1395,6 +1435,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1405,7 +1446,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setMultibandCompressorCrossovers', {
+      await _invokeNativeSetter('setMultibandCompressorCrossovers', {
         'f0': f0,
         'f1': f1,
         'f2': f2,
@@ -1417,6 +1458,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1433,7 +1475,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDynamicBassParams', {
+      await _invokeNativeSetter('setDynamicBassParams', {
         'enabled': enabled,
         'strength': strength,
         'xLow': xLow,
@@ -1451,6 +1493,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1587,8 +1630,9 @@ class AudioEffectsChannel {
   Future<void> setReverbCrossChannel(double crossChannel) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbCrossChannel',
-          {'crossChannel': crossChannel}).timeout(const Duration(seconds: 2));
+      await _invokeNativeSetter(
+              'setReverbCrossChannel', {'crossChannel': crossChannel})
+          .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log(
         'setReverbCrossChannel failed',
@@ -1596,6 +1640,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1610,7 +1655,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbParams', {
+      await _invokeNativeSetter('setReverbParams', {
         'predelayMs': predelayMs,
         'damping': damping,
         'crossChannel': crossChannel,
@@ -1622,6 +1667,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1852,7 +1898,7 @@ class AudioEffectsChannel {
   }) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setHeadphoneSafetyParams', {
+      await _invokeNativeSetter('setHeadphoneSafetyParams', {
         'enabled': enabled,
         'doseThreshold': doseThreshold,
         'safetyCeilingDb': safetyCeilingDb,
@@ -1864,6 +1910,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1900,8 +1947,8 @@ class AudioEffectsChannel {
   Future<void> setCrossfeedMode(int mode) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setCrossfeedMode', {'mode': mode}).timeout(
-          const Duration(seconds: 3));
+      await _invokeNativeSetter('setCrossfeedMode', {'mode': mode})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set crossfeed mode ($mode)',
@@ -1909,6 +1956,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1916,8 +1964,9 @@ class AudioEffectsChannel {
   Future<void> setSaturationMultiband(bool multiband) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSaturationMultiband',
-          {'multiband': multiband}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter(
+              'setSaturationMultiband', {'multiband': multiband})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set saturation multiband ($multiband)',
@@ -1925,6 +1974,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1932,8 +1982,8 @@ class AudioEffectsChannel {
   Future<void> setViperDdcEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setViperDdcEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setViperDdcEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set ViPER-DDC enabled ($enabled)',
@@ -1941,6 +1991,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -1970,8 +2021,8 @@ class AudioEffectsChannel {
   Future<void> setArbitraryEqEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setArbitraryEqEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setArbitraryEqEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set Arbitrary EQ enabled ($enabled)',
@@ -1979,6 +2030,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -2008,8 +2060,8 @@ class AudioEffectsChannel {
   Future<void> setLiveProgEnabled(bool enabled) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLiveProgEnabled',
-          {'enabled': enabled}).timeout(const Duration(seconds: 3));
+      await _invokeNativeSetter('setLiveProgEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set LiveProg enabled ($enabled)',
@@ -2017,6 +2069,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 
@@ -2042,8 +2095,9 @@ class AudioEffectsChannel {
   Future<void> setLiveProgSlider(int index, double value) async {
     if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLiveProgSlider',
-          {'index': index, 'value': value}).timeout(const Duration(seconds: 2));
+      await _invokeNativeSetter(
+              'setLiveProgSlider', {'index': index, 'value': value})
+          .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set LiveProg slider $index',
@@ -2051,6 +2105,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 

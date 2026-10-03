@@ -52,9 +52,9 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
 
     final double maxBarWidth = isTablet ? 640.0 : 540.0;
     final double barHeight = widget.iconOnly ? 48.0 : (isTablet ? 68.0 : 64.0);
-    final navRadius = BorderRadius.circular(isTablet
-        ? AppRadii.r28
-        : (widget.iconOnly ? AppRadii.r20 : AppRadii.r24));
+    final navRadius = isTablet
+        ? AppRadii.r28All
+        : (widget.iconOnly ? AppRadii.r20All : AppRadii.r24All);
 
     return SafeArea(
       top: false,
@@ -178,8 +178,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                   decoration: BoxDecoration(
                                     color:
                                         p.textTertiary.withValues(alpha: 0.25),
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r2),
+                                    borderRadius: AppRadii.r2All,
                                   ),
                                 ),
                               ),
@@ -264,8 +263,7 @@ class _NavTabItem extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius:
-                BorderRadius.circular(isTablet ? AppRadii.r22 : AppRadii.r18),
+            borderRadius: isTablet ? AppRadii.r22All : AppRadii.r18All,
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,
             child: AnimatedContainer(
@@ -286,8 +284,7 @@ class _NavTabItem extends StatelessWidget {
                         ],
                       )
                     : null,
-                borderRadius: BorderRadius.circular(
-                    isTablet ? AppRadii.r22 : AppRadii.r18),
+                borderRadius: isTablet ? AppRadii.r22All : AppRadii.r18All,
                 border: isSelected
                     ? Border.all(
                         color: p.accent.withValues(alpha: 0.38),
@@ -336,7 +333,7 @@ class _NavTabItem extends StatelessWidget {
                               color: isSelected
                                   ? p.accent
                                   : p.textTertiary.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(AppRadii.r2),
+                              borderRadius: AppRadii.r2All,
                               boxShadow: isSelected
                                   ? [
                                       BoxShadow(

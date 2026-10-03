@@ -186,7 +186,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                     child: Material(
                       color: p.surfaceContainer,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.r16),
+                        borderRadius: AppRadii.r16All,
                         side: BorderSide(
                           color: folder.isExcluded
                               ? p.error.withValues(alpha: 0.4)
@@ -198,7 +198,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                       child: ListTile(
                         onTap: () => context.push('/folder', extra: folder),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          borderRadius: AppRadii.r16All,
                         ),
                         leading: _buildFolderLeading(
                           folder: folder,
@@ -233,8 +233,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                                     vertical: AppSpacing.s2),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.18),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r6),
+                                  borderRadius: AppRadii.r6All,
                                 ),
                                 child: Text(
                                   context.l10n.downloadsLabel,
@@ -348,7 +347,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                 child: Container(
                   decoration: BoxDecoration(
                     color: p.error.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                    borderRadius: AppRadii.r12All,
                   ),
                   child: Center(
                     child: Icon(Icons.block_rounded, size: 20, color: p.error),
@@ -387,7 +386,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
             : isDownloads
                 ? p.accent.withValues(alpha: 0.22)
                 : p.accentContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
       ),
       child: Icon(
         fallbackIcon,

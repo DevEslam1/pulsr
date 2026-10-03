@@ -89,7 +89,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                     height: 4,
                     decoration: BoxDecoration(
                       color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(AppRadii.r2),
+                      borderRadius: AppRadii.r2All,
                     ),
                   ),
                 ),
@@ -135,7 +135,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(AppRadii.r14),
+                    borderRadius: AppRadii.r14All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -186,7 +186,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Column(
@@ -233,11 +233,11 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                           fillColor: p.surface,
                           contentPadding: const EdgeInsets.all(AppSpacing.sm),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                             borderSide: BorderSide(color: p.hairline),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r10),
+                            borderRadius: AppRadii.r10All,
                             borderSide: BorderSide(color: p.primary),
                           ),
                         ),
@@ -257,8 +257,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               foregroundColor: p.textSecondary,
                               side: BorderSide(color: p.hairline),
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r10),
+                                borderRadius: AppRadii.r10All,
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -272,8 +271,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                               backgroundColor: p.accent,
                               foregroundColor: p.onAccent,
                               shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r10),
+                                borderRadius: AppRadii.r10All,
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
@@ -305,14 +303,14 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                         cubit.setArbitraryEqEnabled(true,
                             eqString: entry.value, linearPhase: _linearPhase);
                       },
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
                             vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r14),
+                          borderRadius: AppRadii.r14All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(

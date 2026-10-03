@@ -500,7 +500,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppRadii.r12),
+        borderRadius: AppRadii.r12All,
         border: Border.all(color: accent.withValues(alpha: 0.35)),
       ),
       child: Column(
@@ -532,7 +532,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
           ),
           const SizedBox(height: AppSpacing.xs),
           ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadii.r4),
+            borderRadius: AppRadii.r4All,
             child: LinearProgressIndicator(
               value: (v.convergence.score / 100.0).clamp(0.0, 1.0),
               minHeight: 6,
@@ -664,7 +664,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         height: 4,
                         decoration: BoxDecoration(
                           color: p.hairline,
-                          borderRadius: BorderRadius.circular(AppRadii.r2),
+                          borderRadius: AppRadii.r2All,
                         ),
                       ),
                     ),
@@ -678,7 +678,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           height: 38,
                           decoration: BoxDecoration(
                             color: p.accentContainer,
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                           ),
                           child: Icon(Icons.graphic_eq_rounded,
                               color: p.accent, size: 20),
@@ -726,7 +726,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: p.error.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
+                            borderRadius: AppRadii.r12All,
                             border: Border.all(
                                 color: p.error.withValues(alpha: 0.3)),
                           ),
@@ -749,7 +749,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         padding: const EdgeInsets.all(AppSpacing.sm),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          borderRadius: AppRadii.r12All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -777,7 +777,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          borderRadius: AppRadii.r12All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: Row(
@@ -825,7 +825,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             backgroundColor: p.accent,
                             foregroundColor: p.onAccent,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.r14),
+                              borderRadius: AppRadii.r14All,
                             ),
                           ),
                           icon: const Icon(Icons.graphic_eq_rounded, size: 20),
@@ -873,7 +873,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             ],
                             const SizedBox(height: AppSpacing.s14),
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(AppRadii.r6),
+                              borderRadius: AppRadii.r6All,
                               child: LinearProgressIndicator(
                                 value: (_phase == _RcPhase.measuring ||
                                         _phase == _RcPhase.verifying)
@@ -935,8 +935,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r14),
+                                    borderRadius: AppRadii.r14All,
                                   ),
                                 ),
                                 icon: const Icon(Icons.play_arrow_rounded,
@@ -976,8 +975,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: _snrColor.withValues(alpha: 0.15),
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r8),
+                                borderRadius: AppRadii.r8All,
                                 border: Border.all(
                                     color: _snrColor.withValues(alpha: 0.3)),
                               ),
@@ -1006,7 +1004,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                         padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppRadii.r12),
+                          borderRadius: AppRadii.r12All,
                           border: Border.all(color: p.hairline),
                         ),
                         child: CustomPaint(
@@ -1125,8 +1123,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   foregroundColor: p.textSecondary,
                                   side: BorderSide(color: p.hairline),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
+                                    borderRadius: AppRadii.r12All,
                                   ),
                                 ),
                                 onPressed: () => Navigator.of(context).pop(),
@@ -1143,8 +1140,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                                   backgroundColor: p.accent,
                                   foregroundColor: p.onAccent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
+                                    borderRadius: AppRadii.r12All,
                                   ),
                                 ),
                                 icon: const Icon(Icons.verified_rounded,

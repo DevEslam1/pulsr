@@ -86,7 +86,7 @@ class PulsrDismissible extends StatefulWidget {
               horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: borderRadius ?? BorderRadius.circular(AppRadii.r16),
+        borderRadius: borderRadius ?? AppRadii.r16All,
       ),
       alignment: isEnd
           ? AlignmentDirectional.centerEnd
@@ -317,8 +317,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
           ),
           duration: widget.confirmTimeout,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.r10)),
+          shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
         ),
       );
     }
@@ -551,7 +550,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
                       child: IgnorePointer(
                         ignoring: isRevealed,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadii.r16),
+                          borderRadius: AppRadii.r16All,
                           child: widget.child,
                         ),
                       ),

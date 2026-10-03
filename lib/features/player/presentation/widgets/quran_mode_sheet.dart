@@ -108,7 +108,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     padding: const EdgeInsets.all(AppSpacing.s10),
                     decoration: BoxDecoration(
                       color: p.accent.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(AppRadii.r14),
+                      borderRadius: AppRadii.r14All,
                     ),
                     child: Icon(Icons.menu_book_rounded,
                         color: p.accent, size: 22),
@@ -416,7 +416,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r14),
+        borderRadius: AppRadii.r14All,
         border: Border.all(color: p.hairline),
       ),
       child: child,

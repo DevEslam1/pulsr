@@ -18,6 +18,9 @@ public:
     void setSampleRate(double sampleRate, bool resynthesize = true);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
+    // The symmetric 512-tap FIR has a 255.5-frame group delay; integer
+    // transport reports round up so compensation never underestimates it.
+    int getLatencyFrames() const { return enabled_ && hasResponse_ ? FIR_TAPS / 2 : 0; }
     void applyParams(const ArbitraryEqParamSet& params);
     void reset();
 

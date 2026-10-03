@@ -150,7 +150,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   height: 56,
                   decoration: BoxDecoration(
                     color: p.surfaceContainer.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                   ),
                   child: Center(
                     child: SkeletonBox(
@@ -166,7 +166,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
                     color: p.surfaceContainer.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
+                    borderRadius: AppRadii.r16All,
                     border: Border.all(color: p.hairline),
                   ),
                   child: Row(
@@ -194,7 +194,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     padding: const EdgeInsets.all(AppSpacing.s14),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      borderRadius: AppRadii.r16All,
                       border: Border.all(color: p.hairline),
                     ),
                     child: Column(
@@ -282,8 +282,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               margin: const EdgeInsetsDirectional.only(
                                   end: AppSpacing.s14),
                               child: InkWell(
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.r16),
+                                borderRadius: AppRadii.r16All,
                                 onTap: () =>
                                     context.push('/album', extra: album),
                                 child: Column(
@@ -398,7 +397,7 @@ class _ErrorSection extends StatelessWidget {
                 horizontal: AppSpacing.md, vertical: AppSpacing.s14),
             decoration: BoxDecoration(
               color: p.error.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(AppRadii.r14),
+              borderRadius: AppRadii.r14All,
               border: Border.all(color: p.error.withValues(alpha: 0.3)),
             ),
             child: Row(

@@ -65,7 +65,7 @@ public:
     ReverbPreset getPreset() const { return preset_; }
 
     int getReverbLatencyFrames() const {
-        if (!isEnabled()) return 0;
+        if (!isEnabled() && !isRamping()) return 0;
         return reverbLatencyFrames_.load(std::memory_order_relaxed);
     }
 
