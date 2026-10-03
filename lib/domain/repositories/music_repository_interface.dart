@@ -22,6 +22,13 @@ abstract class IMusicRepository {
     int? offset,
   });
 
+  /// Lightweight song entry used for folder aggregation with artwork metadata.
+  Future<Result<List<FolderSongEntry>>> getLocalSongEntries() async {
+    final pathsResult = await getLocalSongPaths();
+    return pathsResult.map((paths) =>
+        paths.map((p) => FolderSongEntry(path: p, id: 0)).toList());
+  }
+
   /// Path-only listing of local songs. Folder aggregation uses this instead of
   /// [getAllSongs] so it never materializes full song rows. The production
   /// repository overrides this with a column-projected query.
@@ -209,4 +216,20 @@ String _parentDir(String path) {
   final backslash = path.lastIndexOf('\\');
   final i = slash > backslash ? slash : backslash;
   return i <= 0 ? path : path.substring(0, i);
+}
+
+class FolderSongEntry {
+  final String path;
+  final int id;
+  final int? albumId;
+  final String? artworkUri;
+  final String? remoteArtworkUrl;
+
+  const FolderSongEntry({
+    required this.path,
+    required this.id,
+    this.albumId,
+    this.artworkUri,
+    this.remoteArtworkUrl,
+  });
 }

@@ -11,13 +11,46 @@ class FolderItem {
   final String name;
   final int songCount;
   final bool isExcluded;
+  final int? representativeSongId;
+  final int? representativeAlbumId;
+  final String? representativeArtworkUri;
+  final String? representativeRemoteUrl;
 
   const FolderItem({
     required this.path,
     required this.name,
     required this.songCount,
     required this.isExcluded,
+    this.representativeSongId,
+    this.representativeAlbumId,
+    this.representativeArtworkUri,
+    this.representativeRemoteUrl,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FolderItem &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          name == other.name &&
+          songCount == other.songCount &&
+          isExcluded == other.isExcluded &&
+          representativeSongId == other.representativeSongId &&
+          representativeAlbumId == other.representativeAlbumId &&
+          representativeArtworkUri == other.representativeArtworkUri &&
+          representativeRemoteUrl == other.representativeRemoteUrl;
+
+  @override
+  int get hashCode =>
+      path.hashCode ^
+      name.hashCode ^
+      songCount.hashCode ^
+      isExcluded.hashCode ^
+      representativeSongId.hashCode ^
+      representativeAlbumId.hashCode ^
+      representativeArtworkUri.hashCode ^
+      representativeRemoteUrl.hashCode;
 }
 
 @singleton
@@ -39,25 +72,36 @@ class FolderUseCases {
   }
 
   Future<Result<List<FolderItem>>> getFolderHierarchy() async {
-    final pathsResult = await _repository.getLocalSongPaths();
+    Result<List<FolderSongEntry>> entriesResult;
+    try {
+      entriesResult = await _repository.getLocalSongEntries();
+    } catch (_) {
+      final pathsResult = await _repository.getLocalSongPaths();
+      entriesResult = pathsResult.map((paths) =>
+          paths.map((p) => FolderSongEntry(path: p, id: 0)).toList());
+    }
+
     final excludedResult = await _repository.getExcludedFolderPaths();
 
-    if (pathsResult.isLeft()) {
+    if (entriesResult.isLeft()) {
       return Left(
-          pathsResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
+          entriesResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
     }
     if (excludedResult.isLeft()) {
       return Left(
           excludedResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
     }
 
-    final List<String> paths = pathsResult.fold((l) => [], (r) => r);
+    final List<FolderSongEntry> entries =
+        entriesResult.fold((l) => [], (r) => r);
     final List<String> excludedPaths = excludedResult.fold((l) => [], (r) => r);
     final Map<String, int> folderSongCounts = {};
+    final Map<String, FolderSongEntry> folderRepresentative = {};
 
-    for (final path in paths) {
-      final parentDir = p.dirname(path);
+    for (final entry in entries) {
+      final parentDir = p.dirname(entry.path);
       folderSongCounts[parentDir] = (folderSongCounts[parentDir] ?? 0) + 1;
+      folderRepresentative.putIfAbsent(parentDir, () => entry);
     }
 
     final List<FolderItem> items = [];
@@ -73,12 +117,17 @@ class FolderUseCases {
               .lastOrNull ??
           path;
       final isExcluded = excludedPaths.contains(path);
+      final rep = folderRepresentative[path];
       items.add(
         FolderItem(
           path: path,
           name: name,
           songCount: entry.value,
           isExcluded: isExcluded,
+          representativeSongId: rep?.id,
+          representativeAlbumId: rep?.albumId,
+          representativeArtworkUri: rep?.artworkUri,
+          representativeRemoteUrl: rep?.remoteArtworkUrl,
         ),
       );
     }

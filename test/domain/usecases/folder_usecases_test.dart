@@ -73,5 +73,73 @@ void main() {
       expect(items.single.name, 'Junk');
       expect(items.single.isExcluded, isTrue);
     });
+
+    test('populates representative artwork metadata from song entries', () async {
+      when(() => repo.getLocalSongEntries()).thenAnswer(
+        (_) async => const Right([
+          FolderSongEntry(
+            path: r'C:\Music\Pink Floyd\The Wall\01.flac',
+            id: 101,
+            albumId: 55,
+            artworkUri: 'content://media/artwork/55',
+            remoteArtworkUrl: 'https://img.test/wall.jpg',
+          ),
+          FolderSongEntry(
+            path: r'C:\Music\Pink Floyd\The Wall\02.flac',
+            id: 102,
+            albumId: 55,
+            artworkUri: 'content://media/artwork/55',
+          ),
+        ]),
+      );
+      when(() => repo.getExcludedFolderPaths())
+          .thenAnswer((_) async => const Right([]));
+
+      final result = await useCases.getFolderHierarchy();
+      final items = result.fold((l) => throw l, (r) => r);
+
+      expect(items.length, 1);
+      final folder = items.first;
+      expect(folder.name, 'The Wall');
+      expect(folder.songCount, 2);
+      expect(folder.representativeSongId, 101);
+      expect(folder.representativeAlbumId, 55);
+      expect(folder.representativeArtworkUri, 'content://media/artwork/55');
+      expect(folder.representativeRemoteUrl, 'https://img.test/wall.jpg');
+    });
+
+    test('FolderItem equality matches all fields including artwork', () {
+      const a = FolderItem(
+        path: '/music/rock',
+        name: 'rock',
+        songCount: 5,
+        isExcluded: false,
+        representativeSongId: 1,
+        representativeAlbumId: 2,
+        representativeArtworkUri: 'uri',
+        representativeRemoteUrl: 'url',
+      );
+      const b = FolderItem(
+        path: '/music/rock',
+        name: 'rock',
+        songCount: 5,
+        isExcluded: false,
+        representativeSongId: 1,
+        representativeAlbumId: 2,
+        representativeArtworkUri: 'uri',
+        representativeRemoteUrl: 'url',
+      );
+      const c = FolderItem(
+        path: '/music/rock',
+        name: 'rock',
+        songCount: 5,
+        isExcluded: false,
+        representativeSongId: 999,
+      );
+
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+      expect(a, isNot(equals(c)));
+    });
   });
 }

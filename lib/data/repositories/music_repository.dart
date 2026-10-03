@@ -351,6 +351,40 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<List<FolderSongEntry>>> getLocalSongEntries() async {
+    try {
+      final query = _db.selectOnly(_db.songsTable)
+        ..addColumns([
+          _db.songsTable.id,
+          _db.songsTable.albumId,
+          _db.songsTable.path,
+          _db.songsTable.artworkUri,
+          _db.songsTable.remoteArtworkUrl,
+        ])
+        ..where(_db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.like('ytmusic://%').not() &
+            _db.songsTable.cueStartMs.isNull());
+      final rows = await query.get();
+      final entries = rows.map((r) {
+        final path = r.read(_db.songsTable.path);
+        final id = r.read(_db.songsTable.id);
+        if (path == null || id == null) return null;
+        return FolderSongEntry(
+          path: path,
+          id: id,
+          albumId: r.read(_db.songsTable.albumId),
+          artworkUri: r.read(_db.songsTable.artworkUri),
+          remoteArtworkUrl: r.read(_db.songsTable.remoteArtworkUrl),
+        );
+      }).whereType<FolderSongEntry>().toList();
+      return Right(entries);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch folder song entries', e));
+    }
+  }
+
+  @override
   Future<Result<List<String>>> getLocalSongPaths() async {
     try {
       // CUE virtual tracks share their container's path — excluding them

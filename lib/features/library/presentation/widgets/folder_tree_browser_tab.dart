@@ -3,7 +3,9 @@ import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p_path;
+import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/song_tile.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/folder_usecases.dart';
@@ -222,37 +224,89 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
 
                   // Subfolders (all of them — ListView virtualizes, no cap).
                   for (final sub in childFolders) ...[
-                    ListTile(
-                      leading: Icon(Icons.folder_rounded, color: p.primary),
-                      title: Text(
-                        p_path.posix.basename(sub),
-                        style: TextStyle(
-                            color: p.textPrimary, fontWeight: FontWeight.w600),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (folderItemFor(sub) != null)
-                            IconButton(
-                              icon: Icon(Icons.open_in_new_rounded,
-                                  color: p.textSecondary, size: 18),
-                              tooltip: context.l10n.browseOpenFolderDetails,
-                              constraints: const BoxConstraints(
-                                minWidth: AppSpacing.minTouchTarget,
-                                minHeight: AppSpacing.minTouchTarget,
-                              ),
-                              onPressed: () {
-                                final item = folderItemFor(sub);
-                                if (item != null) {
-                                  context.push('/folder', extra: item);
-                                }
-                              },
-                            ),
-                          Icon(Icons.chevron_right_rounded,
-                              color: p.textSecondary),
-                        ],
-                      ),
-                      onTap: () => _navigateTo(sub),
+                    Builder(
+                      builder: (context) {
+                        final item = folderItemFor(sub);
+                        int? songId = item?.representativeSongId;
+                        int? albumId = item?.representativeAlbumId;
+                        String? remoteUrl = item?.representativeRemoteUrl ??
+                            item?.representativeArtworkUri;
+
+                        if ((songId == null || songId == 0) &&
+                            (remoteUrl == null || remoteUrl.isEmpty)) {
+                          final normSub = p_path.posix
+                              .normalize(sub.replaceAll('\\', '/'))
+                              .toLowerCase();
+                          final dirPrefixSub =
+                              normSub.endsWith('/') ? normSub : '$normSub/';
+                          for (final s in songs) {
+                            final normPath = p_path.posix
+                                .normalize(s.path.replaceAll('\\', '/'))
+                                .toLowerCase();
+                            if (normPath.startsWith(dirPrefixSub) ||
+                                p_path.posix.dirname(normPath) == normSub) {
+                              songId = s.id;
+                              albumId = s.albumId;
+                              remoteUrl = s.remoteArtworkUrl ?? s.artworkUri;
+                              break;
+                            }
+                          }
+                        }
+
+                        final hasArtwork = (songId != null && songId > 0) ||
+                            (remoteUrl != null && remoteUrl.isNotEmpty);
+
+                        return ListTile(
+                          leading: hasArtwork
+                              ? CachedArtwork(
+                                  id: songId ?? 0,
+                                  albumId: albumId,
+                                  remoteUrl: remoteUrl,
+                                  type: ArtworkType.AUDIO,
+                                  size: 40,
+                                  borderRadius: AppRadii.r10,
+                                  fallbackIcon: Icons.folder_rounded,
+                                )
+                              : Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: p.accentContainer,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r10),
+                                  ),
+                                  child: Icon(Icons.folder_rounded,
+                                      color: p.accent, size: 20),
+                                ),
+                          title: Text(
+                            p_path.posix.basename(sub),
+                            style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (item != null)
+                                IconButton(
+                                  icon: Icon(Icons.open_in_new_rounded,
+                                      color: p.textSecondary, size: 18),
+                                  tooltip: context.l10n.browseOpenFolderDetails,
+                                  constraints: const BoxConstraints(
+                                    minWidth: AppSpacing.minTouchTarget,
+                                    minHeight: AppSpacing.minTouchTarget,
+                                  ),
+                                  onPressed: () {
+                                    context.push('/folder', extra: item);
+                                  },
+                                ),
+                              Icon(Icons.chevron_right_rounded,
+                                  color: p.textSecondary),
+                            ],
+                          ),
+                          onTap: () => _navigateTo(sub),
+                        );
+                      },
                     ),
                   ],
 

@@ -2,9 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:path/path.dart' as p_path;
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -197,26 +200,11 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadii.r16),
                         ),
-                        leading: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: folder.isExcluded
-                                ? p.error.withValues(alpha: 0.15)
-                                : isDownloads
-                                    ? p.accent.withValues(alpha: 0.22)
-                                    : p.accentContainer,
-                            borderRadius: BorderRadius.circular(AppRadii.r12),
-                          ),
-                          child: Icon(
-                            folder.isExcluded
-                                ? Icons.folder_off_rounded
-                                : isDownloads
-                                    ? Icons.download_done_rounded
-                                    : Icons.folder_rounded,
-                            color: folder.isExcluded ? p.error : p.accent,
-                            size: 20,
-                          ),
+                        leading: _buildFolderLeading(
+                          folder: folder,
+                          state: state,
+                          p: p,
+                          isDownloads: isDownloads,
                         ),
                         title: Row(
                           children: [
@@ -294,6 +282,108 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFolderLeading({
+    required FolderItem folder,
+    required LibraryState state,
+    required PulsrPalette p,
+    required bool isDownloads,
+  }) {
+    int? songId = folder.representativeSongId;
+    int? albumId = folder.representativeAlbumId;
+    String? remoteUrl = folder.representativeRemoteUrl ?? folder.representativeArtworkUri;
+
+    // Fallback: match from currently loaded library songs if no direct ID on folder
+    if ((songId == null || songId == 0) && (remoteUrl == null || remoteUrl.isEmpty)) {
+      final normFolder = p_path.posix.normalize(folder.path.replaceAll('\\', '/')).toLowerCase();
+      for (final s in state.songs) {
+        final parent = p_path.posix.dirname(p_path.posix.normalize(s.path.replaceAll('\\', '/'))).toLowerCase();
+        if (parent == normFolder) {
+          songId = s.id;
+          albumId = s.albumId;
+          remoteUrl = s.remoteArtworkUrl ?? s.artworkUri;
+          break;
+        }
+      }
+    }
+
+    final hasArtwork = (songId != null && songId > 0) || (remoteUrl != null && remoteUrl.isNotEmpty);
+
+    final fallbackIcon = folder.isExcluded
+        ? Icons.folder_off_rounded
+        : isDownloads
+            ? Icons.download_done_rounded
+            : Icons.folder_rounded;
+
+    if (hasArtwork) {
+      return SizedBox(
+        width: 42,
+        height: 42,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CachedArtwork(
+              id: songId ?? 0,
+              albumId: albumId,
+              remoteUrl: remoteUrl,
+              type: ArtworkType.AUDIO,
+              size: 42,
+              borderRadius: AppRadii.r12,
+              fallbackIcon: fallbackIcon,
+            ),
+            if (folder.isExcluded)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: p.error.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(AppRadii.r12),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.block_rounded, size: 20, color: p.error),
+                  ),
+                ),
+              )
+            else if (isDownloads)
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: p.accent,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: p.surfaceContainer, width: 1.5),
+                  ),
+                  child: const Icon(
+                    Icons.download_done_rounded,
+                    size: 10,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: folder.isExcluded
+            ? p.error.withValues(alpha: 0.15)
+            : isDownloads
+                ? p.accent.withValues(alpha: 0.22)
+                : p.accentContainer,
+        borderRadius: BorderRadius.circular(AppRadii.r12),
+      ),
+      child: Icon(
+        fallbackIcon,
+        color: folder.isExcluded ? p.error : p.accent,
+        size: 20,
+      ),
     );
   }
 }
