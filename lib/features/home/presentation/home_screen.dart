@@ -512,7 +512,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   // ---------- Quick Discovery Tools Row ----------
                   const SizedBox(height: AppSpacing.md),
                   SizedBox(
-                    height: AppSpacing.s44,
+                    height: 48.0,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
@@ -526,7 +526,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             iconColor: p.primary,
                             onTap: () => context.push('/ytm-explore'),
                           ),
-                          const SizedBox(width: AppSpacing.xs),
+                          const SizedBox(width: AppSpacing.sm),
                         ],
                         _DiscoveryChip(
                           icon: Icons.radio_rounded,
@@ -534,7 +534,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                           iconColor: p.warning,
                           onTap: () => context.push('/radio'),
                         ),
-                        const SizedBox(width: AppSpacing.xs),
+                        const SizedBox(width: AppSpacing.sm),
                         _DiscoveryChip(
                           icon: Icons.queue_music_rounded,
                           label: context.l10n.queue,
@@ -542,7 +542,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                           onTap: () => context.push('/queue'),
                         ),
                         if (AppConfig.ytmEnabled && !offlineOnly) ...[
-                          const SizedBox(width: AppSpacing.xs),
+                          const SizedBox(width: AppSpacing.sm),
                           _DiscoveryChip(
                             icon: Icons.downloading_rounded,
                             label: context.l10n.downloadsTitle,
@@ -550,7 +550,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             onTap: () => context.push('/downloads'),
                           ),
                         ],
-                        const SizedBox(width: AppSpacing.xs),
+                        const SizedBox(width: AppSpacing.sm),
                         _DiscoveryChip(
                           icon: Icons.apps_rounded,
                           label: context.l10n.browseMoreTools,
@@ -1232,63 +1232,76 @@ class _TrendingCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.r20),
-        onTap: onTap,
-        child: SizedBox(
-          width: size,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                children: [
-                  CachedArtwork(
-                    id: song.id,
-                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                    albumId: song.albumId,
-                    type: ArtworkType.AUDIO,
-                    size: size,
-                    borderRadius: AppRadii.r18,
-                  ),
-                  // Scrim keeps the download icon legible over arbitrary artwork.
-                  PositionedDirectional(
-                    end: 6,
-                    bottom: 6,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        shape: BoxShape.circle,
+      child: Semantics(
+        button: true,
+        label: '${song.title}, ${song.artist}',
+        hint: context.l10n.play,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.r20),
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  children: [
+                    CachedArtwork(
+                      id: song.id,
+                      remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                      albumId: song.albumId,
+                      type: ArtworkType.AUDIO,
+                      size: size,
+                      borderRadius: AppRadii.r18,
+                    ),
+                    // Scrim keeps the download icon legible over arbitrary artwork.
+                    PositionedDirectional(
+                      end: 6,
+                      bottom: 6,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 44,
+                            minHeight: 44,
+                          ),
+                          child: Center(
+                            child: YtmDownloadButton(song: song),
+                          ),
+                        ),
                       ),
-                      child: YtmDownloadButton(song: song),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                SizedBox(
+                  height: _scaledTitleBoxHeight(context),
+                  child: Text(
+                    song.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppFontSize.label,
+                      height: 1.25,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              SizedBox(
-                height: _scaledTitleBoxHeight(context),
-                child: Text(
-                  song.title,
-                  maxLines: 2,
+                ),
+                const SizedBox(height: AppSpacing.s2),
+                Text(
+                  song.artist,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: p.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: AppFontSize.label,
-                    height: 1.25,
-                  ),
+                      color: p.textSecondary, fontSize: AppFontSize.label),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.s2),
-              Text(
-                song.artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: p.textSecondary, fontSize: AppFontSize.label),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1480,7 +1493,7 @@ class _QuickDiscoveryHeader extends StatelessWidget {
     ];
 
     return SizedBox(
-      height: AppSpacing.s44,
+      height: 48.0,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -1488,7 +1501,7 @@ class _QuickDiscoveryHeader extends StatelessWidget {
           horizontal: Adaptive.pagePadding(context),
         ),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {
           final item = items[index];
           return _DiscoveryChip(
@@ -1660,21 +1673,23 @@ class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
                                     PositionedDirectional(
                                       end: 8,
                                       bottom: 8,
-                                      child: Container(
-                                        width: 34,
-                                        height: 34,
-                                        decoration: BoxDecoration(
-                                          color: p.accent,
-                                          shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                                color: p.glow,
-                                                blurRadius: 14,
-                                                spreadRadius: 1),
-                                          ],
+                                      child: ExcludeSemantics(
+                                        child: Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: p.accent,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                  color: p.glow,
+                                                  blurRadius: 14,
+                                                  spreadRadius: 1),
+                                            ],
+                                          ),
+                                          child: Icon(Icons.play_arrow_rounded,
+                                              color: p.onAccent, size: 22),
                                         ),
-                                        child: Icon(Icons.play_arrow_rounded,
-                                            color: p.onAccent, size: 22),
                                       ),
                                     ),
                                   ],

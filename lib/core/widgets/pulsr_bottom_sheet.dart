@@ -245,14 +245,18 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                           if (showDragHandle) ...[
                             const SizedBox(height: AppSpacing.s10),
                             Center(
-                              child: Container(
-                                width: AppSpacing.s38,
-                                height: 4.5,
-                                decoration: BoxDecoration(
-                                  color:
-                                      (p.isDark ? Colors.white : Colors.black)
-                                          .withValues(alpha: 0.18),
-                                  borderRadius: AppRadii.full,
+                              child: Semantics(
+                                label: 'Sheet drag handle',
+                                hint: 'Drag down to dismiss',
+                                child: Container(
+                                  width: AppSpacing.s38,
+                                  height: 4.5,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        (p.isDark ? Colors.white : Colors.black)
+                                            .withValues(alpha: 0.18),
+                                    borderRadius: AppRadii.full,
+                                  ),
                                 ),
                               ),
                             ),

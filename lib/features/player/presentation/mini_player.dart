@@ -922,7 +922,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                   // Generous hit area so the thin wavy bar is easy to grab; the
                   // wave amplitude stays small so the card never grows.
                   child: SizedBox(
-                    height: AppSpacing.lg,
+                    height: AppSpacing.s28,
                     width: double.infinity,
                     child: AnimatedBuilder(
                       animation: _waveController,

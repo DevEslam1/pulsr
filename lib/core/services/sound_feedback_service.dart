@@ -101,9 +101,15 @@ class SoundFeedbackService {
     } catch (_) {}
   }
 
+  static void _triggerHaptic(VoidCallback hapticAction) {
+    try {
+      hapticAction();
+    } catch (_) {}
+  }
+
   /// Emits a subtle click sound for selection or button presses.
   static void playClick({bool mirrorHaptics = false}) {
-    if (mirrorHaptics) PulsrHaptics.light();
+    if (mirrorHaptics) _triggerHaptic(PulsrHaptics.light);
     _emit(
       SoundFeedbackVerb.click,
       playAction: () => SystemSound.play(SystemSoundType.click),
@@ -112,7 +118,7 @@ class SoundFeedbackService {
 
   /// Emits a subtle toggle sound for switches, checkboxes, and chips.
   static void playToggle({bool mirrorHaptics = false}) {
-    if (mirrorHaptics) PulsrHaptics.tap();
+    if (mirrorHaptics) _triggerHaptic(PulsrHaptics.tap);
     _emit(
       SoundFeedbackVerb.toggle,
       playAction: () => SystemSound.play(SystemSoundType.click),
@@ -121,7 +127,7 @@ class SoundFeedbackService {
 
   /// Emits a positive confirmation sound for success actions (saved, completed).
   static void playSuccess({bool mirrorHaptics = false}) {
-    if (mirrorHaptics) PulsrHaptics.confirm();
+    if (mirrorHaptics) _triggerHaptic(PulsrHaptics.confirm);
     _emit(
       SoundFeedbackVerb.success,
       playAction: () => SystemSound.play(SystemSoundType.click),
@@ -130,7 +136,7 @@ class SoundFeedbackService {
 
   /// Emits a warning sound for destructive operations (delete, remove, clear).
   static void playWarning({bool mirrorHaptics = false}) {
-    if (mirrorHaptics) PulsrHaptics.destructive();
+    if (mirrorHaptics) _triggerHaptic(PulsrHaptics.destructive);
     _emit(
       SoundFeedbackVerb.warning,
       playAction: () => SystemSound.play(SystemSoundType.alert),
@@ -139,7 +145,7 @@ class SoundFeedbackService {
 
   /// Emits an error sound for failed operations (auth failure, network drop).
   static void playError({bool mirrorHaptics = false}) {
-    if (mirrorHaptics) PulsrHaptics.destructive();
+    if (mirrorHaptics) _triggerHaptic(PulsrHaptics.destructive);
     _emit(
       SoundFeedbackVerb.error,
       playAction: () => SystemSound.play(SystemSoundType.alert),
@@ -148,7 +154,7 @@ class SoundFeedbackService {
 
   /// Emits an alert sound when enabled.
   static void playAlert({bool mirrorHaptics = false}) {
-    if (mirrorHaptics) PulsrHaptics.confirm();
+    if (mirrorHaptics) _triggerHaptic(PulsrHaptics.confirm);
     _emit(
       SoundFeedbackVerb.alert,
       playAction: () => SystemSound.play(SystemSoundType.alert),

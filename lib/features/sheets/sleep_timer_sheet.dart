@@ -210,9 +210,12 @@ class SleepTimerSheet extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       ...presets.map((mins) {
+                        final isPresetActive = timerMode == SleepTimerMode.duration &&
+                            sleepTimerRemaining != null &&
+                            (sleepTimerRemaining.inSeconds / 60).ceil() == mins;
                         return ChoiceChip(
                           label: Text(context.l10n.sleepTimerMinutes(mins)),
-                          selected: false,
+                          selected: isPresetActive,
                           onSelected: (_) {
                             cubit.startSleepTimer(mins);
                             Navigator.pop(context);

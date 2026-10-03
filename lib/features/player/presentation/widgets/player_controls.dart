@@ -219,7 +219,7 @@ class PlayerControls extends StatelessWidget {
                     Icons.skip_next_rounded,
                     color: hasNext
                         ? p.textPrimary
-                        : p.textSecondary.withValues(alpha: 0.35),
+                        : p.textTertiary.withValues(alpha: 0.3),
                     size: 38,
                   ),
                 ),

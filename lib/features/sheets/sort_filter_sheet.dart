@@ -93,7 +93,9 @@ class SortFilterSheet extends StatelessWidget {
                 onApply(option['key']!, newAsc);
                 Navigator.pop(context);
               },
-              child: Padding(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.symmetric(
                     vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
                 child: Row(

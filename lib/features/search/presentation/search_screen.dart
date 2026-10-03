@@ -363,14 +363,14 @@ class _SearchScreenState extends State<SearchScreen> {
                               for (final filter in _localFilters)
                                 Padding(
                                   padding: const EdgeInsetsDirectional.only(
-                                      end: AppSpacing.xs),
+                                      end: AppSpacing.sm),
                                   child: _buildChip(context, state, filter, p),
                                 ),
                               // C-05: save the current query + filter.
                               if (state.query.trim().isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsetsDirectional.only(
-                                      start: AppSpacing.xs),
+                                      start: AppSpacing.sm),
                                   child: ActionChip(
                                     avatar: Icon(Icons.bookmark_add_outlined,
                                         size: 16, color: p.accent),

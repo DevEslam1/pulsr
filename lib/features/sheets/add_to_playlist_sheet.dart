@@ -171,15 +171,24 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                 color: p.accent,
               ),
             )
-          : PulsrPressable(
-              onTap: () => _showNewPlaylistDialog(context),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: p.accentContainer,
-                  borderRadius: BorderRadius.circular(AppRadii.r10),
+          : Semantics(
+              button: true,
+              label: context.l10n.createPlaylist,
+              child: PulsrPressable(
+                onTap: () => _showNewPlaylistDialog(context),
+                child: Tooltip(
+                  message: context.l10n.createPlaylist,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: p.accentContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.r10),
+                    ),
+                    child: Icon(Icons.add_rounded, color: p.accent, size: 22),
+                  ),
                 ),
-                child: Icon(Icons.add_rounded, color: p.accent, size: 20),
               ),
             ),
       child: Stack(
@@ -284,21 +293,24 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                           if (index > 0) const SizedBox(height: AppSpacing.s6),
                           Builder(builder: (context) {
                             final playlist = playlists[index];
-                            return PulsrPressable(
-                              pressedScale: 0.98,
-                              onTap: () =>
-                                  _addToExistingPlaylist(context, playlist),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s14,
-                                    vertical: AppSpacing.s10),
-                                decoration: BoxDecoration(
-                                  color:
-                                      p.surfaceContainer.withValues(alpha: 0.6),
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r14),
-                                  border: Border.all(color: p.hairline),
-                                ),
+                            return Semantics(
+                              button: true,
+                              label: '${context.l10n.addToPlaylist}: ${playlist.name}',
+                              child: PulsrPressable(
+                                pressedScale: 0.98,
+                                onTap: () =>
+                                    _addToExistingPlaylist(context, playlist),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.s14,
+                                      vertical: AppSpacing.sm),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        p.surfaceContainer.withValues(alpha: 0.6),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadii.r14),
+                                    border: Border.all(color: p.hairline),
+                                  ),
                                 child: Row(
                                   children: [
                                     Container(
@@ -328,7 +340,8 @@ class _AddToPlaylistSheetState extends State<AddToPlaylistSheet> {
                                   ],
                                 ),
                               ),
-                            );
+                            ),
+                          );
                           }),
                         ],
                       ],

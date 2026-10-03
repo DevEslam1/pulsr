@@ -373,12 +373,12 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
               // FIX-M6: Use _AudioOverridesSection with cached stores
               _AudioOverridesSection(song: song),
               _buildPlaybackToolsSection(context, p),
-              const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
@@ -400,6 +400,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 48),
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         shape: RoundedRectangleBorder(
@@ -442,6 +443,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
                       backgroundColor: p.accent,
                       foregroundColor: p.onAccent,
                       padding:
@@ -483,7 +485,7 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
     final cubit = playerCubit;
 
     return Container(
-      margin: const EdgeInsets.only(top: AppSpacing.s10),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
@@ -583,8 +585,8 @@ class _SongInfoSheetState extends State<SongInfoSheet> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Wrap(
-              spacing: 8,
-              runSpacing: 4,
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
               children: [
                 if (stored != null)
                   OutlinedButton.icon(
@@ -967,7 +969,7 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
     }
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: AppSpacing.s10),
+      margin: const EdgeInsets.only(top: AppSpacing.s10, bottom: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.s14),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
