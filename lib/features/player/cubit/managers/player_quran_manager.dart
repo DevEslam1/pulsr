@@ -1,6 +1,5 @@
 // lib/features/player/cubit/managers/player_quran_manager.dart
 // FIX-A1: Modular Quran manager extracted from PlayerCubit
-import 'dart:async';
 import '../../../../core/services/quran_mode_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../domain/models/quran_mode_profile.dart';
@@ -32,25 +31,33 @@ class PlayerQuranManager {
     }
   }
 
-  Future<void> setEnabled(bool enabled) async {
+  /// Persists the enabled flag. Returns false when the write failed so callers
+  /// never flip the in-memory mode to a state the service did not record.
+  /// A missing service is treated as a successful no-op.
+  Future<bool> setEnabled(bool enabled) async {
     final service = _service;
-    if (service == null) return;
+    if (service == null) return true;
     try {
       await service.setEnabled(enabled);
+      return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to set Quran Mode enabled: $enabled',
           error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return false;
     }
   }
 
-  Future<void> setStyle(QuranReciterStyle style) async {
+  /// Persists the reciter style. Returns false when the write failed.
+  Future<bool> setStyle(QuranReciterStyle style) async {
     final service = _service;
-    if (service == null) return;
+    if (service == null) return true;
     try {
       await service.setStyle(style);
+      return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to set Quran reciter style: $style',
           error: e, stackTrace: st, category: 'PlayerQuranManager');
+      return false;
     }
   }
 }

@@ -66,7 +66,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
-  Future<void> restoreQueueSlots() async {
+  Future<void> restoreQueueSlots() =>
+      _queueMutex.protect(_restoreQueueSlotsLocked);
+
+  Future<void> _restoreQueueSlotsLocked() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(PrefsKeys.queueSlots);
@@ -80,7 +83,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         final rawSlot = data[key];
         if (rawSlot is! Map) continue;
         final decoded = QueueSlotCodec.decodeSlot(
-            Map<String, dynamic>.from(rawSlot), PlayerQueueController.maxQueueSize);
+            Map<String, dynamic>.from(rawSlot),
+            PlayerQueueController.maxQueueSize);
         if (decoded == null) continue;
         try {
           final songsResult = await _repository.getSongsByIds(decoded.songIds);
@@ -170,7 +174,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
-  void restoreQueue(List<SongsTableData> previousQueue, int previousIndex) {
+  Future<void> restoreQueue(
+          List<SongsTableData> previousQueue, int previousIndex) =>
+      _queueMutex.protect(
+          () async => _restoreQueueLocked(previousQueue, previousIndex));
+
+  void _restoreQueueLocked(
+      List<SongsTableData> previousQueue, int previousIndex) {
     // Empty queue is a safe no-op: `clamp(0, previousQueue.length - 1)` would
     // be clamp(0, -1) and throw ArgumentError.
     if (previousQueue.isEmpty) return;
@@ -191,6 +201,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: validIndex,
       ),
     ));
+    _invalidateQueueSyncResolution();
     _audioHandler
         .loadQueue(
       previousQueue,
@@ -222,9 +233,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     int newCurrentIndex = state.currentIndex;
     if (state.currentIndex == oldIndex) {
       newCurrentIndex = newIndex;
-    } else if (oldIndex < state.currentIndex && newIndex >= state.currentIndex) {
+    } else if (oldIndex < state.currentIndex &&
+        newIndex >= state.currentIndex) {
       newCurrentIndex = state.currentIndex - 1;
-    } else if (oldIndex > state.currentIndex && newIndex <= state.currentIndex) {
+    } else if (oldIndex > state.currentIndex &&
+        newIndex <= state.currentIndex) {
       newCurrentIndex = state.currentIndex + 1;
     }
 
@@ -280,12 +293,37 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final state = _getState();
     if (index < 0 || index >= state.queue.length) return;
     if (state.queue.length <= 1) {
-      await _clearQueueLocked();
+      setQueueSlot(
+        state.activeQueueSlot,
+        songs: const [],
+        currentIndex: 0,
+        position: Duration.zero,
+        speed: state.playbackSpeed,
+      );
+      debouncedPersistQueueSlots();
+      _bumpQueueVersion();
+      _emit(state.copyWith(
+        queueSlice: state.queueSlice.copyWith(queue: const [], currentIndex: 0),
+        playback: state.playback.copyWith(
+          currentSong: null,
+          isPlaying: false,
+          position: Duration.zero,
+          duration: Duration.zero,
+        ),
+      ));
+      _invalidateQueueSyncResolution();
+      try {
+        await _audioHandler.clearQueue();
+      } catch (e, st) {
+        ErrorLogger.log('Failed to clear queue in audio handler',
+            error: e, stackTrace: st, category: 'PlayerQueueController');
+      }
       return;
     }
 
     final removingCurrent = index == state.currentIndex;
-    final updatedQueue = List<SongsTableData>.from(state.queue)..removeAt(index);
+    final updatedQueue = List<SongsTableData>.from(state.queue)
+      ..removeAt(index);
     int newIndex = state.currentIndex;
     if (index < state.currentIndex) {
       newIndex = state.currentIndex - 1;
@@ -293,20 +331,27 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       newIndex = index.clamp(0, updatedQueue.length - 1);
     }
 
+    final nextSong = (removingCurrent && updatedQueue.isNotEmpty)
+        ? updatedQueue[newIndex]
+        : state.currentSong;
+
     setQueueSlot(
       state.activeQueueSlot,
       songs: updatedQueue,
       currentIndex: newIndex,
-      position: state.position,
+      position: removingCurrent ? Duration.zero : state.position,
       speed: state.playbackSpeed,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
-    // When the current track itself is removed, advance currentSong to whatever
-    // now occupies newIndex so the UI stops showing the removed song until the
-    // audio handler emits the next track-changed event.
-    final playback = (removingCurrent && updatedQueue.isNotEmpty)
-        ? state.playback.copyWith(currentSong: updatedQueue[newIndex])
+    final playback = removingCurrent
+        ? state.playback.copyWith(
+            currentSong: nextSong,
+            position: Duration.zero,
+            duration: nextSong != null
+                ? Duration(milliseconds: nextSong.durationMs)
+                : Duration.zero,
+          )
         : state.playback;
     _emit(state.copyWith(
       queueSlice: state.queueSlice.copyWith(
@@ -322,10 +367,23 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     } catch (e, st) {
       ErrorLogger.log('Failed to remove queue item in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
+      if (!_isClosed()) {
+        final s = _getState();
+        _emit(s.copyWith(
+          queueSlice: s.queueSlice.copyWith(
+            queue: state.queue,
+            currentIndex: state.currentIndex,
+          ),
+          playback: state.playback,
+        ));
+      }
     }
   }
 
-  Future<void> switchQueueSlot(int slot) async {
+  Future<void> switchQueueSlot(int slot) =>
+      _queueMutex.protect(() => _switchQueueSlotLocked(slot));
+
+  Future<void> _switchQueueSlotLocked(int slot) async {
     if (_isSwitchingSlot || _isClosed()) return;
     _isSwitchingSlot = true;
     try {
@@ -342,7 +400,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       );
       final targetSlot = _queueSlots[slot] ??
           const QueueSlotData(
-              songIds: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+              songIds: [],
+              currentIndex: 0,
+              position: Duration.zero,
+              speed: 1.0);
       final targetSongs = targetSlot.songsFrom(_slotLookupCache);
       final targetOriginalSong = (targetSlot.currentIndex >= 0 &&
               targetSlot.currentIndex < targetSongs.length)
@@ -354,7 +415,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
       if (validSongs.isEmpty) {
         _emit(state.copyWith(
-          playback: state.playback.copyWith(errorMessage: 'Queue slot is empty'),
+          playback:
+              state.playback.copyWith(errorMessage: 'Queue slot is empty'),
         ));
         return;
       }
@@ -362,7 +424,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _bumpQueueVersion();
       int safeIdx = -1;
       if (targetOriginalSong != null) {
-        safeIdx = validSongs.indexWhere((s) => _isSameTrack(s, targetOriginalSong));
+        safeIdx =
+            validSongs.indexWhere((s) => _isSameTrack(s, targetOriginalSong));
       }
       if (safeIdx == -1) {
         safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
@@ -391,20 +454,20 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           autoPlay: wasPlaying,
         );
         _loadLyrics(song);
+        _updateWidgetThrottled(force: true);
       } catch (e, st) {
         ErrorLogger.log('Failed to switch queue slot $slot',
             error: e, stackTrace: st, category: 'PlayerQueueController');
         if (!_isClosed()) {
-          // Roll the UI back to the pre-switch slice (slot, queue, current
-          // song, index, position) so a failed engine load doesn't strand the
-          // UI on a slot that never loaded. `state` is the pre-optimistic
-          // snapshot captured at the top of this method.
           _bumpQueueVersion();
           _emit(state.copyWith(
-            playback:
-                state.playback.copyWith(errorMessage: 'Failed to switch queue slot'),
+            playback: state.playback
+                .copyWith(errorMessage: 'Failed to switch queue slot'),
           ));
           _invalidateQueueSyncResolution();
+          try {
+            await _audioHandler.setSpeed(state.playbackSpeed);
+          } catch (_) {}
         }
       }
     } finally {
@@ -412,8 +475,12 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
-  Future<void> swapReconciledSong(dynamic oldSongOrId, dynamic newSongOrId) async {
-    final int oldId = oldSongOrId is SongsTableData ? oldSongOrId.id : (oldSongOrId as int);
+  Future<void> swapReconciledSong(
+      Object? oldSongOrId, Object? newSongOrId) async {
+    final int? oldId = oldSongOrId is SongsTableData
+        ? oldSongOrId.id
+        : (oldSongOrId is int ? oldSongOrId : null);
+    if (oldId == null) return;
     SongsTableData? newSong;
     if (newSongOrId is SongsTableData) {
       newSong = newSongOrId;
@@ -424,13 +491,18 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final safeNewSong = newSong;
     if (safeNewSong == null || oldId == safeNewSong.id) return;
 
+    final state = _getState();
+    if (state.queue.any((s) => s.id == safeNewSong.id)) return;
+
     _slotLookupCache[safeNewSong.id] = safeNewSong;
     _slotLookupCache.remove(oldId);
     await _queueMutex.protect(() async {
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;
         return QueueSlotData(
-          songIds: data.songIds.map((id) => id == oldId ? safeNewSong.id : id).toList(),
+          songIds: data.songIds
+              .map((id) => id == oldId ? safeNewSong.id : id)
+              .toList(),
           currentIndex: data.currentIndex,
           position: data.position,
           speed: data.speed,
@@ -439,12 +511,12 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     });
     debouncedPersistQueueSlots();
 
-    final state = _getState();
     if (state.queue.any((s) => s.id == oldId)) {
       _bumpQueueVersion();
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
-          queue: state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
+          queue:
+              state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
         ),
         playback: state.playback.copyWith(
           currentSong:
@@ -456,7 +528,10 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
     try {
       _audioHandler.swapReconciledSong(oldId, safeNewSong);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to swap reconciled song in audio handler',
+          error: e, stackTrace: st, category: 'PlayerQueueController');
+    }
   }
 
   Future<void> addToQueue(SongsTableData song) =>
@@ -603,10 +678,25 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       ));
       return;
     }
-    final toAdd = songs
-        .where((s) => !state.queue.any((q) => _isSameTrack(q, s)))
-        .take(room)
-        .toList();
+    final seen = <int>{...state.queue.map((q) => q.id)};
+    final toAdd = <SongsTableData>[];
+    for (final s in songs) {
+      if (!seen.contains(s.id)) {
+        seen.add(s.id);
+        toAdd.add(s);
+        if (toAdd.length == room) break;
+      }
+    }
+    if (toAdd.isEmpty) {
+      if (state.queue.length >= PlayerQueueController.maxQueueSize) {
+        _emit(state.copyWith(
+          playback: state.playback.copyWith(
+              errorMessage:
+                  'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+        ));
+      }
+      return;
+    }
     final added = <SongsTableData>[];
     for (final song in toAdd) {
       try {
@@ -618,7 +708,16 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         break;
       }
     }
-    if (added.isEmpty || _isClosed()) return;
+    if (added.isEmpty || _isClosed()) {
+      if (toAdd.isNotEmpty && !_isClosed()) {
+        final s = _getState();
+        _emit(s.copyWith(
+          playback:
+              s.playback.copyWith(errorMessage: 'Failed to add songs to queue'),
+        ));
+      }
+      return;
+    }
     // Re-fetch state after the awaits so the batch lands on the fresh queue.
     final s = _getState();
     final updatedQueue = [...s.queue, ...added];
@@ -653,20 +752,23 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final nextTrack = queue[currentIndex + 1];
     if (nextTrack.source != SongSource.youtube) return;
 
-    _repository.findMatchingLocalSong(
+    _repository
+        .findMatchingLocalSong(
       remoteId: nextTrack.remoteId,
       title: nextTrack.title,
       artist: nextTrack.artist,
-    ).then((res) {
+    )
+        .then((res) async {
       final match = res.fold((_) => null, (s) => s);
       if (match != null &&
           _localMatchSwapGuard.isValid(capturedSwapGen) &&
           _mediaItemResolutionGuard.isValid(capturedResolutionGen) &&
           !_isClosed()) {
-        swapReconciledSong(nextTrack.id, match);
+        await swapReconciledSong(nextTrack.id, match);
       }
     }).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('Find next local match failed', error: e, stackTrace: st, category: 'PlayerQueueController');
+      ErrorLogger.log('Find next local match failed',
+          error: e, stackTrace: st, category: 'PlayerQueueController');
     });
   }
 }

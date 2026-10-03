@@ -32,6 +32,9 @@ extension PlayerDspProfilesExtension on PlayerDspController {
             if (!applied && !_isClosed()) {
               _lastAutoAppliedDeviceKey = null;
             }
+            if (smartEnabled) {
+              await _applySmartQuality(device, profile.headphoneProfileId);
+            }
             return;
           }
         }
@@ -79,7 +82,7 @@ extension PlayerDspProfilesExtension on PlayerDspController {
 
       if (_isClosed()) return null;
       _lastAutoAppliedDeviceKey = key;
-      await applyHeadphoneProfile(profile);
+      await applyHeadphoneProfile(profile, showErrorOnGuard: false);
       return profile;
     } catch (e, st) {
       ErrorLogger.log('Smart Auto AutoEQ match failed',
@@ -108,14 +111,14 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     try {
       if (plan.preferBitPerfect) {
         if (!settings.state.bitPerfectOutput) {
-          _smartAutoBitPerfectApplied = true;
           await settings.setBitPerfectOutput(true);
+          _smartAutoBitPerfectApplied = true;
         }
       } else if (_smartAutoBitPerfectApplied) {
-        _smartAutoBitPerfectApplied = false;
         if (settings.state.bitPerfectOutput) {
           await settings.setBitPerfectOutput(false);
         }
+        _smartAutoBitPerfectApplied = false;
       }
     } catch (e, st) {
       ErrorLogger.log('Smart Audio quality arbitration failed',
@@ -161,8 +164,8 @@ extension PlayerDspProfilesExtension on PlayerDspController {
             break;
           }
         }
-        await setEqualizerEnabled(true);
-        await applyPreset(preset);
+        final okEq = await setEqualizerEnabled(true);
+        final okPreset = await applyPreset(preset);
         await setVolumeBoost(profile.volumeBoost);
         await setSaturation(profile.saturationEnabled ?? false);
         await setStereoWidth(profile.stereoWidthEnabled ?? false);
@@ -178,13 +181,17 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         } else {
           await setCrossfeed(false);
         }
+        bool okHp = true;
         if (profile.headphoneProfileId != null) {
           final repo = _headphoneProfilesRepo;
           await repo.loadProfiles();
           final hpProfile = repo.getProfileById(profile.headphoneProfileId!);
-          await applyHeadphoneProfile(hpProfile);
+          okHp = await applyHeadphoneProfile(hpProfile);
         } else {
-          await applyHeadphoneProfile(null);
+          okHp = await applyHeadphoneProfile(null);
+        }
+        if (!okEq || !okPreset || !okHp) {
+          throw Exception('One or more DSP stages failed to apply');
         }
       }
       // When DSP is blocked (profile keeps bit-perfect/AAudio/DoP active) the

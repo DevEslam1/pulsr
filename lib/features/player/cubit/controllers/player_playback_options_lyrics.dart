@@ -38,6 +38,9 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
 
   void toggleAbLoop() {
     final s = _getState();
+    if (!s.abLoopEnabled && (s.abPointA == null || s.abPointB == null)) {
+      return;
+    }
     _emit(s.copyWith(playback: s.playback.copyWith(abLoopEnabled: !s.abLoopEnabled)));
   }
 
@@ -63,8 +66,11 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
       _audioHandler.bookmarkStore.save(key, posMs,
           durationMs: s.duration.inMilliseconds);
       await _audioHandler.persistBookmarks();
-      _emit(s.copyWith(
-          playback: s.playback.copyWith(bookmarkPosition: Duration(milliseconds: posMs))));
+      if (_isClosed()) return false;
+      final cur = _getState();
+      _emit(cur.copyWith(
+          playback: cur.playback.copyWith(
+              bookmarkPosition: Duration(milliseconds: posMs))));
       return true;
     } catch (_) {
       return false;
@@ -85,14 +91,19 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     if (song == null) return;
     try {
       await _audioHandler.clearBookmarkFor(song);
-      _emit(s.copyWith(playback: s.playback.copyWith(bookmarkPosition: null)));
+      if (_isClosed()) return;
+      final cur = _getState();
+      _emit(cur.copyWith(playback: cur.playback.copyWith(bookmarkPosition: null)));
     } catch (_) {}
   }
 
   Future<bool> updateLyrics(List<LyricsLine> lines) async {
+    if (lines.isEmpty) {
+      // Do not overwrite an existing sidecar .lrc file with an empty list
+      return false;
+    }
     final s = _getState();
-    final source =
-        lines.isNotEmpty ? LyricsSource.externalLrc : LyricsSource.none;
+    const source = LyricsSource.externalLrc;
     _emit(s.copyWith(
       lyricsSlice: s.lyricsSlice.copyWith(
         lyrics: lines,
@@ -157,7 +168,28 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     ));
 
     if (_onLoadLyrics != null) {
-      await _onLoadLyrics!(song, isOfflineOnly: false);
+      try {
+        await _onLoadLyrics!(song, isOfflineOnly: false);
+      } catch (e, st) {
+        ErrorLogger.log('Refresh lyrics failed',
+            error: e, stackTrace: st, category: 'Lyrics');
+      } finally {
+        if (!_isClosed()) {
+          final cur = _getState();
+          if (cur.isLoadingLyrics) {
+            _emit(cur.copyWith(
+              lyricsSlice: cur.lyricsSlice.copyWith(isLoadingLyrics: false),
+            ));
+          }
+        }
+      }
+    } else {
+      if (!_isClosed()) {
+        final cur = _getState();
+        _emit(cur.copyWith(
+          lyricsSlice: cur.lyricsSlice.copyWith(isLoadingLyrics: false),
+        ));
+      }
     }
   }
 

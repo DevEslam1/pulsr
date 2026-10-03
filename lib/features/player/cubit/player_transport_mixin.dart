@@ -3,6 +3,9 @@ part of 'player_cubit.dart';
 mixin PlayerTransportControls on PulsrCubit<PlayerState> {
   PlayerTransportController get transportController;
 
+  /// Cancels any in-flight mediaItem resolution from a previous selection.
+  void invalidateMediaItemResolution();
+
   Future<void> play() => transportController.play();
 
   Future<void> pause() => transportController.pause();
@@ -15,8 +18,10 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
 
   Future<void> previous() => transportController.previous();
 
-  Future<void> skipToQueueItem(int index) =>
-      transportController.skipToQueueItem(index);
+  Future<void> skipToQueueItem(int index) {
+    invalidateMediaItemResolution();
+    return transportController.skipToQueueItem(index);
+  }
 
   Future<void> toggleShuffle() => transportController.toggleShuffle();
 
@@ -28,7 +33,7 @@ mixin PlayerTransportControls on PulsrCubit<PlayerState> {
   Future<void> toggleFavoriteById(int songId) =>
       transportController.toggleFavoriteById(songId);
 
-  Future<void> toggleFavorite([dynamic target]) =>
+  Future<void> toggleFavorite([Object? target]) =>
       transportController.toggleFavorite(target);
 
   Future<void> fastForward([Duration step = const Duration(seconds: 10)]) =>

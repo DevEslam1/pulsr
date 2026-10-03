@@ -21,6 +21,7 @@ import 'queue_slot_data.dart';
 
 part 'player_queue_slots.dart';
 part 'player_queue_warming.dart';
+part 'player_queue_radio.dart';
 
 /// Controls playback queue management, slot switching, and reordering.
 class PlayerQueueController {
@@ -100,54 +101,20 @@ class PlayerQueueController {
         _invalidateQueueSyncResolution =
             invalidateQueueSyncResolution ?? (() {});
 
-  void setQueueSlot(
-    int slot, {
-    required List<SongsTableData> songs,
-    required int currentIndex,
-    required Duration position,
-    required double speed,
-  }) {
-    _cacheSlotSongs(_slotLookupCache, songs);
-    _queueSlots[slot] = QueueSlotData(
-      songIds: songs.map((s) => s.id).toList(),
-      currentIndex: currentIndex,
-      position: position,
-      speed: speed,
-    );
-  }
-
-  Future<void> playRadioStation(RadioStation station) async {
-    final uri = Uri.tryParse(station.url);
-    if (!RadioStation.isHttpUrl(station.url) || uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-      final s = _getState();
-      _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
-      return;
-    }
-    final song = SongsTableData(
-      id: station.songId,
-      title: station.name,
-      artist: (station.genre != null && station.genre!.isNotEmpty)
-          ? station.genre!
-          : station.name,
-      album: '',
-      durationMs: 0,
-      path: station.url,
-      source: SongSource.radio,
-      remoteArtworkUrl: station.artworkUrl,
-      isFavorite: false,
-      isMissing: false,
-      isDownloaded: false,
-      playCount: 0,
-      lastPositionMs: 0,
-    );
-    unawaited(RadioStationStore().markPlayed(
-      station.id,
-      DateTime.now().millisecondsSinceEpoch,
-    ));
-    await playSong(song);
-  }
-
   Future<void> playSong(
+    SongsTableData song, {
+    List<SongsTableData>? queue,
+    Duration? initialPosition,
+    bool openPlayerIfPlaying = true,
+  }) =>
+      _queueMutex.protect(() => _playSongLocked(
+            song,
+            queue: queue,
+            initialPosition: initialPosition,
+            openPlayerIfPlaying: openPlayerIfPlaying,
+          ));
+
+  Future<void> _playSongLocked(
     SongsTableData song, {
     List<SongsTableData>? queue,
     Duration? initialPosition,
@@ -167,7 +134,8 @@ class PlayerQueueController {
             state.queue.map((s) => s.id).toList(growable: false),
           );
       if (queueUnchanged) {
-        _emit(state.copyWith(playback: state.playback.copyWith(isExpanded: true)));
+        _emit(state.copyWith(
+            playback: state.playback.copyWith(isExpanded: true)));
         if (!state.isPlaying) {
           try {
             await _audioHandler.play();
@@ -177,7 +145,8 @@ class PlayerQueueController {
             if (!_isClosed()) {
               final s = _getState();
               _emit(s.copyWith(
-                  playback: s.playback.copyWith(errorMessage: 'Failed to play ${song.title}')));
+                  playback: s.playback
+                      .copyWith(errorMessage: 'Failed to play ${song.title}')));
             }
           }
         }
@@ -218,8 +187,13 @@ class PlayerQueueController {
       }
       effectiveQueue = rawQueue.sublist(start, start + maxQueueSize);
       effectiveIndex = targetIndex - start;
+      final headDropped = start > 0;
+      final tailDropped = start + maxQueueSize < rawQueue.length;
+      final dropMsg = (headDropped && tailDropped)
+          ? 'head and tail dropped'
+          : (headDropped ? 'head dropped' : 'tail dropped');
       ErrorLogger.log(
-        'Queue truncated to $maxQueueSize (was ${rawQueue.length}) — tail dropped',
+        'Queue truncated to $maxQueueSize (was ${rawQueue.length}) — $dropMsg',
         category: 'PlayerQueueController',
       );
     } else {
@@ -270,6 +244,7 @@ class PlayerQueueController {
     ));
 
     _updateWidgetThrottled(force: true);
+    _invalidateQueueSyncResolution();
 
     try {
       await _audioHandler.loadQueue(
@@ -296,6 +271,8 @@ class PlayerQueueController {
       if (!_isClosed()) {
         if (prevSlot != null) {
           _queueSlots[state.activeQueueSlot] = prevSlot;
+        } else {
+          _queueSlots.remove(state.activeQueueSlot);
         }
         _debouncedPersistQueueSlots();
         _bumpQueueVersion();
@@ -317,6 +294,7 @@ class PlayerQueueController {
             lyricsSource: prevLyricsSource,
           ),
         ));
+        _invalidateQueueSyncResolution();
         try {
           if (prevQueue.isNotEmpty) {
             await _audioHandler.loadQueue(
@@ -357,8 +335,11 @@ class PlayerQueueController {
               ));
             }
           } catch (emitError, emitSt) {
-            ErrorLogger.log('Failed to emit terminal error state on queue failure',
-                error: emitError, stackTrace: emitSt, category: 'PlayerQueueController');
+            ErrorLogger.log(
+                'Failed to emit terminal error state on queue failure',
+                error: emitError,
+                stackTrace: emitSt,
+                category: 'PlayerQueueController');
           }
         }
       }
@@ -373,13 +354,17 @@ class PlayerQueueController {
     }
 
     if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-      _findNextLocalMatch(song, effectiveQueue, effectiveIndex, capturedSwapGen, capturedGen);
+      _findNextLocalMatch(
+          song, effectiveQueue, effectiveIndex, capturedSwapGen, capturedGen);
     }
   }
 
   void dispose() {
-    _persistQueueDebounce?.cancel();
-    _persistQueueDebounce = null;
+    if (_persistQueueDebounce != null) {
+      _persistQueueDebounce?.cancel();
+      _persistQueueDebounce = null;
+      persistQueueSlotsNow();
+    }
     _mediaItemResolutionGuard.invalidate();
     _localMatchSwapGuard.invalidate();
     _mediaItemGuard.invalidate();

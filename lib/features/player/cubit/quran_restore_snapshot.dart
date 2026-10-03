@@ -5,7 +5,10 @@ import '../../../domain/models/headphone_profile.dart';
 /// Captures the DSP settings that Quran Mode overrides so they can be restored
 /// verbatim when the mode is switched off.
 class QuranRestoreSnapshot {
-  final EqPreset eqPreset;
+  /// Null for a legacy/corrupt snapshot missing the EQ payload: a default
+  /// [EqPreset.fromJson] on an empty map would look like a real "Custom" preset,
+  /// so absence must stay distinguishable from an actual captured preset.
+  final EqPreset? eqPreset;
   final bool isEqEnabled;
   final HeadphoneProfile? headphoneProfile;
   final bool isReverbEnabled;
@@ -40,7 +43,7 @@ class QuranRestoreSnapshot {
   });
 
   Map<String, dynamic> toJson() => {
-        'eqPreset': eqPreset.toJson(),
+        if (eqPreset != null) 'eqPreset': eqPreset!.toJson(),
         'isEqEnabled': isEqEnabled,
         'headphoneProfile': headphoneProfile?.toJson(),
         'isReverbEnabled': isReverbEnabled,
@@ -61,8 +64,9 @@ class QuranRestoreSnapshot {
     final rawEq = json['eqPreset'];
     final rawProfile = json['headphoneProfile'];
     return QuranRestoreSnapshot(
-      eqPreset: EqPreset.fromJson(
-          rawEq is Map ? Map<String, dynamic>.from(rawEq) : const {}),
+      eqPreset: rawEq is Map
+          ? EqPreset.fromJson(Map<String, dynamic>.from(rawEq))
+          : null,
       isEqEnabled: json['isEqEnabled'] as bool? ?? false,
       headphoneProfile: rawProfile is Map
           ? HeadphoneProfile.fromJson(Map<String, dynamic>.from(rawProfile))

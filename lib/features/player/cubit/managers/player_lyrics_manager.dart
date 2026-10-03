@@ -57,6 +57,10 @@ class PlayerLyricsManager {
     bool Function()? isStale,
   }) async {
     LyricsResult? result;
+    // True when a source failed (offline blip, timeout, corrupt file): a
+    // failure is not evidence that lyrics do not exist, so it must not seed the
+    // negative cache and block re-queries for the whole TTL.
+    var hadError = false;
 
     // 1. Local metadata and sidecar .lrc files
     if (song.source == SongSource.local &&
@@ -68,6 +72,7 @@ class PlayerLyricsManager {
           songId: song.id,
         );
       } catch (e, st) {
+        hadError = true;
         ErrorLogger.log('Local lyrics resolution failed for ${song.path}',
             error: e, stackTrace: st, category: 'PlayerLyricsManager');
       }
@@ -95,6 +100,7 @@ class PlayerLyricsManager {
           );
         }
       } catch (e, st) {
+        hadError = true;
         ErrorLogger.log('LRCLIB fetch failed for ${song.title}',
             error: e, stackTrace: st, category: 'PlayerLyricsManager');
       }
@@ -120,13 +126,18 @@ class PlayerLyricsManager {
             );
           }
         } catch (e, st) {
+          hadError = true;
           ErrorLogger.log('YTM lyrics fetch failed for $remoteId',
               error: e, stackTrace: st, category: 'PlayerLyricsManager');
         }
       }
     }
 
-    if ((result == null || result.lines.isEmpty) && !isOfflineOnly) {
+    if (isStale != null && isStale()) return result;
+
+    if (!hadError &&
+        (result == null || result.lines.isEmpty) &&
+        !isOfflineOnly) {
       cacheNegativeResult(song);
     }
 

@@ -145,24 +145,6 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       isClosed: () => isClosed,
       isSameTrack: _isSameTrack,
     );
-    playbackOptionsController = PlayerPlaybackOptionsController(
-      audioHandler: _audioHandler,
-      earbudOptimizationService:
-          dependencies?.earbudOptimizationService ?? earbudOptimizationService,
-      hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
-      perSongEqStore: dependencies?.perSongEqStore ?? perSongEqStore,
-      perSongVolumeStore:
-          dependencies?.perSongVolumeStore ?? perSongVolumeStore,
-      songRatingStore: dependencies?.songRatingStore ?? songRatingStore,
-      quranManager: PlayerQuranManager(
-        service: dependencies?.quranModeService ?? quranModeService,
-      ),
-      getState: () => state,
-      emit: safeEmit,
-      isClosed: () => isClosed,
-      onLoadLyrics: (song, {isOfflineOnly = false}) =>
-          metadataController.loadLyrics(song, isOfflineOnly: isOfflineOnly),
-    );
     dspController = PlayerDspController(
       audioHandler: _audioHandler,
       settingsCubit: _settingsCubit,
@@ -177,6 +159,26 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       syncAudioEffects: _syncAudioEffects,
       isClosed: () => isClosed,
     );
+    playbackOptionsController = PlayerPlaybackOptionsController(
+      audioHandler: _audioHandler,
+      earbudOptimizationService:
+          dependencies?.earbudOptimizationService ?? earbudOptimizationService,
+      hiResAudioService: dependencies?.hiResAudioService ?? hiResAudioService,
+      perSongEqStore: dependencies?.perSongEqStore ?? perSongEqStore,
+      perSongVolumeStore:
+          dependencies?.perSongVolumeStore ?? perSongVolumeStore,
+      songRatingStore: dependencies?.songRatingStore ?? songRatingStore,
+      quranManager: PlayerQuranManager(
+        service: dependencies?.quranModeService ?? quranModeService,
+      ),
+      guardDsp: (feature, {showError = true}) =>
+          dspController.guardDsp(feature, showError: showError),
+      getState: () => state,
+      emit: safeEmit,
+      isClosed: () => isClosed,
+      onLoadLyrics: (song, {isOfflineOnly = false}) =>
+          metadataController.loadLyrics(song, isOfflineOnly: isOfflineOnly),
+    );
     widgetBridge = PlayerWidgetBridge(
       widgetService: dependencies?.widgetService ?? widgetService,
       scrobblerService: () =>
@@ -184,6 +186,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       latencyTracker: dependencies?.latencyTracker ?? latencyTracker,
       isQuranMode: () => state.isQuranModeEnabled,
       isClosed: () => isClosed,
+      playbackSpeed: () => state.playbackSpeed,
     );
     final queueMutex = Mutex();
     final slotLookupCache = <int, SongsTableData>{};

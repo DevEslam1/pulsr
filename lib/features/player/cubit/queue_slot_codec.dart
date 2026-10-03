@@ -73,7 +73,8 @@ class QueueSlotCodec {
             .toList(),
         'currentIndex': entry.value.currentIndex,
         'positionMs': entry.value.position.inMilliseconds,
-        'speed': entry.value.speed,
+        // jsonEncode throws on NaN/Infinity, which would abort the whole save.
+        'speed': entry.value.speed.isFinite ? entry.value.speed : 1.0,
       };
     }
     // Which slot is active is part of the session: without it a restart
@@ -142,22 +143,41 @@ class QueueSlotCodec {
 
     // Keep positive (DB-backed) ids and negative ids that have a materialized
     // online song; drop orphan/corrupt negatives that nothing can resolve.
+    // Capture the index's original id first so the index can be remapped through
+    // the filtering: otherwise a dropped id before it shifts every later song
+    // and the restored queue resumes on the wrong track.
+    final rawIndex = slotData['currentIndex'];
+    final rawIndexInt = rawIndex is int ? rawIndex : 0;
+    final anchorId = (rawIndexInt >= 0 && rawIndexInt < rawIds.length)
+        ? rawIds[rawIndexInt]
+        : null;
+
     final songIds = rawIds
         .whereType<int>()
         .where((id) => id >= 0 || onlineSongsById.containsKey(id))
         .toList();
     if (songIds.isEmpty) return null;
 
-    final rawIndex = slotData['currentIndex'];
-    final currentIndex = rawIndex is int ? rawIndex : 0;
+    // songIds only holds ints, so a non-int anchor (corrupt id) can never match
+    // and must not be passed to List<int>.indexOf, whose parameter is covariant.
+    final remappedIndex =
+        anchorId is int ? songIds.indexOf(anchorId) : -1;
+    final currentIndex = (remappedIndex != -1
+            ? remappedIndex
+            : rawIndexInt)
+        .clamp(0, songIds.length - 1);
 
+    // isFinite guards Infinity/NaN (jsonDecode of 1e999 yields Infinity) whose
+    // toInt() would throw and abort the remaining slots.
     final rawPos = slotData['positionMs'];
-    final positionMs =
-        (rawPos is num) ? rawPos.toInt().clamp(0, maxPositionMs) : 0;
+    final positionMs = (rawPos is num && rawPos.isFinite)
+        ? rawPos.toInt().clamp(0, maxPositionMs)
+        : 0;
 
     final rawSpeed = slotData['speed'];
-    final speed =
-        (rawSpeed is num) ? rawSpeed.toDouble().clamp(minSpeed, maxSpeed) : 1.0;
+    final speed = (rawSpeed is num && rawSpeed.isFinite)
+        ? rawSpeed.toDouble().clamp(minSpeed, maxSpeed)
+        : 1.0;
 
     return DecodedSlot(
       songIds: songIds,

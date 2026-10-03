@@ -25,7 +25,7 @@ class PlayerTransportController {
   // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
   // controller instances (e.g. test + prod) never share throttle state.
   final Stopwatch _seekStopwatch = Stopwatch()..start();
-  int _lastSeekMs = 0;
+  int _lastSeekMs = -PlayerConstants.seekThrottleMs;
   Timer? _seekThrottleTimer;
   Duration? _pendingSeek;
 
@@ -55,7 +55,8 @@ class PlayerTransportController {
       await _audioHandler.play();
       if (!_isClosed()) {
         final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: true, errorMessage: null)));
+        final isPlaying = _audioHandler.playbackState.value.playing;
+        _emit(s.copyWith(playback: s.playback.copyWith(isPlaying: isPlaying, errorMessage: null)));
       }
     } catch (e, st) {
       ErrorLogger.log('Play failed',
@@ -74,6 +75,7 @@ class PlayerTransportController {
       _emit(prevState.copyWith(playback: prevState.playback.copyWith(isPlaying: false)));
       await _audioHandler.pause();
     } catch (e, st) {
+      _onUserPausedIntentionally?.call(false);
       ErrorLogger.log('Pause failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
@@ -92,11 +94,10 @@ class PlayerTransportController {
   Future<void> togglePlayPause() async {
     HapticFeedback.lightImpact();
     final prevState = _getState();
+    final state = prevState;
+    final enginePlaying = _audioHandler.playbackState.value.playing;
+    final shouldPause = state.isPlaying || enginePlaying;
     try {
-      final state = prevState;
-      final enginePlaying = _audioHandler.playbackState.value.playing;
-      final shouldPause = state.isPlaying || enginePlaying;
-
       if (shouldPause) {
         _onUserPausedIntentionally?.call(true);
         _emit(state.copyWith(playback: state.playback.copyWith(isPlaying: false)));
@@ -111,6 +112,9 @@ class PlayerTransportController {
         await _audioHandler.play();
       }
     } catch (e, st) {
+      if (shouldPause) {
+        _onUserPausedIntentionally?.call(false);
+      }
       ErrorLogger.log('Toggle play/pause failed',
           error: e, stackTrace: st, category: 'PlayerTransportController');
       if (!_isClosed()) {
@@ -129,7 +133,8 @@ class PlayerTransportController {
   Future<void> seek(Duration position) {
     if (_isClosed()) return Future.value();
     final state = _getState();
-    final prevPosition = state.position; // C-2: snapshot for rollback
+    final enginePos = _audioHandler.playbackState.value.position;
+    final prevPosition = enginePos > Duration.zero ? enginePos : state.position;
     var target = position.isNegative ? Duration.zero : position;
     if (state.duration > Duration.zero && target > state.duration) {
       target = state.duration;
@@ -173,6 +178,10 @@ class PlayerTransportController {
       );
       return Future.value();
     }
+
+    _pendingSeek = null;
+    _seekThrottleTimer?.cancel();
+    _seekThrottleTimer = null;
     _lastSeekMs = nowMs;
 
     return _audioHandler.seekDirect(target).catchError((Object e, StackTrace st) {
@@ -297,7 +306,7 @@ class PlayerTransportController {
     }
   }
 
-  Future<void> toggleFavorite([dynamic target]) async {
+  Future<void> toggleFavorite([Object? target]) async {
     if (target is SongsTableData) {
       return toggleFavoriteSong(target);
     } else if (target is int) {
@@ -310,47 +319,52 @@ class PlayerTransportController {
 
   Future<void> _executeToggleFavorite(SongsTableData song) async {
     if (_toggleFavoriteUseCase == null) return;
-    final songId = song.id;
-    final result = await _toggleFavoriteUseCase!(song.id);
-    if (_isClosed()) return;
-    result.fold(
-      (failure) {
-        final s = _getState();
-        _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: failure.message)));
-      },
-      (isFav) {
-        // Mirror the favorite change to the media session / OS notification.
-        _audioHandler.updateFavorite(songId, isFav);
-        final state = _getState();
-        final updatedQueue = state.queue
-            .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
-            .toList();
-        if (_slotLookupCache != null) {
-          final cached = _slotLookupCache![songId];
-          if (cached != null) {
-            _slotLookupCache![songId] = cached.copyWith(isFavorite: isFav);
+    try {
+      final songId = song.id;
+      final result = await _toggleFavoriteUseCase!(song.id);
+      if (_isClosed()) return;
+      result.fold(
+        (failure) {
+          final s = _getState();
+          _emit(s.copyWith(playback: s.playback.copyWith(errorMessage: failure.message)));
+        },
+        (isFav) {
+          // Mirror the favorite change to the media session / OS notification.
+          _audioHandler.updateFavorite(songId, isFav);
+          final state = _getState();
+          final updatedQueue = state.queue
+              .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
+              .toList();
+          if (_slotLookupCache != null) {
+            final cached = _slotLookupCache![songId];
+            if (cached != null) {
+              _slotLookupCache![songId] = cached.copyWith(isFavorite: isFav);
+            }
           }
-        }
-        _debouncedPersistQueueSlots?.call();
-        if (state.currentSong != null && state.currentSong!.id == songId) {
-          _emit(
-            state.copyWith(
-              playback: state.playback.copyWith(
-                currentSong: state.currentSong!.copyWith(isFavorite: isFav),
-                errorMessage: null,
+          _debouncedPersistQueueSlots?.call();
+          if (state.currentSong != null && state.currentSong!.id == songId) {
+            _emit(
+              state.copyWith(
+                playback: state.playback.copyWith(
+                  currentSong: state.currentSong!.copyWith(isFavorite: isFav),
+                  errorMessage: null,
+                ),
+                queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
               ),
+            );
+            _updateWidgetThrottled?.call(force: true);
+          } else if (state.queue.any((s) => s.id == songId)) {
+            _emit(state.copyWith(
               queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
-            ),
-          );
-          _updateWidgetThrottled?.call(force: true);
-        } else if (state.queue.any((s) => s.id == songId)) {
-          _emit(state.copyWith(
-            queueSlice: state.queueSlice.copyWith(queue: updatedQueue),
-            playback: state.playback.copyWith(errorMessage: null),
-          ));
-        }
-      },
-    );
+              playback: state.playback.copyWith(errorMessage: null),
+            ));
+          }
+        },
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Toggle favorite failed',
+          error: e, stackTrace: st, category: 'PlayerTransportController');
+    }
   }
 
   Future<void> fastForward([Duration step = const Duration(seconds: 10)]) async {

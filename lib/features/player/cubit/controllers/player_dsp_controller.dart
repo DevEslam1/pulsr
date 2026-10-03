@@ -8,7 +8,6 @@ import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/services/device_profile_service.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/room_correction_service.dart';
-import '../../../../core/services/settings_profiles_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/safe_file_path.dart';
@@ -34,6 +33,7 @@ import '../player_state.dart';
 part 'player_dsp_effects.dart';
 part 'player_dsp_profiles.dart';
 part 'player_dsp_comparison.dart';
+part 'player_dsp_follow_rate.dart';
 
 /// Orchestrates all audio DSP effects, equalizer presets, and bit-perfect conflict gating.
 class PlayerDspController {
@@ -53,7 +53,7 @@ class PlayerDspController {
   final bool Function() _isClosed;
 
   StreamSubscription<AudioOutputInfo>? _deviceSub;
-  PlayerState? _dspSnapshot;
+  DspSlice? _dspSnapshot;
   EqPreset? globalEqBackup;
   HeadphoneProfile? globalHeadphoneProfileBackup;
   bool perSongOverrideActive = false;
@@ -116,52 +116,6 @@ class PlayerDspController {
   int? _lastFollowedBitDepth;
   String? _lastFollowedRoute;
 
-  /// [H-18] Serializes concurrent follow-rate requests (e.g. rapid track
-  /// changes) through a mutex so overlapping native output-format switches
-  /// apply in strict order instead of racing one another.
-  Future<void> maybeFollowTrackSampleRate(SongsTableData song) async {
-    final service = _hiResAudioService;
-    if (service == null || _settingsCubit == null) return;
-    await _followSampleRateMutex.protect(() async {
-      final settings = _settingsCubit!.state;
-      final depth = (song.bitDepth != null && song.bitDepth! > 0)
-          ? song.bitDepth!
-          : PlayerConstants.defaultBitDepth;
-      final device = settings.currentOutputDevice;
-      final route =
-          '${device?.deviceName}|${device?.activeDeviceType}|${device?.isUsbDac}';
-      final rate = HiResAudioService.followTrackRateToApply(
-        trackSampleRate: song.sampleRate,
-        lastRequestedSampleRate:
-            depth == _lastFollowedBitDepth && route == _lastFollowedRoute
-                ? _lastFollowedSampleRate
-                : null,
-        isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
-        followTrackEnabled:
-            settings.followTrackSampleRate || settings.strictBitPerfect,
-      );
-      if (rate == null) return;
-      try {
-        final applied = await service.setTargetOutputFormat(
-            sampleRate: rate, bitDepth: depth);
-        if (!applied) {
-          _lastFollowedSampleRate = null;
-          await _settingsCubit!.refreshOutputDevice();
-          return;
-        }
-        if (_isClosed()) return;
-        _lastFollowedSampleRate = rate;
-        _lastFollowedBitDepth = depth;
-        _lastFollowedRoute = route;
-        await _settingsCubit!.refreshOutputDevice();
-      } catch (e, st) {
-        _lastFollowedSampleRate = null;
-        ErrorLogger.log('Follow-track sample rate failed ($rate)',
-            error: e, stackTrace: st, category: 'PlayerDspController');
-      }
-    });
-  }
-
   String? dspBlockedReason() {
     final s = _settingsCubit?.state;
     if (s == null) return null;
@@ -199,7 +153,69 @@ class PlayerDspController {
   /// [_syncAudioEffects] on failure — the snapshot is the authoritative
   /// known-good state, and re-reading the engine mid-failure only risks
   /// emitting a half-applied slice.
-  Future<void> applyDspEffect({
+  static DspSlice mergeDspRollback(DspSlice current, DspSlice previous, DspSlice attempted) {
+    return current.copyWith(
+      isEqEnabled: attempted.isEqEnabled != previous.isEqEnabled ? previous.isEqEnabled : current.isEqEnabled,
+      eqPreset: attempted.eqPreset != previous.eqPreset ? previous.eqPreset : current.eqPreset,
+      selectedHeadphoneProfile: attempted.selectedHeadphoneProfile != previous.selectedHeadphoneProfile ? previous.selectedHeadphoneProfile : current.selectedHeadphoneProfile,
+      preampDb: attempted.preampDb != previous.preampDb ? previous.preampDb : current.preampDb,
+      isSpatializerEnabled: attempted.isSpatializerEnabled != previous.isSpatializerEnabled ? previous.isSpatializerEnabled : current.isSpatializerEnabled,
+      isVirtualizerEnabled: attempted.isVirtualizerEnabled != previous.isVirtualizerEnabled ? previous.isVirtualizerEnabled : current.isVirtualizerEnabled,
+      virtualizerStrength: attempted.virtualizerStrength != previous.virtualizerStrength ? previous.virtualizerStrength : current.virtualizerStrength,
+      isDynamicsEnabled: attempted.isDynamicsEnabled != previous.isDynamicsEnabled ? previous.isDynamicsEnabled : current.isDynamicsEnabled,
+      dynamicsPreset: attempted.dynamicsPreset != previous.dynamicsPreset ? previous.dynamicsPreset : current.dynamicsPreset,
+      isCrossfeedEnabled: attempted.isCrossfeedEnabled != previous.isCrossfeedEnabled ? previous.isCrossfeedEnabled : current.isCrossfeedEnabled,
+      crossfeedDelayUs: attempted.crossfeedDelayUs != previous.crossfeedDelayUs ? previous.crossfeedDelayUs : current.crossfeedDelayUs,
+      crossfeedFeedDb: attempted.crossfeedFeedDb != previous.crossfeedFeedDb ? previous.crossfeedFeedDb : current.crossfeedFeedDb,
+      crossfeedMode: attempted.crossfeedMode != previous.crossfeedMode ? previous.crossfeedMode : current.crossfeedMode,
+      isLimiterEnabled: attempted.isLimiterEnabled != previous.isLimiterEnabled ? previous.isLimiterEnabled : current.isLimiterEnabled,
+      limiterThresholdDb: attempted.limiterThresholdDb != previous.limiterThresholdDb ? previous.limiterThresholdDb : current.limiterThresholdDb,
+      limiterReleaseMs: attempted.limiterReleaseMs != previous.limiterReleaseMs ? previous.limiterReleaseMs : current.limiterReleaseMs,
+      isReverbEnabled: attempted.isReverbEnabled != previous.isReverbEnabled ? previous.isReverbEnabled : current.isReverbEnabled,
+      reverbPreset: attempted.reverbPreset != previous.reverbPreset ? previous.reverbPreset : current.reverbPreset,
+      reverbWetDry: attempted.reverbWetDry != previous.reverbWetDry ? previous.reverbWetDry : current.reverbWetDry,
+      isSaturationEnabled: attempted.isSaturationEnabled != previous.isSaturationEnabled ? previous.isSaturationEnabled : current.isSaturationEnabled,
+      saturationDrive: attempted.saturationDrive != previous.saturationDrive ? previous.saturationDrive : current.saturationDrive,
+      saturationMix: attempted.saturationMix != previous.saturationMix ? previous.saturationMix : current.saturationMix,
+      saturationTilt: attempted.saturationTilt != previous.saturationTilt ? previous.saturationTilt : current.saturationTilt,
+      saturationMultiband: attempted.saturationMultiband != previous.saturationMultiband ? previous.saturationMultiband : current.saturationMultiband,
+      isStereoWidthEnabled: attempted.isStereoWidthEnabled != previous.isStereoWidthEnabled ? previous.isStereoWidthEnabled : current.isStereoWidthEnabled,
+      stereoWidth: attempted.stereoWidth != previous.stereoWidth ? previous.stereoWidth : current.stereoWidth,
+      stereoWidthMultiband: attempted.stereoWidthMultiband != previous.stereoWidthMultiband ? previous.stereoWidthMultiband : current.stereoWidthMultiband,
+      stereoWidthLow: attempted.stereoWidthLow != previous.stereoWidthLow ? previous.stereoWidthLow : current.stereoWidthLow,
+      stereoWidthMid: attempted.stereoWidthMid != previous.stereoWidthMid ? previous.stereoWidthMid : current.stereoWidthMid,
+      stereoWidthHigh: attempted.stereoWidthHigh != previous.stereoWidthHigh ? previous.stereoWidthHigh : current.stereoWidthHigh,
+      stereoWidthLowCrossoverHz: attempted.stereoWidthLowCrossoverHz != previous.stereoWidthLowCrossoverHz ? previous.stereoWidthLowCrossoverHz : current.stereoWidthLowCrossoverHz,
+      stereoWidthHighCrossoverHz: attempted.stereoWidthHighCrossoverHz != previous.stereoWidthHighCrossoverHz ? previous.stereoWidthHighCrossoverHz : current.stereoWidthHighCrossoverHz,
+      isLoudnessContourEnabled: attempted.isLoudnessContourEnabled != previous.isLoudnessContourEnabled ? previous.isLoudnessContourEnabled : current.isLoudnessContourEnabled,
+      loudnessContourIntensity: attempted.loudnessContourIntensity != previous.loudnessContourIntensity ? previous.loudnessContourIntensity : current.loudnessContourIntensity,
+      isSubCrossoverEnabled: attempted.isSubCrossoverEnabled != previous.isSubCrossoverEnabled ? previous.isSubCrossoverEnabled : current.isSubCrossoverEnabled,
+      subCrossoverCornerHz: attempted.subCrossoverCornerHz != previous.subCrossoverCornerHz ? previous.subCrossoverCornerHz : current.subCrossoverCornerHz,
+      subCrossoverSlopeDbPerOct: attempted.subCrossoverSlopeDbPerOct != previous.subCrossoverSlopeDbPerOct ? previous.subCrossoverSlopeDbPerOct : current.subCrossoverSlopeDbPerOct,
+      subCrossoverGain: attempted.subCrossoverGain != previous.subCrossoverGain ? previous.subCrossoverGain : current.subCrossoverGain,
+      subCrossoverBassMono: attempted.subCrossoverBassMono != previous.subCrossoverBassMono ? previous.subCrossoverBassMono : current.subCrossoverBassMono,
+      subCrossoverAntiPop: attempted.subCrossoverAntiPop != previous.subCrossoverAntiPop ? previous.subCrossoverAntiPop : current.subCrossoverAntiPop,
+      isDynamicEqEnabled: attempted.isDynamicEqEnabled != previous.isDynamicEqEnabled ? previous.isDynamicEqEnabled : current.isDynamicEqEnabled,
+      dynamicEqBands: attempted.dynamicEqBands != previous.dynamicEqBands ? previous.dynamicEqBands : current.dynamicEqBands,
+      isViperDdcEnabled: attempted.isViperDdcEnabled != previous.isViperDdcEnabled ? previous.isViperDdcEnabled : current.isViperDdcEnabled,
+      viperDdcProfileName: attempted.viperDdcProfileName != previous.viperDdcProfileName ? previous.viperDdcProfileName : current.viperDdcProfileName,
+      isArbitraryEqEnabled: attempted.isArbitraryEqEnabled != previous.isArbitraryEqEnabled ? previous.isArbitraryEqEnabled : current.isArbitraryEqEnabled,
+      arbitraryEqString: attempted.arbitraryEqString != previous.arbitraryEqString ? previous.arbitraryEqString : current.arbitraryEqString,
+      isLiveProgEnabled: attempted.isLiveProgEnabled != previous.isLiveProgEnabled ? previous.isLiveProgEnabled : current.isLiveProgEnabled,
+      liveProgCode: attempted.liveProgCode != previous.liveProgCode ? previous.liveProgCode : current.liveProgCode,
+      isDynamicBassEnabled: attempted.isDynamicBassEnabled != previous.isDynamicBassEnabled ? previous.isDynamicBassEnabled : current.isDynamicBassEnabled,
+      dynamicBassStrength: attempted.dynamicBassStrength != previous.dynamicBassStrength ? previous.dynamicBassStrength : current.dynamicBassStrength,
+      dynamicBassPreset: attempted.dynamicBassPreset != previous.dynamicBassPreset ? previous.dynamicBassPreset : current.dynamicBassPreset,
+      volumeBoost: attempted.volumeBoost != previous.volumeBoost ? previous.volumeBoost : current.volumeBoost,
+      stereoBalance: attempted.stereoBalance != previous.stereoBalance ? previous.stereoBalance : current.stereoBalance,
+      monoMix: attempted.monoMix != previous.monoMix ? previous.monoMix : current.monoMix,
+      isSincResamplerEnabled: attempted.isSincResamplerEnabled != previous.isSincResamplerEnabled ? previous.isSincResamplerEnabled : current.isSincResamplerEnabled,
+      isDitherEnabled: attempted.isDitherEnabled != previous.isDitherEnabled ? previous.isDitherEnabled : current.isDitherEnabled,
+      ditherTargetBitDepth: attempted.ditherTargetBitDepth != previous.ditherTargetBitDepth ? previous.ditherTargetBitDepth : current.ditherTargetBitDepth,
+    );
+  }
+
+  Future<bool> applyDspEffect({
     required String featureName,
     bool requiresGuard = true,
     bool guardCondition = true,
@@ -212,39 +228,49 @@ class PlayerDspController {
     if (requiresGuard &&
         guardCondition &&
         !guardDsp(featureName, showError: showErrorOnGuard)) {
-      return;
+      return false;
     }
     final state = _getState();
     final previousDsp = state.dsp;
+    final attemptedDsp = updateDsp(previousDsp);
     _emit(state.copyWith(
-      dsp: updateDsp(previousDsp),
+      dsp: attemptedDsp,
       playback: state.playback.copyWith(errorMessage: null),
     ));
     try {
       await applyAudioHandler();
-    } catch (e) {
+      if (featureName != 'Volume Boost') {
+        unawaited(rebalanceVolumeBoostIfNeeded());
+      }
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set $featureName',
+          error: e, stackTrace: st, category: 'PlayerDspController');
       final s = _getState();
+      final rolledBackDsp = mergeDspRollback(s.dsp, previousDsp, attemptedDsp);
       _emit(s.copyWith(
-        dsp: previousDsp,
+        dsp: rolledBackDsp,
         playback: s.playback.copyWith(
           errorMessage: failureMessage ??
               'Failed to set ${featureName.toLowerCase()}: $e',
         ),
       ));
+      return false;
     }
   }
 
   // Equalizer methods
-  Future<void> setEqualizerEnabled(bool enabled) => applyDspEffect(
+  Future<bool> setEqualizerEnabled(bool enabled) => applyDspEffect(
         featureName: 'Equalizer',
         guardCondition: enabled,
         updateDsp: (dsp) => dsp.copyWith(isEqEnabled: enabled),
         applyAudioHandler: () => _audioHandler.setEqualizerEnabled(enabled),
       );
 
-  Future<void> applyPreset(EqPreset preset,
+  Future<bool> applyPreset(EqPreset preset,
       {bool isPerSongRestore = false}) async {
-    if (!guardDsp('Equalizer Preset')) return;
+    markUserInteracting();
+    if (!guardDsp('Equalizer Preset')) return false;
     if (perSongOverrideActive && !isPerSongRestore) {
       globalEqBackup = preset;
       globalHeadphoneProfileBackup = null;
@@ -262,16 +288,20 @@ class PlayerDspController {
     try {
       await _audioHandler.setEqualizerEnabled(true);
       await _audioHandler.applyPreset(preset);
-    } catch (e) {
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply preset',
+          error: e, stackTrace: st, category: 'PlayerDspController');
       final s = _getState();
       _emit(s.copyWith(
           dsp: previousDsp,
           playback:
               s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
+      return false;
     }
   }
 
-  Future<void> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
+  Future<bool> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
 
   /// The engine-canonical EQ preamp (dB), read through the handler boundary
   /// (which returns the equalizer manager's value) — the single source of truth,
@@ -287,7 +317,7 @@ class PlayerDspController {
   /// central ±15 dB contract ([DspParamRanges.preampDb]) and mirrored into
   /// PlayerState.dsp.preampDb so the reconciliation path and UI never drift from
   /// the engine (PlayerCubit._syncAudioEffects reads it back from the handler).
-  Future<void> setPreamp(double preampDb) {
+  Future<bool> setPreamp(double preampDb) {
     final clamped = DspParamRanges.preampDb.clampRaw(preampDb);
     return applyDspEffect(
       featureName: 'Preamp',
@@ -296,14 +326,17 @@ class PlayerDspController {
     );
   }
 
-  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile,
-      {bool isPerSongRestore = false}) async {
-    if (profile != null && !guardDsp('AutoEQ', showError: true)) return;
+  Future<bool> applyHeadphoneProfile(HeadphoneProfile? profile,
+      {bool isPerSongRestore = false, bool showErrorOnGuard = true}) async {
+    markUserInteracting();
+    if (profile != null && !guardDsp('AutoEQ', showError: showErrorOnGuard)) {
+      return false;
+    }
     final state = _getState();
     final previousDsp = state.dsp;
     if (profile != null) {
       if (perSongOverrideActive && !isPerSongRestore) {
-        globalEqBackup = EqPreset(
+        globalEqBackup = state.eqPreset.copyWith(
           name: profile.name,
           gains: profile.gains,
           bassBoost: profile.bassBoost,
@@ -314,7 +347,7 @@ class PlayerDspController {
         dsp: state.dsp.copyWith(
           isEqEnabled: true,
           selectedHeadphoneProfile: profile,
-          eqPreset: EqPreset(
+          eqPreset: state.eqPreset.copyWith(
             name: profile.name,
             gains: profile.gains,
             bassBoost: profile.bassBoost,
@@ -325,7 +358,10 @@ class PlayerDspController {
       try {
         await _audioHandler.setEqualizerEnabled(true);
         await _audioHandler.applyHeadphoneProfile(profile);
-      } catch (e) {
+        return true;
+      } catch (e, st) {
+        ErrorLogger.log('Failed to apply AutoEQ profile',
+            error: e, stackTrace: st, category: 'PlayerDspController');
         final s = _getState();
         _emit(s.copyWith(
           dsp: previousDsp,
@@ -333,6 +369,7 @@ class PlayerDspController {
             errorMessage: 'Failed to apply AutoEQ profile: $e',
           ),
         ));
+        return false;
       }
     } else {
       _emit(state.copyWith(
@@ -340,7 +377,10 @@ class PlayerDspController {
       ));
       try {
         await _audioHandler.applyHeadphoneProfile(null);
-      } catch (e) {
+        return true;
+      } catch (e, st) {
+        ErrorLogger.log('Failed to reset headphone profile',
+            error: e, stackTrace: st, category: 'PlayerDspController');
         final s = _getState();
         _emit(s.copyWith(
           dsp: previousDsp,
@@ -348,34 +388,36 @@ class PlayerDspController {
             errorMessage: 'Failed to reset headphone profile: $e',
           ),
         ));
+        return false;
       }
     }
   }
 
-  Future<void> resetHeadphoneProfile() => applyHeadphoneProfile(null);
+  Future<bool> resetHeadphoneProfile() => applyHeadphoneProfile(null);
 
   Future<void> setBandGain(int bandIndex, double gain) async {
+    markUserInteracting();
     if (!guardDsp('Band Gain', showError: false)) return;
     final clamped = gain.clamp(-15.0, 15.0);
     final state = _getState();
-    final previousDsp = state.dsp;
     final currentGains = List<double>.from(state.eqPreset.gains);
-    if (bandIndex >= 0 && bandIndex < currentGains.length) {
-      currentGains[bandIndex] = clamped;
-      _emit(state.copyWith(
-        dsp: state.dsp.copyWith(
-          eqPreset: EqPreset(
-            name: 'Custom',
-            gains: currentGains,
-            bassBoost: state.eqPreset.bassBoost,
-          ),
-          selectedHeadphoneProfile: null,
+    if (bandIndex < 0 || bandIndex >= currentGains.length) return;
+    final previousDsp = state.dsp;
+    currentGains[bandIndex] = clamped;
+    _emit(state.copyWith(
+      dsp: state.dsp.copyWith(
+        eqPreset: state.eqPreset.copyWith(
+          name: 'Custom',
+          gains: currentGains,
         ),
-      ));
-    }
+        selectedHeadphoneProfile: null,
+      ),
+    ));
     try {
       await _audioHandler.setBandGain(bandIndex, clamped);
-    } catch (e) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set band gain',
+          error: e, stackTrace: st, category: 'PlayerDspController');
       final s = _getState();
       _emit(s.copyWith(
           dsp: previousDsp,
@@ -385,6 +427,7 @@ class PlayerDspController {
   }
 
   Future<void> resetToFlat() async {
+    markUserInteracting();
     final state = _getState();
     final previousDsp = state.dsp;
     _emit(state.copyWith(
@@ -395,7 +438,9 @@ class PlayerDspController {
     ));
     try {
       await _audioHandler.resetToFlat();
-    } catch (e) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reset equalizer',
+          error: e, stackTrace: st, category: 'PlayerDspController');
       final s = _getState();
       _emit(s.copyWith(
         dsp: previousDsp,

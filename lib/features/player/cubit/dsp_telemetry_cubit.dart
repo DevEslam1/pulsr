@@ -105,8 +105,14 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
     if (_fetchInFlight) return;
     _fetchInFlight = true;
     try {
-      final telemetry = await _channel.getTelemetry();
-      if (isClosed) return;
+      // Bound the cubit's own wait as well: a channel/fake that never completes
+      // would otherwise leave _fetchInFlight stuck true forever.
+      final telemetry = await _channel.getTelemetry().timeout(
+            const Duration(seconds: 1),
+          );
+      // A fetch that lands after the last consumer unsubscribed (or after
+      // close) must not resurrect stale meters.
+      if (isClosed || _listenerCount == 0) return;
       _consecutiveFailures = 0;
       _didLogFailure = false;
       _retryTimer?.cancel();

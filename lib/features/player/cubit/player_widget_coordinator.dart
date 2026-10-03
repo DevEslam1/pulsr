@@ -16,6 +16,7 @@ class PlayerWidgetCoordinator {
   // B16: monotonic clock so widget-push throttling is immune to system clock
   // changes (matches PlayerScrobbleCoordinator).
   final Stopwatch _clock = Stopwatch()..start();
+  bool _disposed = false;
   int? _lastUpdateMs;
   int? _lastProgressUpdateMs;
   int? _cachedNextTitlesIndex;
@@ -74,6 +75,7 @@ class PlayerWidgetCoordinator {
   }
 
   void updateThrottled(PlayerState s, int queueVersion, {bool force = false}) {
+    if (_disposed) return;
     if (!_clock.isRunning) _clock.start();
     final now = _clock.elapsedMilliseconds;
     if (!force &&
@@ -89,24 +91,31 @@ class PlayerWidgetCoordinator {
       final nextSong = s.queue[s.currentIndex + 1];
       queueCover = nextSong.artworkUri ?? nextSong.remoteArtworkUrl;
     }
-    _widgetService?.updateNowPlaying(
-      song: s.currentSong,
-      isPlaying: s.isPlaying,
-      position: s.position,
-      duration: s.duration,
-      isFavorite: s.currentSong?.isFavorite ?? false,
-      isShuffle: s.isShuffle,
-      repeatMode: switch (s.repeatMode) {
-        PlayerRepeatMode.one => 'one',
-        PlayerRepeatMode.all => 'all',
-        PlayerRepeatMode.off => 'off',
-      },
-      nextQueueTitles: nextTitles(s, queueVersion),
-      queueCover: queueCover,
-    );
+    // catchError, not try/catch: an async failure is delivered on the returned
+    // Future and would otherwise surface as an unhandled zone error.
+    try {
+      unawaited(_widgetService
+          ?.updateNowPlaying(
+            song: s.currentSong,
+            isPlaying: s.isPlaying,
+            position: s.position,
+            duration: s.duration,
+            isFavorite: s.currentSong?.isFavorite ?? false,
+            isShuffle: s.isShuffle,
+            repeatMode: switch (s.repeatMode) {
+              PlayerRepeatMode.one => 'one',
+              PlayerRepeatMode.all => 'all',
+              PlayerRepeatMode.off => 'off',
+            },
+            nextQueueTitles: nextTitles(s, queueVersion),
+            queueCover: queueCover,
+          )
+          .catchError((Object _) {}));
+    } catch (_) {}
   }
 
   void updateProgressThrottled(PlayerState s) {
+    if (_disposed) return;
     if (!_clock.isRunning) _clock.start();
     final now = _clock.elapsedMilliseconds;
     if (_lastProgressUpdateMs != null &&
@@ -116,11 +125,13 @@ class PlayerWidgetCoordinator {
     }
     _lastProgressUpdateMs = now;
     try {
-      unawaited(_widgetService?.updateProgress(
-        isPlaying: s.isPlaying,
-        position: s.position,
-        duration: s.duration,
-      ));
+      unawaited(_widgetService
+          ?.updateProgress(
+            isPlaying: s.isPlaying,
+            position: s.position,
+            duration: s.duration,
+          )
+          .catchError((Object _) {}));
     } catch (_) {}
   }
 
@@ -140,6 +151,7 @@ class PlayerWidgetCoordinator {
   }
 
   void dispose() {
+    _disposed = true;
     _clock.stop();
     _clock.reset();
     _lastUpdateMs = null;

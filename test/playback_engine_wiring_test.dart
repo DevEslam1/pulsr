@@ -1,5 +1,6 @@
 // test/playback_engine_wiring_test.dart
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
@@ -23,6 +24,16 @@ class MockYtmUrlCache extends Mock implements YtmUrlCache {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const audioEffectsChannel = MethodChannel('com.pulsr.music/audio_effects');
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(audioEffectsChannel, (call) async => true);
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(audioEffectsChannel, null);
+  });
 
   group('Playback Engine Wiring Verification Suite', () {
     // 1. AdaptiveBufferEngine throughput & bucket transition

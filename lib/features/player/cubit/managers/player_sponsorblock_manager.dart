@@ -14,7 +14,10 @@ class PlayerSponsorBlockManager {
 
   List<SponsorBlockSegment> _currentSegments = const [];
   String? _currentVideoId;
-  Duration? _lastSkippedSegmentEnd;
+  Duration? _lastSkippedTarget;
+  // Last position evaluated by [checkSkipTarget]; a backwards jump clears the
+  // skip guard so a rewind or a repeat-one restart can skip the segment again.
+  Duration? _lastCheckPosition;
   DateTime? _lastSkipTime;
 
   List<SponsorBlockSegment> get currentSegments => _currentSegments;
@@ -33,7 +36,8 @@ class PlayerSponsorBlockManager {
   void reset() {
     _currentSegments = const [];
     _currentVideoId = null;
-    _lastSkippedSegmentEnd = null;
+    _lastSkippedTarget = null;
+    _lastCheckPosition = null;
     _lastSkipTime = null;
   }
 
@@ -59,7 +63,9 @@ class PlayerSponsorBlockManager {
       return const [];
     }
 
-    if (_currentVideoId == videoId && _currentSegments.isNotEmpty) {
+    // Cache empty results too: a video with no segments otherwise re-runs the
+    // whole lookup (and resets skip state) on every load.
+    if (_currentVideoId == videoId) {
       return _currentSegments;
     }
 
@@ -72,7 +78,6 @@ class PlayerSponsorBlockManager {
       }
       _currentSegments = segments;
       _currentVideoId = videoId;
-      _lastSkippedSegmentEnd = null;
       return segments;
     } catch (e, st) {
       ErrorLogger.log('Failed to fetch SponsorBlock segments for $videoId',
@@ -88,6 +93,15 @@ class PlayerSponsorBlockManager {
       return null;
     }
 
+    // A backwards jump (manual rewind or repeat-one restart) invalidates the
+    // previous skip, so the same segment is skipped again on the next pass.
+    final lastPos = _lastCheckPosition;
+    if (lastPos != null &&
+        pos < lastPos - const Duration(milliseconds: 500)) {
+      _lastSkippedTarget = null;
+    }
+    _lastCheckPosition = pos;
+
     final now = DateTime.now();
     if (_lastSkipTime != null &&
         now.difference(_lastSkipTime!).inMilliseconds < 1500) {
@@ -101,18 +115,15 @@ class PlayerSponsorBlockManager {
     );
     if (seekTarget == null) return null;
 
-    final target = seekTarget <= const Duration(milliseconds: 50)
-        ? Duration.zero
-        : seekTarget - const Duration(milliseconds: 50);
-
-    if (_lastSkippedSegmentEnd != null &&
-        (_lastSkippedSegmentEnd == target ||
-            (pos - _lastSkippedSegmentEnd!).abs() <
-                const Duration(seconds: 2))) {
+    // While the engine is still applying the previous seek, position ticks can
+    // keep reporting positions inside the already-skipped segment. Suppress the
+    // duplicate. Once playback passes the stored target (or the user rewinds,
+    // clearing it above) a later segment is evaluated normally.
+    if (_lastSkippedTarget != null && pos < _lastSkippedTarget!) {
       return null;
     }
 
-    _lastSkippedSegmentEnd = target;
+    _lastSkippedTarget = seekTarget;
     _lastSkipTime = now;
     return seekTarget;
   }

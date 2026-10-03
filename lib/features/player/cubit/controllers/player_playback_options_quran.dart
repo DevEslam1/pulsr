@@ -92,55 +92,87 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
   }
 
   Future<void> setQuranModeEnabled(bool enabled) async {
-    final s = _getState();
-    if (enabled == s.isQuranModeEnabled) return;
-    await _quranManager.setEnabled(enabled);
-    if (enabled) {
-      final snapshot = _captureQuranRestoreSnapshot(s);
-      // Keep the snapshot on the manager as well as persisting it: a
-      // failed/corrupt prefs write must not leave disabling unable to restore
-      // the real DSP.
-      _quranManager.setRestoreSnapshot(snapshot);
-      await _persistQuranSnapshot(snapshot);
-      _emit(s.copyWith(dsp: s.dsp.copyWith(isQuranModeEnabled: true)));
-      final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
-      await _applyQuranProfile(profile);
-    } else {
-      // Prefer the persisted snapshot; fall back to the in-memory copy when the
-      // persisted one is missing or corrupt (loadQuranSnapshot returns null).
-      final snapshot = await loadQuranSnapshot() ?? _quranManager.restoreSnapshot;
-      if (snapshot != null) {
-        await _restoreFromSnapshot(snapshot);
-      } else {
-        // Neither source is available: never flip the toggle off while Quran
-        // DSP stays applied. Reset the Quran-controlled effects to safe
-        // defaults so the toggle and the real effect chain agree.
-        await _restoreSafeDefaults();
+    if (_isTogglingQuranMode) return;
+    _isTogglingQuranMode = true;
+    try {
+      final s = _getState();
+      if (enabled == s.isQuranModeEnabled) return;
+      if (enabled && !checkDspGuard('Quran Mode')) return;
+
+      final persisted = await _quranManager.setEnabled(enabled);
+      if (!persisted) {
+        if (!isClosed) {
+          final current = _getState();
+          _emit(current.copyWith(
+            playback: current.playback.copyWith(
+                errorMessage: 'Failed to save Quran Mode setting'),
+          ));
+        }
+        return;
       }
-      _quranManager.setRestoreSnapshot(null);
-      await _clearQuranSnapshot();
-      final current = _getState();
-      _emit(current.copyWith(dsp: current.dsp.copyWith(isQuranModeEnabled: false)));
+      if (isClosed) return;
+
+      if (enabled) {
+        final snapshot = _captureQuranRestoreSnapshot(_getState());
+        _quranManager.setRestoreSnapshot(snapshot);
+        await _persistQuranSnapshot(snapshot);
+        if (isClosed) return;
+        final current = _getState();
+        _emit(current.copyWith(dsp: current.dsp.copyWith(isQuranModeEnabled: true)));
+        final profile = QuranModeProfile.forStyle(current.quranReciterStyle);
+        await _applyQuranProfile(profile);
+      } else {
+        final snapshot = await loadQuranSnapshot() ?? _quranManager.restoreSnapshot;
+        if (snapshot != null) {
+          final restored = await _restoreFromSnapshot(snapshot);
+          if (!restored) {
+            if (!isClosed) {
+              final current = _getState();
+              _emit(current.copyWith(
+                playback: current.playback.copyWith(
+                    errorMessage: 'Failed to restore audio settings from Quran Mode'),
+              ));
+            }
+            return;
+          }
+        } else {
+          await _restoreSafeDefaults();
+        }
+        _quranManager.setRestoreSnapshot(null);
+        await _clearQuranSnapshot();
+        if (isClosed) return;
+        final current = _getState();
+        _emit(current.copyWith(dsp: current.dsp.copyWith(isQuranModeEnabled: false)));
+      }
+    } finally {
+      _isTogglingQuranMode = false;
     }
   }
 
-  void setQuranReciterStyle(QuranReciterStyle style) {
+  Future<void> setQuranReciterStyle(QuranReciterStyle style) async {
+    final gen = ++_reciterStyleGen;
     final s = _getState();
     _emit(s.copyWith(dsp: s.dsp.copyWith(quranReciterStyle: style)));
-    unawaited(_quranManager.setStyle(style));
-    if (s.isQuranModeEnabled) {
-      final profile = QuranModeProfile.forStyle(style);
-      unawaited(_applyQuranProfile(profile));
+    try {
+      await _quranManager.setStyle(style);
+      if (isClosed || gen != _reciterStyleGen) return;
+      if (_getState().isQuranModeEnabled) {
+        if (!checkDspGuard('Quran Mode')) return;
+        final profile = QuranModeProfile.forStyle(style);
+        await _applyQuranProfile(profile);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set Quran reciter style',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsQuran');
     }
   }
 
   Future<void> setQuranAmbience(double v) async {
-    final clamped = v.clamp(0.0, 0.6);
     final s = _getState();
-    // Only enable reverb when Quran Mode is actively enabled and slider has a positive value.
-    // If set to 0 or if Quran mode is inactive, do not unconditionally force reverb on.
-    final enable =
-        s.isQuranModeEnabled ? (clamped > 0.001) : s.isReverbEnabled;
+    if (!s.isQuranModeEnabled) return;
+    final clamped = v.clamp(0.0, 0.6);
+    if (clamped > 0.001 && !checkDspGuard('Quran Ambience')) return;
+    final enable = clamped > 0.001;
     _emit(s.copyWith(
       dsp: s.dsp.copyWith(isReverbEnabled: enable, reverbWetDry: clamped),
     ));
@@ -152,12 +184,13 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     }
   }
 
-  Future<void> _restoreFromSnapshot(QuranRestoreSnapshot snapshot) async {
+  Future<bool> _restoreFromSnapshot(QuranRestoreSnapshot snapshot) async {
     final s = _getState();
+    final eqPreset = snapshot.eqPreset;
     _emit(s.copyWith(
       dsp: s.dsp.copyWith(
-        isEqEnabled: snapshot.isEqEnabled,
-        eqPreset: snapshot.eqPreset,
+        isEqEnabled: eqPreset != null ? snapshot.isEqEnabled : s.isEqEnabled,
+        eqPreset: eqPreset ?? s.eqPreset,
         selectedHeadphoneProfile: snapshot.headphoneProfile,
         isReverbEnabled: snapshot.isReverbEnabled,
         reverbPreset: snapshot.reverbPreset,
@@ -172,13 +205,15 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       ),
       playback: s.playback.copyWith(
         playbackSpeed: snapshot.playbackSpeed,
-        isShuffle: snapshot.isShuffle,
       ),
     ));
 
     try {
-      await _audioHandler.setEqualizerEnabled(snapshot.isEqEnabled);
-      await _audioHandler.applyPreset(snapshot.eqPreset);
+      if (eqPreset != null) {
+        await _audioHandler.setEqualizerEnabled(snapshot.isEqEnabled);
+        await _audioHandler.applyPreset(eqPreset);
+      }
+      await _audioHandler.applyHeadphoneProfile(snapshot.headphoneProfile);
       await _audioHandler.setPreamp(snapshot.preampDb);
       await _audioHandler.setReverb(
         snapshot.isReverbEnabled,
@@ -195,36 +230,29 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         snapshot.dynamicsPreset,
         enabled: snapshot.isDynamicsEnabled,
       );
-      // Restore speed directly — not via setPlaybackSpeed — so the restore
-      // does not overwrite the song's per-song speed memory with the Quran
-      // speed that was active just before disabling the mode.
       await _audioHandler.setSpeed(snapshot.playbackSpeed);
-      if (snapshot.isShuffle != s.isShuffle) {
-        await _audioHandler.setShuffleMode(
-          snapshot.isShuffle
-              ? AudioServiceShuffleMode.all
-              : AudioServiceShuffleMode.none,
-        );
-      }
+      return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to restore from Quran snapshot',
           error: e,
           stackTrace: st,
           category: 'PlayerPlaybackOptionsQuran');
+      return false;
     }
   }
 
   /// Fallback used when Quran Mode is disabled but no restorable snapshot
-  /// exists (neither persisted nor in memory). Turns the Quran-applied DSP
-  /// back off so the toggle and the real effect chain agree, rather than
-  /// leaving Quran EQ/reverb/saturation/dynamics/speed applied. Mirrors the
-  /// "off" half of [_restoreFromSnapshot] without captured values; shuffle is
-  /// intentionally left untouched since Quran Mode does not change it.
+  /// exists (neither persisted nor in memory). Resets all Quran-controlled
+  /// DSP stages to safe defaults, including neutral preamp and flat preset.
   Future<void> _restoreSafeDefaults() async {
     final s = _getState();
+    final defaultPreset = EqPreset.defaultPresets.first;
     _emit(s.copyWith(
       dsp: s.dsp.copyWith(
         isEqEnabled: false,
+        eqPreset: defaultPreset,
+        selectedHeadphoneProfile: null,
+        preampDb: 0.0,
         isReverbEnabled: false,
         reverbWetDry: 0.0,
         isSaturationEnabled: false,
@@ -236,12 +264,13 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     ));
 
     try {
+      await _audioHandler.setPreamp(0.0);
+      await _audioHandler.applyPreset(defaultPreset);
+      await _audioHandler.applyHeadphoneProfile(null);
       await _audioHandler.setEqualizerEnabled(false);
       await _audioHandler.setReverb(false, wetDry: 0.0);
       await _audioHandler.setSaturation(false);
       await _audioHandler.setDynamicsPreset(s.dynamicsPreset, enabled: false);
-      // Use setSpeed directly — not setPlaybackSpeed — to avoid writing 1.0
-      // to the per-song store and triggering a redundant state emit.
       await _audioHandler.setSpeed(1.0);
     } catch (e, st) {
       ErrorLogger.log('Failed to restore safe defaults while disabling Quran Mode',
@@ -259,6 +288,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       dsp: s.dsp.copyWith(
         isEqEnabled: true,
         eqPreset: eqPreset,
+        selectedHeadphoneProfile: null,
         isReverbEnabled: profile.reverbEnabled,
         reverbPreset: profile.reverbPreset.wireValue,
         reverbWetDry: profile.reverbWetDry,
@@ -276,8 +306,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     ));
 
     try {
-      // Lower the preamp BEFORE the EQ boosts go live so the +dB bands never
-      // hit the output without their headroom (momentary clipping = click).
+      // Clear headphone profile in engine so AutoEQ curves don't conflict with Quran EQ
+      await _audioHandler.applyHeadphoneProfile(null);
       await _audioHandler.setPreamp(profile.preampDb);
       await _audioHandler.applyPreset(eqPreset);
       await _audioHandler.setEqualizerEnabled(true);
@@ -296,9 +326,6 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         profile.dynamicsPreset,
         enabled: profile.dynamicsEnabled,
       );
-      // Use setSpeed directly to avoid writing the Quran-mode speed into the
-      // per-song playback store (which would corrupt the song's remembered
-      // speed and be heard as a glitch when effects re-init mid-profile apply).
       await _audioHandler.setSpeed(profile.playbackSpeed);
     } catch (e, st) {
       ErrorLogger.log('Failed to apply Quran profile',
@@ -310,10 +337,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
 
   Future<void> reapplyQuranProfile() async {
     final s = _getState();
-    // "Reset Profile" must re-apply the reciter's Quran profile while the mode
-    // is on. The pre-Quran snapshot is only meaningful when the mode is being
-    // disabled (or is already off), never for a reset.
     if (s.isQuranModeEnabled) {
+      if (!checkDspGuard('Quran Mode')) return;
       final profile = QuranModeProfile.forStyle(s.quranReciterStyle);
       await _applyQuranProfile(profile);
       return;

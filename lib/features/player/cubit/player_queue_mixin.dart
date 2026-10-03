@@ -8,8 +8,10 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   /// cannot clobber the new one when it finally completes.
   void invalidateMediaItemResolution();
 
-  Future<void> playRadioStation(RadioStation station) =>
-      queueController.playRadioStation(station);
+  Future<void> playRadioStation(RadioStation station) {
+    invalidateMediaItemResolution();
+    return queueController.playRadioStation(station);
+  }
 
   /// Pre-resolve [song]'s stream URL in the background so a later tap starts
   /// instantly. Safe and idempotent; call it when a list of songs first renders.
@@ -48,8 +50,10 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
 
   Future<void> clearQueue() => queueController.clearQueue();
 
-  void restoreQueue(List<SongsTableData> previousQueue, int previousIndex) =>
-      queueController.restoreQueue(previousQueue, previousIndex);
+  void restoreQueue(List<SongsTableData> previousQueue, int previousIndex) {
+    invalidateMediaItemResolution();
+    queueController.restoreQueue(previousQueue, previousIndex);
+  }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) =>
       queueController.reorderQueue(oldIndex, newIndex);
@@ -57,9 +61,11 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
   Future<void> removeQueueItem(int index) =>
       queueController.removeQueueItem(index);
 
-  Future<void> switchQueueSlot(int slot) =>
-      queueController.switchQueueSlot(slot);
+  Future<void> switchQueueSlot(int slot) {
+    invalidateMediaItemResolution();
+    return queueController.switchQueueSlot(slot);
+  }
 
-  Future<void> swapReconciledSong(dynamic oldSongOrId, dynamic newSongOrId) =>
+  Future<void> swapReconciledSong(Object? oldSongOrId, Object? newSongOrId) =>
       queueController.swapReconciledSong(oldSongOrId, newSongOrId);
 }

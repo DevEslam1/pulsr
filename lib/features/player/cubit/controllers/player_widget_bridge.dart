@@ -24,6 +24,7 @@ class PlayerWidgetBridge {
     required bool Function() isQuranMode,
     required bool Function() isClosed,
     Duration scrobbleInterval = const Duration(seconds: 5),
+    double Function()? playbackSpeed,
   })  : _widgetService = widgetService,
         _widgetCoordinator = PlayerWidgetCoordinator(widgetService),
         _scrobbleCoordinator = PlayerScrobbleCoordinator(
@@ -31,6 +32,7 @@ class PlayerWidgetBridge {
           isQuranMode: isQuranMode,
           isClosed: isClosed,
           interval: scrobbleInterval,
+          playbackSpeed: playbackSpeed,
         ),
         _latencyTracker = latencyTracker;
 

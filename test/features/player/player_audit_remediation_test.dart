@@ -188,7 +188,7 @@ DSP Chain Status:
       final json = snapshot.toJson();
       final restored = QuranRestoreSnapshot.fromJson(json);
 
-      expect(restored.eqPreset.name, 'Rock');
+      expect(restored.eqPreset!.name, 'Rock');
       expect(restored.isEqEnabled, isTrue);
       expect(restored.headphoneProfile, isNull);
       expect(restored.isReverbEnabled, isTrue);

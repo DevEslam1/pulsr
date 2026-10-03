@@ -1,11 +1,11 @@
 // lib/features/player/cubit/player_constants.dart
-import 'dart:core';
 
 /// Shared constants for the player feature, eliminating magic numbers across controllers and UI.
 abstract final class PlayerConstants {
   /// Seek throttle window to prevent flooding AudioHandler with rapid scrubbing calls.
-  static const Duration seekThrottleDuration = Duration(milliseconds: 100);
   static const int seekThrottleMs = 100;
+  static const Duration seekThrottleDuration =
+      Duration(milliseconds: seekThrottleMs);
 
   /// Throttling interval for position stream updates to the UI and widget progress.
   static const Duration positionThrottleDuration = Duration(milliseconds: 200);
