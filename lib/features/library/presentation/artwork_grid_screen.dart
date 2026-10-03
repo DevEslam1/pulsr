@@ -10,7 +10,7 @@ import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/utils/error_logger.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
@@ -84,6 +84,9 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
             Row(
               children: [
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.zoom_out_rounded),
                   tooltip: context.l10n.zoomOut,
                   onPressed: () {
@@ -94,6 +97,9 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                   },
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.zoom_in_rounded),
                   tooltip: context.l10n.zoomIn,
                   onPressed: () {
@@ -121,7 +127,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                   children: [
                     SizedBox(
                       height: MediaQuery.sizeOf(context).height * 0.65,
-                      child: EmptyStateWidget(
+                      child: PulsrEmptyState(
                         icon: Icons.album_outlined,
                         title: context.l10n.noAlbumsFound,
                         subtitle: context.l10n.rescanSubtitle,

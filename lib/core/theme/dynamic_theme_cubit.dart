@@ -274,8 +274,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
         final darkVibrant =
             palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
         final bg = darkVibrant != null
-            ? Color.alphaBlend(
-                Colors.black.withValues(alpha: 0.75), darkVibrant)
+            ? Color.alphaBlend(AppColors.scrimAt(0.75), darkVibrant)
             : AppColors.darkSurface;
 
         final newPalette = _CachedPalette(

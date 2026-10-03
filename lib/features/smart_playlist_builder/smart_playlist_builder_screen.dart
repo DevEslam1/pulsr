@@ -17,6 +17,7 @@ import 'smart_playlist_builder_cubit.dart';
 import 'smart_playlist_builder_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:flutter/services.dart';
 
 class SmartPlaylistBuilderScreen extends StatelessWidget {
   final PlaylistsTableData? initialPlaylist;
@@ -244,7 +245,10 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                         : p.textSecondary,
                                     fontWeight: FontWeight.w700,
                                   ),
-                                  onSelected: (_) => cubit.toggleMatchAll(true),
+                                  onSelected: (_) {
+                                    HapticFeedback.selectionClick();
+                                    cubit.toggleMatchAll(true);
+                                  },
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.xs),
@@ -261,8 +265,10 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                         : p.textSecondary,
                                     fontWeight: FontWeight.w700,
                                   ),
-                                  onSelected: (_) =>
-                                      cubit.toggleMatchAll(false),
+                                  onSelected: (_) {
+                                    HapticFeedback.selectionClick();
+                                    cubit.toggleMatchAll(false);
+                                  },
                                 ),
                               ),
                             ],
@@ -705,6 +711,9 @@ class _RuleCardState extends State<_RuleCard> {
                 ),
 
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: Icon(Icons.close_rounded, size: 20, color: p.error),
                   tooltip: context.l10n.delete,
                   onPressed: widget.onDelete,

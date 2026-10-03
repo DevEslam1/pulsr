@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -8,6 +9,7 @@ import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
@@ -50,8 +52,9 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
 
     final double maxBarWidth = isTablet ? 640.0 : 540.0;
     final double barHeight = widget.iconOnly ? 48.0 : (isTablet ? 68.0 : 64.0);
-    final navRadius =
-        BorderRadius.circular(isTablet ? 28 : (widget.iconOnly ? 20 : 24));
+    final navRadius = BorderRadius.circular(isTablet
+        ? AppRadii.r28
+        : (widget.iconOnly ? AppRadii.r20 : AppRadii.r24));
 
     return SafeArea(
       top: false,
@@ -155,8 +158,8 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                             ),
                             border: Border.all(
                               color: p.isDark
-                                  ? Colors.white.withValues(alpha: 0.14)
-                                  : Colors.black.withValues(alpha: 0.08),
+                                  ? AppColors.specularStrong
+                                  : AppColors.scrimAt(0.08),
                               width: 1.2,
                             ),
                           ),
@@ -188,6 +191,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                     Expanded(
                                       child: _NavTabItem(
                                         item: items[i],
+                                        index: i,
                                         isSelected: widget.currentIndex == i,
                                         p: p,
                                         isTablet: isTablet,
@@ -227,6 +231,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
 
 class _NavTabItem extends StatelessWidget {
   final PulsrDestination item;
+  final int index;
   final bool isSelected;
   final PulsrPalette p;
   final bool isTablet;
@@ -235,6 +240,7 @@ class _NavTabItem extends StatelessWidget {
 
   const _NavTabItem({
     required this.item,
+    required this.index,
     required this.isSelected,
     required this.p,
     required this.isTablet,
@@ -250,6 +256,7 @@ class _NavTabItem extends StatelessWidget {
       selected: isSelected,
       button: true,
       label: item.label,
+      sortKey: OrdinalSortKey(index.toDouble()),
       child: Tooltip(
         message: item.label,
         waitDuration: const Duration(milliseconds: 500),
@@ -257,7 +264,8 @@ class _NavTabItem extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
+            borderRadius:
+                BorderRadius.circular(isTablet ? AppRadii.r22 : AppRadii.r18),
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,
             child: AnimatedContainer(
@@ -278,7 +286,8 @@ class _NavTabItem extends StatelessWidget {
                         ],
                       )
                     : null,
-                borderRadius: BorderRadius.circular(isTablet ? 22 : 18),
+                borderRadius: BorderRadius.circular(
+                    isTablet ? AppRadii.r22 : AppRadii.r18),
                 border: isSelected
                     ? Border.all(
                         color: p.accent.withValues(alpha: 0.38),

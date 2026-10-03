@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/aura_theme.dart';
 import 'waveform_logo.dart';
 
+/// {@category DesignSystem}
 class ArtworkPlaceholder extends StatelessWidget {
   final double size;
   final double borderRadius;

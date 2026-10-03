@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// A widget that displays text normally when it fits within the parent bounds,
 /// and smoothly scrolls it horizontally (marquee) when it overflows.
 class MarqueeText extends StatefulWidget {

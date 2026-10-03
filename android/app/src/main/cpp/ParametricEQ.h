@@ -52,6 +52,9 @@ public:
 
 private:
     void computeCoeffs(EQBandState& band, double gainDb);
+    // Off->on transition: clear stale filter memory and restart preamp/band
+    // gains from flat so the smoother fades the EQ in instead of clicking.
+    void beginEnableRamp();
 
     EQBandState bands_[MAX_BANDS];
     int bandCount_ = 10;

@@ -22,6 +22,7 @@ import '../../../player/presentation/widgets/dsp_inspector_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'battery_optimization_card.dart';
+import 'bit_perfect_conflict_dialog.dart';
 import 'bt_latency_tap_sheet.dart';
 import 'cast_section.dart';
 import 'headphone_safety_sheet.dart';
@@ -36,7 +37,10 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 part 'audio_sound_dop_selector.dart';
-part 'audio_sound_subsections.dart';
+part 'audio_output_section.dart';
+part 'audio_dsp_section.dart';
+part 'audio_gain_section.dart';
+part 'audio_diagnostic_section.dart';
 
 /// Sound engine: equalizer, DSP engine, output device / bit-perfect,
 /// ReplayGain and battery optimization for background audio.

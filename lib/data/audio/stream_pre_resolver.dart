@@ -63,6 +63,28 @@ class StreamPreResolver {
     this.preResolveWindowSize = 1,
   });
 
+  /// Test entry point mirroring the production constructor so unit tests can
+  /// inject a deterministic URL resolver and cache.
+  @visibleForTesting
+  factory StreamPreResolver.forTesting({
+    required StreamUrlResolver resolveUrl,
+    required YtmUrlCache urlCache,
+    String Function() qualityProvider = _defaultQuality,
+    Duration debounceDuration = const Duration(milliseconds: 100),
+    bool Function(String videoId)? isAlreadyPrefetching,
+    bool Function()? repeatQueueProvider,
+    int preResolveWindowSize = 1,
+  }) =>
+      StreamPreResolver(
+        resolveUrl: resolveUrl,
+        urlCache: urlCache,
+        qualityProvider: qualityProvider,
+        debounceDuration: debounceDuration,
+        isAlreadyPrefetching: isAlreadyPrefetching,
+        repeatQueueProvider: repeatQueueProvider,
+        preResolveWindowSize: preResolveWindowSize,
+      );
+
   final bool Function()? repeatQueueProvider;
 
   static String _defaultQuality() => 'high';

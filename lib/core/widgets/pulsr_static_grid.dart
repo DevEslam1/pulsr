@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// A static, non-scrollable grid layout implemented via [Column], [Row], and [AspectRatio]/[SizedBox].
 ///
 /// Unlike [GridView.builder] with `shrinkWrap: true` and [NeverScrollableScrollPhysics],

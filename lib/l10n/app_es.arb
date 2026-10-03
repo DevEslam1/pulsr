@@ -4354,5 +4354,8 @@
   "maxVolume": "Volumen máximo",
   "pageLoadingProgress": "Progreso de carga de la página",
   "albumArtworkLabel": "Carátula del álbum",
-  "failedToApplyLabel": "No se pudo aplicar {label}"
+  "failedToApplyLabel": "No se pudo aplicar {label}",
+  "bitPerfectConflictTitle": "¿Desactivar estas funciones para usar Bit-Perfect?",
+  "bitPerfectConflictBody": "Bit-Perfect envía el audio original sin alteraciones a tu DAC USB. Estas funciones cambian el sonido y no son compatibles:",
+  "bitPerfectDisableAndEnable": "Desactivar y activar"
 }

@@ -222,11 +222,17 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
               Row(
                 children: [
                   IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
                     icon: Icon(Icons.sort_rounded, color: p.primary),
                     onPressed: _sortLines,
                     tooltip: context.l10n.dspSortByTime,
                   ),
                   IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
                     icon: Icon(Icons.add_rounded, color: p.primary),
                     onPressed: _addNewLine,
                     tooltip: context.l10n.dspAddLine,
@@ -342,16 +348,25 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                       ),
                       // Offset adjust buttons
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         icon: const Icon(Icons.remove_rounded, size: 16),
                         color: p.textSecondary,
                         onPressed: () => _adjustOffset(index, -250),
                       ),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         icon: const Icon(Icons.add_rounded, size: 16),
                         color: p.textSecondary,
                         onPressed: () => _adjustOffset(index, 250),
                       ),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         icon:
                             const Icon(Icons.delete_outline_rounded, size: 16),
                         color: p.textSecondary,

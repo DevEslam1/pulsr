@@ -214,24 +214,36 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         ),
                       ),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         tooltip: context.l10n.dspCopyJsonReport,
                         icon:
                             Icon(Icons.copy_rounded, color: p.accent, size: 20),
                         onPressed: () => _copyReportToClipboard(context),
                       ),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         tooltip: 'Share DSP report',
                         icon: Icon(Icons.share_rounded,
                             color: p.accent, size: 20),
                         onPressed: () => _shareReport(context),
                       ),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         tooltip: 'Latency & Sync Diagnostics',
                         icon:
                             Icon(Icons.sync_rounded, color: p.accent, size: 20),
                         onPressed: () => SyncDiagnosticsSheet.show(context),
                       ),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         tooltip: context.l10n.dspRefreshStatus,
                         icon: Icon(Icons.refresh_rounded,
                             color: p.accent, size: 20),

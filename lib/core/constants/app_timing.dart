@@ -1,5 +1,6 @@
 // lib/core/constants/app_timing.dart
 
+/// {@category DesignSystem}
 abstract class AppTiming {
   static const Duration debounceShort = Duration(milliseconds: 200);
   static const Duration debounceMedium = Duration(milliseconds: 300);

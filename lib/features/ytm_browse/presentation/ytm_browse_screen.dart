@@ -7,7 +7,7 @@ import '../../../../core/services/ytm_browse_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/error_logger.dart';
-import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/pulsr_empty_state.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../../core/widgets/shimmer_skeleton.dart';
@@ -17,6 +17,7 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class YtmBrowseScreen extends StatefulWidget {
   const YtmBrowseScreen({super.key});
@@ -93,6 +94,9 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
           ),
           actions: [
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               icon: Icon(Icons.refresh_rounded, color: p.textPrimary),
               tooltip: context.l10n.refresh,
               onPressed: _isLoading ? null : _loadFeed,
@@ -112,7 +116,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
         body: (_isLoading && _sections.isEmpty)
             ? const SkeletonList(padding: EdgeInsets.only(top: AppSpacing.xs))
             : (_error != null && _loadFailed)
-                ? EmptyStateWidget(
+                ? PulsrEmptyState(
                     icon: Icons.cloud_off_rounded,
                     iconColor: p.error,
                     title: context.l10n.browseFailedLoadFeed,
@@ -122,7 +126,7 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                     onPrimaryAction: _loadFeed,
                   )
                 : _sections.isEmpty
-                    ? EmptyStateWidget(
+                    ? PulsrEmptyState(
                         icon: Icons.explore_off_rounded,
                         title: context.l10n.browseNoRecommendations,
                         subtitle: context.l10n.browseSearchSongsHint,
@@ -226,121 +230,121 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
       button: true,
       label: context.l10n.songByArtist(item.title, item.subtitle),
       child: Container(
-      width: cardWidth,
-      decoration: BoxDecoration(
-        color: p.surfaceCard,
-        borderRadius: BorderRadius.circular(AppRadii.r16),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          context.read<PlayerCubit>().playSong(song, queue: queueSongs);
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                item.artworkUrl != null
-                    ? Image.network(
-                        item.artworkUrl!,
-                        width: cardWidth,
-                        height: imgHeight,
-                        fit: BoxFit.cover,
-                        cacheWidth: (cardWidth * 2).round(),
-                        cacheHeight: (imgHeight * 2).round(),
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                                ? child
-                                : Container(
-                                    width: cardWidth,
-                                    height: imgHeight,
-                                    color: p.surfaceContainer,
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: p.accent,
+        width: cardWidth,
+        decoration: BoxDecoration(
+          color: p.surfaceCard,
+          borderRadius: BorderRadius.circular(AppRadii.r16),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            context.read<PlayerCubit>().playSong(song, queue: queueSongs);
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  item.artworkUrl != null
+                      ? Image.network(
+                          item.artworkUrl!,
+                          width: cardWidth,
+                          height: imgHeight,
+                          fit: BoxFit.cover,
+                          cacheWidth: (cardWidth * 2).round(),
+                          cacheHeight: (imgHeight * 2).round(),
+                          loadingBuilder: (context, child, progress) =>
+                              progress == null
+                                  ? child
+                                  : Container(
+                                      width: cardWidth,
+                                      height: imgHeight,
+                                      color: p.surfaceContainer,
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: p.accent,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                        errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, __, ___) => Container(
+                            width: cardWidth,
+                            height: imgHeight,
+                            color: p.surfaceContainer,
+                            child: Icon(Icons.music_note_rounded,
+                                color: p.primary, size: 36),
+                          ),
+                        )
+                      : Container(
                           width: cardWidth,
                           height: imgHeight,
                           color: p.surfaceContainer,
                           child: Icon(Icons.music_note_rounded,
                               color: p.primary, size: 36),
                         ),
-                      )
-                    : Container(
-                        width: cardWidth,
-                        height: imgHeight,
-                        color: p.surfaceContainer,
-                        child: Icon(Icons.music_note_rounded,
-                            color: p.primary, size: 36),
+                  PositionedDirectional(
+                    bottom: 6,
+                    end: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.s6),
+                      decoration: BoxDecoration(
+                        color: AppColors.scrimAt(0.7),
+                        shape: BoxShape.circle,
                       ),
-                PositionedDirectional(
-                  bottom: 6,
-                  end: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(AppSpacing.s6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.play_arrow_rounded,
-                        color: Colors.white, size: 18),
-                  ),
-                ),
-                PositionedDirectional(
-                  top: 4,
-                  end: 4,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      shape: BoxShape.circle,
-                    ),
-                    child: YtmDownloadButton(song: song, iconSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.xs),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontSize: AppFontSize.bodySmall,
-                      fontWeight: FontWeight.w600,
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: Colors.white, size: 18),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.s2),
-                  Text(
-                    item.hasKnownDuration
-                        ? '${item.subtitle} • ${_formatDuration(item.duration)}'
-                        : item.subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.caption,
+                  PositionedDirectional(
+                    top: 4,
+                    end: 4,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.scrimAt(0.55),
+                        shape: BoxShape.circle,
+                      ),
+                      child: YtmDownloadButton(song: song, iconSize: 16),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: AppFontSize.bodySmall,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      item.hasKnownDuration
+                          ? '${item.subtitle} • ${_formatDuration(item.duration)}'
+                          : item.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.caption,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

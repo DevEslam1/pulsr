@@ -38,7 +38,7 @@ struct SinkReadLock {
 }  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeOpen(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeOpen(
     JNIEnv* /*env*/, jclass /*clazz*/, jint sampleRate, jint channelCount,
     jint encoding, jboolean preferExclusive, jint targetBufferMs) {
     AAudioSink::Config cfg;
@@ -59,7 +59,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeOpen(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeClose(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeClose(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     if (handle == 0) return;
     std::unique_lock<std::shared_mutex> lifeLock(gSinkLifecycleMutex);
@@ -70,7 +70,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeClose(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeWrite(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeWrite(
     JNIEnv* env, jclass /*clazz*/, jlong handle, jobject directBuffer,
     jint offset, jint length) {
     SinkReadLock lifeLock;
@@ -90,28 +90,28 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeWrite(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativePlay(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativePlay(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) sink->Play();
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativePause(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativePause(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) sink->Pause();
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeFlush(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeFlush(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) sink->Flush();
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetFramesRead(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetFramesRead(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->FramesRead();
@@ -119,7 +119,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetFramesRead(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetFramesWritten(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetFramesWritten(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->FramesWritten();
@@ -127,7 +127,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetFramesWritten(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetXRunCount(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetXRunCount(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->XRunCount();
@@ -135,7 +135,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetXRunCount(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetXRunDelta(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetXRunDelta(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->XRunDelta();
@@ -143,7 +143,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetXRunDelta(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeIsExclusive(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeIsExclusive(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->IsExclusive() ? JNI_TRUE : JNI_FALSE;
@@ -151,14 +151,14 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeIsExclusive(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeSetVolume(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeSetVolume(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle, jfloat volume) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) sink->SetVolume(volume);
 }
 
 extern "C" JNIEXPORT jdouble JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetOutputLatencyMs(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetOutputLatencyMs(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->GetOutputLatencyMs();
@@ -166,7 +166,7 @@ Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetOutputLatencyMs(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_ryanheise_just_audio_AaudioNativeBridge_nativeGetFramesPerBurst(
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetFramesPerBurst(
     JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
     SinkReadLock lifeLock;
     if (auto* sink = AsSink(handle)) return sink->FramesPerBurst();

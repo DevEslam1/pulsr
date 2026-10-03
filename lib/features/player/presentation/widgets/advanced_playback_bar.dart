@@ -64,6 +64,9 @@ class AdvancedPlaybackBar extends StatelessWidget {
                             onPressed: cubit.seekToBookmark,
                             child: Text(l10n.resume)),
                         IconButton(
+                            constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget),
                             tooltip: l10n.close,
                             onPressed: cubit.dismissBookmark,
                             icon: const Icon(Icons.close, size: 18)),

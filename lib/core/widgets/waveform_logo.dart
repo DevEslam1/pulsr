@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
 
+/// {@category DesignSystem}
 class WaveformLogo extends StatefulWidget {
   final double size;
   final Color? color;

@@ -28,6 +28,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'widgets/tablet_player_bar.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 enum MiniPlayerVariant { auto, compact, horizontal, tablet }
 
@@ -125,7 +126,9 @@ class MiniPlayerState extends State<MiniPlayer> {
       final state = playerCubit.state;
       final queue = state.queue.isNotEmpty
           ? state.queue
-          : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
+          : (state.currentSong != null
+              ? [state.currentSong!]
+              : const <SongsTableData>[]);
       final currentIndex =
           state.currentIndex.clamp(0, math.max(0, queue.length - 1)).toInt();
       _syncPageController(currentIndex, queue.length);
@@ -141,7 +144,9 @@ class MiniPlayerState extends State<MiniPlayer> {
         final state = cubit.state;
         final queue = state.queue.isNotEmpty
             ? state.queue
-            : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
+            : (state.currentSong != null
+                ? [state.currentSong!]
+                : const <SongsTableData>[]);
         if (queue.isNotEmpty) {
           final target = state.currentIndex.clamp(0, queue.length - 1);
           if (_pageController != null &&
@@ -173,7 +178,9 @@ class MiniPlayerState extends State<MiniPlayer> {
     final qLen = _pendingQueueLength;
     if (target == null || qLen == null) return;
     final controller = _pageController;
-    if (controller != null && controller.hasClients && controller.position.hasContentDimensions) {
+    if (controller != null &&
+        controller.hasClients &&
+        controller.position.hasContentDimensions) {
       _pendingSyncIndex = null;
       _pendingQueueLength = null;
       _syncPageController(target, qLen);
@@ -214,7 +221,9 @@ class MiniPlayerState extends State<MiniPlayer> {
         if (controller.page?.round() != safeIndex) {
           try {
             final maxPage = controller.position.viewportDimension > 0
-                ? (controller.position.maxScrollExtent / controller.position.viewportDimension).round()
+                ? (controller.position.maxScrollExtent /
+                        controller.position.viewportDimension)
+                    .round()
                 : queueLength - 1;
             if (safeIndex <= maxPage && !_controllerDisposed) {
               controller.jumpToPage(safeIndex);
@@ -259,7 +268,9 @@ class MiniPlayerState extends State<MiniPlayer> {
       final synced = cubit.state;
       final syncedQueue = synced.queue.isNotEmpty
           ? synced.queue
-          : (synced.currentSong != null ? [synced.currentSong!] : const <SongsTableData>[]);
+          : (synced.currentSong != null
+              ? [synced.currentSong!]
+              : const <SongsTableData>[]);
       if (syncedQueue.isNotEmpty) {
         _syncPageController(
           synced.currentIndex.clamp(0, syncedQueue.length - 1).toInt(),
@@ -280,8 +291,9 @@ class MiniPlayerState extends State<MiniPlayer> {
         .select<SettingsCubit, PlayerThemeMode>((c) => c.state.playerThemeMode);
     // Mini-player swipe actions are user-configurable; the queue carousel can
     // only natively express the next/prev mapping.
-    final swipeLeftAction = context.select<SettingsCubit, MiniPlayerSwipeAction>(
-        (c) => c.state.miniPlayerSwipeLeft);
+    final swipeLeftAction =
+        context.select<SettingsCubit, MiniPlayerSwipeAction>(
+            (c) => c.state.miniPlayerSwipeLeft);
     final swipeRightAction =
         context.select<SettingsCubit, MiniPlayerSwipeAction>(
             (c) => c.state.miniPlayerSwipeRight);
@@ -289,7 +301,7 @@ class MiniPlayerState extends State<MiniPlayer> {
         swipeRightAction == MiniPlayerSwipeAction.prev;
     final p = context.palette;
 
-    return BlocConsumer<PlayerCubit, PlayerState>(
+    final content = BlocConsumer<PlayerCubit, PlayerState>(
       listenWhen: (a, b) =>
           a.currentIndex != b.currentIndex ||
           listContentDiffers(a.queue, b.queue),
@@ -297,7 +309,9 @@ class MiniPlayerState extends State<MiniPlayer> {
         if (!mounted || _controllerDisposed) return;
         final queue = state.queue.isNotEmpty
             ? state.queue
-            : (state.currentSong != null ? [state.currentSong!] : const <SongsTableData>[]);
+            : (state.currentSong != null
+                ? [state.currentSong!]
+                : const <SongsTableData>[]);
         final currentIndex =
             state.currentIndex.clamp(0, math.max(0, queue.length - 1)).toInt();
         _syncPageController(currentIndex, queue.length);
@@ -321,7 +335,8 @@ class MiniPlayerState extends State<MiniPlayer> {
         final currentIndex = state.currentIndex.clamp(0, queue.length - 1);
 
         final isTablet = Adaptive.isTablet(context);
-        final playerRadius = BorderRadius.circular(isTablet ? 28 : 24);
+        final playerRadius =
+            BorderRadius.circular(isTablet ? AppRadii.r28 : AppRadii.r24);
 
         // Screen readers cannot perform drag gestures, so expose the swipe
         // up/down actions as custom semantics actions (I9).
@@ -342,411 +357,516 @@ class MiniPlayerState extends State<MiniPlayer> {
               button: true,
               customSemanticsActions: customSemanticsActions,
               child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onTap,
-            onLongPress: widget.onLongPress,
-            onVerticalDragStart: (_) {
-              if (_swipeInFlight) return;
-              _verticalDragDy = 0.0;
-            },
-            onVerticalDragUpdate: (d) {
-              if (_swipeInFlight) return;
-              _verticalDragDy += d.delta.dy;
-            },
-            onVerticalDragEnd: (d) {
-              if (_swipeInFlight) return;
-              final vy = d.velocity.pixelsPerSecond.dy;
-              if (_verticalDragDy > 25 || vy > 120) {
-                _swipeInFlight = true;
-                HapticFeedback.selectionClick();
-                widget.onSwipeDown?.call();
-                _verticalSwipeTimer?.cancel();
-                _verticalSwipeTimer = Timer(const Duration(milliseconds: 500), () {
-                  if (mounted) setState(() => _swipeInFlight = false);
-                });
-              } else if (_verticalDragDy < -25 || vy < -120) {
-                _swipeInFlight = true;
-                HapticFeedback.selectionClick();
-                if (widget.onSwipeUp != null) {
-                  widget.onSwipeUp!();
-                } else {
-                  widget.onTap();
-                }
-                _verticalSwipeTimer?.cancel();
-                _verticalSwipeTimer = Timer(const Duration(milliseconds: 500), () {
-                  if (mounted) setState(() => _swipeInFlight = false);
-                });
-              }
-              _verticalDragDy = 0.0;
-            },
-            onHorizontalDragStart: carouselEnabled
-                ? null
-                : (_) {
-                    if (_swipeInFlight) return;
-                    _horizontalDragDx = 0.0;
-                  },
-            onHorizontalDragUpdate: carouselEnabled
-                ? null
-                : (d) {
-                    if (_swipeInFlight) return;
-                    _horizontalDragDx += d.delta.dx;
-                  },
-            onHorizontalDragEnd: carouselEnabled
-                ? null
-                : (d) {
-                    if (_swipeInFlight) return;
-                    final dx = _horizontalDragDx + d.velocity.pixelsPerSecond.dx * 0.05;
-                    _horizontalDragDx = 0.0;
-                    if (dx.abs() < 24) return;
-                    final swipedLeft = dx < 0;
-                    unawaited(_applySwipeAction(
-                      swipedLeft ? swipeLeftAction : swipeRightAction,
-                      cubit,
-                      swipedLeft: swipedLeft,
-                    ));
-                  },
-            child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(
-                isTablet ? 24 : 14,
-                0,
-                isTablet ? 24 : 14,
-                0,
-              ),
-              // Same glass recipe as the bottom navigation bar so the two dock
-              // cards read as one surface family.
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: playerRadius,
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.12),
-                      blurRadius: 24,
-                      spreadRadius: 0,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color:
-                          p.accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
-                      blurRadius: 18,
-                      spreadRadius: -2,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: playerRadius,
-                  child: Builder(
-                    builder: (context) {
-                      final miniPlayerContainer = Container(
-                        decoration: BoxDecoration(
-                          borderRadius: playerRadius,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              GpuBudget.isGpuSaverActive
-                                  ? p.surface
-                                  : p.surface
-                                      .withValues(alpha: p.isDark ? 0.76 : 0.86),
-                              GpuBudget.isGpuSaverActive
-                                  ? p.surfaceContainer
-                                  : p.surfaceContainer
-                                      .withValues(alpha: p.isDark ? 0.70 : 0.82),
-                            ],
-                          ),
-                        border: Border.all(
-                          color: p.isDark
-                              ? Colors.white.withValues(alpha: 0.14)
-                              : Colors.black.withValues(alpha: 0.08),
-                          width: 1.2,
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onTap,
+                onLongPress: widget.onLongPress,
+                onVerticalDragStart: (_) {
+                  if (_swipeInFlight) return;
+                  _verticalDragDy = 0.0;
+                },
+                onVerticalDragUpdate: (d) {
+                  if (_swipeInFlight) return;
+                  _verticalDragDy += d.delta.dy;
+                },
+                onVerticalDragEnd: (d) {
+                  if (_swipeInFlight) return;
+                  final vy = d.velocity.pixelsPerSecond.dy;
+                  if (_verticalDragDy > 25 || vy > 120) {
+                    _swipeInFlight = true;
+                    HapticFeedback.selectionClick();
+                    widget.onSwipeDown?.call();
+                    _verticalSwipeTimer?.cancel();
+                    _verticalSwipeTimer =
+                        Timer(const Duration(milliseconds: 500), () {
+                      if (mounted) setState(() => _swipeInFlight = false);
+                    });
+                  } else if (_verticalDragDy < -25 || vy < -120) {
+                    _swipeInFlight = true;
+                    HapticFeedback.selectionClick();
+                    if (widget.onSwipeUp != null) {
+                      widget.onSwipeUp!();
+                    } else {
+                      widget.onTap();
+                    }
+                    _verticalSwipeTimer?.cancel();
+                    _verticalSwipeTimer =
+                        Timer(const Duration(milliseconds: 500), () {
+                      if (mounted) setState(() => _swipeInFlight = false);
+                    });
+                  }
+                  _verticalDragDy = 0.0;
+                },
+                onHorizontalDragStart: carouselEnabled
+                    ? null
+                    : (_) {
+                        if (_swipeInFlight) return;
+                        _horizontalDragDx = 0.0;
+                      },
+                onHorizontalDragUpdate: carouselEnabled
+                    ? null
+                    : (d) {
+                        if (_swipeInFlight) return;
+                        _horizontalDragDx += d.delta.dx;
+                      },
+                onHorizontalDragEnd: carouselEnabled
+                    ? null
+                    : (d) {
+                        if (_swipeInFlight) return;
+                        final dx = _horizontalDragDx +
+                            d.velocity.pixelsPerSecond.dx * 0.05;
+                        _horizontalDragDx = 0.0;
+                        if (dx.abs() < 24) return;
+                        final swipedLeft = dx < 0;
+                        unawaited(_applySwipeAction(
+                          swipedLeft ? swipeLeftAction : swipeRightAction,
+                          cubit,
+                          swipedLeft: swipedLeft,
+                        ));
+                      },
+                child: Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    isTablet ? 24 : 14,
+                    0,
+                    isTablet ? 24 : 14,
+                    0,
+                  ),
+                  // Same glass recipe as the bottom navigation bar so the two dock
+                  // cards read as one surface family.
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: playerRadius,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.scrimAt(p.isDark ? 0.40 : 0.12),
+                          blurRadius: 24,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 8),
                         ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: playerRadius,
-                        child: Stack(
-                          alignment: Alignment.topCenter,
-                          children: [
-                            // Specular refraction highlight along top edge
-                            PositionedDirectional(
-                              top: 0,
-                              start: 16,
-                              end: 16,
-                              height: 1.2,
-                              child: IgnorePointer(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.white.withValues(alpha: 0.0),
-                                        Colors.white.withValues(
-                                            alpha: p.isDark ? 0.35 : 0.65),
-                                        Colors.white.withValues(alpha: 0.0),
-                                      ],
-                                      stops: const [0.0, 0.5, 1.0],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s10, AppSpacing.xs, AppSpacing.xs, 0),
-                            child: Row(
-                              children: [
-                                // Interactive Swipeable Track Info Carousel
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 52,
-                                    child: NotificationListener<ScrollNotification>(
-                                      onNotification: (notification) {
-                                        if (notification is ScrollStartNotification &&
-                                            notification.dragDetails != null) {
-                                          _isInteracting.value = true;
-                                        } else if (notification is UserScrollNotification) {
-                                          if (notification.direction != ScrollDirection.idle) {
-                                            _isInteracting.value = true;
-                                          } else if (!_swipeInFlight) {
-                                            _isInteracting.value = false;
-                                          }
-                                        } else if (notification is ScrollEndNotification) {
-                                          if (!_swipeInFlight) {
-                                            _isInteracting.value = false;
-                                            _drainPendingSync();
-                                          }
-                                        }
-                                        return false;
-                                      },
-                                      child: PageView.builder(
-                                        controller: _pageController,
-                                        physics: carouselEnabled
-                                            ? const BouncingScrollPhysics()
-                                            : const NeverScrollableScrollPhysics(),
-                                        itemCount: queue.length,
-                                        onPageChanged: (page) {
-                                          if (!_swipeInFlight &&
-                                              _isInteracting.value &&
-                                              page != currentIndex) {
-                                            _lastKnownIndex = page;
-                                            _swipeInFlight = true;
-                                            unawaited(_completeSwipe(page, cubit));
-                                          }
-                                        },
-                                       itemBuilder: (context, index) {
-                                        final item = queue[index];
-                                        final isCurrent = index == currentIndex;
-
-                                        return RepaintBoundary(
-                                          child: GestureDetector(
-                                            behavior: HitTestBehavior.opaque,
-                                            onTap: widget.onTap,
-                                            child: Row(
-                                            children: [
-                                              // Artwork or Vinyl Disc
-                                              Stack(
-                                                alignment: Alignment.center,
-                                                children: [
-                                                  if (playerThemeMode ==
-                                                      PlayerThemeMode.vinyl)
-                                                    SpinningVinylDisc(
-                                                      id: item.id,
-                                                      remoteArtworkUrl:
-                                                          item.remoteArtworkUrl,
-                                                      size: 46,
-                                                      isPlaying: state.isPlaying &&
-                                                          isCurrent,
-                                                    )
-                                                  else
-                                                    Hero(
-                                                      tag: isCurrent
-                                                          ? _fullArtworkHeroTag(
-                                                              playerThemeMode)
-                                                          : 'queue_art_${item.id}_$index',
-                                                      child: CachedArtwork(
-                                                        id: item.id,
-                                                        remoteUrl:
-                                                            item.remoteArtworkUrl,
-                                                        type: ArtworkType.AUDIO,
-                                                        size: 46,
-                                                        borderRadius: 12,
-                                                      ),
-                                                    ),
-                                                  if (isCurrent && state.isPlaying && playerThemeMode != PlayerThemeMode.vinyl)
-                                                    PositionedDirectional(
-                                                      bottom: 2,
-                                                      end: 2,
-                                                      child: Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.black.withValues(alpha: 0.65),
-                                                          borderRadius: BorderRadius.circular(4),
-                                                        ),
-                                                        child: WaveformLogo(
-                                                          size: 11,
-                                                          color: p.accent,
-                                                          animate: true,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                              const SizedBox(width: AppSpacing.sm),
-                                              // Track title & artist.
-                                              // Dense fixed-height chrome: clamp
-                                              // Dynamic Type here so the 52px
-                                              // row can never clip, while
-                                              // content areas scale to 2.0x.
-                                              Expanded(
-                                                child: MediaQuery.withClampedTextScaling(
-                                                  minScaleFactor: 0.8,
-                                                  maxScaleFactor: 1.3,
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment.center,
-                                                    children: [
-                                                      Text(
-                                                        item.title,
-                                                        maxLines: 1,
-                                                        overflow:
-                                                            TextOverflow.ellipsis,
-                                                        style: TextStyle(
-                                                          color: isCurrent
-                                                              ? p.textPrimary
-                                                              : p.textSecondary,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          fontSize: AppFontSize.body,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: AppSpacing.s2),
-                                                      Text(
-                                                        item.artist,
-                                                        maxLines: 1,
-                                                        overflow:
-                                                            TextOverflow.ellipsis,
-                                                        style: TextStyle(
-                                                          color: p.textSecondary,
-                                                          fontSize: AppFontSize.label,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                               ],
-                                             ),
-                                           ),
-                                         );
-                                       },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.s6),
-                                // Controls
-                                IconButton(
-                                  tooltip: state.isPlaying
-                                      ? context.l10n.pause
-                                      : context.l10n.play,
-                                  icon: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 200),
-                                    transitionBuilder: (child, anim) =>
-                                        ScaleTransition(scale: anim, child: child),
-                                    child: Icon(
-                                      state.isPlaying
-                                          ? Icons.pause_rounded
-                                          : Icons.play_arrow_rounded,
-                                      key: ValueKey<bool>(state.isPlaying),
-                                      color: activeAccent,
-                                      size: 32,
-                                    ),
-                                  ),
-                                  onPressed: () {
-                                    HapticFeedback.lightImpact();
-                                    cubit.togglePlayPause();
-                                  },
-                                ),
-                                IconButton(
-                                  tooltip: context.l10n.next,
-                                  icon: Icon(
-                                    Icons.skip_next_rounded,
-                                    color: p.textPrimary,
-                                    size: 28,
-                                  ),
-                                  onPressed: () {
-                                    HapticFeedback.selectionClick();
-                                    cubit.next();
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        RepaintBoundary(
-                          child: _MiniPlayerProgressBar(
-                            duration: state.duration,
-                            activeAccent: activeAccent,
-                            hairlineColor: p.hairline,
-                            isPlaying: state.isPlaying,
-                            onSeek: (pos) => cubit.seek(pos),
-                          ),
+                        BoxShadow(
+                          color: p.accent
+                              .withValues(alpha: p.isDark ? 0.10 : 0.05),
+                          blurRadius: 18,
+                          spreadRadius: -2,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    Positioned(
-                      top: 2.5,
-                      child: IgnorePointer(
-                        child: Container(
-                          width: 28,
-                          height: 2.5,
-                          decoration: BoxDecoration(
-                            color: (p.isDark ? Colors.white : Colors.black)
-                                .withValues(alpha: 0.22),
-                            borderRadius: BorderRadius.circular(1.5),
-                          ),
-                        ),
+                    child: ClipRRect(
+                      borderRadius: playerRadius,
+                      child: Builder(
+                        builder: (context) {
+                          final miniPlayerContainer = Container(
+                            decoration: BoxDecoration(
+                              borderRadius: playerRadius,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  GpuBudget.isGpuSaverActive
+                                      ? p.surface
+                                      : p.surface.withValues(
+                                          alpha: p.isDark ? 0.76 : 0.86),
+                                  GpuBudget.isGpuSaverActive
+                                      ? p.surfaceContainer
+                                      : p.surfaceContainer.withValues(
+                                          alpha: p.isDark ? 0.70 : 0.82),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: p.isDark
+                                    ? AppColors.specularStrong
+                                    : AppColors.scrimAt(0.08),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: playerRadius,
+                              child: Stack(
+                                alignment: Alignment.topCenter,
+                                children: [
+                                  // Specular refraction highlight along top edge
+                                  PositionedDirectional(
+                                    top: 0,
+                                    start: 16,
+                                    end: 16,
+                                    height: 1.2,
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppColors.specularAt(0.0),
+                                              AppColors.specularAt(
+                                                  p.isDark ? 0.35 : 0.65),
+                                              AppColors.specularAt(0.0),
+                                            ],
+                                            stops: const [0.0, 0.5, 1.0],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsetsDirectional
+                                            .fromSTEB(AppSpacing.s10,
+                                            AppSpacing.xs, AppSpacing.xs, 0),
+                                        child: Row(
+                                          children: [
+                                            // Interactive Swipeable Track Info Carousel
+                                            Expanded(
+                                              child: SizedBox(
+                                                height: 52,
+                                                child: NotificationListener<
+                                                    ScrollNotification>(
+                                                  onNotification:
+                                                      (notification) {
+                                                    if (notification
+                                                            is ScrollStartNotification &&
+                                                        notification
+                                                                .dragDetails !=
+                                                            null) {
+                                                      _isInteracting.value =
+                                                          true;
+                                                    } else if (notification
+                                                        is UserScrollNotification) {
+                                                      if (notification
+                                                              .direction !=
+                                                          ScrollDirection
+                                                              .idle) {
+                                                        _isInteracting.value =
+                                                            true;
+                                                      } else if (!_swipeInFlight) {
+                                                        _isInteracting.value =
+                                                            false;
+                                                      }
+                                                    } else if (notification
+                                                        is ScrollEndNotification) {
+                                                      if (!_swipeInFlight) {
+                                                        _isInteracting.value =
+                                                            false;
+                                                        _drainPendingSync();
+                                                      }
+                                                    }
+                                                    return false;
+                                                  },
+                                                  child: PageView.builder(
+                                                    controller: _pageController,
+                                                    physics: carouselEnabled
+                                                        ? const BouncingScrollPhysics()
+                                                        : const NeverScrollableScrollPhysics(),
+                                                    itemCount: queue.length,
+                                                    onPageChanged: (page) {
+                                                      if (!_swipeInFlight &&
+                                                          _isInteracting
+                                                              .value &&
+                                                          page !=
+                                                              currentIndex) {
+                                                        _lastKnownIndex = page;
+                                                        _swipeInFlight = true;
+                                                        unawaited(
+                                                            _completeSwipe(
+                                                                page, cubit));
+                                                      }
+                                                    },
+                                                    itemBuilder:
+                                                        (context, index) {
+                                                      final item = queue[index];
+                                                      final isCurrent =
+                                                          index == currentIndex;
+
+                                                      return RepaintBoundary(
+                                                        child: GestureDetector(
+                                                          behavior:
+                                                              HitTestBehavior
+                                                                  .opaque,
+                                                          onTap: widget.onTap,
+                                                          child: Row(
+                                                            children: [
+                                                              // Artwork or Vinyl Disc
+                                                              Stack(
+                                                                alignment:
+                                                                    Alignment
+                                                                        .center,
+                                                                children: [
+                                                                  if (playerThemeMode ==
+                                                                      PlayerThemeMode
+                                                                          .vinyl)
+                                                                    SpinningVinylDisc(
+                                                                      id: item
+                                                                          .id,
+                                                                      remoteArtworkUrl:
+                                                                          item.remoteArtworkUrl,
+                                                                      size: 46,
+                                                                      isPlaying:
+                                                                          state.isPlaying &&
+                                                                              isCurrent,
+                                                                    )
+                                                                  else
+                                                                    Hero(
+                                                                      tag: isCurrent
+                                                                          ? _fullArtworkHeroTag(
+                                                                              playerThemeMode)
+                                                                          : 'queue_art_${item.id}_$index',
+                                                                      child:
+                                                                          CachedArtwork(
+                                                                        id: item
+                                                                            .id,
+                                                                        remoteUrl:
+                                                                            item.remoteArtworkUrl,
+                                                                        type: ArtworkType
+                                                                            .AUDIO,
+                                                                        size:
+                                                                            46,
+                                                                        borderRadius:
+                                                                            12,
+                                                                      ),
+                                                                    ),
+                                                                  if (isCurrent &&
+                                                                      state
+                                                                          .isPlaying &&
+                                                                      playerThemeMode !=
+                                                                          PlayerThemeMode
+                                                                              .vinyl)
+                                                                    PositionedDirectional(
+                                                                      bottom: 2,
+                                                                      end: 2,
+                                                                      child:
+                                                                          Container(
+                                                                        padding: const EdgeInsets
+                                                                            .symmetric(
+                                                                            horizontal:
+                                                                                3,
+                                                                            vertical:
+                                                                                2),
+                                                                        decoration:
+                                                                            BoxDecoration(
+                                                                          color:
+                                                                              AppColors.scrim,
+                                                                          borderRadius:
+                                                                              BorderRadius.circular(AppRadii.r4),
+                                                                        ),
+                                                                        child:
+                                                                            WaveformLogo(
+                                                                          size:
+                                                                              11,
+                                                                          color:
+                                                                              p.accent,
+                                                                          animate:
+                                                                              true,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                ],
+                                                              ),
+                                                              const SizedBox(
+                                                                  width:
+                                                                      AppSpacing
+                                                                          .sm),
+                                                              // Track title & artist.
+                                                              // Dense fixed-height chrome: clamp
+                                                              // Dynamic Type here so the 52px
+                                                              // row can never clip, while
+                                                              // content areas scale to 2.0x.
+                                                              Expanded(
+                                                                child: MediaQuery
+                                                                    .withClampedTextScaling(
+                                                                  minScaleFactor:
+                                                                      0.8,
+                                                                  maxScaleFactor:
+                                                                      1.3,
+                                                                  child: Column(
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    crossAxisAlignment:
+                                                                        CrossAxisAlignment
+                                                                            .start,
+                                                                    mainAxisAlignment:
+                                                                        MainAxisAlignment
+                                                                            .center,
+                                                                    children: [
+                                                                      Text(
+                                                                        item.title,
+                                                                        maxLines:
+                                                                            1,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        style:
+                                                                            TextStyle(
+                                                                          color: isCurrent
+                                                                              ? p.textPrimary
+                                                                              : p.textSecondary,
+                                                                          fontWeight:
+                                                                              FontWeight.w700,
+                                                                          fontSize:
+                                                                              AppFontSize.body,
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                          height:
+                                                                              AppSpacing.s2),
+                                                                      Text(
+                                                                        item.artist,
+                                                                        maxLines:
+                                                                            1,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        style:
+                                                                            TextStyle(
+                                                                          color:
+                                                                              p.textSecondary,
+                                                                          fontSize:
+                                                                              AppFontSize.label,
+                                                                          fontWeight:
+                                                                              FontWeight.w500,
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                width: AppSpacing.s6),
+                                            // Controls
+                                            IconButton(
+                                              constraints: const BoxConstraints(
+                                                  minWidth:
+                                                      AppSpacing.minTouchTarget,
+                                                  minHeight: AppSpacing
+                                                      .minTouchTarget),
+                                              tooltip: state.isPlaying
+                                                  ? context.l10n.pause
+                                                  : context.l10n.play,
+                                              icon: AnimatedSwitcher(
+                                                duration: PulsrMotion.state,
+                                                transitionBuilder:
+                                                    (child, anim) =>
+                                                        ScaleTransition(
+                                                            scale: anim,
+                                                            child: child),
+                                                child: Icon(
+                                                  state.isPlaying
+                                                      ? Icons.pause_rounded
+                                                      : Icons
+                                                          .play_arrow_rounded,
+                                                  key: ValueKey<bool>(
+                                                      state.isPlaying),
+                                                  color: activeAccent,
+                                                  size: 32,
+                                                ),
+                                              ),
+                                              onPressed: () {
+                                                HapticFeedback.lightImpact();
+                                                cubit.togglePlayPause();
+                                              },
+                                            ),
+                                            IconButton(
+                                              constraints: const BoxConstraints(
+                                                  minWidth:
+                                                      AppSpacing.minTouchTarget,
+                                                  minHeight: AppSpacing
+                                                      .minTouchTarget),
+                                              tooltip: context.l10n.next,
+                                              icon: Icon(
+                                                Icons.skip_next_rounded,
+                                                color: p.textPrimary,
+                                                size: 28,
+                                              ),
+                                              onPressed: () {
+                                                HapticFeedback.selectionClick();
+                                                cubit.next();
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      RepaintBoundary(
+                                        child: _MiniPlayerProgressBar(
+                                          duration: state.duration,
+                                          activeAccent: activeAccent,
+                                          hairlineColor: p.hairline,
+                                          isPlaying: state.isPlaying,
+                                          onSeek: (pos) => cubit.seek(pos),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Positioned(
+                                    top: 2.5,
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        width: 28,
+                                        height: 2.5,
+                                        decoration: BoxDecoration(
+                                          color: (p.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(alpha: 0.22),
+                                          borderRadius: BorderRadius.circular(
+                                              AppRadii.r1_5),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+
+                          if (GpuBudget.isGpuSaverActive) {
+                            return miniPlayerContainer;
+                          }
+                          return BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                            child: miniPlayerContainer,
+                          );
+                        },
                       ),
                     ),
-                  ],
-                ),
                   ),
-                );
-
-                if (GpuBudget.isGpuSaverActive) {
-                  return miniPlayerContainer;
-                }
-                return BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                  child: miniPlayerContainer,
-                );
-              },
+                ),
+              ),
             ),
-          ),
-          ),
+            PositionedDirectional(
+              top: -38,
+              start: 16,
+              end: 16,
+              child: GestureHintOverlay(
+                hintKey: 'mini_player_swipe',
+                message: context.l10n.miniPlayerSwipeHint,
+                padding: EdgeInsets.zero,
+                icon: Icons.swipe_rounded,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: context.motion(PulsrMotion.state),
+      curve: Curves.easeOut,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, 8 * (1 - t)),
+          child: child,
         ),
       ),
-    ),
-    PositionedDirectional(
-          top: -38,
-          start: 16,
-          end: 16,
-          child: GestureHintOverlay(
-            hintKey: 'mini_player_swipe',
-            message: context.l10n.miniPlayerSwipeHint,
-            padding: EdgeInsets.zero,
-            icon: Icons.swipe_rounded,
-          ),
-        ),
-      ],
-    );
-      },
+      child: content,
     );
   }
 }
@@ -806,10 +926,8 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
   void _syncWave() {
     final isTest = const bool.fromEnvironment('FLUTTER_TEST') ||
         WidgetsBinding.instance.runtimeType.toString().contains('Test');
-    final shouldAnimate = _isAppActive &&
-        widget.isPlaying &&
-        context.motionEnabled &&
-        !isTest;
+    final shouldAnimate =
+        _isAppActive && widget.isPlaying && context.motionEnabled && !isTest;
     if (shouldAnimate) {
       if (!_waveController.isAnimating) _waveController.repeat();
     } else if (_waveController.isAnimating) {
@@ -843,14 +961,15 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
               builder: (context, position) {
                 final progress = _dragProgress ??
                     (widget.duration.inMilliseconds > 0
-                        ? (position.inMilliseconds / widget.duration.inMilliseconds)
+                        ? (position.inMilliseconds /
+                                widget.duration.inMilliseconds)
                             .clamp(0.0, 1.0)
                         : 0.0);
                 final currentDuration = _dragProgress != null
                     ? Duration(
-                        milliseconds: (widget.duration.inMilliseconds *
-                                _dragProgress!)
-                            .round())
+                        milliseconds:
+                            (widget.duration.inMilliseconds * _dragProgress!)
+                                .round())
                     : position;
                 final valueLabel =
                     '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
@@ -863,10 +982,10 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
 
                 String labelFor(Duration d) =>
                     '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
-                final increasedLabel = labelFor(
-                    clampDuration(currentDuration + const Duration(seconds: 10)));
-                final decreasedLabel = labelFor(
-                    clampDuration(currentDuration - const Duration(seconds: 10)));
+                final increasedLabel = labelFor(clampDuration(
+                    currentDuration + const Duration(seconds: 10)));
+                final decreasedLabel = labelFor(clampDuration(
+                    currentDuration - const Duration(seconds: 10)));
 
                 return Semantics(
                   slider: true,
@@ -874,112 +993,114 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                   value: valueLabel,
                   increasedValue: increasedLabel,
                   decreasedValue: decreasedLabel,
-                  onIncrease: () => widget.onSeek(
-                      clampDuration(currentDuration + const Duration(seconds: 10))),
-                  onDecrease: () => widget.onSeek(
-                      clampDuration(currentDuration - const Duration(seconds: 10))),
+                  onIncrease: () => widget.onSeek(clampDuration(
+                      currentDuration + const Duration(seconds: 10))),
+                  onDecrease: () => widget.onSeek(clampDuration(
+                      currentDuration - const Duration(seconds: 10))),
                   child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (details) {
-                    if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
-                      HapticFeedback.selectionClick();
-                      final ratio =
-                          (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (details) {
+                      if (trackWidth > 0 &&
+                          widget.duration.inMilliseconds > 0) {
+                        HapticFeedback.selectionClick();
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
+                        setState(() => _dragProgress = null);
+                        final seekMs =
+                            (widget.duration.inMilliseconds * ratio).round();
+                        widget.onSeek(Duration(milliseconds: seekMs));
+                      }
+                    },
+                    onHorizontalDragStart: (details) {
+                      if (trackWidth > 0 &&
+                          widget.duration.inMilliseconds > 0) {
+                        HapticFeedback.selectionClick();
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
+                        setState(() => _dragProgress = ratio);
+                      }
+                    },
+                    onHorizontalDragUpdate: (details) {
+                      if (trackWidth > 0 &&
+                          widget.duration.inMilliseconds > 0) {
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
+                        setState(() => _dragProgress = ratio);
+                      }
+                    },
+                    onHorizontalDragEnd: (_) {
+                      if (_dragProgress != null &&
+                          widget.duration.inMilliseconds > 0) {
+                        final seekMs =
+                            (widget.duration.inMilliseconds * _dragProgress!)
+                                .round();
+                        widget.onSeek(Duration(milliseconds: seekMs));
+                        setState(() => _dragProgress = null);
+                      }
+                    },
+                    onHorizontalDragCancel: () {
                       setState(() => _dragProgress = null);
-                      final seekMs =
-                          (widget.duration.inMilliseconds * ratio).round();
-                      widget.onSeek(Duration(milliseconds: seekMs));
-                    }
-                  },
-                  onHorizontalDragStart: (details) {
-                    if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
-                      HapticFeedback.selectionClick();
-                      final ratio =
-                          (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                      setState(() => _dragProgress = ratio);
-                    }
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
-                      final ratio =
-                          (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                      setState(() => _dragProgress = ratio);
-                    }
-                  },
-                  onHorizontalDragEnd: (_) {
-                    if (_dragProgress != null &&
-                        widget.duration.inMilliseconds > 0) {
-                      final seekMs =
-                          (widget.duration.inMilliseconds * _dragProgress!)
-                              .round();
-                      widget.onSeek(Duration(milliseconds: seekMs));
-                      setState(() => _dragProgress = null);
-                    }
-                  },
-                  onHorizontalDragCancel: () {
-                    setState(() => _dragProgress = null);
-                  },
-                  // Generous hit area so the thin wavy bar is easy to grab; the
-                  // wave amplitude stays small so the card never grows.
-                  child: SizedBox(
-                    height: AppSpacing.s28,
-                    width: double.infinity,
-                    child: AnimatedBuilder(
-                      animation: _waveController,
-                      builder: (context, _) => Stack(
-                        clipBehavior: Clip.none,
-                        alignment: AlignmentDirectional.centerStart,
-                        children: [
-                          Positioned.fill(
-                            child: RepaintBoundary(
-                              child: CustomPaint(
-                                painter: _MiniProgressWavePainter(
-                                  progress: progress,
-                                  phase: _waveController.value * 2 * math.pi,
-                                  activeColor: widget.activeAccent,
-                                  inactiveColor: widget.hairlineColor
-                                      .withValues(alpha: 0.35),
-                                  isPlaying: widget.isPlaying,
+                    },
+                    // Generous hit area so the thin wavy bar is easy to grab; the
+                    // wave amplitude stays small so the card never grows.
+                    child: SizedBox(
+                      height: AppSpacing.s28,
+                      width: double.infinity,
+                      child: AnimatedBuilder(
+                        animation: _waveController,
+                        builder: (context, _) => Stack(
+                          clipBehavior: Clip.none,
+                          alignment: AlignmentDirectional.centerStart,
+                          children: [
+                            Positioned.fill(
+                              child: RepaintBoundary(
+                                child: CustomPaint(
+                                  painter: _MiniProgressWavePainter(
+                                    progress: progress,
+                                    phase: _waveController.value * 2 * math.pi,
+                                    activeColor: widget.activeAccent,
+                                    inactiveColor: widget.hairlineColor
+                                        .withValues(alpha: 0.35),
+                                    isPlaying: widget.isPlaying,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        // Scrub thumb, shown while dragging.
-                        if (_dragProgress != null)
-                          Align(
-                            alignment: Alignment(
-                                (progress * 2 - 1).clamp(-0.94, 0.94), 0),
-                            child: Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: widget.activeAccent,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: widget.activeAccent
-                                        .withValues(alpha: 0.5),
-                                    blurRadius: 6,
+                            // Scrub thumb, shown while dragging.
+                            if (_dragProgress != null)
+                              Align(
+                                alignment: Alignment(
+                                    (progress * 2 - 1).clamp(-0.94, 0.94), 0),
+                                child: Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: BoxDecoration(
+                                    color: widget.activeAccent,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: widget.activeAccent
+                                            .withValues(alpha: 0.5),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
-                      ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             );
-            },
-          );
-        },
+          },
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
-}
-
 
 /// Draws the mini-player progress as the app's signature animated wave:
 /// a thin inactive remainder plus a sine-enveloped active line with a soft glow,
@@ -1207,4 +1328,3 @@ class MiniPlayerTablet extends StatelessWidget {
 
 /// Compact portrait mini player (alias for standard MiniPlayer in compact mode).
 typedef MiniPlayerCompact = MiniPlayer;
-

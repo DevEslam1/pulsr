@@ -955,8 +955,11 @@ void main() {
         );
 
         await cubit.playSong(song1, queue: [song1, song2]);
+        final sawPosition = cubit.stream
+            .firstWhere((s) => s.position == const Duration(seconds: 45))
+            .timeout(const Duration(seconds: 5));
         testAudioHandler._positionController.add(const Duration(seconds: 45));
-        await Future<void>.delayed(const Duration(milliseconds: 120));
+        await sawPosition;
         expect(cubit.state.position, equals(const Duration(seconds: 45)));
 
         // Switch track

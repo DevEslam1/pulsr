@@ -1,5 +1,7 @@
 // test/hires_audio_and_android_auto_test.dart
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/core/services/hires_audio_service.dart';
@@ -16,6 +18,15 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel(PulsrChannels.audioEffects), (_) async => true);
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel(PulsrChannels.audioEffects), null);
   });
 
   group('AudioOutputInfo Model Tests', () {

@@ -14,6 +14,7 @@ import '../../../../core/widgets/pulsr_switch.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:flutter/services.dart';
 
 /// Bottom sheet entry point for Quran Mode.
 class QuranModeSheet extends StatelessWidget {
@@ -166,7 +167,10 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   final selected = s == style;
                   return ChoiceChip(
                     selected: selected,
-                    onSelected: (_) => cubit.setQuranReciterStyle(s),
+                    onSelected: (_) {
+                      HapticFeedback.selectionClick();
+                      cubit.setQuranReciterStyle(s);
+                    },
                     label: Text(s.label),
                     labelStyle: TextStyle(
                       color: selected ? p.onAccent : p.textPrimary,

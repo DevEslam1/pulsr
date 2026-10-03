@@ -9,8 +9,9 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/pulsr_section_header.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_artists_usecase.dart';
@@ -60,8 +61,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   }
 
   void _rebuildStreams() {
-    _albumsStream =
-        _useCase.watchArtistAlbums(widget.artist.id).distinct();
+    _albumsStream = _useCase.watchArtistAlbums(widget.artist.id).distinct();
     _songsStream = _useCase.watchArtistSongs(widget.artist.id).distinct();
   }
 
@@ -96,26 +96,26 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               image: true,
               label: artist.name,
               child: Container(
-              padding: const EdgeInsets.all(AppSpacing.xxs),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: p.accent.withValues(alpha: 0.3), width: 2),
-                boxShadow: [
-                  BoxShadow(
-                      color: p.glow,
-                      blurRadius: 28,
-                      spreadRadius: -4,
-                      offset: const Offset(0, 8)),
-                ],
-              ),
-              child: CachedArtwork(
-                id: artist.id,
-                type: ArtworkType.ARTIST,
-                size: isTablet ? 160 : 130,
-                borderRadius: 999,
-                fallbackIcon: Icons.person_rounded,
-              ),
+                padding: const EdgeInsets.all(AppSpacing.xxs),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: p.accent.withValues(alpha: 0.3), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: p.glow,
+                        blurRadius: 28,
+                        spreadRadius: -4,
+                        offset: const Offset(0, 8)),
+                  ],
+                ),
+                child: CachedArtwork(
+                  id: artist.id,
+                  type: ArtworkType.ARTIST,
+                  size: isTablet ? 160 : 130,
+                  borderRadius: 999,
+                  fallbackIcon: Icons.person_rounded,
+                ),
               ),
             ),
           ),
@@ -142,8 +142,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
             key: ValueKey('artist_bio_${artist.id}'),
             future: _bioFuture,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Container(
+              return AsyncStateBuilder<ArtistInfo?>(
+                snapshot: snapshot,
+                loadingWidget: Container(
                   margin: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
                   height: 56,
@@ -158,10 +159,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       radius: AppRadii.r12,
                     ),
                   ),
-                );
-              }
-              if (snapshot.hasError) {
-                return Container(
+                ),
+                onError: (_) => Container(
                   margin: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
                   padding: const EdgeInsets.all(AppSpacing.sm),
@@ -184,53 +183,54 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       ),
                     ],
                   ),
-                );
-              }
-              if (snapshot.hasData && snapshot.data?.bio != null) {
-                final bio = snapshot.data!.bio!;
-                return Container(
-                  margin: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
-                  padding: const EdgeInsets.all(AppSpacing.s14),
-                  decoration: BoxDecoration(
-                    color: p.surfaceContainer.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(AppRadii.r16),
-                    border: Border.all(color: p.hairline),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info_outline_rounded,
-                              size: 16, color: p.accent),
-                          const SizedBox(width: AppSpacing.s6),
-                          Text(
-                            context.l10n.aboutArtist,
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w700,
-                              color: p.accent,
+                ),
+                emptyWidget: const SizedBox.shrink(),
+                isEmpty: (info) => info?.bio == null,
+                onData: (info) {
+                  final bio = info!.bio!;
+                  return Container(
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s20, vertical: AppSpacing.xs),
+                    padding: const EdgeInsets.all(AppSpacing.s14),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(AppRadii.r16),
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                size: 16, color: p.accent),
+                            const SizedBox(width: AppSpacing.s6),
+                            Text(
+                              context.l10n.aboutArtist,
+                              style: TextStyle(
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w700,
+                                color: p.accent,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.s6),
-                      Text(
-                        bio,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          color: p.textSecondary,
-                          height: 1.4,
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
+                        const SizedBox(height: AppSpacing.s6),
+                        Text(
+                          bio,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.label,
+                            color: p.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
             },
           ),
           const SizedBox(height: AppSpacing.md),
@@ -243,82 +243,83 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           StreamBuilder<Result<List<AlbumsTableData>>>(
             stream: _albumsStream,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return Padding(
+              Widget buildErrorSection() => _ErrorSection(
+                    title: context.l10n.albums,
+                    message: context.l10n.browseCouldNotLoadAlbums,
+                    onRetry: () => setState(() {}),
+                  );
+
+              return AsyncStateBuilder<Result<List<AlbumsTableData>>>(
+                snapshot: snapshot,
+                loadingWidget: Padding(
                   padding: EdgeInsets.symmetric(
                       horizontal: Adaptive.pagePadding(context)),
                   child: const SkeletonList(itemCount: 2),
-                );
-              }
-              final loadFailed = snapshot.hasError ||
-                  (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-              if (loadFailed) {
-                return _ErrorSection(
-                  title: context.l10n.albums,
-                  message: context.l10n.browseCouldNotLoadAlbums,
-                  onRetry: () => setState(() {}),
-                );
-              }
-              final albums =
-                  snapshot.data?.fold((l) => <AlbumsTableData>[], (r) => r) ??
-                      [];
-              if (albums.isEmpty) return const SizedBox.shrink();
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(title: context.l10n.albums),
-                  SizedBox(
-                    height: 175,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      addAutomaticKeepAlives: false,
-                      addRepaintBoundaries: true,
-                      padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
-                      itemCount: albums.length,
-                      itemBuilder: (context, index) {
-                        final album = albums[index];
-                        return Container(
-                          width: 120,
-                          margin: const EdgeInsetsDirectional.only(
-                              end: AppSpacing.s14),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
-                            onTap: () => context.push('/album', extra: album),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CachedArtwork(
-                                    id: album.id,
-                                    type: ArtworkType.ALBUM,
-                                    size: 120,
-                                    borderRadius: 16),
-                                const SizedBox(height: AppSpacing.xs),
-                                Text(album.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color: p.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: AppFontSize.bodySmall)),
-                                const SizedBox(height: AppSpacing.s2),
-                                Text(
-                                    Formatters.formatTrackCount(
-                                        album.songCount),
-                                    style: TextStyle(
-                                        color: p.textSecondary,
-                                        fontSize: AppFontSize.caption)),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                ),
+                onError: (_) => buildErrorSection(),
+                emptyWidget: const SizedBox.shrink(),
+                isEmpty: (result) =>
+                    result.fold((_) => false, (albums) => albums.isEmpty),
+                onData: (result) => result.fold(
+                  (_) => buildErrorSection(),
+                  (albums) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PulsrSectionHeader(title: context.l10n.albums),
+                      SizedBox(
+                        height: 175,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          itemCount: albums.length,
+                          itemBuilder: (context, index) {
+                            final album = albums[index];
+                            return Container(
+                              width: 120,
+                              margin: const EdgeInsetsDirectional.only(
+                                  end: AppSpacing.s14),
+                              child: InkWell(
+                                borderRadius:
+                                    BorderRadius.circular(AppRadii.r16),
+                                onTap: () =>
+                                    context.push('/album', extra: album),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CachedArtwork(
+                                        id: album.id,
+                                        type: ArtworkType.ALBUM,
+                                        size: 120,
+                                        borderRadius: 16),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    Text(album.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            color: p.textPrimary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: AppFontSize.bodySmall)),
+                                    const SizedBox(height: AppSpacing.s2),
+                                    Text(
+                                        Formatters.formatTrackCount(
+                                            album.songCount),
+                                        style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: AppFontSize.caption)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
+                ),
               );
             },
           ),
@@ -327,44 +328,43 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           StreamBuilder<Result<List<SongsTableData>>>(
             stream: _songsStream,
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting &&
-                  !snapshot.hasData) {
-                return Padding(
+              Widget buildErrorSection() => _ErrorSection(
+                    title: context.l10n.browseTopTracks,
+                    message: context.l10n.browseCouldNotLoadTopTracks,
+                    onRetry: () => setState(() {}),
+                  );
+
+              return AsyncStateBuilder<Result<List<SongsTableData>>>(
+                snapshot: snapshot,
+                loadingWidget: Padding(
                   padding: EdgeInsets.symmetric(
                       horizontal: Adaptive.pagePadding(context)),
                   child: const SkeletonList(itemCount: 4),
-                );
-              }
-              final loadFailed = snapshot.hasError ||
-                  (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-              if (loadFailed) {
-                return _ErrorSection(
-                  title: context.l10n.browseTopTracks,
-                  message: context.l10n.browseCouldNotLoadTopTracks,
-                  onRetry: () => setState(() {}),
-                );
-              }
-              final songs =
-                  snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ??
-                      [];
-              if (songs.isEmpty) return const SizedBox.shrink();
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionHeader(title: context.l10n.browseTopTracks),
-                  for (int i = 0; i < songs.length; i++)
-                    SongTile(
-                      song: songs[i],
-                      index: i,
-                      subtitleOverride: songs[i].album,
-                      onTap: () => context
-                          .read<PlayerCubit>()
-                          .playSong(songs[i], queue: songs),
-                      onMorePressed: () =>
-                          SongInfoSheet.show(context, song: songs[i]),
-                    ),
-                ],
+                ),
+                onError: (_) => buildErrorSection(),
+                emptyWidget: const SizedBox.shrink(),
+                isEmpty: (result) =>
+                    result.fold((_) => false, (songs) => songs.isEmpty),
+                onData: (result) => result.fold(
+                  (_) => buildErrorSection(),
+                  (songs) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PulsrSectionHeader(title: context.l10n.browseTopTracks),
+                      for (int i = 0; i < songs.length; i++)
+                        SongTile(
+                          song: songs[i],
+                          index: i,
+                          subtitleOverride: songs[i].album,
+                          onTap: () => context
+                              .read<PlayerCubit>()
+                              .playSong(songs[i], queue: songs),
+                          onMorePressed: () =>
+                              SongInfoSheet.show(context, song: songs[i]),
+                        ),
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -391,7 +391,7 @@ class _ErrorSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(title: title),
+          PulsrSectionHeader(title: title),
           const SizedBox(height: AppSpacing.xs),
           Container(
             padding: const EdgeInsets.symmetric(

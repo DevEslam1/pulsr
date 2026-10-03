@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_typography.dart';
 import 'pulsr_responsive_tokens.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 /// Developer debug overlay that displays live viewport metrics, breakpoint tiers,
 /// content constraints, grid columns, and safe area insets.
@@ -43,10 +45,10 @@ class _PulsrViewportDebugOverlayState extends State<PulsrViewportDebugOverlay> {
             child: GestureDetector(
               onTap: () => setState(() => _minimized = !_minimized),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: PulsrMotion.state,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.85),
+                  color: AppColors.scrimStrong,
                   borderRadius: BorderRadius.circular(AppRadii.r8),
                   border: Border.all(color: Colors.white24, width: 0.8),
                 ),

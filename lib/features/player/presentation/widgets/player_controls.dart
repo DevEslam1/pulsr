@@ -9,6 +9,7 @@ import '../../cubit/player_state.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class PlayerControls extends StatelessWidget {
   final bool isPlaying;
@@ -72,207 +73,213 @@ class PlayerControls extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-            // Shuffle Button with active indicator
-            Semantics(
-              label: shuffleLabel,
-              button: true,
-              child: _ControlButton(
-                tooltip: shuffleLabel,
-                isActive: isShuffle,
-                activeColor: primaryColor,
-                inactiveColor: p.textSecondary,
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  onToggleShuffle();
-                },
-                icon: Icons.shuffle_rounded,
-                iconSize: 22,
+              // Shuffle Button with active indicator
+              Semantics(
+                label: shuffleLabel,
+                button: true,
+                child: _ControlButton(
+                  tooltip: shuffleLabel,
+                  isActive: isShuffle,
+                  activeColor: primaryColor,
+                  inactiveColor: p.textSecondary,
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    onToggleShuffle();
+                  },
+                  icon: Icons.shuffle_rounded,
+                  iconSize: 22,
+                ),
               ),
-            ),
 
-            const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.md),
 
-            // Previous Button
-            Semantics(
-              label: l10n.previous,
-              button: true,
-              enabled: hasPrevious,
-              child: Material(
-                color: Colors.transparent,
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: IconButton(
-                  tooltip: l10n.previous,
-                  splashRadius: 28,
-                  onPressed: hasPrevious
-                      ? () {
-                          HapticFeedback.lightImpact();
-                          onPrevious();
-                        }
-                      : null,
-                  icon: Icon(
-                    Icons.skip_previous_rounded,
-                    color: hasPrevious
-                        ? p.textPrimary
-                        : p.textTertiary.withValues(alpha: 0.3),
-                    size: 38,
+              // Previous Button
+              Semantics(
+                label: l10n.previous,
+                button: true,
+                enabled: hasPrevious,
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
+                    tooltip: l10n.previous,
+                    splashRadius: 28,
+                    onPressed: hasPrevious
+                        ? () {
+                            HapticFeedback.lightImpact();
+                            onPrevious();
+                          }
+                        : null,
+                    icon: Icon(
+                      Icons.skip_previous_rounded,
+                      color: hasPrevious
+                          ? p.textPrimary
+                          : p.textTertiary.withValues(alpha: 0.3),
+                      size: 38,
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            const SizedBox(width: AppSpacing.s18),
+              const SizedBox(width: AppSpacing.s18),
 
-            // Main Play / Pause Button
-            Semantics(
-              label: isPlaying ? l10n.pause : l10n.play,
-              button: true,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  HapticFeedback.mediumImpact();
-                  onPlayPause();
-                },
-                child: AnimatedContainer(
-                  duration: context.motionMs(200),
-                  width: mainButtonSize,
-                  height: mainButtonSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color.lerp(primaryColor, Colors.white, 0.18) ??
-                            primaryColor,
-                        primaryColor,
+              // Main Play / Pause Button
+              Semantics(
+                label: isPlaying ? l10n.pause : l10n.play,
+                button: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    onPlayPause();
+                  },
+                  child: AnimatedContainer(
+                    duration: context.motionMs(200),
+                    width: mainButtonSize,
+                    height: mainButtonSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color.lerp(primaryColor, Colors.white, 0.18) ??
+                              primaryColor,
+                          primaryColor,
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withValues(
+                              alpha: isPlaying ? 0.45 : 0.25),
+                          blurRadius: isPlaying ? 24 : 16,
+                          spreadRadius: isPlaying ? 2 : 0,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: AppColors.scrimAt(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
                       ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withValues(
-                            alpha: isPlaying ? 0.45 : 0.25),
-                        blurRadius: isPlaying ? 24 : 16,
-                        spreadRadius: isPlaying ? 2 : 0,
-                        offset: const Offset(0, 6),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: abLoopActive
-                          ? p.accent
-                          : Colors.white.withValues(alpha: 0.25),
-                      width: abLoopActive ? 2.2 : 1.2,
-                    ),
-                  ),
-                  child: Center(
-                    child: AnimatedSwitcher(
-                      duration: context.motionMs(180),
-                      transitionBuilder: (child, anim) => ScaleTransition(
-                        scale: anim,
-                        child: child,
-                      ),
-                      child: Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        key: ValueKey(isPlaying),
-                        color: onPrimaryColor,
-                        size: mainButtonSize * 0.52,
+                      border: Border.all(
+                        color: abLoopActive
+                            ? p.accent
+                            : AppColors.specularAt(0.25),
+                        width: abLoopActive ? 2.2 : 1.2,
                       ),
                     ),
-                  ),
-                ).animate(target: isPlaying ? 1 : 0).scale(
-                      duration: context.motionMs(140),
-                      curve: context.motionCurve(Curves.easeOutBack),
-                      begin: const Offset(0.94, 0.94),
-                      end: const Offset(1.0, 1.0),
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: context.motionMs(180),
+                        transitionBuilder: (child, anim) => ScaleTransition(
+                          scale: anim,
+                          child: child,
+                        ),
+                        child: Icon(
+                          isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          key: ValueKey(isPlaying),
+                          color: onPrimaryColor,
+                          size: mainButtonSize * 0.52,
+                        ),
+                      ),
                     ),
+                  ).animate(target: isPlaying ? 1 : 0).scale(
+                        duration: context.motionMs(140),
+                        curve: context.motionCurve(Curves.easeOutBack),
+                        begin: const Offset(0.94, 0.94),
+                        end: const Offset(1.0, 1.0),
+                      ),
+                ),
               ),
-            ),
 
-            const SizedBox(width: AppSpacing.s18),
+              const SizedBox(width: AppSpacing.s18),
 
-            // Next Button
-            Semantics(
-              label: l10n.next,
-              button: true,
-              enabled: hasNext,
-              child: Material(
-                color: Colors.transparent,
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: IconButton(
-                  tooltip: l10n.next,
-                  splashRadius: 28,
-                  onPressed: hasNext
-                      ? () {
-                          HapticFeedback.lightImpact();
-                          onNext();
-                        }
-                      : null,
-                  icon: Icon(
-                    Icons.skip_next_rounded,
-                    color: hasNext
-                        ? p.textPrimary
-                        : p.textTertiary.withValues(alpha: 0.3),
-                    size: 38,
+              // Next Button
+              Semantics(
+                label: l10n.next,
+                button: true,
+                enabled: hasNext,
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
+                    tooltip: l10n.next,
+                    splashRadius: 28,
+                    onPressed: hasNext
+                        ? () {
+                            HapticFeedback.lightImpact();
+                            onNext();
+                          }
+                        : null,
+                    icon: Icon(
+                      Icons.skip_next_rounded,
+                      color: hasNext
+                          ? p.textPrimary
+                          : p.textTertiary.withValues(alpha: 0.3),
+                      size: 38,
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: AppSpacing.md),
 
-            // Repeat Button with active indicator
-            Semantics(
-              label: repeatLabel,
-              button: true,
-              child: _ControlButton(
-                tooltip: repeatLabel,
-                isActive: repeatMode != PlayerRepeatMode.off,
-                activeColor: primaryColor,
-                inactiveColor: p.textSecondary,
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  onToggleRepeat();
-                  final nextMode = switch (repeatMode) {
-                    PlayerRepeatMode.off => PlayerRepeatMode.all,
-                    PlayerRepeatMode.all => PlayerRepeatMode.one,
-                    PlayerRepeatMode.one => PlayerRepeatMode.off,
-                  };
-                  final nextLabel = switch (nextMode) {
-                    PlayerRepeatMode.one => l10n.repeatOne,
-                    PlayerRepeatMode.all => l10n.repeatAll,
-                    PlayerRepeatMode.off => l10n.repeatOff,
-                  };
-                  final nextIcon = switch (nextMode) {
-                    PlayerRepeatMode.one => Icons.repeat_one_rounded,
-                    PlayerRepeatMode.all => Icons.repeat_rounded,
-                    PlayerRepeatMode.off => Icons.repeat_rounded,
-                  };
-                  PulsrToast.show(
-                    context,
-                    message: nextLabel,
-                    icon: nextIcon,
-                    duration: const Duration(milliseconds: 1200),
-                  );
-                },
-                icon: repeatMode == PlayerRepeatMode.one
-                    ? Icons.repeat_one_rounded
-                    : Icons.repeat_rounded,
-                iconSize: 22,
+              // Repeat Button with active indicator
+              Semantics(
+                label: repeatLabel,
+                button: true,
+                child: _ControlButton(
+                  tooltip: repeatLabel,
+                  isActive: repeatMode != PlayerRepeatMode.off,
+                  activeColor: primaryColor,
+                  inactiveColor: p.textSecondary,
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    onToggleRepeat();
+                    final nextMode = switch (repeatMode) {
+                      PlayerRepeatMode.off => PlayerRepeatMode.all,
+                      PlayerRepeatMode.all => PlayerRepeatMode.one,
+                      PlayerRepeatMode.one => PlayerRepeatMode.off,
+                    };
+                    final nextLabel = switch (nextMode) {
+                      PlayerRepeatMode.one => l10n.repeatOne,
+                      PlayerRepeatMode.all => l10n.repeatAll,
+                      PlayerRepeatMode.off => l10n.repeatOff,
+                    };
+                    final nextIcon = switch (nextMode) {
+                      PlayerRepeatMode.one => Icons.repeat_one_rounded,
+                      PlayerRepeatMode.all => Icons.repeat_rounded,
+                      PlayerRepeatMode.off => Icons.repeat_rounded,
+                    };
+                    PulsrToast.show(
+                      context,
+                      message: nextLabel,
+                      icon: nextIcon,
+                      duration: const Duration(milliseconds: 1200),
+                    );
+                  },
+                  icon: repeatMode == PlayerRepeatMode.one
+                      ? Icons.repeat_one_rounded
+                      : Icons.repeat_rounded,
+                  iconSize: 22,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 

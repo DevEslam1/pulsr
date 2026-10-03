@@ -8,6 +8,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Modal bottom sheet allowing users to select download quality with live
 /// file size estimates before starting a download.
@@ -115,7 +116,7 @@ class _DownloadQualityPickerSheetState
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
+            color: AppColors.scrimAt(0.35),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -174,6 +175,9 @@ class _DownloadQualityPickerSheetState
                 ),
               ),
               IconButton(
+                constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget),
                 icon: const Icon(Icons.close_rounded),
                 color: p.textSecondary,
                 tooltip: context.l10n.cancel,

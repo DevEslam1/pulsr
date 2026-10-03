@@ -207,10 +207,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
 
         int processed = frameCount;
+        boolean bitPerfect = false;
         if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
             try {
                 processed = nativeProcessDirectFloatBuffer(
                         nativeEngineHandle, scratch, 0, frameCount, channelCount);
+                bitPerfect = processed < 0;
+                if (bitPerfect) processed = -processed;
             } catch (UnsatisfiedLinkError e) {
                 processed = frameCount;
             }
@@ -218,6 +221,18 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         if (processed <= 0 || processed > frameCount) {
             // Engine declined the block; scratch still holds the untouched input.
             processed = frameCount;
+            bitPerfect = false;
+        }
+
+        if (bitPerfect) {
+            clearGainCurve();
+            ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
+            ByteBuffer original = inputBuffer.duplicate();
+            original.limit(position + processed * inputAudioFormat.bytesPerFrame);
+            output.put(original);
+            output.flip();
+            inputBuffer.position(limit);
+            return;
         }
 
         // Snapshot ramp state and consume the frames we are about to emit.
@@ -266,9 +281,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 // Emit straight float32: no 16-bit re-quantisation after DSP.
                 output.putFloat(value);
             } else {
-                float scaled = value * (value < 0.0f ? 32768f : 32767f);
-                int sample = Math.round(scaled);
-                output.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, sample)));
+                output.putShort(Pcm16Quantizer.fromFloat(value));
             }
         }
         inputBuffer.position(limit);

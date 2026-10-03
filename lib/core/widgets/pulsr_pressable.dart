@@ -5,6 +5,7 @@ import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
+/// {@category DesignSystem}
 enum PulsrHapticStyle {
   light,
   medium,

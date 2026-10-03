@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../motion/pulsr_motion.dart';
 
+/// {@category DesignSystem}
 /// Reveals [child] with a short fade + rise, staggered by [index].
 ///
 /// Include the current sort/group signature in [groupKey]: because the key

@@ -8023,4 +8023,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String failedToApplyLabel(String label) {
     return 'No se pudo aplicar $label';
   }
+
+  @override
+  String get bitPerfectConflictTitle =>
+      '¿Desactivar estas funciones para usar Bit-Perfect?';
+
+  @override
+  String get bitPerfectConflictBody =>
+      'Bit-Perfect envía el audio original sin alteraciones a tu DAC USB. Estas funciones cambian el sonido y no son compatibles:';
+
+  @override
+  String get bitPerfectDisableAndEnable => 'Desactivar y activar';
 }

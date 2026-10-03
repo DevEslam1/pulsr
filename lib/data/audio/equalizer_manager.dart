@@ -2148,10 +2148,10 @@ class EqualizerManager {
   /// Owned bypass: stores state, pushes to native (with DoP mirror), and
   /// syncs the pipeline mirror so reattach/route resync restores it.
   Future<void> setBypassDspForBitPerfect(bool bypass, {bool? isDop}) async {
-    isBitPerfectBypass = bypass;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setBypassDspForBitPerfect(bypass, isDop: isDop);
     }
+    isBitPerfectBypass = bypass;
     _syncPipeline();
   }
 

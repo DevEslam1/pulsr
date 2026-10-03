@@ -1,6 +1,7 @@
 // lib/core/constants/app_elevation.dart
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// Standardized elevation scale (e0..e3) mapping to consistent design shadows
 /// and surface elevations across light and dark themes.
 abstract class AppElevation {

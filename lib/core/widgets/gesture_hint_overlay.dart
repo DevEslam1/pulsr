@@ -9,6 +9,7 @@ import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
+/// {@category DesignSystem}
 /// A shared, self-dismissing hint overlay/banner that shows once to educate
 /// users about gestures (D6: swipe down to dismiss, double-tap, mini player
 /// swipe to skip, song tile swipe actions).

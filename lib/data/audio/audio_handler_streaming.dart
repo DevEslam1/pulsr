@@ -1,8 +1,6 @@
-// ignore_for_file: unused_element
 part of 'audio_handler.dart';
 
 mixin PulsrAudioStreaming on BaseAudioHandler {
-  String? _lastAppliedPerSongEq;
   int get _preloadCountForCurrentBucket {
     switch (_currentBucket) {
       case BufferBucket.minimal:
@@ -11,213 +9,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         return 2;
       case BufferBucket.generous:
         return 3;
-    }
-  }
-
-  Future<void> _evaluateBufferBucket(SongsTableData song) async {
-    final isLocal =
-        song.source == SongSource.local || song.isDownloaded == true;
-    bool isWifi = false;
-    if (!isLocal) {
-      try {
-        isWifi = await _ytmService.isWifiConnected();
-      } catch (e, st) {
-        ErrorLogger.log('Network check failed in _evaluateBufferBucket',
-            error: e, stackTrace: st, category: 'AudioHandler');
-      }
-    }
-    try {
-      _adaptiveBufferEngine.evaluateBucket(isWifi: isWifi, isLocal: isLocal);
-    } catch (e, st) {
-      ErrorLogger.log('Adaptive buffer evaluation failed',
-          error: e, stackTrace: st, category: 'AudioHandler');
-    }
-  }
-
-  void _notifyTrackChanged(SongsTableData song) {
-    // F1: AB loop is per-track; a new song invalidates the live region,
-    // then the persisted loop for the new track (if any) is restored.
-    abLoopManager.onSongChanged(song.id);
-    unawaited(abLoopManager.restoreForSong(song.id));
-    // T10: a new track re-arms its start seek. The advance guard is re-armed
-    // by the position listener once it observes a position inside the window,
-    // which prevents a stale post-advance tick from skipping the new track.
-    _cueStartSeeked = false;
-    // D2: seed the BPM-synced crossfade map from manual per-track overrides.
-    _seedBpmOverride(song);
-    // Correct DSP coefficients for the real header rate (replaces the 48kHz
-    // cold-start assumption once known). A missing rate keeps the previous
-    // track's coefficients, so log it loudly instead of failing silently —
-    // the scanner should populate sampleRate for local files.
-    final rate = song.sampleRate;
-    if (rate != null && rate > 0) {
-      unawaited(AudioEffectsChannel().resyncForTrack(rate.toDouble()));
-      unawaited(_syncDspLatencyForTrack(rate.toDouble()));
-    } else {
-      ErrorLogger.log(
-        'No sample rate for "${song.title}"; DSP keeps previous track coefficients',
-        category: 'PulsrAudioHandler',
-      );
-    }
-    // F9: auto-restore per-album DSP snapshot (fire-and-forget).
-    if (dspSnapshotStore.enabled) {
-      unawaited(recallDspSnapshotFor(song));
-    }
-    final previousSong = _lastPlayedSong;
-    if (previousSong != null && previousSong.id != song.id) {
-      final prevKey = previousSong.id.toString();
-      final curSpeed = _activePlayer.speed;
-      final curPitch = _pitch;
-      if ((curSpeed - 1.0).abs() >= 0.01 || (curPitch - 1.0).abs() >= 0.01) {
-        unawaited(perSongPlaybackStore.setSpeed(prevKey, curSpeed));
-        unawaited(perSongPlaybackStore.setPitch(prevKey, curPitch));
-      }
-      _memoryManager.onTrackCompleted(previousSong.id);
-      if (previousSong.remoteId != null) {
-        // Prefetch registers keys as `remoteId:quality`; evict every variant.
-        _memoryManager.evictByPrefix(previousSong.remoteId!);
-      }
-    }
-    _lastPlayedSong = song;
-
-    // F13: restore per-song speed/pitch memory (B-16)
-    final songKey = song.id.toString();
-    final remSpeed = perSongPlaybackStore.getSpeed(songKey);
-    final remPitch = perSongPlaybackStore.getPitch(songKey);
-    if (remSpeed != null) {
-      unawaited(setSpeed(remSpeed));
-    } else {
-      unawaited(restorePersistedSpeed());
-    }
-    if (remPitch != null) {
-      unawaited(setPitch(remPitch));
-    } else {
-      unawaited(restorePersistedPitch());
-    }
-
-    // Restore per-song EQ preset if configured (B-16, N-4)
-    if (getIt.isRegistered<PerSongEqStore>()) {
-      try {
-        final eqStore = getIt<PerSongEqStore>();
-        final presetName = eqStore.getPresetForTrack(songKey);
-        if (presetName != null) {
-          final matchedPreset = EqPreset.defaultPresets.firstWhere(
-            (p) => p.name.toLowerCase() == presetName.toLowerCase(),
-            orElse: () =>
-                _equalizerManager.currentPreset.copyWith(name: presetName),
-          );
-          _lastAppliedPerSongEq = presetName;
-          unawaited(_equalizerManager.setPreset(matchedPreset));
-        } else if (_lastAppliedPerSongEq != null) {
-          _lastAppliedPerSongEq = null;
-          final baseName =
-              _cachedPrefs?.getString(PrefsKeys.eqPresetName) ?? 'Flat';
-          final basePreset = EqPreset.defaultPresets.firstWhere(
-            (p) => p.name.toLowerCase() == baseName.toLowerCase(),
-            orElse: () => EqPreset.defaultPresets.first,
-          );
-          unawaited(_equalizerManager.setPreset(basePreset));
-        }
-      } catch (_) {}
-    }
-    _onTrackChangedSubject.add(song);
-    // Signature-scan local lossless files so MQA material is labeled honestly
-    // instead of silently reported as plain FLAC on the next quality rebuild.
-    if (song.source == SongSource.local && !song.path.startsWith('content:')) {
-      final lowerPath = song.path.toLowerCase();
-      if (lowerPath.endsWith('.flac') || lowerPath.endsWith('.wav')) {
-        unawaited(MqaDecoderHelper.isMqaFile(song.path).then((isMqa) {
-          if (isMqa) MqaDecoderHelper.markMqaPath(song.path);
-        }).catchError((e, st) {
-          // File vanished or unreadable mid-play: the track simply plays
-          // without the MQA badge rather than failing silently (14-03).
-          ErrorLogger.log('MQA signature scan failed for ${song.path}',
-              error: e, stackTrace: st, category: 'AudioHandler');
-        }));
-      }
-    }
-    unawaited(_beginAudioSession(song));
-    unawaited(_maybeNegotiateOutputFormat(song));
-    // Native ReplayGain follows the track: push tags so the DSP pre-gain
-    // tracks the new song, then re-apply the mixer volume (unity for RG
-    // component when native owns it, full Dart math otherwise).
-    unawaited(_pushNativeReplayGain(song));
-  }
-
-  /// Syncs native latency reporting and programs the sinc resampler with the
-  /// real track-rate -> device-rate pair so 44.1k <-> 48k switches convert
-  /// instead of running bypassed on stale rates.
-  Future<void> _syncDspLatencyForTrack(double trackRate) async {
-    double? outputRate;
-    try {
-      outputRate = (await _currentOutputInfo())?.sampleRate.toDouble();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to read output sample rate for DSP resampler',
-          error: e, stackTrace: st, category: 'AudioHandler');
-    }
-    await _equalizerManager.syncNativeLatency(
-      trackRate,
-      outputRate: outputRate,
-    );
-  }
-
-  /// Per-track output-format negotiation. Hi-res-first by default: the pure
-  /// [negotiateOutputFormat] decision picks the best format the device supports
-  /// and pushes it through the existing target-format channel (bit-perfect
-  /// keeps its own exclusive mixer attributes). Smart Audio also forces this on.
-  Future<void> _maybeNegotiateOutputFormat(SongsTableData song) async {
-    try {
-      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      var negotiate =
-          prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? true;
-      // Smart Audio (Auto) opts into best-quality output negotiation without
-      // changing the user's explicit manual setting.
-      if (!negotiate && getIt.isRegistered<SmartAudioService>()) {
-        negotiate = await getIt<SmartAudioService>().isEnabled();
-      }
-      if (!negotiate) {
-        return;
-      }
-      if (!getIt.isRegistered<HiResAudioService>()) return;
-      final service = getIt<HiResAudioService>();
-      final info =
-          service.currentOutputInfo ?? await service.getAudioOutputInfo();
-      final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
-          (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
-      final decision = negotiateOutputFormat(
-        request: OutputFormatRequest(
-          trackSampleRate: song.sampleRate ?? 0,
-          trackBitDepth: song.bitDepth ?? 0,
-        ),
-        deviceSampleRates: info.supportedSampleRates,
-        deviceMaxBitDepth: info.bitDepth,
-        route: OutputRoute.fromOutputInfo(info),
-        bitPerfectActive: bitPerfect,
-      );
-      if (!decision.applied) return; // Exclusive path owns the mixer format.
-      // setTargetOutputFormat only accepts the platform's known ladder; fall
-      // back to "auto" for that dimension when the device reports a rate it
-      // does not accept, rather than silently requesting nothing.
-      const validRates = <int>{
-        44100,
-        48000,
-        88200,
-        96000,
-        176400,
-        192000,
-        352800,
-        384000,
-        768000
-      };
-      final rate =
-          validRates.contains(decision.sampleRate) ? decision.sampleRate : 0;
-      await service.setTargetOutputFormat(
-        sampleRate: rate,
-        bitDepth: decision.bitDepth,
-      );
-    } catch (e, st) {
-      ErrorLogger.log('Output format negotiation failed',
-          error: e, stackTrace: st, category: 'AudioHandler');
     }
   }
 
@@ -237,32 +28,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
     unawaited(_prefetchPlayer
         .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
-  }
-
-  Future<void> _onQualityStepDownRequested(String newQuality) async {
-    debugPrint(
-        '[AudioHandler] Adaptive bitrate switching stepped down streaming quality to $newQuality');
-    final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
-    await prefs.setString('setting_streaming_quality', newQuality);
-    final song = currentSong;
-    final remoteId = song?.remoteId;
-    if (remoteId != null && remoteId.isNotEmpty) {
-      _streamCache.removeWhere(
-          (k, _) => k.startsWith('$remoteId:') || k.startsWith(remoteId));
-      _streamResolutionPipeline.invalidateCache(remoteId);
-    }
-    _resolveEpoch++;
-    try {
-      if (getIt.isRegistered<YtmUrlCache>()) {
-        final urlCache = getIt<YtmUrlCache>();
-        if (remoteId != null && remoteId.isNotEmpty) {
-          urlCache.invalidate(remoteId);
-        }
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Failed to invalidate URL cache on quality change',
-          error: e, stackTrace: st, category: 'AudioHandler');
-    }
   }
 
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
@@ -332,9 +97,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     }
     if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
       // Already 2 rapid gaps means 3rd song in your loop → pause instead of skip
-      if (_consecutiveFailures >= 2 || _rapidGaplessChangeCount >= 1) {
+      if (_consecutiveFailures >= 2) {
         _consecutiveFailures = 0;
-        _rapidGaplessChangeCount = 0;
         _activePlayer.pause().ignore();
         _broadcastState(_activePlayer.playbackEvent);
         return;
@@ -350,110 +114,22 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
     if (isFatal) {
       _consecutiveFailures = 0;
-      _rapidGaplessChangeCount = 0;
       _activePlayer.pause().ignore();
       _broadcastState(_activePlayer.playbackEvent);
     } else {
       _consecutiveFailures++;
       if (PulsrAudioHandler.shouldHaltFailureCascade(
         consecutiveFailures: _consecutiveFailures,
-        rapidGaplessChanges: _rapidGaplessChangeCount,
+        rapidGaplessChanges: 0,
         queueLength: _songs.length,
       )) {
         _consecutiveFailures = 0;
-        _rapidGaplessChangeCount = 0;
         _activePlayer.pause().ignore();
         _broadcastState(_activePlayer.playbackEvent);
       } else {
         unawaited(skipToNext());
       }
     }
-  }
-
-  AudioSource _buildGaplessChild(SongsTableData song) {
-    final tag = PulsrAudioHandler._songToMediaItem(song);
-    // HTTP streams are not files: skip the disk/format/trim paths and hand
-    // the URL to just_audio directly (HLS auto-detected).
-    if (PulsrAudioHandler._isStreamUrl(song.path)) {
-      return _createAudioSource(song, tag);
-    }
-    final isRemoteYtm = song.source == SongSource.youtube &&
-        (song.path.startsWith('ytmusic://') || song.path.isEmpty) &&
-        song.isDownloaded != true;
-    final isLocalFile = !isRemoteYtm &&
-        (!song.path.startsWith('ytmusic://') && song.path.isNotEmpty) &&
-        (song.path.startsWith('content:') ||
-            song.isDownloaded == true ||
-            (song.fileSize != null && !song.isMissing) ||
-            (_pathExistsCache[song.path] ??= File(song.path).existsSync()));
-    // FIX-#8: Evict oldest 25% when the cache exceeds the bound to prevent
-    // an unbounded memory leak over long listening sessions.
-    if (_pathExistsCache.length > PulsrAudioHandler._maxPathCacheSize) {
-      final keys = _pathExistsCache.keys.toList();
-      for (var i = 0; i < keys.length ~/ 4; i++) {
-        _pathExistsCache.remove(keys[i]);
-      }
-    }
-    final isRemote = song.source == SongSource.youtube && !isLocalFile;
-    if (isRemote) {
-      late final YtmResolvingSource source;
-      source = YtmResolvingSource.withRefresh(
-        videoId: song.remoteId ?? '',
-        quality: _currentStreamingQuality(),
-        resolve: ({bool forceRefresh = false}) async {
-          final resolved =
-              await _resolveStreamUrl(song, forceRefresh: forceRefresh);
-          source.userAgent = resolved.userAgent;
-          source.cookies = resolved.cookies;
-          source.quality = resolved.quality;
-          return resolved.url;
-        },
-        onError: (error) => _handleStreamResolutionError(song, error),
-        tag: tag,
-      );
-      return source;
-    }
-    final base = _createAudioSource(song, tag);
-    // Apply codec encoder-delay/padding trims so Opus/MP3/AAC joins are
-    // truly gapless instead of carrying ~6-48ms of silence.
-    try {
-      final trim = GaplessTrimHandler.trimFor(
-        path: song.path,
-        codec: song.codec,
-        // Thread the real sample rate so header sample-count→duration math is
-        // correct for 48kHz content (item 15); 44100 stays the documented
-        // default when the scanner left it unknown.
-        sampleRate: song.sampleRate,
-      );
-      if (!trim.isEmpty) {
-        final trackLen = Duration(milliseconds: song.durationMs);
-        final clamped = trim.clampedTo(trackLen);
-        var start = GaplessTrimHandler.startOffset(clamped);
-        final end = trackLen > Duration.zero
-            ? GaplessTrimHandler.effectiveEnd(trackLen, clamped)
-            : null;
-        // When the real duration is unknown (durationMs == 0) clampedTo cannot
-        // cap the trim, so a corrupt header could seek far into (or past) the
-        // track. Real encoder pre-skip is tens of ms, never seconds — cap the
-        // start (item 15).
-        if (trackLen <= Duration.zero && start > const Duration(seconds: 1)) {
-          start = const Duration(seconds: 1);
-        }
-        if (start > Duration.zero || (end != null && end < trackLen)) {
-          return ClippingAudioSource(
-            start: start == Duration.zero ? null : start,
-            end: (end == null || end >= trackLen) ? null : end,
-            child: base,
-            tag: tag,
-          );
-        }
-      }
-    } catch (_) {}
-    return base;
-  }
-
-  List<AudioSource> _buildAudioSources(List<SongsTableData> songs) {
-    return songs.map(_buildGaplessChild).toList();
   }
 
   /// A local song plays straight off disk; a YouTube row needs a freshly
@@ -564,15 +240,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     return source;
   }
 
-  /// Non-blocking background cache warm for [song]. Populates the stream URL
-  /// cache so a subsequent lazy resolve completes near-instantly.
-  Future<void> _warmStreamCache(SongsTableData song) async {
-    if (_ytmService.isBotCoolingDown) return;
-    try {
-      await _resolveStreamUrl(song).timeout(const Duration(seconds: 15));
-    } catch (_) {}
-  }
-
   void _addToStreamCache(
       String key,
       ({
@@ -585,81 +252,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       _streamCache.remove(_streamCache.keys.first);
     }
     _streamCache[key] = entry;
-  }
-
-  /// Quick soft-landing before a hard stop/swap: stopping mid-waveform without
-  /// a fade cuts the signal at a non-zero crossing, which the ear hears as a
-  /// click/pop on every manual track change. 70ms is inaudible as a delay.
-  Future<void> _fadeOutForSwitch(AudioPlayer player) async {
-    try {
-      if (!player.playing) return;
-      final from = player.volume;
-      if (from <= 0.01) return;
-      await _crossfadeManager
-          .fadeVolume(player, from, 0.0, const Duration(milliseconds: 70),
-              _crossfadeManager.nextFadeId())
-          .timeout(const Duration(milliseconds: 250));
-    } catch (_) {}
-  }
-
-  /// Matching fade-in after a switch: starting at 0 and ramping to the
-  /// ReplayGain target avoids the cold-start click. Skipped while ducked
-  /// (navigation/call) so the ramp never fights the duck level.
-  void _fadeInAfterSwitch(AudioPlayer player, double targetVolume) {
-    if (_duckActive) return;
-    unawaited(_crossfadeManager.fadeVolume(
-        player,
-        0.0,
-        targetVolume.clamp(0.0, 1.0),
-        const Duration(milliseconds: 90),
-        _crossfadeManager.nextFadeId()));
-  }
-
-  /// Safety net for the cold-start fade-in: the 90ms ramp is unawaited and can
-  /// be orphaned by a racing fade-id bump, a cancelled crossfade, or a play()
-  /// interrupted mid-load, leaving the player audibly running at volume 0
-  /// until the user pauses and resumes. A short convergence check restores the
-  /// ReplayGain target when the player is ready and playing but still muted.
-  void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation) {
-    if (_duckActive) return;
-    var attempts = 0;
-    // FIX-#12: Cancel any previous guard and store the new timer so it can
-    // be disposed on onTaskRemoved / hot-restart.
-    _fadeInGuardTimer?.cancel();
-    _fadeInGuardTimer =
-        Timer.periodic(const Duration(milliseconds: 250), (timer) async {
-      attempts++;
-      try {
-        if (attempts > 8 ||
-            generation != _playGeneration ||
-            !identical(player, _activePlayer) ||
-            _duckActive ||
-            _crossfadeManager.isCrossfading ||
-            !player.playing) {
-          timer.cancel();
-          return;
-        }
-        if (player.volume > 0.01) {
-          timer.cancel();
-          return;
-        }
-        // Guard against premature volume restore before slow decoders are actually ready
-        if (player.processingState != ProcessingState.ready) {
-          return;
-        }
-        // Player is playing but volume is still muted
-        final target = _calculateReplayGainVolume(currentSong).clamp(0.0, 1.0);
-        if (target > 0.05) {
-          ErrorLogger.log(
-              'Cold-start fade-in did not converge (attempt $attempts); restoring target volume',
-              category: 'AudioHandler');
-          await player.setVolume(target);
-          timer.cancel();
-        }
-      } catch (_) {
-        timer.cancel();
-      }
-    });
   }
 
   void cancelPrefetches() {
@@ -746,9 +338,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// Pushes the opt-in AAudio Direct output preference to every player
   /// (active, inactive and prefetch). Off by default; with `false` the sink
   /// stays the historical DefaultAudioSink path. Never throws.
-  Future<void> setAaudioOutputEnabled(bool enabled,
+  Future<bool> setAaudioOutputEnabled(bool enabled,
       {bool preferExclusive = true, int targetBufferMs = 150}) async {
-    await pushAaudioOutputToPlayers(
+    return pushAaudioOutputToPlayers(
       enabled,
       preferExclusive: preferExclusive,
       targetBufferMs: targetBufferMs,
@@ -799,73 +391,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     } catch (_) {
       return false;
     }
-  }
-
-  /// Warms [_streamCache] for an upcoming YouTube track so track switching is instant.
-  void _prefetchStream(SongsTableData song) {
-    final videoId = song.remoteId;
-    if (song.source != SongSource.youtube ||
-        videoId == null ||
-        videoId.isEmpty) {
-      return;
-    }
-    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) ||
-        videoId.startsWith('n_')) {
-      return;
-    }
-    // Skip prefetch if downloaded/local file exists
-    if (!song.path.startsWith('ytmusic://') &&
-        song.path.isNotEmpty &&
-        (song.path.startsWith('content:') || song.isDownloaded == true)) {
-      return;
-    }
-    // Avoid launching background prefetch storms if playback failures are occurring
-    if (_consecutiveFailures >= 3) {
-      return;
-    }
-    // While the IP is cooling down every resolve fails instantly with the same
-    // BOT_CHALLENGE, so prefetching only burns log lines and thread-pool slots.
-    // The foreground resolve retries once the window lapses.
-    if (_ytmService.isBotCoolingDown) {
-      return;
-    }
-    // Deduplicate against active stream pre-resolver (quality-aware: a
-    // medium prefetch must not block a high foreground resolve).
-    final prefetchKey = '$videoId:${_currentStreamingQuality().toLowerCase()}';
-    if (_streamPreResolver.inFlightVideoId == videoId) {
-      return;
-    }
-    final isBatteryConstrained =
-        _batteryAwarePlayback.currentLevel != BatteryOptimizationLevel.normal;
-    if (!_memoryManager.canPreload(
-        isBatteryConstrained: isBatteryConstrained)) {
-      return;
-    }
-    if (!_prefetching.add(prefetchKey)) {
-      return;
-    }
-    _memoryManager.registerPreload(
-      prefetchKey,
-      AudioMemoryManager.calculateHeadSize(
-          bitrateKbps: song.bitrateKbps ?? 256),
-    );
-    final currentGen = _prefetchGeneration;
-    unawaited(() async {
-      try {
-        await _resolveStreamUrl(song);
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Background stream prefetch failed for ${song.title}',
-          error: e,
-          stackTrace: st,
-          category: 'AudioHandler',
-        );
-      } finally {
-        if (_prefetchGeneration == currentGen) {
-          _prefetching.remove(prefetchKey);
-        }
-      }
-    }());
   }
 
   bool _isConsecutiveAlbumPlayback() {
@@ -922,35 +447,21 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     );
   }
 
-  void _prefetchNextTracks() {
-    _smartPrefetch();
-  }
-
   // Abstract contract supplied by the composing PulsrAudioHandler (same
   // library). Declaring these here keeps the mixin stateless and lets the
   // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
 
-  AdaptiveBufferEngine get _adaptiveBufferEngine;
-
   BatteryAwarePlayback get _batteryAwarePlayback;
-
-  Future<void> _beginAudioSession(SongsTableData song);
 
   void _broadcastState(PlaybackEvent event);
 
   SharedPreferences? get _cachedPrefs;
-  set _cachedPrefs(SharedPreferences? value);
-
-  double _calculateReplayGainVolume(SongsTableData? song);
 
   int get _consecutiveFailures;
   set _consecutiveFailures(int value);
 
   CrossfadeManager get _crossfadeManager;
-
-  bool get _cueStartSeeked;
-  set _cueStartSeeked(bool value);
 
   AudioLoadConfiguration get _currentAudioLoadConfiguration;
   set _currentAudioLoadConfiguration(AudioLoadConfiguration value);
@@ -960,11 +471,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   int get _currentIndex;
 
-  Future<AudioOutputInfo?> _currentOutputInfo();
-
   String _currentStreamingQuality();
-
-  bool get _duckActive;
 
   bool get _gaplessMode;
 
@@ -976,31 +483,17 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   StreamController<String> get _errorSubject;
 
-  Timer? get _fadeInGuardTimer;
-  set _fadeInGuardTimer(Timer? value);
-
   FormatAwareDecoder get _formatDecoder;
 
   dynamic get _inFlightResolves;
 
   AudioPlayer get _inactivePlayer;
 
-  SongsTableData? get _lastPlayedSong;
-  set _lastPlayedSong(SongsTableData? value);
-
   String? get _lastSmartPrefetchKey;
   set _lastSmartPrefetchKey(String? value);
 
   int get _lastSmartPrefetchMs;
   set _lastSmartPrefetchMs(int value);
-
-  AudioMemoryManager get _memoryManager;
-
-  StreamController<SongsTableData> get _onTrackChangedSubject;
-
-  Map<String, bool> get _pathExistsCache;
-
-  int get _playGeneration;
 
   AudioPlayer get _playerA;
 
@@ -1015,11 +508,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   SmartPreloadScheduler get _preloadScheduler;
 
-  Future<void> _pushNativeReplayGain(SongsTableData? song);
-
-  int get _rapidGaplessChangeCount;
-  set _rapidGaplessChangeCount(int value);
-
   IMusicRepository get _repository;
 
   int get _resolveEpoch;
@@ -1031,8 +519,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   List<SongsTableData> get _songs;
 
   dynamic get _streamCache;
-
-  StreamPreResolver get _streamPreResolver;
 
   YtmService get _ytmService;
 
@@ -1048,10 +534,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   SilenceSkipController get silenceSkipController;
 
-  StreamResolutionPipeline get _streamResolutionPipeline;
-
   PerSongPlaybackStore get perSongPlaybackStore;
-  double get _pitch;
   Future<void> setPitch(double pitch);
   Future<void> restorePersistedSpeed();
   Future<void> restorePersistedPitch();

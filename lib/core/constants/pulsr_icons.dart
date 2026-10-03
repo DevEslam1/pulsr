@@ -1,6 +1,7 @@
 // lib/core/constants/pulsr_icons.dart
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// Semantic iconography system for Pulsr.
 ///
 /// Maps semantic roles to concrete Material/Cupertino icon data so icon set swaps,

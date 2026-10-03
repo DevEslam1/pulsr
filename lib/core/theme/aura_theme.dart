@@ -220,7 +220,7 @@ class AuraTheme {
         surface: const Color(0xFF0B0B0E),
         surfaceContainer: const Color(0xFF121216),
         surfaceContainerHigh: const Color(0xFF18181E),
-        hairline: Colors.white.withValues(alpha: 0.09),
+        hairline: AppColors.specularAt(0.09),
         // Dim white point softens peak white for night listening (12.8:1,
         // still well above AA) without touching secondary/tertiary hierarchy.
         textPrimary:
@@ -247,7 +247,7 @@ class AuraTheme {
       surface: const Color(0xFF12141D),
       surfaceContainer: const Color(0xFF171B28),
       surfaceContainerHigh: const Color(0xFF1E2235),
-      hairline: Colors.white.withValues(alpha: 0.07),
+      hairline: AppColors.specular,
       // Dim white point softens peak white for night listening (12.8:1).
       textPrimary:
           dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFEDEFF7),
@@ -554,8 +554,8 @@ class AuraTheme {
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return p.accent;
           return p.isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.black.withValues(alpha: 0.08);
+              ? AppColors.specularAt(0.12)
+              : AppColors.scrimAt(0.08);
         }),
         trackOutlineColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return Colors.transparent;
@@ -710,7 +710,7 @@ class PulsrElevation {
   /// Subtle elevation for cards and list items.
   static List<BoxShadow> level1(PulsrPalette p) => [
         BoxShadow(
-          color: Colors.black.withValues(alpha: p.isDark ? 0.20 : 0.06),
+          color: AppColors.scrimAt(p.isDark ? 0.20 : 0.06),
           blurRadius: 6,
           offset: const Offset(0, 2),
         ),
@@ -719,7 +719,7 @@ class PulsrElevation {
   /// Medium elevation for floating action buttons, popovers, and sticky bars.
   static List<BoxShadow> level2(PulsrPalette p) => [
         BoxShadow(
-          color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.10),
+          color: AppColors.scrimAt(p.isDark ? 0.35 : 0.10),
           blurRadius: 14,
           offset: const Offset(0, 4),
         ),
@@ -728,7 +728,7 @@ class PulsrElevation {
   /// High elevation for bottom sheets, modals, and dialogs.
   static List<BoxShadow> level3(PulsrPalette p) => [
         BoxShadow(
-          color: Colors.black.withValues(alpha: p.isDark ? 0.50 : 0.16),
+          color: AppColors.scrimAt(p.isDark ? 0.50 : 0.16),
           blurRadius: 24,
           offset: const Offset(0, 8),
         ),

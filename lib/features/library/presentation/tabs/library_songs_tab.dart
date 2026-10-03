@@ -125,7 +125,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                             end: 6,
                             top: 6,
                             child: Material(
-                              color: Colors.black.withValues(alpha: 0.5),
+                              color: AppColors.scrimAt(0.5),
                               shape: const CircleBorder(),
                               child: InkWell(
                                 customBorder: const CircleBorder(),
@@ -393,6 +393,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     ),
                   ),
                   IconButton.filled(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
                     style: IconButton.styleFrom(
                       backgroundColor: p.accent,
                       foregroundColor: p.onAccent,
@@ -404,6 +407,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                   ),
                   const SizedBox(width: AppSpacing.s6),
                   IconButton.filledTonal(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
                     style: IconButton.styleFrom(
                       backgroundColor: p.surfaceContainerHigh,
                       foregroundColor: p.textPrimary,

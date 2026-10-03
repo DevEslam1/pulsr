@@ -17,6 +17,7 @@ import '../nav_destinations.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// The 4 navigation rail display modes based on screen width/posture.
 enum SidebarRailMode {
@@ -194,19 +195,18 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
               colors: [
                 GpuBudget.isGpuSaverActive
                     ? p.surface
-                    : p.surface.withValues(
-                        alpha: p.isDark ? 0.78 : 0.88),
+                    : p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
                 GpuBudget.isGpuSaverActive
                     ? p.surfaceContainer
-                    : p.surfaceContainer.withValues(
-                        alpha: p.isDark ? 0.72 : 0.84),
+                    : p.surfaceContainer
+                        .withValues(alpha: p.isDark ? 0.72 : 0.84),
               ],
             ),
             border: BorderDirectional(
               end: BorderSide(
                 color: p.isDark
-                    ? Colors.white.withValues(alpha: 0.14)
-                    : Colors.black.withValues(alpha: 0.08),
+                    ? AppColors.specularStrong
+                    : AppColors.scrimAt(0.08),
                 width: 1.2,
               ),
             ),
@@ -216,175 +216,181 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
               builder: (context) {
                 final sidebarBody = Padding(
                   padding: EdgeInsetsDirectional.only(start: leftInset),
-              child: SafeArea(
-                top: true,
-                bottom: true,
-                left: false,
-                right: false,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: SizedBox(
-                        width: targetContentWidth,
-                        height: constraints.maxHeight,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // ── Brand Header ──────────────────────────────────────────
-                            _SidebarBrandHeader(
-                              isExtended: isExtended,
-                              onToggle: widget.onToggleExtended,
-                              p: p,
-                            ),
-
-                            const SizedBox(height: AppSpacing.s6),
-
-                            // ── Main Scrollable Nav List ──────────────────────────────
-                            Expanded(
-                              child: ListView(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: horizontalPadding,
-                                  vertical: AppSpacing.xxs,
+                  child: SafeArea(
+                    top: true,
+                    bottom: true,
+                    left: false,
+                    right: false,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: SizedBox(
+                            width: targetContentWidth,
+                            height: constraints.maxHeight,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // ── Brand Header ──────────────────────────────────────────
+                                _SidebarBrandHeader(
+                                  isExtended: isExtended,
+                                  onToggle: widget.onToggleExtended,
+                                  p: p,
                                 ),
-                                children: [
-                                  if (isExtended)
-                                    _SectionHeader(
-                                        title: context.l10n.sidebarBrowse,
-                                        p: p),
-                                  for (final item in primaryItems) ...[
-                                    _SidebarNavItem(
-                                      icon: item.icon,
-                                      activeIcon: item.activeIcon,
-                                      label: item.label,
-                                      isSelected:
-                                          widget.currentIndex == item.index,
-                                      isExtended: isExtended,
-                                      iconSize: iconSize,
-                                      showCompactLabel: showCompactLabel,
-                                      badgeCount:
-                                          widget.badgeCounts?[item.index],
-                                      p: p,
-                                      onTap: () {
-                                        if (widget.currentIndex != item.index) {
-                                          widget.onDestinationSelected(
-                                              item.index);
-                                        }
-                                      },
-                                    ),
-                                    const SizedBox(height: AppSpacing.xxs),
-                                  ],
 
-                                  const SizedBox(height: AppSpacing.s10),
-                                  if (isExtended)
-                                    _SectionHeader(
-                                        title: context.l10n.sidebarCollection,
-                                        p: p)
-                                  else
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.s14,
-                                          vertical: AppSpacing.s6),
-                                      child: Divider(
-                                        height: 1,
-                                        thickness: 1,
-                                        color:
-                                            p.hairline.withValues(alpha: 0.3),
-                                      ),
-                                    ),
+                                const SizedBox(height: AppSpacing.s6),
 
-                                  for (final item in secondaryItems) ...[
-                                    _SidebarNavItem(
-                                      icon: item.icon,
-                                      activeIcon: item.activeIcon,
-                                      label: item.label,
-                                      isSelected:
-                                          widget.currentIndex == item.index,
-                                      isExtended: isExtended,
-                                      iconSize: iconSize,
-                                      showCompactLabel: showCompactLabel,
-                                      badgeCount:
-                                          widget.badgeCounts?[item.index],
-                                      p: p,
-                                      onTap: () {
-                                        if (widget.currentIndex != item.index) {
-                                          widget.onDestinationSelected(
-                                              item.index);
-                                        }
-                                      },
+                                // ── Main Scrollable Nav List ──────────────────────────────
+                                Expanded(
+                                  child: ListView(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: horizontalPadding,
+                                      vertical: AppSpacing.xxs,
                                     ),
-                                    const SizedBox(height: AppSpacing.xxs),
-                                  ],
-
-                                  // Optional Side Inspector (Queue/Lyrics) Shortcut
-                                  if (widget.onToggleSideInspector != null) ...[
-                                    const SizedBox(height: AppSpacing.s10),
-                                    if (isExtended)
-                                      _SectionHeader(
-                                          title: context.l10n.sidebarPanel,
-                                          p: p)
-                                    else
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.s14,
-                                            vertical: AppSpacing.s6),
-                                        child: Divider(
-                                          height: 1,
-                                          thickness: 1,
-                                          color:
-                                              p.hairline.withValues(alpha: 0.3),
+                                    children: [
+                                      if (isExtended)
+                                        _SectionHeader(
+                                            title: context.l10n.sidebarBrowse,
+                                            p: p),
+                                      for (final item in primaryItems) ...[
+                                        _SidebarNavItem(
+                                          icon: item.icon,
+                                          activeIcon: item.activeIcon,
+                                          label: item.label,
+                                          isSelected:
+                                              widget.currentIndex == item.index,
+                                          isExtended: isExtended,
+                                          iconSize: iconSize,
+                                          showCompactLabel: showCompactLabel,
+                                          badgeCount:
+                                              widget.badgeCounts?[item.index],
+                                          p: p,
+                                          onTap: () {
+                                            if (widget.currentIndex !=
+                                                item.index) {
+                                              widget.onDestinationSelected(
+                                                  item.index);
+                                            }
+                                          },
                                         ),
-                                      ),
-                                    _SidebarNavItem(
-                                      icon: Icons.vertical_split_outlined,
-                                      activeIcon: Icons.vertical_split_rounded,
-                                      label: context.l10n.sidebarSidePanel,
-                                      isSelected: widget.isSideInspectorOpen,
-                                      isExtended: isExtended,
-                                      iconSize: iconSize,
-                                      showCompactLabel: showCompactLabel,
-                                      p: p,
-                                      trailingBadge: isExtended &&
-                                              widget.isSideInspectorOpen
-                                          ? context.l10n.badgeOn
-                                          : null,
-                                      onTap: () {
-                                        HapticFeedback.selectionClick();
-                                        widget.onToggleSideInspector!();
-                                      },
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
+                                        const SizedBox(height: AppSpacing.xxs),
+                                      ],
 
-                            // ── Bottom Section: Active Song Badge & Collapse Toggle ────
-                            _SidebarBottomSection(
-                              isExtended: isExtended,
-                              p: p,
-                              onOpenNowPlaying: widget.onOpenNowPlaying,
-                              onToggleExtended: widget.onToggleExtended,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            );
+                                      const SizedBox(height: AppSpacing.s10),
+                                      if (isExtended)
+                                        _SectionHeader(
+                                            title:
+                                                context.l10n.sidebarCollection,
+                                            p: p)
+                                      else
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.s14,
+                                              vertical: AppSpacing.s6),
+                                          child: Divider(
+                                            height: 1,
+                                            thickness: 1,
+                                            color: p.hairline
+                                                .withValues(alpha: 0.3),
+                                          ),
+                                        ),
 
-              if (GpuBudget.isGpuSaverActive) {
-                return sidebarBody;
-              }
-              return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                child: sidebarBody,
-              );
-            },
+                                      for (final item in secondaryItems) ...[
+                                        _SidebarNavItem(
+                                          icon: item.icon,
+                                          activeIcon: item.activeIcon,
+                                          label: item.label,
+                                          isSelected:
+                                              widget.currentIndex == item.index,
+                                          isExtended: isExtended,
+                                          iconSize: iconSize,
+                                          showCompactLabel: showCompactLabel,
+                                          badgeCount:
+                                              widget.badgeCounts?[item.index],
+                                          p: p,
+                                          onTap: () {
+                                            if (widget.currentIndex !=
+                                                item.index) {
+                                              widget.onDestinationSelected(
+                                                  item.index);
+                                            }
+                                          },
+                                        ),
+                                        const SizedBox(height: AppSpacing.xxs),
+                                      ],
+
+                                      // Optional Side Inspector (Queue/Lyrics) Shortcut
+                                      if (widget.onToggleSideInspector !=
+                                          null) ...[
+                                        const SizedBox(height: AppSpacing.s10),
+                                        if (isExtended)
+                                          _SectionHeader(
+                                              title: context.l10n.sidebarPanel,
+                                              p: p)
+                                        else
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: AppSpacing.s14,
+                                                vertical: AppSpacing.s6),
+                                            child: Divider(
+                                              height: 1,
+                                              thickness: 1,
+                                              color: p.hairline
+                                                  .withValues(alpha: 0.3),
+                                            ),
+                                          ),
+                                        _SidebarNavItem(
+                                          icon: Icons.vertical_split_outlined,
+                                          activeIcon:
+                                              Icons.vertical_split_rounded,
+                                          label: context.l10n.sidebarSidePanel,
+                                          isSelected:
+                                              widget.isSideInspectorOpen,
+                                          isExtended: isExtended,
+                                          iconSize: iconSize,
+                                          showCompactLabel: showCompactLabel,
+                                          p: p,
+                                          trailingBadge: isExtended &&
+                                                  widget.isSideInspectorOpen
+                                              ? context.l10n.badgeOn
+                                              : null,
+                                          onTap: () {
+                                            HapticFeedback.selectionClick();
+                                            widget.onToggleSideInspector!();
+                                          },
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+
+                                // ── Bottom Section: Active Song Badge & Collapse Toggle ────
+                                _SidebarBottomSection(
+                                  isExtended: isExtended,
+                                  p: p,
+                                  onOpenNowPlaying: widget.onOpenNowPlaying,
+                                  onToggleExtended: widget.onToggleExtended,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+
+                if (GpuBudget.isGpuSaverActive) {
+                  return sidebarBody;
+                }
+                return BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                  child: sidebarBody,
+                );
+              },
+            ),
           ),
-        ),
         ),
       ),
     );
@@ -816,8 +822,7 @@ class _SidebarBottomSection extends StatelessWidget {
                           borderRadius: BorderRadius.circular(AppRadii.r12),
                           child: CachedArtwork(
                             id: song.id,
-                            remoteUrl:
-                                song.remoteArtworkUrl ?? song.artworkUri,
+                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
                             type: ArtworkType.AUDIO,
                             size: 44,
                             borderRadius: 11,
@@ -896,6 +901,9 @@ class _SidebarBottomSection extends StatelessWidget {
               // Expand / Collapse Bottom Trigger (for collapsed mode)
               if (!isExtended)
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   tooltip: context.l10n.sidebarExpand,
                   iconSize: 20,
                   icon: Icon(

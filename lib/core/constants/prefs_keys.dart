@@ -1,5 +1,6 @@
 // lib/core/constants/prefs_keys.dart
 
+/// {@category DesignSystem}
 class PrefsKeys {
   static const String eqEnabled = 'eq_enabled';
   static const String eqPresetName = 'eq_preset_name';

@@ -256,6 +256,9 @@ class SettingsHeroCard extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton.filledTonal(
+                                    constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget),
                                     tooltip: context.l10n.syncNow,
                                     style: IconButton.styleFrom(
                                       backgroundColor:
@@ -281,6 +284,9 @@ class SettingsHeroCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: AppSpacing.xxs),
                                   IconButton(
+                                    constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget),
                                     tooltip: context.l10n.signOut,
                                     icon: Icon(
                                       Icons.logout_rounded,
@@ -524,6 +530,9 @@ class SettingsHeroCard extends StatelessWidget {
                     )
                   else
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       tooltip: context.l10n.settingsManageYtm,
                       icon: Icon(
                         Icons.tune_rounded,

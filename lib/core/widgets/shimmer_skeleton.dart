@@ -5,6 +5,7 @@ import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
+/// {@category DesignSystem}
 /// Coordinates the shimmer sweep for every [SkeletonBox] beneath it.
 ///
 /// A single [AnimationController] drives one full-screen highlight band through

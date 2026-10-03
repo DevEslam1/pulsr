@@ -1,4 +1,3 @@
-// ignore_for_file: unused_element_parameter
 part of 'proxy_settings_screen.dart';
 
 mixin ProxySettingsSections on State<ProxySettingsScreen> {
@@ -347,6 +346,9 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     width: AppSpacing.xl,
                     height: 32,
                     child: IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       padding: EdgeInsets.zero,
                       tooltip: context.l10n.settingsTestLatency,
                       icon: item.isTesting
@@ -371,6 +373,9 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                     width: AppSpacing.xl,
                     height: 32,
                     child: IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       padding: EdgeInsets.zero,
                       tooltip: context.l10n.settingsRemoveProxy,
                       icon: Icon(Icons.close_rounded,
@@ -907,6 +912,9 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                 prefixIcon:
                     Icon(Icons.lock_outline_rounded, color: p.accent, size: 20),
                 suffixIcon: IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   tooltip: context.l10n.settingsPasswordLabel,
                   icon: Icon(
                     _obscurePassword
@@ -1105,7 +1113,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
   });
 
   // Requires: provided by the composing class (same library).
-  Future<void> _showImportDialog({String? prefilledText});
+  Future<void> _showImportDialog();
 
   // Requires: provided by the composing class (same library).
   // ignore: unused_element

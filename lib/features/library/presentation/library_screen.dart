@@ -18,7 +18,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/song_classification.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../core/widgets/staggered_reveal.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -540,8 +540,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                       size: 16, color: Colors.white70),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(msg,
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
+                    child:
+                        Text(msg, maxLines: 2, overflow: TextOverflow.ellipsis),
                   ),
                 ],
               ),
@@ -560,6 +560,9 @@ class _LibraryScreenState extends State<LibraryScreen>
           appBar: isMultiSelect
               ? AppBar(
                   leading: IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.close_rounded),
                       tooltip: context.l10n.close,
                       onPressed: cubit.clearSelection),
@@ -567,10 +570,16 @@ class _LibraryScreenState extends State<LibraryScreen>
                       context.l10n.selectedCount(state.selectedSongIds.length)),
                   actions: [
                     IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         icon: const Icon(Icons.select_all_rounded),
                         tooltip: context.l10n.selectAllAction,
                         onPressed: () => cubit.selectAllSongs()),
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.playlist_add_rounded),
                       tooltip: context.l10n.addToPlaylist,
                       onPressed: () async {
@@ -586,6 +595,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       },
                     ),
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.edit_note_rounded),
                       tooltip: context.l10n.browseBatchEditTags,
                       onPressed: () async {
@@ -605,6 +617,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       },
                     ),
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.queue_music_rounded),
                       tooltip: context.l10n.addToQueue,
                       onPressed: () async {
@@ -621,6 +636,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       },
                     ),
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: Icon(Icons.delete_outline_rounded, color: p.error),
                       tooltip: context.l10n.delete,
                       onPressed: () async {
@@ -655,11 +673,17 @@ class _LibraryScreenState extends State<LibraryScreen>
                   title: Text(context.l10n.navLibrary),
                   actions: [
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.add_rounded),
                       tooltip: context.l10n.libraryManageTabs,
                       onPressed: () => _showManageTabsSheet(context, state),
                     ),
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: Icon(state.viewMode == LibraryViewMode.list
                           ? Icons.grid_view_rounded
                           : Icons.view_list_rounded),
@@ -669,6 +693,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       onPressed: cubit.toggleViewMode,
                     ),
                     IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: const Icon(Icons.sort_rounded),
                       tooltip: context.l10n.sortBy,
                       onPressed: () => SortFilterSheet.show(
@@ -1194,6 +1221,9 @@ class _LibraryScreenState extends State<LibraryScreen>
               ),
               if (_activeTabs.length > 1)
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon:
                       const Icon(Icons.remove_circle_outline_rounded, size: 20),
                   color: AppColors.error.withValues(alpha: 0.8),
@@ -1290,6 +1320,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
               ),
               IconButton(
+                constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget),
                 icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
                 color: p.accent,
                 splashRadius: 20,
@@ -1441,7 +1474,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         slivers: [
           SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyStateWidget(
+            child: PulsrEmptyState(
               icon: icon,
               title: title,
               subtitle: subtitle,

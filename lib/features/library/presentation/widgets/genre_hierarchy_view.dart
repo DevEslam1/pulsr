@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/pulsr_empty_state.dart';
 import '../../../../core/widgets/pulsr_search_field.dart';
 import '../../../../domain/models/genre_item.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -201,7 +201,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
             child: Center(
-              child: EmptyStateWidget(
+              child: PulsrEmptyState(
                 icon: Icons.category_outlined,
                 title: context.l10n.browseNoGenresFound,
                 subtitle: context.l10n.browseScanForGenres,
@@ -212,7 +212,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.s40),
             child: Center(
-              child: EmptyStateWidget(
+              child: PulsrEmptyState(
                 icon: Icons.search_off_rounded,
                 title: context.l10n.noResultsFound,
                 subtitle: '"$_searchQuery"',

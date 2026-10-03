@@ -14,6 +14,7 @@ import '../utils/adaptive.dart';
 import 'pulsr_dock_tracker.dart';
 import 'pulsr_modal_tracker.dart';
 
+/// {@category DesignSystem}
 enum PulsrToastPosition {
   aboveDock,
   center,
@@ -196,7 +197,7 @@ class _ToastWidgetState extends State<_ToastWidget>
 
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: PulsrMotion.layout,
     );
 
     _fadeAnimation = CurvedAnimation(
@@ -324,7 +325,8 @@ class _ToastWidgetState extends State<_ToastWidget>
 
     final isTablet = Adaptive.isTablet(context);
     final double maxDockWidth = isTablet ? 640.0 : 540.0;
-    final snackbarRadius = BorderRadius.circular(isTablet ? 26.0 : 20.0);
+    final snackbarRadius =
+        BorderRadius.circular(isTablet ? AppRadii.r26 : AppRadii.r20);
 
     return AnimatedBuilder(
       animation: Listenable.merge([

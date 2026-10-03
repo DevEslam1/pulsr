@@ -1,5 +1,4 @@
-// lib/core/motion/motion_durations.dart
-
+/// {@category DesignSystem}
 /// Canonical numeric duration spec for Pulsr.
 ///
 /// This is the single source of truth for *how long* motion lasts. Every

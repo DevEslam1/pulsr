@@ -1,5 +1,6 @@
 // lib/core/constants/audio_formats.dart
 
+/// {@category DesignSystem}
 class AudioFormats {
   /// Platform-decodable extensions: playable on Android via ExoPlayer/MediaCodec
   /// plus the bundled native DSD decoder. Safe to index into the playable library.

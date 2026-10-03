@@ -399,6 +399,9 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                   ),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: _scanning
                       ? SizedBox(
                           width: AppSpacing.s18,

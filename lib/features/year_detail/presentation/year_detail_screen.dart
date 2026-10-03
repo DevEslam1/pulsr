@@ -6,7 +6,8 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/responsive/detail_scaffold.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/async_state_builder.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -54,9 +55,175 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
     return StreamBuilder<Result<List<SongsTableData>>>(
       stream: _songsStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return PulsrPagePopScope(
+        Widget buildContent(List<SongsTableData> songs) {
+          return DetailScaffold(
+            titleText: '${yearItem.year}',
+            onRefresh: () async {
+              if (mounted) setState(() {});
+            },
+            hero: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: AppSpacing.md),
+                Center(
+                  child: Semantics(
+                    image: true,
+                    label: '${yearItem.year}',
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: p.info.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: p.hairline),
+                        boxShadow: [
+                          BoxShadow(
+                              color: p.info.withValues(alpha: 0.25),
+                              blurRadius: 24,
+                              spreadRadius: -4,
+                              offset: const Offset(0, 8)),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.calendar_today_rounded,
+                        size: 44,
+                        color: p.info,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Center(
+                  child: Text(
+                    '${yearItem.year}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxs),
+                Center(
+                  child: Text(
+                    Formatters.formatTrackCount(songs.length),
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s20),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: songs.isNotEmpty
+                              ? () => context
+                                  .read<PlayerCubit>()
+                                  .playSong(songs.first, queue: songs)
+                              : null,
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: Text(context.l10n.playAll),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: songs.isNotEmpty
+                              ? () {
+                                  final shuffled =
+                                      List<SongsTableData>.from(songs)
+                                        ..shuffle();
+                                  context.read<PlayerCubit>().playSong(
+                                      shuffled.first,
+                                      queue: shuffled);
+                                }
+                              : null,
+                          icon: Icon(Icons.shuffle_rounded, color: p.accent),
+                          label: Text(context.l10n.shuffle),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+            ),
+            body: songs.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: PulsrEmptyState(
+                      icon: Icons.music_off_rounded,
+                      title: context.l10n.browseNoTracks,
+                      subtitle: context.l10n.browseNoTracksInYear,
+                    ),
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (int i = 0; i < songs.length; i++)
+                        SongTile(
+                          song: songs[i],
+                          index: i,
+                          subtitleOverride:
+                              '${songs[i].artist} • ${songs[i].album}',
+                          onTap: () => context
+                              .read<PlayerCubit>()
+                              .playSong(songs[i], queue: songs),
+                          onMorePressed: () =>
+                              SongInfoSheet.show(context, song: songs[i]),
+                        ),
+                    ],
+                  ),
+          );
+        }
+
+        final emptyContent = buildContent(const []);
+        final errorView = PulsrPagePopScope(
+          child: Scaffold(
+            appBar: AppBar(
+              leading: const PulsrBackButton(),
+              title: Text('${yearItem.year}'),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline_rounded, color: p.error, size: 48),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      context.l10n.couldNotLoadYear,
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.bodyLarge),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      context.l10n.libraryReadError,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.bodySmall),
+                    ),
+                    const SizedBox(height: AppSpacing.s20),
+                    FilledButton.icon(
+                      onPressed: () => setState(() {}),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(context.l10n.retry),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        return AsyncStateBuilder<Result<List<SongsTableData>>>(
+          snapshot: snapshot,
+          loadingWidget: PulsrPagePopScope(
             child: Scaffold(
               appBar: AppBar(
                 leading: const PulsrBackButton(),
@@ -65,173 +232,13 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
               body: const SkeletonList(
                   padding: EdgeInsets.only(top: AppSpacing.xs)),
             ),
-          );
-        }
-        final loadFailed = snapshot.hasError ||
-            (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-        if (loadFailed) {
-          return PulsrPagePopScope(
-            child: Scaffold(
-              appBar: AppBar(
-                leading: const PulsrBackButton(),
-                title: Text('${yearItem.year}'),
-              ),
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.error_outline_rounded,
-                          color: p.error, size: 48),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        context.l10n.couldNotLoadYear,
-                        style: TextStyle(
-                            color: p.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: AppFontSize.bodyLarge),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        context.l10n.libraryReadError,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.bodySmall),
-                      ),
-                      const SizedBox(height: AppSpacing.s20),
-                      FilledButton.icon(
-                        onPressed: () => setState(() {}),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(context.l10n.retry),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        final songs =
-            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-
-        return DetailScaffold(
-          titleText: '${yearItem.year}',
-          onRefresh: () async {
-            if (mounted) setState(() {});
-          },
-          hero: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: AppSpacing.md),
-              Center(
-                child: Semantics(
-                  image: true,
-                  label: '${yearItem.year}',
-                  child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: p.info.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: p.hairline),
-                    boxShadow: [
-                      BoxShadow(
-                          color: p.info.withValues(alpha: 0.25),
-                          blurRadius: 24,
-                          spreadRadius: -4,
-                          offset: const Offset(0, 8)),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.calendar_today_rounded,
-                    size: 44,
-                    color: p.info,
-                  ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Center(
-                child: Text(
-                  '${yearItem.year}',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              Center(
-                child: Text(
-                  Formatters.formatTrackCount(songs.length),
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: songs.isNotEmpty
-                            ? () => context
-                                .read<PlayerCubit>()
-                                .playSong(songs.first, queue: songs)
-                            : null,
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: Text(context.l10n.playAll),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: songs.isNotEmpty
-                            ? () {
-                                final shuffled =
-                                    List<SongsTableData>.from(songs)..shuffle();
-                                context
-                                    .read<PlayerCubit>()
-                                    .playSong(shuffled.first, queue: shuffled);
-                              }
-                            : null,
-                        icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                        label: Text(context.l10n.shuffle),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
           ),
-          body: songs.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: EmptyStateWidget(
-                    icon: Icons.music_off_rounded,
-                    title: context.l10n.browseNoTracks,
-                    subtitle: context.l10n.browseNoTracksInYear,
-                  ),
-                )
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (int i = 0; i < songs.length; i++)
-                      SongTile(
-                        song: songs[i],
-                        index: i,
-                        subtitleOverride:
-                            '${songs[i].artist} • ${songs[i].album}',
-                        onTap: () => context
-                            .read<PlayerCubit>()
-                            .playSong(songs[i], queue: songs),
-                        onMorePressed: () =>
-                            SongInfoSheet.show(context, song: songs[i]),
-                      ),
-                  ],
-                ),
+          emptyWidget: emptyContent,
+          onError: (_) => errorView,
+          onData: (result) => result.fold(
+            (_) => errorView,
+            buildContent,
+          ),
         );
       },
     );

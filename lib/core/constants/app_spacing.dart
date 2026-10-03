@@ -1,5 +1,6 @@
 // lib/core/constants/app_spacing.dart
 
+/// {@category DesignSystem}
 /// Canonical spacing rhythm for the whole app.
 ///
 /// Apple HIG comfortable rhythm and Material 3 both derive layout from a small

@@ -1,6 +1,7 @@
 // lib/core/widgets/pulsr_dock_tracker.dart
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// Global tracker for bottom-docked surfaces (MiniPlayer dock in AppShell,
 /// tablet player bar, bottom nav bar).
 ///

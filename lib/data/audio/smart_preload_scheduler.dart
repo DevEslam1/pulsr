@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/network/connectivity_guard.dart';
 import '../db/app_database.dart';
@@ -70,6 +71,26 @@ class SmartPreloadScheduler {
     this.isMeteredConnectionProvider,
     this.networkPolicy = PreloadNetworkPolicy.conservativeOnMetered,
   });
+
+  /// Test entry point mirroring the production constructor so unit tests can
+  /// inject deterministic preload callbacks without touching connectivity.
+  @visibleForTesting
+  factory SmartPreloadScheduler.forTesting({
+    required Future<void> Function(SongsTableData song, {required int priority})
+        onPreloadRequested,
+    String Function()? qualityProvider,
+    void Function()? onCancelRequested,
+    Future<bool> Function()? isMeteredConnectionProvider,
+    PreloadNetworkPolicy networkPolicy =
+        PreloadNetworkPolicy.conservativeOnMetered,
+  }) =>
+      SmartPreloadScheduler(
+        onPreloadRequested: onPreloadRequested,
+        qualityProvider: qualityProvider,
+        onCancelRequested: onCancelRequested,
+        isMeteredConnectionProvider: isMeteredConnectionProvider,
+        networkPolicy: networkPolicy,
+      );
 
   String _dedupKey(SongsTableData song) {
     final videoId = song.remoteId;

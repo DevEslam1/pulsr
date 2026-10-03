@@ -145,11 +145,17 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
           ),
           actions: [
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               icon: Icon(Icons.refresh_rounded, color: p.textSecondary),
               tooltip: context.l10n.refresh,
               onPressed: _loadAllSongs,
             ),
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               icon: Icon(Icons.delete_sweep_rounded, color: p.textSecondary),
               tooltip: context.l10n.browseClearPlayHistory,
               onPressed: () => _confirmClearHistory(context),

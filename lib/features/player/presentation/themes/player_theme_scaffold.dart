@@ -17,6 +17,7 @@ import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
 /// Computed responsive metrics used across player themes.
 class PlayerThemeMetrics {
@@ -69,7 +70,8 @@ class PlayerThemeMetrics {
       constraints.maxWidth - (isTablet ? 64 : 28),
       isTablet ? 440.0 : 336.0,
     );
-    final double pillBarHeight = (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
+    final double pillBarHeight =
+        (isTablet ? 50.0 : 44.0) * heightRatio.clamp(0.85, 1.15);
 
     return PlayerThemeMetrics(
       constraints: constraints,
@@ -127,6 +129,9 @@ class PlayerHeaderBar extends StatelessWidget {
     return Row(
       children: [
         IconButton(
+          constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget),
           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
           color: p.textPrimary,
           tooltip: 'Close',
@@ -164,6 +169,9 @@ class PlayerHeaderBar extends StatelessWidget {
             },
           ),
           IconButton(
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
             icon: const Icon(Icons.more_vert_rounded, size: 22),
             color: p.textPrimary,
             tooltip: 'Options',
@@ -194,11 +202,16 @@ class PlayerThemeScaffold extends StatelessWidget {
   final PlayerDockIconStyle dockIconStyle;
   final bool showLyricsAndQueueOverlays;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics) body;
-  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? trackInfo;
-  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? seekBar;
-  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? controls;
-  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? bottomDock;
-  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? viewSwitcher;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
+      trackInfo;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
+      seekBar;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
+      controls;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
+      bottomDock;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
+      viewSwitcher;
   final EdgeInsetsGeometry padding;
 
   const PlayerThemeScaffold({
@@ -239,7 +252,8 @@ class PlayerThemeScaffold extends StatelessWidget {
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final metrics = PlayerThemeMetrics.calculate(context, constraints);
+                final metrics =
+                    PlayerThemeMetrics.calculate(context, constraints);
 
                 final resolvedSwitcher = viewSwitcher != null
                     ? viewSwitcher!(context, metrics)
@@ -371,12 +385,15 @@ class PlayerThemeScaffold extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  if (trackInfo != null) trackInfo!(context, metrics),
+                                  if (trackInfo != null)
+                                    trackInfo!(context, metrics),
                                   SizedBox(height: metrics.spacingTrackToSeek),
                                   resolvedSeekBar,
-                                  SizedBox(height: metrics.spacingSeekToControls),
+                                  SizedBox(
+                                      height: metrics.spacingSeekToControls),
                                   resolvedControls,
-                                  SizedBox(height: metrics.spacingControlsToDock),
+                                  SizedBox(
+                                      height: metrics.spacingControlsToDock),
                                   resolvedDock,
                                   SizedBox(height: metrics.spacingBelowDock),
                                 ],

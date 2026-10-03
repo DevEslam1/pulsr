@@ -1,10 +1,8 @@
-// ignore_for_file: unused_element, unused_element_parameter
 part of 'audio_handler.dart';
 
 mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> play() {
-    _userPlaybackInitiated = true;
     // A user/system-initiated play clears the becoming-noisy auto-resume
     // arming so only a becoming-noisy pause keeps it armed (item 2).
     _pausedForNoisy = false;
@@ -28,7 +26,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         return _loadGaplessQueue(initialPosition: pending, preload: true);
       }
     }
-    final generation = _playGeneration;
     final player = _activePlayer;
     try {
       player.dspClearGainCurve().catchError((_) => false);
@@ -45,13 +42,11 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           await player.seek(Duration.zero);
         } catch (_) {}
         final f = player.play();
-        _scheduleFadeInConvergenceGuard(player, generation);
         _broadcastState(player.playbackEvent);
         await f;
       }();
     }
     final playFuture = player.play();
-    _scheduleFadeInConvergenceGuard(player, generation);
     _broadcastState(player.playbackEvent);
     return playFuture;
   }
@@ -266,8 +261,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
     cancelPrefetches();
     _isManualSkip = true;
-    _rapidGaplessChangeCount = 0;
-    _lastGaplessChangeTime = null;
 
     final now = DateTime.now();
     final isDoubleTap = _lastPreviousTapTime != null &&
@@ -609,9 +602,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       if (song != null) {
         _songs.add(song);
         _queueDirty = true;
-        if (_gaplessMode && _gaplessLoaded) {
-          await _activePlayer.addAudioSource(_buildGaplessChild(song));
-        }
         queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
         _saveCurrentPosition();
       }
@@ -646,10 +636,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _queueStateMachine.insertSong(insertIdx, song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
-    if (_gaplessMode && _gaplessLoaded) {
-      await _activePlayer.insertAudioSource(
-          insertIdx, _buildGaplessChild(song));
-    }
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -676,9 +662,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _songs.add(song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
-    if (_gaplessMode && _gaplessLoaded) {
-      await _activePlayer.addAudioSource(_buildGaplessChild(song));
-    }
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -828,8 +811,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   void _broadcastState(PlaybackEvent event);
 
-  AudioSource _buildGaplessChild(SongsTableData song);
-
   SharedPreferences? get _cachedPrefs;
   set _cachedPrefs(SharedPreferences? value);
 
@@ -843,7 +824,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   bool get _gaplessMode;
 
-  int? _getNextIndex({int offset = 1, bool peek = false});
+  int? _getNextIndex({bool peek = false});
 
   int? getPreviousIndex({bool forcePrevious = false});
 
@@ -870,7 +851,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> _loadGaplessQueue(
       {Duration? initialPosition, bool preload = true});
 
-  Future<void> _loadSongPaused(int index, {Duration? initialPosition});
+  Future<void> _loadSongPaused(int index);
 
   Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);
@@ -898,8 +879,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   Future<void> saveCurrentPositionImmediate();
 
-  void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation);
-
   Timer? get _seekDebounceTimer;
   set _seekDebounceTimer(Timer? value);
 
@@ -918,24 +897,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   Future<void> playSongAt(int index, {Duration? initialPosition});
 
-  bool get _userPlaybackInitiated;
-  set _userPlaybackInitiated(bool value);
-
-  int get _rapidGaplessChangeCount;
-  set _rapidGaplessChangeCount(int value);
-
-  DateTime? get _lastGaplessChangeTime;
-  set _lastGaplessChangeTime(DateTime? value);
-
-  bool get _queueDirty;
   set _queueDirty(bool value);
 
-  int get _lastGaplessIndex;
   set _lastGaplessIndex(int value);
 
   HeadsetControlConfig? get cachedHeadsetConfig;
   set cachedHeadsetConfig(HeadsetControlConfig? value);
 
-  bool get _pausedForNoisy;
   set _pausedForNoisy(bool value);
 }

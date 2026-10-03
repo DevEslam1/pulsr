@@ -81,8 +81,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
     } catch (_) {
       // Report the failure honestly instead of claiming a successful export.
       if (!mounted) return;
-      PulsrToast.show(context,
-          message: l10n.themeExportFailed, isError: true);
+      PulsrToast.show(context, message: l10n.themeExportFailed, isError: true);
     }
   }
 
@@ -100,8 +99,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.l10n.pasteThemeJson,
-              style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.bodySmall),
+            Text(
+              context.l10n.pasteThemeJson,
+              style: TextStyle(
+                  color: p.textSecondary, fontSize: AppFontSize.bodySmall),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
@@ -113,7 +114,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 fontSize: AppFontSize.label,
               ),
               decoration: InputDecoration(
-                hintText: '{\n  "accentColor": 4288388853,\n  "cornerRadius": 24.0,\n  ...\n}',
+                hintText:
+                    '{\n  "accentColor": 4288388853,\n  "cornerRadius": 24.0,\n  ...\n}',
                 hintStyle: TextStyle(color: p.textTertiary),
                 filled: true,
                 fillColor: p.surfaceCard,
@@ -128,7 +130,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -181,7 +184,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
               message: l10n.invalidThemeJson, isError: true);
         }
       } catch (_) {
-        PulsrToast.show(context, message: l10n.themeImportFailed, isError: true);
+        PulsrToast.show(context,
+            message: l10n.themeImportFailed, isError: true);
       }
     }
   }
@@ -197,16 +201,23 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(context.l10n.themeStudio,
+          title: Text(
+            context.l10n.themeStudio,
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
           actions: [
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               icon: Icon(Icons.file_upload_outlined, color: p.textSecondary),
               tooltip: context.l10n.importThemeJson,
               onPressed: _showImportDialog,
             ),
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               icon: Icon(Icons.share_rounded, color: p.textSecondary),
               tooltip: context.l10n.dspExportThemeJson,
               onPressed: _exportTheme,
@@ -214,7 +225,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           ],
         ),
         body: ListView(
-          padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
           children: [
             // Live Theme Preview Controls & Card
             Row(
@@ -347,7 +359,7 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                               Text(
                                 context.l10n.dspPulsrAudiophileEdition,
                                 style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
+                                    color: AppColors.specularAt(0.7),
                                     fontSize: AppFontSize.label),
                               ),
                             ],
@@ -388,7 +400,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
               ),
             const SizedBox(height: AppSpacing.lg),
 
-            Text(context.l10n.accentPalette,
+            Text(
+              context.l10n.accentPalette,
               style: TextStyle(
                   fontSize: AppFontSize.callout,
                   fontWeight: FontWeight.w700,
@@ -451,7 +464,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                   style: TextStyle(
                       color: p.textPrimary, fontWeight: FontWeight.w600)),
               subtitle: Text(context.l10n.glowDesc,
-                  style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label)),
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: AppFontSize.label)),
               value: _glowEnabled,
               activeThumbColor: Color(_accentColor),
               onChanged: (val) {

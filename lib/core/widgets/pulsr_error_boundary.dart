@@ -4,6 +4,7 @@ import '../theme/aura_theme.dart';
 import '../utils/error_logger.dart';
 import 'pulsr_empty_state.dart';
 
+/// {@category DesignSystem}
 enum ErrorSeverity {
   info,
   warning,

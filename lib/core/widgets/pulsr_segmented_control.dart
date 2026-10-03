@@ -8,6 +8,7 @@ import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+/// {@category DesignSystem}
 /// One option in a [PulsrSegmentedControl].
 class PulsrSegment {
   final String label;
@@ -69,17 +70,13 @@ class PulsrSegmentedControl extends StatelessWidget {
                   width: segmentWidth,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: p.accentContainer,
+                      color: p.accent,
                       borderRadius: BorderRadius.circular(AppRadii.r12),
-                      border: Border.all(
-                        color: p.accent.withValues(alpha: 0.40),
-                        width: 1.0,
-                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: p.accent.withValues(alpha: 0.18),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
+                          color: p.accent.withValues(alpha: 0.35),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
@@ -115,7 +112,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                                     segments[i].icon,
                                     size: 16,
                                     color: clampedIndex == i
-                                        ? p.accent
+                                        ? p.onAccent
                                         : p.textSecondary,
                                   ),
                                   const SizedBox(width: AppSpacing.s6),
@@ -132,7 +129,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                                             ? FontWeight.w800
                                             : FontWeight.w600,
                                         color: clampedIndex == i
-                                            ? p.accent
+                                            ? p.onAccent
                                             : p.textSecondary,
                                       ),
                                     ),

@@ -14,6 +14,7 @@ import '../../cubit/downloads_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 class DownloadTile extends StatelessWidget {
   final DownloadTask task;
@@ -316,7 +317,7 @@ class DownloadTile extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadii.r4),
               child: TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 250),
+                duration: PulsrMotion.standard,
                 curve: Curves.easeOut,
                 tween: Tween<double>(
                   begin: 0.0,

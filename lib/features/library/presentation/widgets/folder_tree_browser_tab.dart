@@ -15,6 +15,7 @@ import '../../cubit/library_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 class FolderTreeBrowserTab extends StatefulWidget {
   const FolderTreeBrowserTab({super.key});
@@ -33,7 +34,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
       if (_breadcrumbController.hasClients) {
         _breadcrumbController.animateTo(
           _breadcrumbController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
+          duration: PulsrMotion.standard,
           curve: Curves.easeOutCubic,
         );
       }

@@ -18,7 +18,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/safe_file_path.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
@@ -496,22 +496,34 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             actions: [
               if (_selectedTab == _PlaylistTabMode.online) ...[
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: context.l10n.syncOnlineLibrary,
                   onPressed: () => cubit.autoFetchOnlineLibrary(force: true),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.add_link_rounded),
                   tooltip: context.l10n.addPlaylistUrl,
                   onPressed: () => _showAddOnlinePlaylistDialog(context, cubit),
                 ),
               ] else ...[
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.file_upload_rounded),
                   tooltip: context.l10n.importM3u,
                   onPressed: () => _importPlaylist(context),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: _isCreatingPlaylist
                       ? const SizedBox(
                           width: 18,
@@ -835,7 +847,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 ),
               )
             else if (state.playlists.isEmpty && state.errorMessage != null)
-              EmptyStateWidget(
+              PulsrEmptyState(
                 icon: Icons.error_outline_rounded,
                 title: context.l10n.playlistLoadFailed,
                 subtitle: state.errorMessage!,
@@ -843,7 +855,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 onPrimaryAction: cubit.reloadPlaylists,
               )
             else if (userPlaylists.isEmpty)
-              EmptyStateWidget(
+              PulsrEmptyState(
                 icon: Icons.playlist_add_rounded,
                 title: context.l10n.emptyPlaylists,
                 subtitle: context.l10n.emptyPlaylistsSubtitle,
@@ -1382,8 +1394,8 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                                 context.push('/online-playlist', extra: pl),
                             onDownload: () =>
                                 _downloadCustomPlaylist(context, pl),
-                            onRemove: () => _confirmRemoveCustomPlaylist(
-                                context, pl),
+                            onRemove: () =>
+                                _confirmRemoveCustomPlaylist(context, pl),
                           );
                         },
                       ),
@@ -1536,7 +1548,7 @@ class _AccountPlaylistCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(AppSpacing.s6),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.55),
+                              color: AppColors.scrimAt(0.55),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.download_rounded,
@@ -1658,7 +1670,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: AppColors.specularAt(0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.thumb_up_alt_rounded,
@@ -1682,8 +1694,8 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: Colors.white.withValues(
-                          alpha: status == YtmFetchStatus.error ? 0.7 : 0.85),
+                      color: AppColors.specularAt(
+                          status == YtmFetchStatus.error ? 0.7 : 0.85),
                       fontSize: AppFontSize.label,
                     ),
                   ),
@@ -1707,7 +1719,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppColors.specularAt(0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.download_rounded,
@@ -1811,7 +1823,7 @@ class _OnlinePlaylistCard extends StatelessWidget {
                             child: Container(
                               padding: const EdgeInsets.all(AppSpacing.xxs),
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.35),
+                                color: AppColors.scrimAt(0.35),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.download_rounded,
@@ -1827,7 +1839,7 @@ class _OnlinePlaylistCard extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(AppSpacing.xxs),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.35),
+                              color: AppColors.scrimAt(0.35),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.close_rounded,
@@ -1916,8 +1928,7 @@ class _PlaylistHeroCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle),
+                  color: AppColors.specularAt(0.2), shape: BoxShape.circle),
               child: Icon(icon, color: Colors.white, size: 26),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -1936,7 +1947,7 @@ class _PlaylistHeroCard extends StatelessWidget {
                   const SizedBox(height: AppSpacing.s2),
                   Text(subtitle,
                       style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: AppColors.specularAt(0.8),
                           fontSize: AppFontSize.label)),
                 ],
               ),
@@ -2126,10 +2137,10 @@ class _PlaylistCard extends StatelessWidget {
                               vertical: AppSpacing.s2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.45),
+                              color: AppColors.scrimLight,
                               borderRadius: BorderRadius.circular(AppRadii.r6),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.35),
+                                color: AppColors.specularAt(0.35),
                                 width: 0.8,
                               ),
                             ),

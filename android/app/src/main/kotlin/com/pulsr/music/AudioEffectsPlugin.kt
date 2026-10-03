@@ -3031,19 +3031,24 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setBypassDspForBitPerfect" -> {
                     val bypass = call.argument<Boolean>("bypass") ?: false
-                    val isDop = (call.argument<Boolean>("isDop") ?: isDopActive)
+                    val isDop = bypass && (call.argument<Boolean>("isDop") ?: isDopActive)
                     synchronized(stateLock) {
-                        if (bypass != isBitPerfectBypassActive || (bypass && isDop != isDopActive)) {
-                            if (bypass) bypassSavedStages = activeDspStages
+                        if (bypass != isBitPerfectBypassActive || isDop != isDopActive) {
+                            if (isNativeDspLoaded) {
+                                try {
+                                    nativeSetBitPerfectParams(bypass, isDop)
+                                } catch (e: Throwable) {
+                                    result.success(notApplied("Bit-perfect bypass failed: ${e.message}"))
+                                    return
+                                }
+                            }
+                            if (bypass && !isBitPerfectBypassActive) bypassSavedStages = activeDspStages
                             isBitPerfectBypassActive = bypass
                             isDopActive = isDop
                             // Mirror into the native snapshot so the C++ early-return
                             // fires even if a stages mask is stale after reattach.
                             // Guard the JNI call: an UnsatisfiedLinkError (a Throwable,
                             // not an Exception) crashes if libpulsr_dsp failed to load.
-                            if (isNativeDspLoaded) {
-                                try { nativeSetBitPerfectParams(bypass, isDop) } catch (_: Throwable) {}
-                            }
                             // DVC cannot apply its float gain through the bypass
                             // early-return, so suspend it while bit-perfect is active.
                             // Hearing-safety: DVC pins STREAM_MUSIC to device max and

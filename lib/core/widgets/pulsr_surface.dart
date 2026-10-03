@@ -5,6 +5,7 @@ import '../constants/app_spacing.dart';
 import 'glass_container.dart';
 import 'pulsr_pressable.dart';
 
+/// {@category DesignSystem}
 /// A unified interactive surface combining glass/solid materials, ink ripple,
 /// and tactile scale micro-interactions.
 ///

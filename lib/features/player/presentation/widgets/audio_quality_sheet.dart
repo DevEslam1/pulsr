@@ -17,6 +17,7 @@ import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../domain/services/cast_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
+import '../../../settings/presentation/widgets/bit_perfect_conflict_dialog.dart';
 import '../../cubit/player_cubit.dart';
 import 'pulsr_cast_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -52,9 +53,17 @@ class AudioQualitySheet extends StatelessWidget {
     final p = context.palette;
     final settingsCubit = context.read<SettingsCubit?>();
     final settingsState = settingsCubit?.state;
-    final (streamingQuality, outputDevice) =
-        context.select<SettingsCubit, (YtmAudioQuality?, AudioOutputInfo?)>(
-            (c) => (c.state.streamingQuality, c.state.currentOutputDevice));
+    // `bitPerfectOutput` is part of the selection even though it is not read
+    // here: the toggle inside the sheet reads it off the cubit, and without it
+    // the sheet never rebuilds when the toggle changes, so the switch appeared
+    // stuck off.
+    final (streamingQuality, outputDevice, _) = context
+        .select<SettingsCubit, (YtmAudioQuality?, AudioOutputInfo?, bool)>(
+            (c) => (
+                  c.state.streamingQuality,
+                  c.state.currentOutputDevice,
+                  c.state.bitPerfectOutput,
+                ));
     final info = AudioQualityInfo.fromSong(
       song,
       streamingQuality: streamingQuality,
@@ -1263,7 +1272,9 @@ class AudioQualitySheet extends StatelessWidget {
                           return;
                         }
                         HapticFeedback.selectionClick();
-                        cubit?.setBitPerfectOutput(val);
+                        if (cubit != null) {
+                          requestBitPerfectOutput(context, val);
+                        }
                       },
               ),
             ],

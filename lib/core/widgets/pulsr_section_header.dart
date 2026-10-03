@@ -4,8 +4,7 @@ import '../constants/app_typography.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 
-export 'section_header.dart';
-
+/// {@category DesignSystem}
 /// Standardized section header with typography hierarchy and optional trailing action.
 class PulsrSectionHeader extends StatelessWidget {
   final String title;

@@ -13,6 +13,7 @@ import '../../core/widgets/pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:flutter/services.dart';
 
 class SleepTimerSheet extends StatelessWidget {
   const SleepTimerSheet({super.key});
@@ -134,6 +135,7 @@ class SleepTimerSheet extends StatelessWidget {
                         // timer is active so the user has visual feedback.
                         selected: timerMode == SleepTimerMode.endOfTrack,
                         onSelected: (_) {
+                          HapticFeedback.selectionClick();
                           cubit.startEndOfTrackTimer();
                           Navigator.pop(context);
                         },
@@ -151,6 +153,7 @@ class SleepTimerSheet extends StatelessWidget {
                         // timer is active.
                         selected: isQueueMode,
                         onSelected: (_) {
+                          HapticFeedback.selectionClick();
                           cubit.startEndOfQueueTimer();
                           Navigator.pop(context);
                         },
@@ -162,6 +165,7 @@ class SleepTimerSheet extends StatelessWidget {
                         selected: timerMode == SleepTimerMode.afterNTracks &&
                             remainingTracks == 2,
                         onSelected: (_) {
+                          HapticFeedback.selectionClick();
                           cubit.startAfterNTracksTimer(2);
                           Navigator.pop(context);
                         },
@@ -171,6 +175,7 @@ class SleepTimerSheet extends StatelessWidget {
                         selected: timerMode == SleepTimerMode.afterNTracks &&
                             remainingTracks == 3,
                         onSelected: (_) {
+                          HapticFeedback.selectionClick();
                           cubit.startAfterNTracksTimer(3);
                           Navigator.pop(context);
                         },
@@ -180,6 +185,7 @@ class SleepTimerSheet extends StatelessWidget {
                         selected: timerMode == SleepTimerMode.afterNTracks &&
                             remainingTracks == 5,
                         onSelected: (_) {
+                          HapticFeedback.selectionClick();
                           cubit.startAfterNTracksTimer(5);
                           Navigator.pop(context);
                         },
@@ -189,6 +195,7 @@ class SleepTimerSheet extends StatelessWidget {
                         selected: timerMode == SleepTimerMode.afterNTracks &&
                             remainingTracks == 10,
                         onSelected: (_) {
+                          HapticFeedback.selectionClick();
                           cubit.startAfterNTracksTimer(10);
                           Navigator.pop(context);
                         },
@@ -210,13 +217,15 @@ class SleepTimerSheet extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       ...presets.map((mins) {
-                        final isPresetActive = timerMode == SleepTimerMode.duration &&
+                        final isPresetActive = timerMode ==
+                                SleepTimerMode.duration &&
                             sleepTimerRemaining != null &&
                             (sleepTimerRemaining.inSeconds / 60).ceil() == mins;
                         return ChoiceChip(
                           label: Text(context.l10n.sleepTimerMinutes(mins)),
                           selected: isPresetActive,
                           onSelected: (_) {
+                            HapticFeedback.selectionClick();
                             cubit.startSleepTimer(mins);
                             Navigator.pop(context);
                           },

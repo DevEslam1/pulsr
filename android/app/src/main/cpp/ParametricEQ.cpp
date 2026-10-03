@@ -103,7 +103,19 @@ void ParametricEQ::setPreamp(double preampDb) {
     targetPreampDb_ = std::clamp(preampDb, -30.0, 30.0);
 }
 
+void ParametricEQ::beginEnableRamp() {
+    std::memset(s1_, 0, sizeof(s1_));
+    std::memset(s2_, 0, sizeof(s2_));
+    smoothedPreampDb_ = 0.0;
+    preampLinear_ = 1.0;
+    for (int i = 0; i < bandCount_; ++i) {
+        bands_[i].smoothedGainDb = 0.0;
+        computeCoeffs(bands_[i], 0.0);
+    }
+}
+
 void ParametricEQ::setEnabled(bool enabled) {
+    if (enabled && !enabled_) beginEnableRamp();
     enabled_ = enabled;
 }
 
@@ -114,6 +126,7 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         std::memset(s1_, 0, sizeof(s1_));
         std::memset(s2_, 0, sizeof(s2_));
     }
+    const bool turningOn = params.enabled && !enabled_;
     enabled_ = params.enabled;
     targetPreampDb_ = std::clamp(params.preampDb, -30.0, 30.0);
     bandCount_ = newBandCount;
@@ -151,6 +164,7 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
             computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
         }
     }
+    if (turningOn) beginEnableRamp();
 }
 
 void ParametricEQ::reset() {

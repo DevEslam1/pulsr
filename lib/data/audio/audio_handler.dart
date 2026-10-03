@@ -1,4 +1,3 @@
-// ignore_for_file: unused_field
 // lib/data/audio/audio_handler.dart
 import 'dart:async';
 import 'dart:collection';
@@ -21,7 +20,6 @@ import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
 import '../../core/services/hires_audio_service.dart';
-import '../../core/services/smart_audio_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/telemetry/audio_session_log.dart';
@@ -51,7 +49,6 @@ import 'battery_aware_playback.dart';
 import 'format_aware_decoder.dart';
 import 'gapless_trim_handler.dart';
 import 'optimized_dsp_pipeline.dart';
-import 'output_format_negotiation.dart';
 import 'playback_analytics.dart';
 import 'replay_gain_math.dart';
 import '../../domain/models/audio_quality_info.dart';
@@ -59,7 +56,6 @@ import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
-import 'mqa_decoder_helper.dart';
 import '../../core/services/ytm_url_cache.dart';
 import 'collaborators/float_output_controller.dart';
 import 'collaborators/aaudio_output_controller.dart';
@@ -71,7 +67,6 @@ import 'adaptive_quality_manager.dart';
 import 'bpm_override_store.dart';
 import 'per_song_volume_store.dart';
 import 'per_song_playback_store.dart';
-import 'per_song_eq_store.dart';
 import 'dsp_snapshot_store.dart';
 import 'ducking_controller.dart';
 import 'multi_output_router.dart';
@@ -271,7 +266,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   set _currentIndex(int value) => _queueStateMachine.setCurrentIndex(value);
 
-  @override
   bool get _queueDirty => _queueStateMachine.isQueueDirty;
   @override
   set _queueDirty(bool value) {
@@ -282,7 +276,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  @override
   int get _savedQueueIndex => _queueStateMachine.savedQueueIndex;
   @override
   set _savedQueueIndex(int value) =>
@@ -301,7 +294,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   // pre-duck level instead of snapping to the RG target (preserves a mid-fade).
   int? _preDuckSongId;
   double? _preDuckRgTarget;
-  @override
   bool _duckActive = false;
   int _duckDepthCounter = 0;
   Timer? _duckSafetyTimer;
@@ -335,10 +327,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _pausedForNoisy = false;
   @override
   int _consecutiveFailures = 0;
-  @override
-  DateTime? _lastGaplessChangeTime;
-  @override
-  int _rapidGaplessChangeCount = 0;
   // Last time a track-completion was reported to the sleep timer. Gapless
   // playback reports one boundary through two independent signals (the native
   // `ProcessingState.completed` event and the `currentIndexStream` advance), so
@@ -402,11 +390,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     return _cachedPrefs?.getString('setting_streaming_quality') ?? 'high';
   }
 
-  @override
   final AdaptiveBufferEngine _adaptiveBufferEngine = AdaptiveBufferEngine();
   final OptimizedDspPipeline _dspPipeline = OptimizedDspPipeline();
   late final PlaybackAnalytics _playbackAnalytics;
-  @override
   late final AudioMemoryManager _memoryManager;
   @override
   late final SmartPreloadScheduler _preloadScheduler;
@@ -464,9 +450,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   int _lastGaplessIndex = -1;
 
-  // Guard against session restoration stomping over user-initiated playback on cold start
-  @override
-  bool _userPlaybackInitiated = false;
   // Target index for current gapless load; used to filter transient ExoPlayer index 0 emits
   @override
   int? _gaplessTargetIndex;
@@ -491,22 +474,17 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get _gaplessMode =>
       _gaplessEnabled && _crossfadeManager.duration <= Duration.zero;
 
-  @override
   final StreamController<SongsTableData> _onTrackChangedSubject =
       StreamController<SongsTableData>.broadcast();
   Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
-  @override
-  SongsTableData? _lastPlayedSong;
 
   // T10: CUE sub-track boundaries. Both flags reset on track change so each
   // virtual track seeks once to its start and advances once at its end.
-  @override
   bool _cueStartSeeked = false;
   bool _cueAdvanceTriggered = false;
 
   bool _positionDirty = false;
   Timer? _positionSaveTimer;
-  @override
   Timer? _fadeInGuardTimer; // FIX-#12: tracked for disposal
   @override
   final StreamController<Duration> _positionSubject =
@@ -609,8 +587,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _sleepTimerManager.baseVolumeProvider =
         () => _calculateReplayGainVolume(currentSong);
     _sleepTimerManager.onFadeFactor = (factor) {
-      _sleepFadeFactor =
-          factor.isFinite ? factor.clamp(0.0, 1.0) : 1.0;
+      _sleepFadeFactor = factor.isFinite ? factor.clamp(0.0, 1.0) : 1.0;
       unawaited(_reapplyActiveVolume());
     };
     // Backstop: if _init() throws before reaching its restore block, the
@@ -728,7 +705,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   // route change, interruption and underrun/dropout count. Every call is
   // fire-and-forget; the service never throws and is a no-op when disabled.
 
-  @override
   Future<AudioOutputInfo?> _currentOutputInfo() async {
     try {
       if (!getIt.isRegistered<HiResAudioService>()) return null;
@@ -736,25 +712,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {
       return null;
     }
-  }
-
-  @override
-  Future<void> _beginAudioSession(SongsTableData song) async {
-    try {
-      final log = AudioSessionLog.instance;
-      // Restore/preload paths can re-notify the same track; keep one session.
-      if (log.activeTrackId == song.id.toString()) return;
-      final info = await _currentOutputInfo();
-      await log.startSession(
-        trackId: song.id.toString(),
-        trackTitle: song.title,
-        routeType: AudioSessionLog.routeTypeForInfo(info),
-        bluetoothCodec: info?.btCodecName,
-        sampleRate: info?.sampleRate ?? song.sampleRate,
-        bitDepth: info?.bitDepth ?? song.bitDepth,
-        bitrateKbps: song.bitrateKbps,
-      );
-    } catch (_) {}
   }
 
   Future<void> _recordSessionRouteChange() async {
@@ -1037,7 +994,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController?.setNativeRgActive(_nativeRgActive);
   }
 
-  @override
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
     Future<void> disableNative() async {
       _nativeRgActive = false;
@@ -1402,9 +1358,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     _preloadScheduler = SmartPreloadScheduler(
       onPreloadRequested: (song, {required priority}) async {
-        if (song.source == SongSource.youtube && song.remoteId != null) {
-          _prefetchStream(song);
-        }
+        if (song.source == SongSource.youtube && song.remoteId != null) {}
       },
       onCancelRequested: () => cancelPrefetches(),
       qualityProvider: _currentStreamingQuality,
@@ -1943,7 +1897,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                       ? _preDuckVolume!
                       : (currentTarget * _sleepFadeFactor).clamp(0.0, 1.0);
                   try {
-                    await _activePlayer.setVolume(restoreActive.clamp(0.0, 1.0));
+                    await _activePlayer
+                        .setVolume(restoreActive.clamp(0.0, 1.0));
                   } catch (e, st) {
                     ErrorLogger.log(
                         'Failed to restore active player volume after duck',
@@ -2182,8 +2137,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// that resolves its URL and caches its bytes lazily on first playback. A
   /// downloaded YouTube row with a real file on disk plays straight off disk.
   @override
-  final Map<String, bool> _pathExistsCache = {};
-  static const _maxPathCacheSize = 2000;
 
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
   /// one until it nears expiry. Throws [YtmException] when nothing usable comes

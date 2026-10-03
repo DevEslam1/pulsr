@@ -210,6 +210,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         super(const SettingsState()) {
     autoSub(_hiResAudioService.outputDeviceStream, (device) {
       if (isClosed) return;
+      final lostBitPerfect = state.bitPerfectOutput &&
+          state.currentOutputDevice?.isBitPerfectActive == true &&
+          !device.isBitPerfectActive;
       final savedSampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
       final savedBitDepth = state.currentOutputDevice?.targetBitDepth ?? 0;
       safeEmit(
@@ -227,6 +230,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       // A DAC may have just been plugged/unplugged: re-probe DoP support so the
       // DSD output control enables/disables truthfully without a manual refresh.
       unawaited(_refreshDopSupport());
+      if (lostBitPerfect) unawaited(setBitPerfectOutput(false));
     });
     _initThemeScheduler();
     _loadPreferences();
@@ -970,8 +974,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               adaptiveQualityEnabled: previous.adaptiveQualityEnabled);
         }
         if (reconciledDirty.contains('duckingMode')) {
-          loadedState =
-              loadedState.copyWith(duckingMode: previous.duckingMode);
+          loadedState = loadedState.copyWith(duckingMode: previous.duckingMode);
         }
         if (reconciledDirty.contains('duckingLevel')) {
           loadedState =
@@ -1038,8 +1041,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               limiterThresholdDb: previous.limiterThresholdDb);
         }
         if (reconciledDirty.contains('limiterReleaseMs')) {
-          loadedState = loadedState.copyWith(
-              limiterReleaseMs: previous.limiterReleaseMs);
+          loadedState =
+              loadedState.copyWith(limiterReleaseMs: previous.limiterReleaseMs);
         }
 
         // Emit before the platform round-trips below: main.dart drives themeMode,
@@ -1067,19 +1070,45 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           safeEmit(state.copyWith(systemEffectsStatus: status));
         } catch (_) {}
         if (loadedState.bitPerfectOutput) {
-          await _hiResAudioService.setBitPerfectMode(true);
+          final applied = await _hiResAudioService.setBitPerfectMode(true);
+          if (!applied) {
+            await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+            await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+            loadedState = loadedState.copyWith(
+              bitPerfectOutput: false,
+              strictBitPerfect: false,
+            );
+            safeEmit(state.copyWith(
+                bitPerfectOutput: false, strictBitPerfect: false));
+          }
         }
         // MQA hook wiring (orphan 20-01): the decoder hook previously defaulted
         // ON with no owner; the preference now owns it.
         await loadMqaDecodingPreference();
-        if (loadedState.bitPerfectOutput && loadedState.bypassDspOnBitPerfect) {
+        try {
           // Re-assert the DSP-bypass policy at boot: without this the Kotlin
           // effects plugin keeps its default (bypass off) after a restart and
           // the saved bit-perfect conflict rule is not enforced this session.
           if (getIt.isRegistered<EqualizerManager>()) {
-            await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
+            await getIt<EqualizerManager>().setBypassDspForBitPerfect(
+                loadedState.bitPerfectOutput &&
+                    loadedState.bypassDspOnBitPerfect);
           } else {
-            await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+            await AudioEffectsChannel().setBypassDspForBitPerfect(
+                loadedState.bitPerfectOutput &&
+                    loadedState.bypassDspOnBitPerfect);
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed to restore native bit-perfect bypass',
+              error: e, stackTrace: st, category: 'SettingsCubit');
+          if (loadedState.bitPerfectOutput) {
+            await _hiResAudioService.setBitPerfectMode(false);
+            await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+            await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+            loadedState = loadedState.copyWith(
+                bitPerfectOutput: false, strictBitPerfect: false);
+            safeEmit(state.copyWith(
+                bitPerfectOutput: false, strictBitPerfect: false));
           }
         }
         final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;

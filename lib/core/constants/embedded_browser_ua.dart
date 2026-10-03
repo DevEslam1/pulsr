@@ -16,6 +16,7 @@
 // that drifts from the installed engine is one of the strongest embedded-
 // WebView signals Google has, so prefer the runtime value everywhere.
 
+/// {@category DesignSystem}
 class EmbeddedBrowserUa {
   EmbeddedBrowserUa._();
 

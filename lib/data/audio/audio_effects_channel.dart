@@ -697,12 +697,15 @@ class AudioEffectsChannel {
   /// [isDop] mirrors the DoP lock into the native snapshot when known.
   Future<void> setBypassDspForBitPerfect(bool bypass, {bool? isDop}) async {
     if (!_isAndroid) return;
-    lastPushedBypassDspForBitPerfect = bypass;
     try {
-      await _channel.invokeMethod('setBypassDspForBitPerfect', {
+      final result = await _channel.invokeMethod('setBypassDspForBitPerfect', {
         'bypass': bypass,
         if (isDop != null) 'isDop': isDop,
       }).timeout(const Duration(seconds: 5));
+      if (result == false || (result is Map && result['applied'] == false)) {
+        throw StateError('Native DSP rejected the bit-perfect bypass change');
+      }
+      lastPushedBypassDspForBitPerfect = bypass;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set bypass DSP for bit-perfect ($bypass)',
@@ -710,6 +713,7 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+      rethrow;
     }
   }
 

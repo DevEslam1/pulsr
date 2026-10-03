@@ -24,6 +24,11 @@ endif()
 
 enable_testing()
 
+# Also allow this suite to run on an Android emulator/device with the NDK.
+if(ANDROID)
+    link_libraries(log)
+endif()
+
 set(MAIN_CPP ${CMAKE_CURRENT_SOURCE_DIR}/../../main/cpp)
 
 # Every translation unit AudioDspEngine links against. Keep in sync with the

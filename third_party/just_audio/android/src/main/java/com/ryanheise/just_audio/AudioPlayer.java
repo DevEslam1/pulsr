@@ -94,6 +94,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private Result playResult;
     private Result seekResult;
     private Map<String, MediaSource> mediaSources = new HashMap<String, MediaSource>();
+    private final List<MediaSource> loadedSources = new ArrayList<>();
+    private ShuffleOrder outputShuffleOrder = new ShuffleOrder.DefaultShuffleOrder(0);
     private IcyInfo icyInfo;
     private IcyHeaders icyHeaders;
     private AudioAttributes pendingAudioAttributes;
@@ -473,13 +475,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             Boolean exclusive = call.argument("preferExclusive");
             Integer bufferMs = call.argument("targetBufferMs");
             boolean enabled = requested != null && requested;
-            if (exclusive != null) aaudioPreferExclusive = exclusive;
+            boolean changed = aaudioOutputEnabled != (enabled && Build.VERSION.SDK_INT >= 28);
+            if (exclusive != null) {
+                changed |= aaudioPreferExclusive != exclusive;
+                aaudioPreferExclusive = exclusive;
+            }
             if (bufferMs != null && bufferMs >= 20 && bufferMs <= 1000) {
+                changed |= aaudioTargetBufferMs != bufferMs;
                 aaudioTargetBufferMs = bufferMs;
             }
-            boolean effective = enabled && Build.VERSION.SDK_INT >= 28;
+            boolean effective = enabled && Build.VERSION.SDK_INT >= 28 && AaudioNativeBridge.ensureAvailable();
             aaudioOutputEnabled = effective;
-            result.success(effective);
+            if (changed) rebuildPlayerForOutput();
+            result.success(effective == enabled);
             return;
         }
 
@@ -590,8 +598,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 break;
             case "concatenatingInsertAll":
                 if (((String)call.argument("id")).length() == 0) {
-                    player.addMediaSources(call.argument("index"), getAudioSources(call.argument("children"))); 
-                    player.setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
+                    List<MediaSource> inserted = getAudioSources(call.argument("children"));
+                    player.addMediaSources(call.argument("index"), inserted);
+                    loadedSources.addAll(call.argument("index"), inserted);
+                    applyShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                     result.success(new HashMap<String, Object>());
                 } else {
                     concatenating(call.argument("id"))
@@ -603,7 +613,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             case "concatenatingRemoveRange":
                 if (((String)call.argument("id")).length() == 0) {
                     player.removeMediaItems(call.argument("startIndex"), call.argument("endIndex"));
-                    player.setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
+                    loadedSources.subList(call.argument("startIndex"), call.argument("endIndex")).clear();
+                    applyShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                     result.success(new HashMap<String, Object>());
                 } else {
                     concatenating(call.argument("id"))
@@ -615,7 +626,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             case "concatenatingMove":
                 if (((String)call.argument("id")).length() == 0) {
                     player.moveMediaItem(call.argument("currentIndex"), call.argument("newIndex"));
-                    player.setShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
+                    MediaSource moved = loadedSources.remove((int) call.argument("currentIndex"));
+                    loadedSources.add(call.argument("newIndex"), moved);
+                    applyShuffleOrder(decodeShuffleOrder(call.argument("shuffleOrder")));
                     result.success(new HashMap<String, Object>());
                 } else {
                     concatenating(call.argument("id"))
@@ -867,7 +880,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         enqueuePlaybackEvent();
         int windowIndex = initialIndex != null ? initialIndex : 0;
         player.setMediaSources(mediaSources, windowIndex, initialPosition);
-        player.setShuffleOrder(shuffleOrder);
+        loadedSources.clear();
+        loadedSources.addAll(mediaSources);
+        applyShuffleOrder(shuffleOrder);
         player.prepare();
     }
 
@@ -880,11 +895,54 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private boolean applyFloatOutput(boolean enabled) {
         boolean supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
         boolean effective = enabled && supported;
+        boolean changed = floatOutputEnabled != effective;
         floatOutputEnabled = effective;
         if (dspAudioProcessor != null) {
             dspAudioProcessor.setFloatOutput(effective);
         }
+        if (changed) rebuildPlayerForOutput();
         return effective == enabled;
+    }
+
+    /** Rebuild the renderer when an output switch changes its sink contract. */
+    private void rebuildPlayerForOutput() {
+        if (player == null) return;
+        int index = player.getCurrentMediaItemIndex();
+        long position = player.getCurrentPosition();
+        boolean playWhenReady = player.getPlayWhenReady();
+        boolean prepare = player.getPlaybackState() != Player.STATE_IDLE;
+        float volume = player.getVolume();
+        int repeat = player.getRepeatMode();
+        boolean shuffle = player.getShuffleModeEnabled();
+        boolean skipSilence = player.getSkipSilenceEnabled();
+        PlaybackParameters params = player.getPlaybackParameters();
+        AudioAttributes attributes = player.getAudioAttributes();
+        player.removeListener(this);
+        player.release();
+        player = null;
+        if (dspAudioProcessor != null) {
+            dspAudioProcessor.release();
+            dspAudioProcessor = null;
+        }
+        ensurePlayerInitialized();
+        player.setVolume(volume);
+        player.setRepeatMode(repeat);
+        player.setShuffleModeEnabled(shuffle);
+        player.setSkipSilenceEnabled(skipSilence);
+        player.setPlaybackParameters(params);
+        player.setAudioAttributes(attributes, false);
+        if (!loadedSources.isEmpty()) {
+            player.setMediaSources(new ArrayList<>(loadedSources),
+                    Math.min(index, loadedSources.size() - 1), position);
+            player.setShuffleOrder(outputShuffleOrder);
+            if (prepare) player.prepare();
+        }
+        player.setPlayWhenReady(playWhenReady);
+    }
+
+    private void applyShuffleOrder(ShuffleOrder order) {
+        outputShuffleOrder = order;
+        player.setShuffleOrder(order);
     }
 
     private void ensurePlayerInitialized() {
@@ -912,11 +970,12 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                                 + t.getMessage());
                         }
                     }
-                    return new DefaultAudioSink.Builder(context)
+                    AudioSink sink = new DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                         .setAudioProcessors(new AudioProcessor[] { dspProcessor })
                         .build();
+                    return enableFloatOutput ? new FloatDspAudioSink(sink, dspProcessor) : sink;
                 }
             };
             // DefaultRenderersFactory forwards this into buildAudioSink(). Enabling
@@ -1209,6 +1268,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             playResult = null;
         }
         mediaSources.clear();
+        loadedSources.clear();
         clearAudioEffects();
         if (player != null) {
             player.release();

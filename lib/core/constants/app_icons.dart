@@ -1,5 +1,6 @@
 // lib/core/constants/app_icons.dart
 
+/// {@category DesignSystem}
 /// Standard icon sizes across Pulsr design system.
 abstract final class AppIconSize {
   /// Extra small icon size (14px) - inline badges, trailing chips, micro hints.

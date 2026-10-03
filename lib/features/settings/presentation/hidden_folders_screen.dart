@@ -18,6 +18,7 @@ import '../cubit/settings_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:flutter/services.dart';
 
 class HiddenFoldersScreen extends StatefulWidget {
   final FolderUseCases? folderUseCases;
@@ -139,6 +140,9 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
               title: Text(context.l10n.hiddenFolders),
               actions: [
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: const Icon(Icons.create_new_folder_outlined),
                   tooltip: context.l10n.settingsAddCustomFolder,
                   onPressed: () => _showAddCustomFolderDialog(context, p),
@@ -437,6 +441,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 label: Text(label),
                                 selected: isSelected,
                                 onSelected: (_) async {
+                                  HapticFeedback.selectionClick();
                                   setState(() => _minFileSizeKb = kb);
                                   await cubit.setMinFileSizeKb(kb);
                                 },
@@ -524,6 +529,9 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               color: p.textTertiary, size: 18),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
+                                  constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget),
                                   tooltip: context.l10n.clear,
                                   icon: Icon(Icons.clear_rounded,
                                       color: p.textTertiary, size: 16),

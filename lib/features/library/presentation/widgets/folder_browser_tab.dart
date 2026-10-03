@@ -8,7 +8,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
-import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/pulsr_empty_state.dart';
 import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
@@ -61,7 +61,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
               slivers: [
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: EmptyStateWidget(
+                  child: PulsrEmptyState(
                     icon: Icons.folder_off_rounded,
                     title: context.l10n.noFoldersFound,
                     subtitle: context.l10n.noFoldersSubtitle,
@@ -258,6 +258,9 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                               fontSize: AppFontSize.label),
                         ),
                         trailing: IconButton(
+                          constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
                           icon: Icon(
                             folder.isExcluded
                                 ? Icons.visibility_off_rounded
@@ -293,13 +296,19 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
   }) {
     int? songId = folder.representativeSongId;
     int? albumId = folder.representativeAlbumId;
-    String? remoteUrl = folder.representativeRemoteUrl ?? folder.representativeArtworkUri;
+    String? remoteUrl =
+        folder.representativeRemoteUrl ?? folder.representativeArtworkUri;
 
     // Fallback: match from currently loaded library songs if no direct ID on folder
-    if ((songId == null || songId == 0) && (remoteUrl == null || remoteUrl.isEmpty)) {
-      final normFolder = p_path.posix.normalize(folder.path.replaceAll('\\', '/')).toLowerCase();
+    if ((songId == null || songId == 0) &&
+        (remoteUrl == null || remoteUrl.isEmpty)) {
+      final normFolder = p_path.posix
+          .normalize(folder.path.replaceAll('\\', '/'))
+          .toLowerCase();
       for (final s in state.songs) {
-        final parent = p_path.posix.dirname(p_path.posix.normalize(s.path.replaceAll('\\', '/'))).toLowerCase();
+        final parent = p_path.posix
+            .dirname(p_path.posix.normalize(s.path.replaceAll('\\', '/')))
+            .toLowerCase();
         if (parent == normFolder) {
           songId = s.id;
           albumId = s.albumId;
@@ -309,7 +318,8 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
       }
     }
 
-    final hasArtwork = (songId != null && songId > 0) || (remoteUrl != null && remoteUrl.isNotEmpty);
+    final hasArtwork = (songId != null && songId > 0) ||
+        (remoteUrl != null && remoteUrl.isNotEmpty);
 
     final fallbackIcon = folder.isExcluded
         ? Icons.folder_off_rounded
@@ -346,8 +356,8 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                 ),
               )
             else if (isDownloads)
-              Positioned(
-                right: -2,
+              PositionedDirectional(
+                end: -2,
                 bottom: -2,
                 child: Container(
                   padding: const EdgeInsets.all(2),

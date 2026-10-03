@@ -1,6 +1,7 @@
 // lib/domain/models/headphone_profile.dart
 import 'dart:math' as math;
 
+import '../../data/audio/eq_legacy_migration.dart';
 import 'eq_preset.dart';
 
 /// Value equality for lists whose elements implement `==`. Kept local so the
@@ -89,6 +90,7 @@ class HeadphoneProfile {
   /// are the authoritative correction; [gains] remains as a derived/fallback
   /// view for legacy consumers and graph rendering.
   final List<EqFilter> filters;
+
   /// Source dataset the profile was imported from (e.g. 'AutoEQ' or a user
   /// file name). Null for hand-authored/bundled legacy curves.
   final String? source;
@@ -123,9 +125,7 @@ class HeadphoneProfile {
             .whereType<Map<String, dynamic>>()
             .map(EqFilter.fromJson)
             .where((f) =>
-                f.frequency.isFinite &&
-                f.frequency > 0 &&
-                f.gain.isFinite)
+                f.frequency.isFinite && f.frequency > 0 && f.gain.isFinite)
             .toList();
     return HeadphoneProfile(
       // Required strings are null-guarded: a stored profile missing a key must
@@ -135,10 +135,13 @@ class HeadphoneProfile {
       brand: json['brand'] as String? ?? '',
       model: json['model'] as String? ?? '',
       category: json['category'] as String? ?? 'Headphone',
-      // If profile is already 10 bands keep as is, otherwise interpolate from 5-band
+      // If profile is already 10 bands keep as is; a 5-band list is legacy
+      // persisted/asset data, otherwise interpolate onto the 10-band plan.
       gains: rawGains.length == EqPreset.centerFrequencies.length
           ? rawGains
-          : EqPreset.interpolateGains(rawGains),
+          : rawGains.length == 5
+              ? EqLegacyMigration.to10Band(rawGains)
+              : EqPreset.interpolateGains(rawGains),
       bassBoost: (json['bassBoost'] as num?)?.toDouble() ?? 0.0,
       preampGain: (json['preampGain'] as num?)?.toDouble() ?? 0.0,
       filters: filters,
@@ -156,7 +159,8 @@ class HeadphoneProfile {
       'gains': gains,
       'bassBoost': bassBoost,
       'preampGain': preampGain,
-      if (filters.isNotEmpty) 'filters': filters.map((f) => f.toJson()).toList(),
+      if (filters.isNotEmpty)
+        'filters': filters.map((f) => f.toJson()).toList(),
       if (source != null) 'source': source,
     };
   }
@@ -214,9 +218,7 @@ class HeadphoneProfile {
     List<double> centers = EqPreset.centerFrequencies,
   }) {
     if (filters.isEmpty) return List<double>.from(gains);
-    return [
-      for (final c in centers) _compositeGainAt(c)
-    ];
+    return [for (final c in centers) _compositeGainAt(c)];
   }
 
   /// Magnitude (dB) of the summed biquad filters at [freq], using the RBJ
@@ -279,9 +281,8 @@ class HeadphoneProfile {
     return _hMag(b0, b1, b2, a0, a1, a2, w);
   }
 
-  static double _hMag(
-      double b0, double b1, double b2, double a0, double a1, double a2,
-      double w) {
+  static double _hMag(double b0, double b1, double b2, double a0, double a1,
+      double a2, double w) {
     final cosw = math.cos(w);
     final cos2w = math.cos(2 * w);
     final num2 = b0 * b0 +

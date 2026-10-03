@@ -191,11 +191,6 @@ class EqPreset {
   static final List<double> iso64Frequencies =
       _logSpread(64, const [20.0, 20000.0]);
 
-  /// The 5-band centers used before 10-band migration.
-  @Deprecated(
-      'Used solely for backward compatibility migrations from 5-band EQ presets')
-  static const List<double> legacyFrequencies = [60, 230, 910, 3600, 14000];
-
   /// Maps [source] gains onto target frequencies (defaults to [targetFrequencies] or 10-band).
   static List<double> interpolateGains(
     List<double> source, {
@@ -216,15 +211,13 @@ class EqPreset {
     if (source.isEmpty) return List<double>.filled(n, 0.0);
     if (source.length == 1) return List<double>.filled(n, source.first);
 
-    final srcFreqs = source.length == legacyFrequencies.length
-        ? legacyFrequencies
-        : (source.length == centerFrequencies.length
-            ? centerFrequencies
-            : (source.length == iso32Frequencies.length
-                ? iso32Frequencies
-                : (source.length == iso64Frequencies.length
-                    ? iso64Frequencies
-                    : _logSpread(source.length, targetFrequencies))));
+    final srcFreqs = source.length == centerFrequencies.length
+        ? centerFrequencies
+        : (source.length == iso32Frequencies.length
+            ? iso32Frequencies
+            : (source.length == iso64Frequencies.length
+                ? iso64Frequencies
+                : _logSpread(source.length, targetFrequencies)));
 
     return [
       for (final f in targetFrequencies) _interpAtLogFreq(f, srcFreqs, source)

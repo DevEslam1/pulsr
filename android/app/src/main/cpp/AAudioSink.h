@@ -2,14 +2,14 @@
 //
 // Pulsr native AAudio output sink ("Direct" mode).
 //
-// Bypasses AudioFlinger's mixer via AAudio: per-stream sample rate (no OS
-// resampling), EXCLUSIVE sharing attempt with LOW_LATENCY performance mode,
+// Requests a per-stream sample rate through AAudio. Exclusive mode is required
+// when requested; shared mode makes no guarantee about downstream resampling.
+// Uses LOW_LATENCY performance mode and
 // and a blocking write path owned by the caller's thread (ExoPlayer's audio
 // rendering thread).
 //
-// Bit-perfect rule: 24-bit packed output (the DoP carrier format) never has
-// volume applied - any gain would corrupt DoP marker bytes. I16/FLOAT apply
-// volume in a scratch copy so the caller's buffer is never mutated.
+// Bit-perfect rule: exclusive PCM and packed 24-bit output never have volume
+// applied. Shared I16/FLOAT use a scratch copy; caller buffers are never mutated.
 //
 // Threading: one writer thread max. Close() may be called from any thread
 // and is ordered via an atomic flag so a blocked write exits promptly.
@@ -39,13 +39,13 @@ public:
         int32_t sampleRate = 48000;
         int32_t channelCount = 2;
         Encoding encoding = Encoding::Int16;
-        bool preferExclusive = true;   // try EXCLUSIVE first, then SHARED ladder
+        bool preferExclusive = true;   // require EXCLUSIVE and unity gain
         bool lowLatency = true;        // PERFORMANCE_MODE_LOW_LATENCY on SHARED
         int32_t targetBufferMs = 150;  // 0 => device default capacity
     };
 
-    // Opens the stream via the EXCLUSIVE -> SHARED(low latency) -> SHARED
-    // fallback ladder. Returns false and fills `error` on failure.
+    // Requires EXCLUSIVE for bit-perfect/DoP; otherwise uses the shared ladder.
+    // Returns false and fills `error` on failure.
     bool Open(const Config& config, std::string* error);
 
     // Blocks until the stream is released. Safe from any thread.
@@ -61,7 +61,7 @@ public:
     // position counters so position math stays monotonic per configuration.
     void Flush();
 
-    void SetVolume(float volume);  // ignored for I24Packed (bit-perfect)
+    void SetVolume(float volume);  // ignored during exclusive/DoP output
 
     int64_t FramesRead() const;      // device-consumed frames since flush base
     int64_t FramesWritten() const;   // app-written frames since flush base
@@ -89,12 +89,13 @@ private:
     mutable std::atomic<int32_t> activeWriters_{0};
     std::atomic<bool> releasing_{false};
     std::atomic<bool> disconnected_{false};
-    bool exclusive_ = false;
-    bool bitPerfect_ = false;           // true for I24Packed (no volume)
+    std::atomic<bool> exclusive_{false};
+    bool bitPerfect_ = false;           // exclusive/DoP: unity gain, no fallback
     int32_t bytesPerFrame_ = 0;
-    int64_t framesWrittenBase_ = 0;     // written-frame counter at last flush
+    std::atomic<int64_t> framesWrittenBase_{0}; // written-frame counter at last flush
     std::atomic<int64_t> framesWritten_{0}; // total written since open
-    int64_t readBase_ = 0;              // device read counter at last flush
+    std::atomic<int64_t> readBase_{0}; // device read counter at last flush
+    std::atomic<int64_t> readOffset_{0}; // timeline carried across disconnect recovery
     mutable std::atomic<int32_t> lastXRunCount_{0};
     std::atomic<float> volume_{1.0f};
     std::string lastError_;

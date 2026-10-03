@@ -1265,21 +1265,23 @@ class AudioPlayer {
   ///
   /// The preference is remembered even when the platform player is idle and is
   /// applied when the native player is (re)created, so it survives just_audio's
-  /// lazy platform initialisation. Returns `false` only when the request could
-  /// not be stored at all (player disposed); platforms that cannot honour float
-  /// output keep the 16-bit path rather than failing.
+  /// lazy platform initialisation. Active players remember the change only
+  /// after native acceptance; a rejected request returns `false`.
   Future<bool> dspSetFloatOutput(bool enabled) async {
     if (_disposed) return false;
-    _floatOutputEnabled = enabled;
     try {
-      if (!_active) return true; // remembered; flushed on platform activation
       final platform = _platformValue;
-      if (platform == null) return true;
+      if (!_active || platform == null) {
+        _floatOutputEnabled = enabled;
+        return true; // remembered; flushed on platform activation
+      }
       final channel =
           MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
-      return await channel
+      final accepted = await channel
               .invokeMethod<bool>('dspSetFloatOutput', {'enabled': enabled}) ??
           false;
+      if (accepted) _floatOutputEnabled = enabled;
+      return accepted;
     } catch (_) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
       return false;
@@ -1289,32 +1291,39 @@ class AudioPlayer {
   /// Pulsr fork: switches this player's audio sink to the native AAudio
   /// "Direct" output (bit-perfect; bypasses the DSP processor chain).
   ///
-  /// [preferExclusive] requests AAudio EXCLUSIVE sharing (automatic SHARED
-  /// fallback when the device refuses); [targetBufferMs] hints the stream
-  /// buffer capacity in milliseconds. The preference must be pushed BEFORE
-  /// the player's sink is built; it is also replayed on platform activation.
-  /// Returns the effective flag (false on unsupported platforms).
+  /// [preferExclusive] requires AAudio EXCLUSIVE sharing and unity PCM gain;
+  /// unavailable exclusive streams fail instead of falling back to shared.
+  /// [targetBufferMs] hints buffer capacity. Changes rebuild an active sink
+  /// and are replayed on platform activation. Returns whether the request
+  /// was accepted (including an OFF request).
   Future<bool> dspSetAaudioOutput(
     bool enabled, {
     bool preferExclusive = true,
     int targetBufferMs = 150,
   }) async {
     if (_disposed) return false;
-    _aaudioOutputEnabled = enabled;
-    _aaudioPreferExclusive = preferExclusive;
-    _aaudioTargetBufferMs = targetBufferMs;
     try {
-      if (!_active) return true; // remembered; flushed on platform activation
       final platform = _platformValue;
-      if (platform == null) return true;
+      if (!_active || platform == null) {
+        _aaudioOutputEnabled = enabled;
+        _aaudioPreferExclusive = preferExclusive;
+        _aaudioTargetBufferMs = targetBufferMs;
+        return true; // remembered; flushed on platform activation
+      }
       final channel =
           MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
-      return await channel.invokeMethod<bool>('dspSetAaudioOutput', {
+      final accepted = await channel.invokeMethod<bool>('dspSetAaudioOutput', {
             'enabled': enabled,
             'preferExclusive': preferExclusive,
             'targetBufferMs': targetBufferMs,
           }) ??
           false;
+      if (accepted) {
+        _aaudioOutputEnabled = enabled;
+        _aaudioPreferExclusive = preferExclusive;
+        _aaudioTargetBufferMs = targetBufferMs;
+      }
+      return accepted;
     } catch (_) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
       return false;

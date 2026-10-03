@@ -3,7 +3,9 @@ import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 enum PulsrCardElevation {
   none,
   low,
@@ -59,7 +61,7 @@ class _PulsrCardState extends State<PulsrCard> {
         return _isHovered
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: p.isDark ? 0.20 : 0.05),
+                  color: AppColors.scrimAt(p.isDark ? 0.20 : 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 )
@@ -68,8 +70,8 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardElevation.low:
         return [
           BoxShadow(
-            color: Colors.black.withValues(
-                alpha: (_isHovered ? 0.28 : 0.20) * (p.isDark ? 1.0 : 0.35)),
+            color: AppColors.scrimAt(
+                (_isHovered ? 0.28 : 0.20) * (p.isDark ? 1.0 : 0.35)),
             blurRadius: _isHovered ? 12 : 8,
             offset: Offset(0, _isHovered ? 3 : 2),
           ),
@@ -77,8 +79,8 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardElevation.medium:
         return [
           BoxShadow(
-            color: Colors.black.withValues(
-                alpha: (_isHovered ? 0.38 : 0.30) * (p.isDark ? 1.0 : 0.35)),
+            color: AppColors.scrimAt(
+                (_isHovered ? 0.38 : 0.30) * (p.isDark ? 1.0 : 0.35)),
             blurRadius: _isHovered ? 20 : 14,
             offset: Offset(0, _isHovered ? 6 : 4),
           ),
@@ -91,8 +93,8 @@ class _PulsrCardState extends State<PulsrCard> {
       case PulsrCardElevation.high:
         return [
           BoxShadow(
-            color: Colors.black.withValues(
-                alpha: (_isHovered ? 0.50 : 0.42) * (p.isDark ? 1.0 : 0.35)),
+            color: AppColors.scrimAt(
+                (_isHovered ? 0.50 : 0.42) * (p.isDark ? 1.0 : 0.35)),
             blurRadius: _isHovered ? 28 : 22,
             offset: Offset(0, _isHovered ? 10 : 7),
           ),

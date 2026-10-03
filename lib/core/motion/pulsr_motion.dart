@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'motion_durations.dart';
 
+/// {@category DesignSystem}
 export 'motion_durations.dart';
 
 /// Centralized motion tokens.

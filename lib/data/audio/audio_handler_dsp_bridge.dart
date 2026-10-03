@@ -1,4 +1,3 @@
-// ignore_for_file: unused_element
 part of 'audio_handler.dart';
 
 mixin PulsrAudioDspBridge on BaseAudioHandler {
@@ -458,10 +457,8 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   List<SongsTableData> get _songs;
 
-  bool get _gaplessLoaded;
   set _gaplessLoaded(bool value);
 
-  Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);
 
   Future<void> playSongAt(int index, {Duration? initialPosition});

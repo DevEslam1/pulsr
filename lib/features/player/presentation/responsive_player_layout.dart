@@ -16,6 +16,7 @@ import 'widgets/lyrics_view.dart';
 import 'widgets/now_playing_queue_view.dart';
 import 'widgets/player_controls.dart';
 import 'widgets/player_seek_bar.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Responsive layout coordinator for the Now Playing screen.
 ///
@@ -182,11 +183,12 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     // Portrait tablets and landscape phones render the full-screen player theme directly.
     final isLandscapeOrientation =
         width > mediaQuery.size.height || Adaptive.isLandscape(context);
-    final isTabletLandscape = ((width >= 840 && mediaQuery.size.height >= 500) ||
-            (Adaptive.isTablet(context) &&
-                width >= 720 &&
-                mediaQuery.size.height >= 500)) &&
-        isLandscapeOrientation;
+    final isTabletLandscape =
+        ((width >= 840 && mediaQuery.size.height >= 500) ||
+                (Adaptive.isTablet(context) &&
+                    width >= 720 &&
+                    mediaQuery.size.height >= 500)) &&
+            isLandscapeOrientation;
     if (isTabletLandscape) {
       final p = context.palette;
       return Stack(
@@ -217,7 +219,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             top: -40,
             start: -30,
             width: width * 0.52,
-            height: mediaQuery.size.height * 0.75, // Mi-1: relative, not hardcoded 540
+            height: mediaQuery.size.height *
+                0.75, // Mi-1: relative, not hardcoded 540
             child: IgnorePointer(
               child: AnimatedContainer(
                 duration: context.motionMs(500),
@@ -242,7 +245,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
             top: 40,
             end: -30,
             width: width * 0.50,
-            height: mediaQuery.size.height * 0.65, // Mi-1: relative, not hardcoded 480
+            height: mediaQuery.size.height *
+                0.65, // Mi-1: relative, not hardcoded 480
             child: IgnorePointer(
               child: AnimatedContainer(
                 duration: context.motionMs(500),
@@ -277,7 +281,6 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                   ),
                 ),
 
-
                 // Right Pane: Tabbed View (Lyrics by default, Queue, Quick DSP)
                 Expanded(
                   flex: 6,
@@ -295,10 +298,10 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                             height: 38,
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
+                              color: AppColors.specularAt(0.08),
                               borderRadius: BorderRadius.circular(AppRadii.r20),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.12),
+                                color: AppColors.specularAt(0.12),
                                 width: 0.8,
                               ),
                             ),
@@ -320,8 +323,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                 ),
                               ),
                               labelColor: Colors.white,
-                              unselectedLabelColor:
-                                  Colors.white.withValues(alpha: 0.60),
+                              unselectedLabelColor: AppColors.specularAt(0.60),
                               labelStyle: const TextStyle(
                                 fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,

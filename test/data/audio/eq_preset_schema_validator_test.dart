@@ -127,4 +127,83 @@ void main() {
       expect(res.errorMessage, contains('exceeds allowed range'));
     });
   });
+
+  group('EqPresetSchemaValidator edge cases', () {
+    test('rejects NaN gains', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: 'NaN', gains: [double.nan, 0.0, 0.0]),
+      );
+      expect(res.isValid, isFalse);
+      expect(res.errorMessage, contains('not a finite number'));
+    });
+
+    test('rejects infinite gains', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: 'Inf', gains: [0.0, double.infinity, 0.0]),
+      );
+      expect(res.isValid, isFalse);
+      expect(res.errorMessage, contains('not a finite number'));
+    });
+
+    test('rejects gains below the lower bound', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: 'Cut', gains: [-30.1, 0.0, 0.0]),
+      );
+      expect(res.isValid, isFalse);
+      expect(res.errorMessage, contains('exceeds allowed range'));
+    });
+
+    test('accepts gains exactly on both bounds', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: 'Bounds', gains: [-30.0, 30.0]),
+      );
+      expect(res.isValid, isTrue);
+    });
+
+    test('rejects empty preset name', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: '   ', gains: [0.0, 0.0]),
+      );
+      expect(res.isValid, isFalse);
+      expect(res.errorMessage, contains('name cannot be empty'));
+    });
+
+    test('rejects empty gains on a constructed preset', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: 'Empty', gains: []),
+      );
+      expect(res.isValid, isFalse);
+      expect(res.errorMessage, contains('gains list cannot be empty'));
+    });
+
+    test('rejects descending custom frequencies on a constructed preset', () {
+      final res = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(
+          name: 'Descending',
+          gains: [0.0, 0.0, 0.0],
+          customFrequencies: [100.0, 80.0, 200.0],
+        ),
+      );
+      expect(res.isValid, isFalse);
+      expect(res.errorMessage, contains('strictly ascending'));
+    });
+
+    test('rejects out-of-range frequencies and Q factors', () {
+      final freq = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(
+          name: 'Freq',
+          gains: [0.0],
+          customFrequencies: [5.0],
+        ),
+      );
+      expect(freq.isValid, isFalse);
+      expect(freq.errorMessage, contains('out of bounds'));
+
+      final q = EqPresetSchemaValidator.validatePreset(
+        const EqPreset(name: 'Q', gains: [0.0], qFactors: [0.05]),
+      );
+      expect(q.isValid, isFalse);
+      expect(q.errorMessage, contains('Q factor'));
+    });
+  });
 }

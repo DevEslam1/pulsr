@@ -117,24 +117,7 @@ class HiResAudioService {
     _init();
   }
 
-  static bool _isSameOutputInfo(AudioOutputInfo a, AudioOutputInfo b) =>
-      a.deviceName == b.deviceName &&
-      a.sampleRate == b.sampleRate &&
-      a.bitDepth == b.bitDepth &&
-      a.isBitPerfectActive == b.isBitPerfectActive &&
-      a.isBitPerfectSupported == b.isBitPerfectSupported &&
-      a.targetSampleRate == b.targetSampleRate &&
-      a.targetBitDepth == b.targetBitDepth &&
-      a.activeDeviceType == b.activeDeviceType &&
-      a.isBluetooth == b.isBluetooth &&
-      a.isLeAudio == b.isLeAudio &&
-      a.bleAudioPresent == b.bleAudioPresent &&
-      a.btCodecName == b.btCodecName &&
-      a.btSampleRateHz == b.btSampleRateHz &&
-      a.btBitDepth == b.btBitDepth &&
-      a.btLdacQualityMode == b.btLdacQualityMode &&
-      a.usbAudioClass == b.usbAudioClass &&
-      a.btCodecConnected == b.btCodecConnected;
+  static bool _isSameOutputInfo(AudioOutputInfo a, AudioOutputInfo b) => a == b;
 
   void _init() {
     if (!PlatformCapabilities.isAndroid) return;
@@ -270,18 +253,26 @@ class HiResAudioService {
     }
   }
 
+  /// Why the last [setBitPerfectMode] enable attempt was rejected (native
+  /// `lastBitPerfectReason`), or null when it succeeded. Captured BEFORE the
+  /// rollback call below, which resets the native reason.
+  String? lastBitPerfectFailureReason;
+
   Future<bool> setBitPerfectMode(bool enabled) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success = await _methodChannel.invokeMethod<bool>(
-          'setBitPerfectMode',
-          {'enabled': enabled}).timeout(const Duration(seconds: 8));
+      final Map<dynamic, dynamic>? res = await _methodChannel
+          .invokeMethod<Map<dynamic, dynamic>>('setBitPerfectModeDetailed',
+              {'enabled': enabled}).timeout(const Duration(seconds: 8));
+      final success = res?['success'] == true;
+      lastBitPerfectFailureReason =
+          success ? null : (res?['reason'] as String?);
       await getAudioOutputInfo();
-      if (success != true && enabled) {
+      if (!success && enabled) {
         // Unsupported hardware: fall back to DSP path and refresh state so
         // the UI never shows bit-perfect as active when it isn't.
         ErrorLogger.log(
-            'Bit-perfect rejected by device — falling back to DSP path',
+            'Bit-perfect rejected by device (${lastBitPerfectFailureReason ?? 'unknown'}) — falling back to DSP path',
             category: 'HiResAudio');
         try {
           await _methodChannel
@@ -290,10 +281,11 @@ class HiResAudioService {
         await getAudioOutputInfo();
         return false;
       }
-      return success ?? false;
+      return success;
     } catch (e, st) {
       ErrorLogger.log('Failed to setBitPerfectMode($enabled)',
           error: e, stackTrace: st, category: 'HiResAudio');
+      lastBitPerfectFailureReason = 'channel_error';
       // Device may have disconnected mid-call — refresh so stale
       // bit-perfect state is never displayed.
       try {

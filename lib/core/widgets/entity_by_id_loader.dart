@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../errors/failures.dart';
 import 'shimmer_skeleton.dart';
 
+/// {@category DesignSystem}
 /// Resolves a single entity either directly by id via [fetchSingle] (preferred, O(1))
 /// or from a reactive list stream [watch] so an id-based deep link (e.g. `/album?id=5`)
 /// can render without a typed route `extra`.

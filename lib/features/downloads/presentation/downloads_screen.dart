@@ -5,7 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
-import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/pulsr_empty_state.dart';
 import '../../../../core/widgets/pulsr_back_button.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -24,6 +24,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 enum DownloadFilter { all, downloading, completed, failed }
 
@@ -144,8 +145,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             listener: (context, state) {
               if (_selectedVideoIds.any((id) => !state.tasks.containsKey(id))) {
                 setState(() {
-                  final pruned =
-                      pruneSelectedVideoIds(_selectedVideoIds, state.tasks.keys);
+                  final pruned = pruneSelectedVideoIds(
+                      _selectedVideoIds, state.tasks.keys);
                   _selectedVideoIds
                     ..clear()
                     ..addAll(pruned);
@@ -153,310 +154,318 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               }
             },
             child: Scaffold(
-            backgroundColor: p.bg,
-            appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: _isSelectionMode
-                  ? IconButton(
-                      icon: const Icon(Icons.close_rounded),
-                      tooltip: l10n.cancel,
-                      onPressed: () =>
-                          setState(() => _selectedVideoIds.clear()),
-                    )
-                  : const PulsrBackButton(),
-              title: Text(
-                _isSelectionMode
-                    ? '${_selectedVideoIds.length} selected'
-                    : l10n.downloadsTitle,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppFontSize.titleLarge,
+              backgroundColor: p.bg,
+              appBar: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leading: _isSelectionMode
+                    ? IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: l10n.cancel,
+                        onPressed: () =>
+                            setState(() => _selectedVideoIds.clear()),
+                      )
+                    : const PulsrBackButton(),
+                title: Text(
+                  _isSelectionMode
+                      ? '${_selectedVideoIds.length} selected'
+                      : l10n.downloadsTitle,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppFontSize.titleLarge,
+                  ),
                 ),
-              ),
-              actions: _isSelectionMode
-                  ? [
-                      IconButton(
-                        icon: Icon(
-                          _selectedVideoIds.length == filteredTasks.length
-                              ? Icons.deselect_rounded
-                              : Icons.select_all_rounded,
-                        ),
-                        tooltip:
-                            _selectedVideoIds.length == filteredTasks.length
-                                ? 'Deselect all'
-                                : 'Select all',
-                        onPressed: () {
-                          setState(() {
-                            if (_selectedVideoIds.length ==
-                                filteredTasks.length) {
-                              _selectedVideoIds.clear();
-                            } else {
-                              _selectedVideoIds
-                                  .addAll(filteredTasks.map((t) => t.videoId));
-                            }
-                          });
-                        },
-                      ),
-                    ]
-                  : [
-                      BlocSelector<DownloadsCubit, DownloadsState,
-                          List<DownloadTask>>(
-                        selector: (state) => state.taskList
-                            .where((t) => t.status == DownloadStatus.complete)
-                            .toList(),
-                        builder: (context, completed) {
-                          if (completed.isEmpty) return const SizedBox.shrink();
-                          return IconButton(
-                            icon: const Icon(Icons.delete_sweep_rounded),
-                            tooltip: l10n.clear,
-                            constraints: const BoxConstraints(
+                actions: _isSelectionMode
+                    ? [
+                        IconButton(
+                          constraints: const BoxConstraints(
                               minWidth: AppSpacing.minTouchTarget,
-                              minHeight: AppSpacing.minTouchTarget,
-                            ),
-                            onPressed: () =>
-                                _confirmClearCompleted(context, completed),
-                          );
-                        },
-                      ),
-                      BlocSelector<DownloadsCubit, DownloadsState, int>(
-                        selector: (state) => state.taskList
-                            .where((t) => t.status == DownloadStatus.failed)
-                            .length,
-                        builder: (context, failedCount) {
-                          if (failedCount == 0) return const SizedBox.shrink();
-                          return TextButton.icon(
-                            onPressed: () =>
-                                context.read<DownloadsCubit>().retryAllFailed(),
-                            icon: Icon(Icons.refresh_rounded,
-                                size: 18, color: p.accent),
-                            label: Text(
-                              '${l10n.retry} ($failedCount)',
-                              style: TextStyle(
-                                  color: p.accent,
-                                  fontSize: AppFontSize.bodySmall),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-            ),
-            bottomNavigationBar: _isSelectionMode
-                ? _buildBulkActionsBar(context, allTasks)
-                : null,
-            body: BlocListener<DownloadsCubit, DownloadsState>(
-              listenWhen: (prev, curr) =>
-                  curr.errorMessage != null &&
-                  curr.errorMessage != prev.errorMessage,
-              listener: (context, state) {
-                final message = state.errorMessage;
-                if (message == null) return;
-                PulsrToast.show(
-                  context,
-                  message: resolveUiErrorMessage(context, message),
-                  icon: Icons.error_outline_rounded,
-                  isError: true,
-                );
-              },
-              child: Builder(
-                builder: (context) {
-                  if (state.isLoading && state.tasks.isEmpty) {
-                    return const SkeletonList(
-                        padding: EdgeInsets.only(top: AppSpacing.xs));
-                  }
-
-                  Widget content;
-                  if (allTasks.isEmpty) {
-                    content = LayoutBuilder(
-                      builder: (context, constraints) => SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight.isFinite
-                                ? constraints.maxHeight
-                                : 0.0,
+                              minHeight: AppSpacing.minTouchTarget),
+                          icon: Icon(
+                            _selectedVideoIds.length == filteredTasks.length
+                                ? Icons.deselect_rounded
+                                : Icons.select_all_rounded,
                           ),
-                          child: Column(
-                            children: [
-                              if (state.storageStats.totalBytes > 0)
-                                StorageStatsHeader(stats: state.storageStats),
-                              EmptyStateWidget(
-                                icon: Icons.download_done_rounded,
-                                title: l10n.noDownloadsTitle,
-                                subtitle: l10n.noDownloadsSubtitle,
-                                primaryActionLabel: l10n.searchOnline,
-                                primaryActionIcon: Icons.explore_rounded,
-                                onPrimaryAction: () => context.go('/browse'),
+                          tooltip:
+                              _selectedVideoIds.length == filteredTasks.length
+                                  ? 'Deselect all'
+                                  : 'Select all',
+                          onPressed: () {
+                            setState(() {
+                              if (_selectedVideoIds.length ==
+                                  filteredTasks.length) {
+                                _selectedVideoIds.clear();
+                              } else {
+                                _selectedVideoIds.addAll(
+                                    filteredTasks.map((t) => t.videoId));
+                              }
+                            });
+                          },
+                        ),
+                      ]
+                    : [
+                        BlocSelector<DownloadsCubit, DownloadsState,
+                            List<DownloadTask>>(
+                          selector: (state) => state.taskList
+                              .where((t) => t.status == DownloadStatus.complete)
+                              .toList(),
+                          builder: (context, completed) {
+                            if (completed.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return IconButton(
+                              icon: const Icon(Icons.delete_sweep_rounded),
+                              tooltip: l10n.clear,
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
                               ),
-                            ],
+                              onPressed: () =>
+                                  _confirmClearCompleted(context, completed),
+                            );
+                          },
+                        ),
+                        BlocSelector<DownloadsCubit, DownloadsState, int>(
+                          selector: (state) => state.taskList
+                              .where((t) => t.status == DownloadStatus.failed)
+                              .length,
+                          builder: (context, failedCount) {
+                            if (failedCount == 0) {
+                              return const SizedBox.shrink();
+                            }
+                            return TextButton.icon(
+                              onPressed: () => context
+                                  .read<DownloadsCubit>()
+                                  .retryAllFailed(),
+                              icon: Icon(Icons.refresh_rounded,
+                                  size: 18, color: p.accent),
+                              label: Text(
+                                '${l10n.retry} ($failedCount)',
+                                style: TextStyle(
+                                    color: p.accent,
+                                    fontSize: AppFontSize.bodySmall),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+              ),
+              bottomNavigationBar: _isSelectionMode
+                  ? _buildBulkActionsBar(context, allTasks)
+                  : null,
+              body: BlocListener<DownloadsCubit, DownloadsState>(
+                listenWhen: (prev, curr) =>
+                    curr.errorMessage != null &&
+                    curr.errorMessage != prev.errorMessage,
+                listener: (context, state) {
+                  final message = state.errorMessage;
+                  if (message == null) return;
+                  PulsrToast.show(
+                    context,
+                    message: resolveUiErrorMessage(context, message),
+                    icon: Icons.error_outline_rounded,
+                    isError: true,
+                  );
+                },
+                child: Builder(
+                  builder: (context) {
+                    if (state.isLoading && state.tasks.isEmpty) {
+                      return const SkeletonList(
+                          padding: EdgeInsets.only(top: AppSpacing.xs));
+                    }
+
+                    Widget content;
+                    if (allTasks.isEmpty) {
+                      content = LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight.isFinite
+                                  ? constraints.maxHeight
+                                  : 0.0,
+                            ),
+                            child: Column(
+                              children: [
+                                if (state.storageStats.totalBytes > 0)
+                                  StorageStatsHeader(stats: state.storageStats),
+                                PulsrEmptyState(
+                                  icon: Icons.download_done_rounded,
+                                  title: l10n.noDownloadsTitle,
+                                  subtitle: l10n.noDownloadsSubtitle,
+                                  primaryActionLabel: l10n.searchOnline,
+                                  primaryActionIcon: Icons.explore_rounded,
+                                  onPrimaryAction: () => context.go('/browse'),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  } else {
-                    content = ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      addAutomaticKeepAlives: false,
-                      addRepaintBoundaries: true,
-                      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-                      itemCount:
-                          filteredTasks.isEmpty ? 3 : filteredTasks.length + 2,
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return StorageStatsHeader(
-                            key: const ValueKey('storage_stats_header'),
-                            stats: state.storageStats,
-                          );
-                        }
+                      );
+                    } else {
+                      content = ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
+                        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                        itemCount: filteredTasks.isEmpty
+                            ? 3
+                            : filteredTasks.length + 2,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return StorageStatsHeader(
+                              key: const ValueKey('storage_stats_header'),
+                              stats: state.storageStats,
+                            );
+                          }
 
-                        if (index == 1) {
-                          return Column(
-                            key: const ValueKey('downloads_filter_row'),
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (activeTasks.isNotEmpty)
-                                Container(
-                                  margin: const EdgeInsetsDirectional.fromSTEB(
-                                      AppSpacing.md,
-                                      AppSpacing.xs,
-                                      AppSpacing.md,
-                                      AppSpacing.xxs),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.sm,
-                                      vertical: AppSpacing.xs),
-                                  decoration: BoxDecoration(
-                                    color: p.accent.withValues(alpha: 0.12),
-                                    borderRadius:
-                                        BorderRadius.circular(AppRadii.r12),
-                                    border: Border.all(
-                                        color:
-                                            p.accent.withValues(alpha: 0.25)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 14,
-                                        height: 14,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  p.accent),
-                                        ),
-                                      ),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      Expanded(
-                                        child: Text(
-                                          'Downloading ${activeTasks.length} • ${completedTasks.length}/${allTasks.length} completed',
-                                          style: TextStyle(
-                                            fontSize: AppFontSize.caption,
-                                            color: p.accent,
-                                            fontWeight: FontWeight.w700,
+                          if (index == 1) {
+                            return Column(
+                              key: const ValueKey('downloads_filter_row'),
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (activeTasks.isNotEmpty)
+                                  Container(
+                                    margin:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                            AppSpacing.md,
+                                            AppSpacing.xs,
+                                            AppSpacing.md,
+                                            AppSpacing.xxs),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                        vertical: AppSpacing.xs),
+                                    decoration: BoxDecoration(
+                                      color: p.accent.withValues(alpha: 0.12),
+                                      borderRadius:
+                                          BorderRadius.circular(AppRadii.r12),
+                                      border: Border.all(
+                                          color:
+                                              p.accent.withValues(alpha: 0.25)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    p.accent),
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: AppSpacing.xs),
+                                        Expanded(
+                                          child: Text(
+                                            'Downloading ${activeTasks.length} • ${completedTasks.length}/${allTasks.length} completed',
+                                            style: TextStyle(
+                                              fontSize: AppFontSize.caption,
+                                              color: p.accent,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.md,
+                                      vertical: AppSpacing.xs),
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: Row(
+                                      children: [
+                                        _buildFilterChip(
+                                            l10n.all,
+                                            allTasks.length,
+                                            DownloadFilter.all,
+                                            p),
+                                        const SizedBox(width: AppSpacing.xs),
+                                        _buildFilterChip(
+                                            l10n.statusDownloading,
+                                            activeTasks.length,
+                                            DownloadFilter.downloading,
+                                            p),
+                                        const SizedBox(width: AppSpacing.xs),
+                                        _buildFilterChip(
+                                            l10n.statusCompleted,
+                                            completedTasks.length,
+                                            DownloadFilter.completed,
+                                            p),
+                                        const SizedBox(width: AppSpacing.xs),
+                                        _buildFilterChip(
+                                            l10n.statusFailed,
+                                            failedTasks.length,
+                                            DownloadFilter.failed,
+                                            p),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.md,
-                                    vertical: AppSpacing.xs),
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: [
-                                      _buildFilterChip(
-                                          l10n.all,
-                                          allTasks.length,
-                                          DownloadFilter.all,
-                                          p),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      _buildFilterChip(
-                                          l10n.statusDownloading,
-                                          activeTasks.length,
-                                          DownloadFilter.downloading,
-                                          p),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      _buildFilterChip(
-                                          l10n.statusCompleted,
-                                          completedTasks.length,
-                                          DownloadFilter.completed,
-                                          p),
-                                      const SizedBox(width: AppSpacing.xs),
-                                      _buildFilterChip(
-                                          l10n.statusFailed,
-                                          failedTasks.length,
-                                          DownloadFilter.failed,
-                                          p),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }
+                              ],
+                            );
+                          }
 
-                        if (filteredTasks.isEmpty) {
-                          return EmptyStateWidget(
-                            icon: _filter == DownloadFilter.failed
-                                ? Icons.error_outline_rounded
-                                : Icons.downloading_rounded,
-                            iconColor: _filter == DownloadFilter.failed
-                                ? p.error
-                                : p.accent,
-                            title: l10n.downloadsTitle,
-                            subtitle: _emptyMessageForFilter(l10n, _filter),
-                            primaryActionLabel: _filter == DownloadFilter.failed
-                                ? l10n.retry
-                                : l10n.searchOnline,
-                            primaryActionIcon: _filter == DownloadFilter.failed
-                                ? Icons.refresh_rounded
-                                : Icons.explore_rounded,
-                            onPrimaryAction: () {
-                              if (_filter == DownloadFilter.failed) {
-                                context.read<DownloadsCubit>().retryAllFailed();
-                              } else {
-                                context.go('/browse');
-                              }
-                            },
-                          );
-                        }
-
-                        // Guard the index-2 offset (two leading header rows)
-                        // against a task list that shrank between builds.
-                        final taskIndex = index - 2;
-                        if (taskIndex < 0 ||
-                            taskIndex >= filteredTasks.length) {
-                          return const SizedBox.shrink();
-                        }
-                        final task = filteredTasks[taskIndex];
-                        final playable =
-                            task.status == DownloadStatus.complete &&
-                                task.localSongId != null;
-                        final isSelected =
-                            _selectedVideoIds.contains(task.videoId);
-
-                        return Padding(
-                          key: ValueKey(task.videoId),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.xxs),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(AppRadii.r16),
-                            onLongPress: () {
-                              Feedback.forLongPress(context);
-                              setState(() {
-                                if (isSelected) {
-                                  _selectedVideoIds.remove(task.videoId);
+                          if (filteredTasks.isEmpty) {
+                            return PulsrEmptyState(
+                              icon: _filter == DownloadFilter.failed
+                                  ? Icons.error_outline_rounded
+                                  : Icons.downloading_rounded,
+                              iconColor: _filter == DownloadFilter.failed
+                                  ? p.error
+                                  : p.accent,
+                              title: l10n.downloadsTitle,
+                              subtitle: _emptyMessageForFilter(l10n, _filter),
+                              primaryActionLabel:
+                                  _filter == DownloadFilter.failed
+                                      ? l10n.retry
+                                      : l10n.searchOnline,
+                              primaryActionIcon:
+                                  _filter == DownloadFilter.failed
+                                      ? Icons.refresh_rounded
+                                      : Icons.explore_rounded,
+                              onPrimaryAction: () {
+                                if (_filter == DownloadFilter.failed) {
+                                  context
+                                      .read<DownloadsCubit>()
+                                      .retryAllFailed();
                                 } else {
-                                  _selectedVideoIds.add(task.videoId);
+                                  context.go('/browse');
                                 }
-                              });
-                            },
-                            onTap: () {
-                              if (_isSelectionMode) {
+                              },
+                            );
+                          }
+
+                          // Guard the index-2 offset (two leading header rows)
+                          // against a task list that shrank between builds.
+                          final taskIndex = index - 2;
+                          if (taskIndex < 0 ||
+                              taskIndex >= filteredTasks.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final task = filteredTasks[taskIndex];
+                          final playable =
+                              task.status == DownloadStatus.complete &&
+                                  task.localSongId != null;
+                          final isSelected =
+                              _selectedVideoIds.contains(task.videoId);
+
+                          return Padding(
+                            key: ValueKey(task.videoId),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.xxs),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(AppRadii.r16),
+                              onLongPress: () {
+                                Feedback.forLongPress(context);
                                 setState(() {
                                   if (isSelected) {
                                     _selectedVideoIds.remove(task.videoId);
@@ -464,91 +473,99 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                     _selectedVideoIds.add(task.videoId);
                                   }
                                 });
-                              } else if (playable) {
-                                _playCompleted(context, task);
-                              }
-                            },
-                            child: Row(
-                              children: [
-                                if (_isSelectionMode) ...[
-                                  Checkbox(
-                                    value: isSelected,
-                                    activeColor: p.accent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.r4),
+                              },
+                              onTap: () {
+                                if (_isSelectionMode) {
+                                  setState(() {
+                                    if (isSelected) {
+                                      _selectedVideoIds.remove(task.videoId);
+                                    } else {
+                                      _selectedVideoIds.add(task.videoId);
+                                    }
+                                  });
+                                } else if (playable) {
+                                  _playCompleted(context, task);
+                                }
+                              },
+                              child: Row(
+                                children: [
+                                  if (_isSelectionMode) ...[
+                                    Checkbox(
+                                      value: isSelected,
+                                      activeColor: p.accent,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(AppRadii.r4),
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            _selectedVideoIds.add(task.videoId);
+                                          } else {
+                                            _selectedVideoIds
+                                                .remove(task.videoId);
+                                          }
+                                        });
+                                      },
                                     ),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        if (val == true) {
-                                          _selectedVideoIds.add(task.videoId);
-                                        } else {
-                                          _selectedVideoIds
-                                              .remove(task.videoId);
-                                        }
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(width: AppSpacing.xxs),
+                                    const SizedBox(width: AppSpacing.xxs),
+                                  ],
+                                  Expanded(child: DownloadTile(task: task)),
                                 ],
-                                Expanded(child: DownloadTile(task: task)),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  }
+                          );
+                        },
+                      );
+                    }
 
-                  return RefreshIndicator(
-                    color: p.accent,
-                    backgroundColor: p.surfaceContainer,
-                    onRefresh: () async {
-                      final cubit = context.read<DownloadsCubit>();
-                      try {
-                        await Future.wait([
-                          cubit.loadInitialTasks(),
-                          cubit.refreshStorageStats(),
-                        ]);
-                        // Both loaders record failures in state.errorMessage
-                        // (surfaced by the listener above); re-surface here so a
-                        // pull-to-refresh failure is not silently swallowed.
-                        final failure = cubit.state.errorMessage;
-                        if (failure != null && context.mounted) {
-                          PulsrToast.show(
-                            context,
-                            message: resolveUiErrorMessage(context, failure),
-                            icon: Icons.error_outline_rounded,
-                            isError: true,
-                          );
+                    return RefreshIndicator(
+                      color: p.accent,
+                      backgroundColor: p.surfaceContainer,
+                      onRefresh: () async {
+                        final cubit = context.read<DownloadsCubit>();
+                        try {
+                          await Future.wait([
+                            cubit.loadInitialTasks(),
+                            cubit.refreshStorageStats(),
+                          ]);
+                          // Both loaders record failures in state.errorMessage
+                          // (surfaced by the listener above); re-surface here so a
+                          // pull-to-refresh failure is not silently swallowed.
+                          final failure = cubit.state.errorMessage;
+                          if (failure != null && context.mounted) {
+                            PulsrToast.show(
+                              context,
+                              message: resolveUiErrorMessage(context, failure),
+                              icon: Icons.error_outline_rounded,
+                              isError: true,
+                            );
+                          }
+                        } catch (e, st) {
+                          ErrorLogger.log('Downloads refresh failed',
+                              error: e, stackTrace: st, category: 'Downloads');
+                          if (context.mounted) {
+                            PulsrToast.show(
+                              context,
+                              message: l10n.libraryReadError,
+                              icon: Icons.error_outline_rounded,
+                              isError: true,
+                            );
+                          }
                         }
-                      } catch (e, st) {
-                        ErrorLogger.log('Downloads refresh failed',
-                            error: e,
-                            stackTrace: st,
-                            category: 'Downloads');
-                        if (context.mounted) {
-                          PulsrToast.show(
-                            context,
-                            message: l10n.libraryReadError,
-                            icon: Icons.error_outline_rounded,
-                            isError: true,
-                          );
-                        }
-                      }
-                    },
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints:
-                            PulsrLayoutMetrics.contentConstraints(context),
-                        child: content,
+                      },
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints:
+                              PulsrLayoutMetrics.contentConstraints(context),
+                          child: content,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
           );
         },
       ),
@@ -578,7 +595,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           border: Border(top: BorderSide(color: p.hairline)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: AppColors.scrimAt(0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),

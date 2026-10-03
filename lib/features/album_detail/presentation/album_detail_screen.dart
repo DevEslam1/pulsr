@@ -7,6 +7,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -144,128 +145,137 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
     return StreamBuilder<Result<List<SongsTableData>>>(
       stream: _songsStream,
       builder: (context, snapshot) {
-        final loadFailed = snapshot.hasError ||
-            (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-        if (loadFailed) {
-          return _AlbumErrorView(onRetry: () => setState(() {}));
-        }
-        final rawSongs =
-            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-        final songs = _sorted(rawSongs);
+        Widget buildSongsView(List<SongsTableData> rawSongs) {
+          final songs = _sorted(rawSongs);
 
-        // Tablet / landscape: adopt the shared adaptive master-detail split so the
-        // horizontal space shows artwork + actions beside the track list. The
-        // breakpoint mirrors DetailScaffold's own split condition so it engages at
-        // exactly the same point as the Genre/Year sibling screens.
-        if (shouldSplit) {
-          return DetailScaffold(
-            titleText: album.title,
-            onRefresh: () async {
-              if (mounted) setState(() {});
-            },
-            hero: _buildSplitHero(context, album, songs),
-            body: _buildTrackListBody(context, songs),
-          );
-        }
+          // Tablet / landscape: adopt the shared adaptive master-detail split so the
+          // horizontal space shows artwork + actions beside the track list. The
+          // breakpoint mirrors DetailScaffold's own split condition so it engages at
+          // exactly the same point as the Genre/Year sibling screens.
+          if (shouldSplit) {
+            return DetailScaffold(
+              titleText: album.title,
+              onRefresh: () async {
+                if (mounted) setState(() {});
+              },
+              hero: _buildSplitHero(context, album, songs),
+              body: _buildTrackListBody(context, songs),
+            );
+          }
 
-        // Phone / portrait: preserve the existing collapsing SliverAppBar layout
-        // exactly (unchanged appearance and behavior).
-        return PulsrPagePopScope(
-          child: Scaffold(
-            body: Center(
-              child: ConstrainedBox(
-                constraints: PulsrLayoutMetrics.contentConstraints(context),
-                child: RefreshIndicator(
-                  color: p.accent,
-                  backgroundColor: p.surfaceContainer,
-                  onRefresh: () async {
-                    if (mounted) setState(() {});
-                  },
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverAppBar(
-                        leading: const PulsrBackButton(),
-                        expandedHeight: expandedHeight,
-                        pinned: true,
-                        backgroundColor: p.bg,
-                        flexibleSpace: FlexibleSpaceBar(
-                          background: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [p.accentContainer, p.bg],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
+          // Phone / portrait: preserve the existing collapsing SliverAppBar layout
+          // exactly (unchanged appearance and behavior).
+          return PulsrPagePopScope(
+            child: Scaffold(
+              body: Center(
+                child: ConstrainedBox(
+                  constraints: PulsrLayoutMetrics.contentConstraints(context),
+                  child: RefreshIndicator(
+                    color: p.accent,
+                    backgroundColor: p.surfaceContainer,
+                    onRefresh: () async {
+                      if (mounted) setState(() {});
+                    },
+                    child: CustomScrollView(
+                      slivers: [
+                        SliverAppBar(
+                          leading: const PulsrBackButton(),
+                          expandedHeight: expandedHeight,
+                          pinned: true,
+                          backgroundColor: p.bg,
+                          flexibleSpace: FlexibleSpaceBar(
+                            background: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [p.accentContainer, p.bg],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ),
                               ),
-                            ),
-                            child: SafeArea(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Hero(
-                                    tag: widget.heroTag ?? 'album_${album.id}',
-                                    child: Semantics(
-                                      image: true,
-                                      label: album.title,
-                                      child: CachedArtwork(
-                                        id: album.id,
-                                        type: ArtworkType.ALBUM,
-                                        remoteUrl: album.artworkUri,
-                                        size: artworkSize,
-                                        borderRadius: 24,
+                              child: SafeArea(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Hero(
+                                      tag:
+                                          widget.heroTag ?? 'album_${album.id}',
+                                      child: Semantics(
+                                        image: true,
+                                        label: album.title,
+                                        child: CachedArtwork(
+                                          id: album.id,
+                                          type: ArtworkType.ALBUM,
+                                          remoteUrl: album.artworkUri,
+                                          size: artworkSize,
+                                          borderRadius: 24,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(album.title,
-                                      textAlign: TextAlign.center,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .headlineSmall),
-                                  const SizedBox(height: AppSpacing.xxs),
-                                  Text(
-                                      '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
-                                      style: TextStyle(
-                                          color: p.textSecondary,
-                                          fontSize: AppFontSize.bodySmall)),
-                                  const SizedBox(height: AppSpacing.md),
-                                ],
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Text(album.title,
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall),
+                                    const SizedBox(height: AppSpacing.xxs),
+                                    Text(
+                                        '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
+                                        style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: AppFontSize.bodySmall)),
+                                    const SizedBox(height: AppSpacing.md),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: Adaptive.pagePadding(context)),
-                          child: _actionButtons(context, songs),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: Adaptive.pagePadding(context)),
+                            child: _actionButtons(context, songs),
+                          ),
                         ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: Adaptive.pagePadding(context)),
-                          child: _queueActionsHeader(context, songs),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: Adaptive.pagePadding(context)),
+                            child: _queueActionsHeader(context, songs),
+                          ),
                         ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.only(
-                            top: AppSpacing.xs,
-                            bottom: AppSpacing.scrollBottom),
-                        sliver: SliverList.builder(
-                          addAutomaticKeepAlives: false,
-                          addRepaintBoundaries: true,
-                          itemCount: songs.length,
-                          itemBuilder: (context, index) {
-                            return _buildSongItem(context, songs, index);
-                          },
+                        SliverPadding(
+                          padding: const EdgeInsets.only(
+                              top: AppSpacing.xs,
+                              bottom: AppSpacing.scrollBottom),
+                          sliver: SliverList.builder(
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
+                            itemCount: songs.length,
+                            itemBuilder: (context, index) {
+                              return _buildSongItem(context, songs, index);
+                            },
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+          );
+        }
+
+        final emptyView = buildSongsView(const []);
+
+        return AsyncStateBuilder<Result<List<SongsTableData>>>(
+          snapshot: snapshot,
+          loadingWidget: emptyView,
+          emptyWidget: emptyView,
+          onError: (_) => _AlbumErrorView(onRetry: () => setState(() {})),
+          onData: (result) => result.fold(
+            (_) => _AlbumErrorView(onRetry: () => setState(() {})),
+            buildSongsView,
           ),
         );
       },

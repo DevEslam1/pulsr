@@ -645,6 +645,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         if (confirm == snapshot) break;
         snapshot = confirm;
     }
+    lastBlockBitPerfect_.store(snapshot && snapshot->bitPerfect.enabled, std::memory_order_relaxed);
     if (!snapshot) return frames;
 
     // Fast check: generation counter skips applyParams entirely when unchanged

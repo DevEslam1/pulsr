@@ -6,6 +6,7 @@ import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
+/// {@category DesignSystem}
 /// Standardized empty state widget featuring an optional illustration slot,
 /// animated badge, title, subtitle, and primary/secondary actions.
 class PulsrEmptyState extends StatelessWidget {

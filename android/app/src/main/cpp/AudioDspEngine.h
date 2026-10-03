@@ -112,6 +112,7 @@ public:
     double getAppliedSampleRate() const { return sampleRate_.load(std::memory_order_acquire); }
     uint64_t getLastAppliedGeneration() const { return lastAppliedGeneration_.load(); }
     uint64_t getPublishedGeneration() const { return snapshotGeneration_.load(); }
+    bool wasLastBlockBitPerfect() const { return lastBlockBitPerfect_.load(std::memory_order_relaxed); }
 
     void resyncForTrack(double sampleRate, int channels = 2);
 
@@ -288,6 +289,7 @@ private:
     // the priority-inversion hazard. Lifetime is covered by retireQueue_ +
     // audioHazardPtr_ (see processInterleaved / retireAndDrain).
     std::atomic<const DspParamSnapshot*> currentParamsPtr_{nullptr};
+    std::atomic<bool> lastBlockBitPerfect_{false};
 
     // Single-reader hazard pointer. The render thread publishes the snapshot it
     // is about to read here (seq_cst) and then re-validates currentParamsPtr_

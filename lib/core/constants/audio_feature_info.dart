@@ -6,6 +6,7 @@ import '../../domain/models/audio_output_info.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../utils/l10n_holder.dart';
 
+/// {@category DesignSystem}
 /// Human-readable info for one toggle/slider/card.
 class AudioFeatureInfo {
   final String id;
@@ -589,20 +590,36 @@ class AudioConflicts {
       return L10nHolder.current?.conflictBtBitPerfectUnsupported ??
           'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
     }
-    if (device.bitPerfectFailureReason == 'requires_android_14_for_usb' ||
-        device.bitPerfectFailureReason == 'requires_android_14') {
-      return L10nHolder.current?.conflictRequiresAndroid14 ??
-          'Requires Android 14+ for USB bit-perfect output.';
+    return bitPerfectReasonMessage(device.bitPerfectFailureReason);
+  }
+
+  /// Maps a native bit-perfect rejection reason code to a user message.
+  static String? bitPerfectReasonMessage(String? reason) {
+    switch (reason) {
+      case 'requires_android_14_for_usb':
+      case 'requires_android_14':
+      case 'usb_not_supported':
+        return L10nHolder.current?.conflictRequiresAndroid14 ??
+            'Requires Android 14+ for USB bit-perfect output.';
+      case 'exclusive_requires_usb_dac':
+        return L10nHolder.current?.conflictExclusiveRequiresUsbDac ??
+            'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
+      case 'bluetooth_transcoded':
+        return L10nHolder.current?.conflictBtBitPerfectUnsupported ??
+            'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
+      case 'no_supported_mixer_attributes':
+        return L10nHolder.current?.conflictNoMixerAttributes ??
+            'This USB DAC does not advertise an exclusive mixer configuration.';
+      case 'target_format_unavailable':
+        return 'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';
+      case 'set_mixer_attributes_failed':
+        return 'Android refused exclusive mode for this USB DAC (another app may be using it).';
+      case 'reflection_method_not_found':
+      case 'audio_mixer_class_not_found':
+        return 'Exclusive output API is not available on this device.';
+      default:
+        return null;
     }
-    if (device.bitPerfectFailureReason == 'exclusive_requires_usb_dac') {
-      return L10nHolder.current?.conflictExclusiveRequiresUsbDac ??
-          'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
-    }
-    if (device.bitPerfectFailureReason == 'no_supported_mixer_attributes') {
-      return L10nHolder.current?.conflictNoMixerAttributes ??
-          'This USB DAC does not advertise an exclusive mixer configuration.';
-    }
-    return null;
   }
 
   static String? gaplessBlockedByCrossfade(double crossfadeSeconds) {

@@ -187,6 +187,9 @@ class _TagEditorAppBar extends StatelessWidget implements PreferredSizeWidget {
           builder: (context, _) {
             final canUndo = context.read<TagEditorCubit>().canUndo;
             return IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               tooltip: context.l10n.undo,
               icon: const Icon(Icons.undo_rounded),
               onPressed: canUndo && !isSaving ? () => cubit.undo() : null,
@@ -243,32 +246,32 @@ class _TagEditorBody extends StatelessWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s20, vertical: AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (state.isBatchMode)
-                    _BatchEditBanner(count: state.batchSongs.length),
-                  ArtworkPicker(
-                    songId: state.song.id,
-                    newArtworkPath: state.newArtworkPath,
-                    artworkBytes: state.artworkBytes,
-                    removeArtwork: state.removeArtwork,
-                    onPick: () => cubit.pickArtwork(),
-                    onRemove: () => cubit.removeArtworkImage(),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Center(
-                    child: _AutoFetchButton(
-                      state: state,
-                      cubit: cubit,
-                      isSaving: isSaving,
-                      isAutoFetching: isAutoFetching,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (state.isBatchMode)
+                      _BatchEditBanner(count: state.batchSongs.length),
+                    ArtworkPicker(
+                      songId: state.song.id,
+                      newArtworkPath: state.newArtworkPath,
+                      artworkBytes: state.artworkBytes,
+                      removeArtwork: state.removeArtwork,
+                      onPick: () => cubit.pickArtwork(),
+                      onRemove: () => cubit.removeArtworkImage(),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.s20),
-                  _TagFields(state: state, cubit: cubit),
-                  const SizedBox(height: AppSpacing.xl),
-                ],
+                    const SizedBox(height: AppSpacing.md),
+                    Center(
+                      child: _AutoFetchButton(
+                        state: state,
+                        cubit: cubit,
+                        isSaving: isSaving,
+                        isAutoFetching: isAutoFetching,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s20),
+                    _TagFields(state: state, cubit: cubit),
+                    const SizedBox(height: AppSpacing.xl),
+                  ],
                 ),
               ),
             ),

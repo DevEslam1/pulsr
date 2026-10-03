@@ -86,7 +86,8 @@ class PlayerDspController {
         _deviceProfileService = deviceProfileService,
         _hiResAudioService = hiResAudioService,
         _smartAudioService = smartAudioService,
-        _headphoneProfilesRepo = headphoneProfilesRepo ?? HeadphoneProfilesRepository(),
+        _headphoneProfilesRepo =
+            headphoneProfilesRepo ?? HeadphoneProfilesRepository(),
         _getState = getState,
         _emit = emit,
         _syncAudioEffects = syncAudioEffects,
@@ -112,6 +113,8 @@ class PlayerDspController {
 
   final Mutex _followSampleRateMutex = Mutex();
   int? _lastFollowedSampleRate;
+  int? _lastFollowedBitDepth;
+  String? _lastFollowedRoute;
 
   /// [H-18] Serializes concurrent follow-rate requests (e.g. rapid track
   /// changes) through a mutex so overlapping native output-format switches
@@ -121,21 +124,35 @@ class PlayerDspController {
     if (service == null || _settingsCubit == null) return;
     await _followSampleRateMutex.protect(() async {
       final settings = _settingsCubit!.state;
+      final depth = (song.bitDepth != null && song.bitDepth! > 0)
+          ? song.bitDepth!
+          : PlayerConstants.defaultBitDepth;
+      final device = settings.currentOutputDevice;
+      final route =
+          '${device?.deviceName}|${device?.activeDeviceType}|${device?.isUsbDac}';
       final rate = HiResAudioService.followTrackRateToApply(
         trackSampleRate: song.sampleRate,
-        lastRequestedSampleRate: _lastFollowedSampleRate,
+        lastRequestedSampleRate:
+            depth == _lastFollowedBitDepth && route == _lastFollowedRoute
+                ? _lastFollowedSampleRate
+                : null,
         isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
         followTrackEnabled:
             settings.followTrackSampleRate || settings.strictBitPerfect,
       );
       if (rate == null) return;
       try {
-        final depth = (song.bitDepth != null && song.bitDepth! > 0)
-            ? song.bitDepth!
-            : PlayerConstants.defaultBitDepth;
-        await service.setTargetOutputFormat(sampleRate: rate, bitDepth: depth);
+        final applied = await service.setTargetOutputFormat(
+            sampleRate: rate, bitDepth: depth);
+        if (!applied) {
+          _lastFollowedSampleRate = null;
+          await _settingsCubit!.refreshOutputDevice();
+          return;
+        }
         if (_isClosed()) return;
         _lastFollowedSampleRate = rate;
+        _lastFollowedBitDepth = depth;
+        _lastFollowedRoute = route;
         await _settingsCubit!.refreshOutputDevice();
       } catch (e, st) {
         _lastFollowedSampleRate = null;
@@ -247,7 +264,10 @@ class PlayerDspController {
       await _audioHandler.applyPreset(preset);
     } catch (e) {
       final s = _getState();
-      _emit(s.copyWith(dsp: previousDsp, playback: s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
+      _emit(s.copyWith(
+          dsp: previousDsp,
+          playback:
+              s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
     }
   }
 
@@ -359,8 +379,8 @@ class PlayerDspController {
       final s = _getState();
       _emit(s.copyWith(
           dsp: previousDsp,
-          playback:
-              s.playback.copyWith(errorMessage: 'Failed to set band gain: $e')));
+          playback: s.playback
+              .copyWith(errorMessage: 'Failed to set band gain: $e')));
     }
   }
 

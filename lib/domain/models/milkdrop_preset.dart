@@ -21,8 +21,6 @@ class MilkdropPreset {
   final double waveG;
   final double waveB;
   final int waveMode;
-  @Deprecated('Parsed from legacy Milkdrop .milk files but unused by renderer')
-  final double fRating;
   final Map<String, String> raw;
 
   const MilkdropPreset({
@@ -38,7 +36,6 @@ class MilkdropPreset {
     this.waveG = 1.0,
     this.waveB = 1.0,
     this.waveMode = 0,
-    this.fRating = 3.0,
     this.raw = const {},
   });
 
@@ -98,7 +95,6 @@ class MilkdropPreset {
       waveG: _d(values, 'waveg', 1.0),
       waveB: _d(values, 'waveb', 1.0),
       waveMode: _i(values, 'wavemode', 0),
-      fRating: _d(values, 'frating', 3.0),
       raw: values,
     );
   }

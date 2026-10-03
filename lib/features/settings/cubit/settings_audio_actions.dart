@@ -1,6 +1,16 @@
 part of 'settings_cubit.dart';
 
 mixin SettingsAudioActions on PulsrCubit<SettingsState> {
+  final Mutex _audioModeMutex = Mutex();
+
+  Future<void> _pushBitPerfectBypass(bool enabled) async {
+    if (getIt.isRegistered<EqualizerManager>()) {
+      await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
+    } else {
+      await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
+    }
+  }
+
   Future<void> setReplayGainMode(ReplayGainMode mode) async {
     markDirty('replayGainMode');
     if (mode != ReplayGainMode.off) {
@@ -88,7 +98,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     ));
   }
 
-  Future<void> setBitPerfectOutput(bool enabled) async {
+  Future<void> setBitPerfectOutput(bool enabled) =>
+      _audioModeMutex.protect(() => _setBitPerfectOutput(enabled));
+
+  Future<void> _setBitPerfectOutput(bool enabled) async {
     markDirty('bitPerfectOutput');
     if (enabled) {
       final block = AudioConflicts.bitPerfectBlockedReason(
@@ -99,31 +112,63 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         return;
       }
     }
-    safeEmit(
-      state.copyWith(
-        bitPerfectOutput: enabled,
-        errorMessage: null,
-      ),
-    );
+    // Talk to the platform BEFORE emitting: an optimistic emit made the switch
+    // animate ON and immediately snap back OFF whenever the route rejected
+    // exclusive mode (e.g. USB DAC on Android < 14).
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
     final applied = await _hiResAudioService.setBitPerfectMode(enabled);
+    if (!enabled && !applied) {
+      safeEmit(state.copyWith(
+        errorMessage:
+            'The output device could not disable Bit-Perfect. Try again.',
+      ));
+      await refreshOutputDevice();
+      return;
+    }
     if (enabled && !applied) {
-      // Device rejected bit-perfect (unsupported/route change). Revert the
-      // optimistic state and pref so the UI and quality badge never claim
-      // bit-perfect output that is not actually active.
+      // Device rejected bit-perfect (unsupported/route change). Keep the pref
+      // and UI off so neither claims bit-perfect output that is not active.
       try {
         await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+        await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+        await _pushBitPerfectBypass(false);
       } catch (_) {}
       if (!isClosed) {
+        final reason = _hiResAudioService.lastBitPerfectFailureReason;
         safeEmit(state.copyWith(
           bitPerfectOutput: false,
-          errorMessage:
+          strictBitPerfect: false,
+          errorMessage: AudioConflicts.bitPerfectReasonMessage(reason) ??
               'Bit-Perfect output is not supported by the current output device.',
         ));
       }
       await refreshOutputDevice();
       return;
+    }
+    try {
+      await _pushBitPerfectBypass(enabled && state.bypassDspOnBitPerfect);
+    } catch (e, st) {
+      await _hiResAudioService.setBitPerfectMode(state.bitPerfectOutput);
+      ErrorLogger.log('Bit-perfect DSP transition failed',
+          error: e, stackTrace: st, category: 'SettingsAudioActions');
+      safeEmit(state.copyWith(
+          errorMessage: 'Failed to update the native DSP bypass.'));
+      await refreshOutputDevice();
+      return;
+    }
+    await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
+    if (!enabled) {
+      markDirty('strictBitPerfect');
+      await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+    }
+    if (!isClosed) {
+      safeEmit(
+        state.copyWith(
+          bitPerfectOutput: enabled,
+          strictBitPerfect: enabled && state.strictBitPerfect,
+          errorMessage: null,
+        ),
+      );
     }
     if (enabled) {
       try {
@@ -135,6 +180,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         try {
           await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
           await _hiResAudioService.setBitPerfectMode(false);
+          await _pushBitPerfectBypass(false);
         } catch (_) {}
         if (!isClosed) {
           safeEmit(state.copyWith(
@@ -147,13 +193,6 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
     if (enabled && state.bypassDspOnBitPerfect) {
-      try {
-        if (getIt.isRegistered<EqualizerManager>()) {
-          await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
-        } else {
-          await AudioEffectsChannel().setBypassDspForBitPerfect(true);
-        }
-      } catch (_) {}
       // Also force ReplayGain off — software gain breaks bit-perfect
       if (state.replayGainMode != ReplayGainMode.off) {
         await prefs.setString(
@@ -166,33 +205,34 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           ),
         );
       }
-    } else if (!enabled) {
-      try {
-        if (getIt.isRegistered<EqualizerManager>()) {
-          await getIt<EqualizerManager>().setBypassDspForBitPerfect(false);
-        } else {
-          await AudioEffectsChannel().setBypassDspForBitPerfect(false);
-        }
-      } catch (_) {}
     }
     await refreshOutputDevice();
   }
 
-  Future<void> setBypassDspOnBitPerfect(bool enabled) async {
+  Future<void> setBypassDspOnBitPerfect(bool enabled) =>
+      _audioModeMutex.protect(() => _setBypassDspOnBitPerfect(enabled));
+
+  Future<void> _setBypassDspOnBitPerfect(bool enabled) async {
+    if (!enabled && state.strictBitPerfect) {
+      safeEmit(state.copyWith(
+        errorMessage:
+            'Disable Strict Bit-Perfect before enabling DSP processing.',
+      ));
+      return;
+    }
+    if (state.bitPerfectOutput) {
+      try {
+        await _pushBitPerfectBypass(enabled);
+      } catch (_) {
+        safeEmit(state.copyWith(
+            errorMessage: 'Failed to update the native DSP bypass.'));
+        return;
+      }
+    }
     markDirty('bypassDspOnBitPerfect');
     safeEmit(state.copyWith(bypassDspOnBitPerfect: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, enabled);
-    // Apply immediately if bit-perfect is currently active
-    if (state.bitPerfectOutput) {
-      try {
-        if (getIt.isRegistered<EqualizerManager>()) {
-          await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
-        } else {
-          await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
-        }
-      } catch (_) {}
-    }
     await refreshOutputDevice();
   }
 
@@ -224,6 +264,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// The actual native call happens in PlayerCubit (it owns the track-change
   /// stream and the de-dupe state); this only persists the preference.
   Future<void> setFollowTrackSampleRate(bool value) async {
+    if (!value && state.strictBitPerfect) {
+      safeEmit(state.copyWith(
+        errorMessage:
+            'Strict Bit-Perfect requires following the track sample rate.',
+      ));
+      return;
+    }
     markDirty('followTrackSampleRate');
     safeEmit(state.copyWith(followTrackSampleRate: value));
     final prefs = await SharedPreferences.getInstance();
@@ -252,7 +299,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// T3: strict bit-perfect (no resample). Enabling forces Bit-Perfect output,
   /// the DSP bypass and follow-track, then surfaces the conflict reason rather
   /// than silently muting stages. Disabled when the path cannot do bit-perfect.
-  Future<void> setStrictBitPerfect(bool enabled) async {
+  Future<void> setStrictBitPerfect(bool enabled) =>
+      _audioModeMutex.protect(() => _setStrictBitPerfect(enabled));
+
+  Future<void> _setStrictBitPerfect(bool enabled) async {
     markDirty('strictBitPerfect');
     markDirty('bitPerfectOutput');
     markDirty('bypassDspOnBitPerfect');
@@ -268,21 +318,16 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       }
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.strictBitPerfect, enabled);
     if (!enabled) {
+      await _setBitPerfectOutput(false);
+      if (state.bitPerfectOutput) return;
+      await prefs.setBool(PrefsKeys.strictBitPerfect, false);
       safeEmit(state.copyWith(strictBitPerfect: false, errorMessage: null));
       return;
     }
-    safeEmit(state.copyWith(
-      strictBitPerfect: true,
-      bitPerfectOutput: true,
-      bypassDspOnBitPerfect: true,
-      followTrackSampleRate: true,
-      errorMessage: null,
-    ));
-    await prefs.setBool(PrefsKeys.bitPerfectOutput, true);
-    await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, true);
-    await prefs.setBool(PrefsKeys.followTrackSampleRate, true);
+    // Confirm with the platform BEFORE emitting: the old optimistic emit made
+    // the strict switch animate ON and snap back OFF whenever exclusive mode
+    // was refused.
     final applied = await _hiResAudioService.setBitPerfectMode(true);
     if (!applied) {
       // Strict bit-perfect is impossible on this device; revert rather than
@@ -293,17 +338,19 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
         await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, false);
         await prefs.setBool(PrefsKeys.followTrackSampleRate, prevFollowRate);
+        await _pushBitPerfectBypass(false);
       } catch (e, st) {
         ErrorLogger.log('Failed to persist strict bit-perfect revert',
             error: e, stackTrace: st, category: 'Settings');
       }
       if (!isClosed) {
+        final reason = _hiResAudioService.lastBitPerfectFailureReason;
         safeEmit(state.copyWith(
           strictBitPerfect: false,
           bitPerfectOutput: false,
           bypassDspOnBitPerfect: false,
           followTrackSampleRate: prevFollowRate,
-          errorMessage:
+          errorMessage: AudioConflicts.bitPerfectReasonMessage(reason) ??
               'Strict Bit-Perfect is not supported by the current output device.',
         ));
       }
@@ -311,12 +358,27 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return;
     }
     try {
-      if (getIt.isRegistered<EqualizerManager>()) {
-        await getIt<EqualizerManager>().setBypassDspForBitPerfect(true);
-      } else {
-        await AudioEffectsChannel().setBypassDspForBitPerfect(true);
-      }
-    } catch (_) {}
+      await _pushBitPerfectBypass(true);
+    } catch (_) {
+      await _hiResAudioService.setBitPerfectMode(state.bitPerfectOutput);
+      safeEmit(state.copyWith(
+          errorMessage: 'Failed to enable the native DSP bypass.'));
+      await refreshOutputDevice();
+      return;
+    }
+    await prefs.setBool(PrefsKeys.strictBitPerfect, true);
+    await prefs.setBool(PrefsKeys.bitPerfectOutput, true);
+    await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, true);
+    await prefs.setBool(PrefsKeys.followTrackSampleRate, true);
+    if (!isClosed) {
+      safeEmit(state.copyWith(
+        strictBitPerfect: true,
+        bitPerfectOutput: true,
+        bypassDspOnBitPerfect: true,
+        followTrackSampleRate: true,
+        errorMessage: null,
+      ));
+    }
     await _forceCrossfadeOffForBitPerfect();
     // Software gain would alter the bitstream; turn it off like the normal
     // Bit-Perfect path does.
@@ -643,28 +705,56 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Opt-in AAudio Direct output (bit-perfect; the DSP processor chain is
   /// bypassed). Persisted here and pushed to every player by the player
   /// layer; takes effect for newly built sinks.
-  Future<void> setAaudioOutputEnabled(bool enabled) async {
+  Future<void> setAaudioOutputEnabled(bool enabled) =>
+      _audioModeMutex.protect(() => _setAaudioOutputEnabled(enabled));
+
+  Future<void> _setAaudioOutputEnabled(bool enabled) async {
     markDirty('aaudioOutputEnabled');
-    safeEmit(state.copyWith(aaudioOutputEnabled: enabled));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PrefsKeys.aaudioOutputEnabled, enabled);
+    if (enabled) {
+      await _forceCrossfadeOffForBitPerfect();
+      if (state.dvcEnabled) await setDvcEnabled(false);
+    }
     try {
       if (getIt.isRegistered<PulsrAudioHandler>()) {
-        await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+        final applied = await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
           enabled,
           preferExclusive: state.aaudioPreferExclusive,
           targetBufferMs: state.aaudioTargetBufferMs,
         );
+        if (!applied) {
+          await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+            state.aaudioOutputEnabled,
+            preferExclusive: state.aaudioPreferExclusive,
+            targetBufferMs: state.aaudioTargetBufferMs,
+          );
+          safeEmit(state.copyWith(
+              errorMessage:
+                  'AAudio output was rejected by a playback player.'));
+          return;
+        }
       }
-    } catch (_) {
-      // Player not available yet; boot/observer push covers it.
+    } catch (e) {
+      safeEmit(
+          state.copyWith(errorMessage: 'Failed to change AAudio output: $e'));
+      return;
     }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.aaudioOutputEnabled, enabled);
+    safeEmit(state.copyWith(aaudioOutputEnabled: enabled, errorMessage: null));
   }
 
   /// Opt-in Direct Volume Control (DVC). Pins the Android media stream to
   /// maximum and applies the composed output gain in the native float DSP path.
   /// Unavailable on non-Android and while Bit-Perfect bypass is active.
   Future<void> setDvcEnabled(bool enabled) async {
+    if (enabled &&
+        (state.aaudioOutputEnabled ||
+            (state.bitPerfectOutput && state.bypassDspOnBitPerfect))) {
+      safeEmit(state.copyWith(
+          errorMessage:
+              'Direct Volume Control requires the active DSP output path.'));
+      return;
+    }
     markDirty('dvcEnabled');
     safeEmit(state.copyWith(dvcEnabled: enabled));
     final prefs = await SharedPreferences.getInstance();

@@ -228,6 +228,9 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
       trailing: isBuiltIn
           ? null
           : IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               tooltip: l10n.delete,
               icon: const Icon(Icons.delete_outline_rounded, size: 20),
               onPressed: () => _deleteProfile(profile),
@@ -283,11 +286,17 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
           ),
         ),
         IconButton(
+          constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget),
           tooltip: l10n.applyProfileNow,
           icon: const Icon(Icons.play_circle_outline_rounded),
           onPressed: link == null ? null : () => _applyForDevice(device),
         ),
         IconButton(
+          constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget),
           tooltip: l10n.forgetDevice,
           icon: const Icon(Icons.link_off_rounded),
           onPressed: link == null

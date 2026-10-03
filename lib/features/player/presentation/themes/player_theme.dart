@@ -39,4 +39,3 @@ class PlayerSplitViewScope extends InheritedWidget {
   bool updateShouldNotify(PlayerSplitViewScope oldWidget) =>
       isInSplitView != oldWidget.isInSplitView;
 }
-

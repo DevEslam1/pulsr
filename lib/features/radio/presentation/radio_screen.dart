@@ -8,7 +8,7 @@ import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -218,16 +218,25 @@ class _RadioScreenState extends State<RadioScreen> {
         title: Text(context.l10n.radioTitle),
         actions: [
           IconButton(
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
             tooltip: context.l10n.radioCuratedBrowse,
             icon: const Icon(Icons.explore_rounded),
             onPressed: _importCurated,
           ),
           IconButton(
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
             tooltip: context.l10n.radioImportPlaylist,
             icon: const Icon(Icons.playlist_add_rounded),
             onPressed: _showImportDialog,
           ),
           IconButton(
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
             tooltip: context.l10n.radioAddStation,
             icon: const Icon(Icons.add_rounded),
             onPressed: _showAddDialog,
@@ -347,6 +356,9 @@ class _RadioScreenState extends State<RadioScreen> {
                           color: p.textSecondary, size: 20),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
+                              constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget),
                               icon: Icon(Icons.close_rounded,
                                   color: p.textSecondary, size: 18),
                               tooltip: context.l10n.clear,
@@ -425,7 +437,7 @@ class _RadioScreenState extends State<RadioScreen> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             child: SizedBox(
                               height: 350,
-                              child: EmptyStateWidget(
+                              child: PulsrEmptyState(
                                 icon: Icons.search_off_rounded,
                                 title: context.l10n
                                     .radioNoStationsMatch(_searchQuery),
@@ -552,6 +564,11 @@ class _RadioScreenState extends State<RadioScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
+                                            constraints: const BoxConstraints(
+                                                minWidth:
+                                                    AppSpacing.minTouchTarget,
+                                                minHeight:
+                                                    AppSpacing.minTouchTarget),
                                             tooltip: context.l10n.radioEdit,
                                             icon: Icon(Icons.edit_rounded,
                                                 color: p.textSecondary,
@@ -560,6 +577,11 @@ class _RadioScreenState extends State<RadioScreen> {
                                                 initial: station),
                                           ),
                                           IconButton(
+                                            constraints: const BoxConstraints(
+                                                minWidth:
+                                                    AppSpacing.minTouchTarget,
+                                                minHeight:
+                                                    AppSpacing.minTouchTarget),
                                             tooltip: isPlaying
                                                 ? context.l10n.pause
                                                 : context.l10n.radioPlay,

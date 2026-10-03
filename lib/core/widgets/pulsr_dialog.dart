@@ -9,7 +9,9 @@ import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../responsive/responsive_values.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 /// Uniform dialog entry-points used across the entire app.
 ///
 /// Every dialog opened through [PulsrDialogHelper] is guaranteed to use the
@@ -52,7 +54,7 @@ class PulsrDialogHelper {
         .push<T>(DialogRoute<T>(
           context: context,
           barrierDismissible: barrierDismissible,
-          barrierColor: Colors.black.withValues(alpha: 0.55),
+          barrierColor: AppColors.scrimAt(0.55),
           builder: builder,
         ))
         .whenComplete(PulsrModalTracker.pop);
@@ -354,7 +356,7 @@ class PulsrDialog extends StatelessWidget {
           blur: 14.0,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: p.isDark ? 0.50 : 0.18),
+              color: AppColors.scrimAt(p.isDark ? 0.50 : 0.18),
               blurRadius: 32,
               spreadRadius: 0,
               offset: const Offset(0, 12),

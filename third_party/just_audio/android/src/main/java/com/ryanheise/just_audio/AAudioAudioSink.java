@@ -14,9 +14,9 @@ import java.nio.ByteBuffer;
 /**
  * Pulsr fork: Media3 {@link AudioSink} backed by a native AAudio stream.
  *
- * <p>"Direct" bit-perfect output: opens a per-stream AAudio path (EXCLUSIVE
- * sharing attempted first, SHARED fallback) at the source sample rate so the
- * OS mixer never resamples, and writes PCM straight to the device. The DSP
+ * <p>Direct output requests the source sample rate through AAudio. Exclusive
+ * requests fail if unavailable and lock PCM volume to unity. Explicit shared
+ * mode permits software volume and makes no downstream bit-perfect guarantee. The DSP
  * processor chain is bypassed in this mode by design - this sink is the
  * bit-perfect alternative path, not a DSP replacement.
  *
@@ -124,9 +124,14 @@ public final class AAudioAudioSink implements AudioSink {
         }
         // Close any stream from a previous configuration before reopening.
         closeHandle();
-        long newHandle = AaudioNativeBridge.nativeOpen(inputFormat.sampleRate,
-                inputFormat.channelCount, encoding, preferExclusive,
-                targetBufferMs);
+        long newHandle;
+        try {
+            newHandle = AaudioNativeBridge.nativeOpen(inputFormat.sampleRate,
+                    inputFormat.channelCount, encoding, preferExclusive,
+                    targetBufferMs);
+        } catch (UnsatisfiedLinkError e) {
+            throw new ConfigurationException(e, inputFormat);
+        }
         if (newHandle == 0L) {
             throw new ConfigurationException(
                 "AAudio stream could not be opened for "
@@ -137,7 +142,11 @@ public final class AAudioAudioSink implements AudioSink {
         configuredFormat = inputFormat;
         sampleRate = inputFormat.sampleRate;
         channelCount = inputFormat.channelCount;
+        eosWritten = false;
+        handledEndOfStream = false;
+        pendingBasePosition = true;
         AaudioNativeBridge.nativeSetVolume(handle, volume);
+        if (!playing) AaudioNativeBridge.nativePause(handle);
         Log.i(TAG, "AAudio sink configured: " + sampleRate + "Hz/" + channelCount
                 + "ch exclusive=" + AaudioNativeBridge.nativeIsExclusive(handle));
     }
@@ -181,21 +190,22 @@ public final class AAudioAudioSink implements AudioSink {
             direct.flip();
             int written = AaudioNativeBridge.nativeWrite(handle, direct, 0,
                     remaining);
-            if (written != remaining) {
+            if (written <= 0 || written > remaining) {
                 throw new WriteException(-1, configuredFormat,
                         /* isRecoverable= */ false);
             }
-            return true;
+            buffer.position(buffer.position() + written);
+            return !buffer.hasRemaining();
         }
         int offset = buffer.position();
         int written = AaudioNativeBridge.nativeWrite(handle, buffer, offset,
                 remaining);
-        if (written != remaining) {
+        if (written <= 0 || written > remaining) {
             throw new WriteException(-1, configuredFormat,
                     /* isRecoverable= */ false);
         }
-        buffer.position(buffer.limit());
-        return true;
+        buffer.position(offset + written);
+        return !buffer.hasRemaining();
     }
 
     @Override
@@ -249,7 +259,7 @@ public final class AAudioAudioSink implements AudioSink {
 
     @Override
     public void setSkipSilenceEnabled(boolean skipSilenceEnabled) {
-        this.skipSilenceEnabled = skipSilenceEnabled;
+        this.skipSilenceEnabled = false;
         if (listener != null) {
             listener.onSkipSilenceEnabledChanged(false);
         }

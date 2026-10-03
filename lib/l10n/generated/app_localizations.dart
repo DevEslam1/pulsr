@@ -14189,6 +14189,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to apply {label}'**
   String failedToApplyLabel(String label);
+
+  /// Title of the dialog listing DSP features that conflict with Bit-Perfect output
+  ///
+  /// In en, this message translates to:
+  /// **'Disable these to use Bit-Perfect?'**
+  String get bitPerfectConflictTitle;
+
+  /// Body of the Bit-Perfect conflict dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect sends the original, unaltered audio to your USB DAC. These features change the sound and are not compatible:'**
+  String get bitPerfectConflictBody;
+
+  /// Confirm button that disables conflicting DSP features and enables Bit-Perfect
+  ///
+  /// In en, this message translates to:
+  /// **'Disable & enable'**
+  String get bitPerfectDisableAndEnable;
 }
 
 class _AppLocalizationsDelegate

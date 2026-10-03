@@ -10,7 +10,9 @@ import '../responsive/pulsr_responsive_tokens.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_bottom_sheet.dart';
 import 'pulsr_dialog.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 /// Viewport-aware adaptive modal container and launcher.
 ///
 /// Automatically switches between:
@@ -192,6 +194,9 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                 if (trailing != null) trailing!,
                 if (isDialog && trailing == null)
                   IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
                     icon: Icon(Icons.close_rounded,
                         size: 20, color: p.textSecondary),
                     tooltip:
@@ -233,7 +238,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         border: Border.all(color: p.hairline, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: p.isDark ? 0.50 : 0.16),
+            color: AppColors.scrimAt(p.isDark ? 0.50 : 0.16),
             blurRadius: 36,
             offset: const Offset(0, -4),
           ),

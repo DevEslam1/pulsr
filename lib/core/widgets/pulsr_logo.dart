@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../motion/pulsr_motion.dart';
 
+/// {@category DesignSystem}
 /// Highly optimized, scalable native vector rendering of the official Pulsr App Icon.
 /// Renders with full neon glow, ambient concentric wave ripples, inner mesh, and theme-adaptive coloring.
 class PulsrLogo extends StatefulWidget {
@@ -151,7 +152,7 @@ class _PulsrLogoPainter extends CustomPainter {
     final wavePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6
-      ..color = Colors.white.withValues(alpha: showBackground ? 0.08 : 0.12);
+      ..color = AppColors.specularAt(showBackground ? 0.08 : 0.12);
 
     final animPhase = animationValue * 2 * math.pi;
 
@@ -169,7 +170,7 @@ class _PulsrLogoPainter extends CustomPainter {
       final p = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
-        ..color = Colors.white.withValues(alpha: alpha);
+        ..color = AppColors.specularAt(alpha);
       final pulse = (math.sin(animPhase + i * 0.4) * 2.5);
       canvas.drawCircle(bulbCenter, r + pulse, p);
     }
@@ -182,7 +183,7 @@ class _PulsrLogoPainter extends CustomPainter {
       final p = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4
-        ..color = Colors.white.withValues(alpha: alpha);
+        ..color = AppColors.specularAt(alpha);
       final pulse = (math.cos(animPhase + i * 0.5) * 2.0);
       canvas.drawCircle(hookCenter, r + pulse, p);
     }
@@ -210,7 +211,7 @@ class _PulsrLogoPainter extends CustomPainter {
 
     final noteBasePaint = Paint()
       ..style = PaintingStyle.fill
-      ..color = Colors.white.withValues(alpha: showBackground ? 0.20 : 0.10);
+      ..color = AppColors.specularAt(showBackground ? 0.20 : 0.10);
     canvas.drawPath(notePath, noteBasePaint);
 
     // 5. Concentric Internal Mesh Clipped Strictly Inside Note
@@ -242,7 +243,7 @@ class _PulsrLogoPainter extends CustomPainter {
     final crispOutline = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
-      ..color = Colors.white.withValues(alpha: 0.85);
+      ..color = AppColors.specularAt(0.85);
     canvas.drawPath(notePath, crispOutline);
 
     canvas.restore();

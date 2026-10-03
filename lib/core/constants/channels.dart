@@ -1,5 +1,6 @@
 // lib/core/constants/channels.dart
 
+/// {@category DesignSystem}
 /// Centralized platform channel names used across Flutter and native Android plugins.
 abstract final class PulsrChannels {
   static const audioEffects = 'com.pulsr.music/audio_effects';

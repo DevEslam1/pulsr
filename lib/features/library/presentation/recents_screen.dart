@@ -20,7 +20,8 @@ import '../../sheets/add_to_playlist_sheet.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/async_state_builder.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -114,6 +115,9 @@ class _RecentsScreenState extends State<RecentsScreen> {
           ),
           actions: [
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               tooltip: context.l10n.browseClearHistory,
               icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: () => _showClearConfirmation(context),
@@ -124,342 +128,367 @@ class _RecentsScreenState extends State<RecentsScreen> {
           key: ValueKey(_historyLimit),
           stream: _recentStream,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData) {
-              return const SkeletonList();
-            }
-
-            final allRecents =
-                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-
-            if (allRecents.isEmpty) {
-              return RefreshIndicator(
-                color: p.accent,
-                backgroundColor: p.surfaceContainer,
-                onRefresh: () async {
-                  if (mounted) setState(() {});
-                },
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                      parent: BouncingScrollPhysics()),
-                  children: [
-                    const SizedBox(height: AppSpacing.xxl),
-                    EmptyStateWidget(
-                      icon: Icons.history_toggle_off_rounded,
-                      title: context.l10n.noRecentSongs,
-                      subtitle: context.l10n.recentEmptyHint,
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            final filtered = _filterSongs(allRecents);
-
-            return RefreshIndicator(
+            final emptyBody = RefreshIndicator(
               color: p.accent,
               backgroundColor: p.surfaceContainer,
               onRefresh: () async {
                 if (mounted) setState(() {});
               },
-              child: CustomScrollView(
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics()),
-                slivers: [
-                  // Search & Header Stats
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                          AppSpacing.md,
-                          AppSpacing.sm,
-                          AppSpacing.md,
-                          AppSpacing.xs),
-                      child: Column(
-                        children: [
-                          // Search bar
-                          PulsrSearchField(
-                            controller: _searchController,
-                            hintText:
-                                '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
-                            // BUG-09: actually debounce keystrokes instead of
-                            // rebuilding the whole list on every character.
-                            onChanged: (val) {
-                              _searchDebounce?.cancel();
-                              _searchDebounce = Timer(
-                                const Duration(milliseconds: 300),
-                                () {
+                children: [
+                  const SizedBox(height: AppSpacing.xxl),
+                  PulsrEmptyState(
+                    icon: Icons.history_toggle_off_rounded,
+                    title: context.l10n.noRecentSongs,
+                    subtitle: context.l10n.recentEmptyHint,
+                  ),
+                ],
+              ),
+            );
+
+            return AsyncStateBuilder<dynamic>(
+              snapshot: snapshot,
+              loadingWidget: const SkeletonList(),
+              emptyWidget: emptyBody,
+              onError: (_) => emptyBody,
+              isEmpty: (data) =>
+                  data?.fold((l) => true, (r) => r.isEmpty) ?? true,
+              onData: (data) {
+                final allRecents =
+                    data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+                final filtered = _filterSongs(allRecents);
+
+                return RefreshIndicator(
+                  color: p.accent,
+                  backgroundColor: p.surfaceContainer,
+                  onRefresh: () async {
+                    if (mounted) setState(() {});
+                  },
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics()),
+                    slivers: [
+                      // Search & Header Stats
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
+                              AppSpacing.md,
+                              AppSpacing.sm,
+                              AppSpacing.md,
+                              AppSpacing.xs),
+                          child: Column(
+                            children: [
+                              // Search bar
+                              PulsrSearchField(
+                                controller: _searchController,
+                                hintText:
+                                    '${context.l10n.search} ${allRecents.length} ${context.l10n.browseRecentSongs}...',
+                                // BUG-09: actually debounce keystrokes instead of
+                                // rebuilding the whole list on every character.
+                                onChanged: (val) {
+                                  _searchDebounce?.cancel();
+                                  _searchDebounce = Timer(
+                                    const Duration(milliseconds: 300),
+                                    () {
+                                      if (mounted) {
+                                        setState(() => _searchQuery = val);
+                                      }
+                                    },
+                                  );
+                                },
+                                onClear: () {
+                                  _searchDebounce?.cancel();
                                   if (mounted) {
-                                    setState(() => _searchQuery = val);
+                                    setState(() => _searchQuery = '');
                                   }
                                 },
-                              );
-                            },
-                            onClear: () {
-                              _searchDebounce?.cancel();
-                              if (mounted) setState(() => _searchQuery = '');
-                            },
-                          ),
-                          const SizedBox(height: AppSpacing.s14),
-                          // Action buttons: Play All & Shuffle
-                          Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: () {
-                                    if (filtered.isNotEmpty) {
-                                      playerCubit.playSong(filtered.first,
-                                          queue: filtered);
-                                    }
-                                  },
-                                  icon: const Icon(Icons.play_arrow_rounded,
-                                      size: 20),
-                                  label: Text(context.l10n
-                                      .playAllCount(filtered.length)),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: p.accent,
-                                    foregroundColor: p.onAccent,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: AppSpacing.sm),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: AppRadii.buttonRadius,
+                              ),
+                              const SizedBox(height: AppSpacing.s14),
+                              // Action buttons: Play All & Shuffle
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.icon(
+                                      onPressed: () {
+                                        if (filtered.isNotEmpty) {
+                                          playerCubit.playSong(filtered.first,
+                                              queue: filtered);
+                                        }
+                                      },
+                                      icon: const Icon(Icons.play_arrow_rounded,
+                                          size: 20),
+                                      label: Text(context.l10n
+                                          .playAllCount(filtered.length)),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: p.accent,
+                                        foregroundColor: p.onAccent,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: AppSpacing.sm),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: AppRadii.buttonRadius,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  if (filtered.isNotEmpty) {
-                                    final shuffled =
-                                        List<SongsTableData>.from(filtered)
-                                          ..shuffle();
-                                    playerCubit.playSong(shuffled.first,
-                                        queue: shuffled);
-                                  }
-                                },
-                                icon:
-                                    const Icon(Icons.shuffle_rounded, size: 20),
-                                label: Text(context.l10n.shuffle),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: p.textPrimary,
-                                  side: BorderSide(color: p.hairline),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: AppSpacing.sm,
-                                      horizontal: AppSpacing.md),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.buttonRadius,
+                                  const SizedBox(width: AppSpacing.sm),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      if (filtered.isNotEmpty) {
+                                        final shuffled =
+                                            List<SongsTableData>.from(filtered)
+                                              ..shuffle();
+                                        playerCubit.playSong(shuffled.first,
+                                            queue: shuffled);
+                                      }
+                                    },
+                                    icon: const Icon(Icons.shuffle_rounded,
+                                        size: 20),
+                                    label: Text(context.l10n.shuffle),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: p.textPrimary,
+                                      side: BorderSide(color: p.hairline),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm,
+                                          horizontal: AppSpacing.md),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: AppRadii.buttonRadius,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // Song List
-                  if (filtered.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: EmptyStateWidget(
-                        icon: Icons.search_off_rounded,
-                        title: context.l10n.noSongsFound,
-                        subtitle: context.l10n.noResultsFor(_searchQuery),
-                        primaryActionLabel:
-                            _searchQuery.isNotEmpty ? context.l10n.clear : null,
-                        primaryActionIcon: _searchQuery.isNotEmpty
-                            ? Icons.clear_rounded
-                            : null,
-                        onPrimaryAction: _searchQuery.isNotEmpty
-                            ? () {
-                                _searchController.clear();
-                                setState(() => _searchQuery = '');
-                              }
-                            : null,
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsetsDirectional.only(
-                          top: AppSpacing.xs,
-                          bottom: 100,
-                          start: AppSpacing.md,
-                          end: AppSpacing.md),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          addAutomaticKeepAlives: false,
-                          addRepaintBoundaries: true,
-                          (context, index) {
-                            final song = filtered[index];
-                            return StaggeredListItem(
-                              index: index,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: AppSpacing.xxs),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: AppRadii.cardRadius,
-                                    onTap: () => playerCubit.playSong(song,
-                                        queue: filtered),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: AppSpacing.s10,
-                                          vertical: AppSpacing.xs),
-                                      decoration: BoxDecoration(
+                      // Song List
+                      if (filtered.isEmpty)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: PulsrEmptyState(
+                            icon: Icons.search_off_rounded,
+                            title: context.l10n.noSongsFound,
+                            subtitle: context.l10n.noResultsFor(_searchQuery),
+                            primaryActionLabel: _searchQuery.isNotEmpty
+                                ? context.l10n.clear
+                                : null,
+                            primaryActionIcon: _searchQuery.isNotEmpty
+                                ? Icons.clear_rounded
+                                : null,
+                            onPrimaryAction: _searchQuery.isNotEmpty
+                                ? () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  }
+                                : null,
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsetsDirectional.only(
+                              top: AppSpacing.xs,
+                              bottom: 100,
+                              start: AppSpacing.md,
+                              end: AppSpacing.md),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              addAutomaticKeepAlives: false,
+                              addRepaintBoundaries: true,
+                              (context, index) {
+                                final song = filtered[index];
+                                return StaggeredListItem(
+                                  index: index,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: AppSpacing.xxs),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
                                         borderRadius: AppRadii.cardRadius,
-                                        color: p.surfaceContainer.withValues(
-                                            alpha: p.isDark ? 0.3 : 0.6),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          // Index number
-                                          SizedBox(
-                                            width: AppSpacing.lg,
-                                            child: Text(
-                                              '${index + 1}',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: p.textTertiary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: AppFontSize.label,
-                                              ),
-                                            ),
+                                        onTap: () => playerCubit.playSong(song,
+                                            queue: filtered),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.s10,
+                                              vertical: AppSpacing.xs),
+                                          decoration: BoxDecoration(
+                                            borderRadius: AppRadii.cardRadius,
+                                            color: p.surfaceContainer
+                                                .withValues(
+                                                    alpha:
+                                                        p.isDark ? 0.3 : 0.6),
                                           ),
-                                          const SizedBox(width: AppSpacing.xs),
-                                          // Artwork
-                                          CachedArtwork(
-                                            id: song.id,
-                                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                                            albumId: song.albumId,
-                                            type: ArtworkType.AUDIO,
-                                            size: 46,
-                                            borderRadius: 12,
-                                          ),
-                                          const SizedBox(width: AppSpacing.sm),
-                                          // Title & Artist
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  song.title,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                          child: Row(
+                                            children: [
+                                              // Index number
+                                              SizedBox(
+                                                width: AppSpacing.lg,
+                                                child: Text(
+                                                  '${index + 1}',
+                                                  textAlign: TextAlign.center,
                                                   style: TextStyle(
-                                                    color: p.textPrimary,
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: AppFontSize.body,
-                                                  ),
-                                                ),
-                                                const SizedBox(
-                                                    height: AppSpacing.s2),
-                                                Text(
-                                                  song.artist,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color: p.textSecondary,
+                                                    color: p.textTertiary,
+                                                    fontWeight: FontWeight.w600,
                                                     fontSize: AppFontSize.label,
                                                   ),
                                                 ),
-                                              ],
-                                            ),
+                                              ),
+                                              const SizedBox(
+                                                  width: AppSpacing.xs),
+                                              // Artwork
+                                              CachedArtwork(
+                                                id: song.id,
+                                                remoteUrl:
+                                                    song.remoteArtworkUrl ??
+                                                        song.artworkUri,
+                                                albumId: song.albumId,
+                                                type: ArtworkType.AUDIO,
+                                                size: 46,
+                                                borderRadius: 12,
+                                              ),
+                                              const SizedBox(
+                                                  width: AppSpacing.sm),
+                                              // Title & Artist
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      song.title,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: p.textPrimary,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize:
+                                                            AppFontSize.body,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(
+                                                        height: AppSpacing.s2),
+                                                    Text(
+                                                      song.artist,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: p.textSecondary,
+                                                        fontSize:
+                                                            AppFontSize.label,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              // More menu
+                                              IconButton(
+                                                constraints:
+                                                    const BoxConstraints(
+                                                        minWidth: AppSpacing
+                                                            .minTouchTarget,
+                                                        minHeight: AppSpacing
+                                                            .minTouchTarget),
+                                                icon: const Icon(
+                                                    Icons.more_vert_rounded,
+                                                    size: 20),
+                                                color: p.textSecondary,
+                                                tooltip:
+                                                    MaterialLocalizations.of(
+                                                            context)
+                                                        .moreButtonTooltip,
+                                                onPressed: () {
+                                                  _showSongOptions(
+                                                      context, song);
+                                                },
+                                              ),
+                                            ],
                                           ),
-                                          // More menu
-                                          IconButton(
-                                            icon: const Icon(
-                                                Icons.more_vert_rounded,
-                                                size: 20),
-                                            color: p.textSecondary,
-                                            tooltip: MaterialLocalizations.of(
-                                                    context)
-                                                .moreButtonTooltip,
-                                            onPressed: () {
-                                              _showSongOptions(context, song);
-                                            },
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
-                          childCount: filtered.length,
-                        ),
-                      ),
-                    ),
-                  if ((_hasMore &&
-                          allRecents.length >= _historyLimit &&
-                          _historyLimit < _maxHistoryLimit &&
-                          _searchQuery.isEmpty) ||
-                      (_userExpanded &&
-                          _historyLimit > _persistedHistoryLimit &&
-                          allRecents.length > _persistedHistoryLimit))
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                        child: Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (_hasMore &&
-                                  allRecents.length >= _historyLimit &&
-                                  _historyLimit < _maxHistoryLimit &&
-                                  _searchQuery.isEmpty)
-                                TextButton.icon(
-                                  icon: const Icon(Icons.expand_more_rounded),
-                                  label: Text(context.l10n.loadMoreHistory),
-                                  onPressed: () {
-                                    if (allRecents.length < _historyLimit) {
-                                      setState(() => _hasMore = false);
-                                      return;
-                                    }
-                                    setState(() {
-                                      _userExpanded = true;
-                                      _historyLimit = (_historyLimit + 100)
-                                          .clamp(_persistedHistoryLimit,
-                                              _maxHistoryLimit);
-                                      _updateStream();
-                                    });
-                                  },
-                                ),
-                              if (_userExpanded &&
-                                  _historyLimit > _persistedHistoryLimit &&
-                                  allRecents.length >
-                                      _persistedHistoryLimit) ...[
-                                if (_hasMore &&
-                                    allRecents.length >= _historyLimit &&
-                                    _historyLimit < _maxHistoryLimit &&
-                                    _searchQuery.isEmpty)
-                                  const SizedBox(width: AppSpacing.sm),
-                                TextButton.icon(
-                                  icon: const Icon(Icons.expand_less_rounded),
-                                  label: Text(context.l10n.showLess),
-                                  onPressed: () {
-                                    setState(() {
-                                      _userExpanded = false;
-                                      _historyLimit = _persistedHistoryLimit;
-                                      _hasMore = true;
-                                      _updateStream();
-                                    });
-                                  },
-                                ),
-                              ],
-                            ],
+                                );
+                              },
+                              childCount: filtered.length,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                ],
-              ),
+                      if ((_hasMore &&
+                              allRecents.length >= _historyLimit &&
+                              _historyLimit < _maxHistoryLimit &&
+                              _searchQuery.isEmpty) ||
+                          (_userExpanded &&
+                              _historyLimit > _persistedHistoryLimit &&
+                              allRecents.length > _persistedHistoryLimit))
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: AppSpacing.md),
+                            child: Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_hasMore &&
+                                      allRecents.length >= _historyLimit &&
+                                      _historyLimit < _maxHistoryLimit &&
+                                      _searchQuery.isEmpty)
+                                    TextButton.icon(
+                                      icon:
+                                          const Icon(Icons.expand_more_rounded),
+                                      label: Text(context.l10n.loadMoreHistory),
+                                      onPressed: () {
+                                        if (allRecents.length < _historyLimit) {
+                                          setState(() => _hasMore = false);
+                                          return;
+                                        }
+                                        setState(() {
+                                          _userExpanded = true;
+                                          _historyLimit = (_historyLimit + 100)
+                                              .clamp(_persistedHistoryLimit,
+                                                  _maxHistoryLimit);
+                                          _updateStream();
+                                        });
+                                      },
+                                    ),
+                                  if (_userExpanded &&
+                                      _historyLimit > _persistedHistoryLimit &&
+                                      allRecents.length >
+                                          _persistedHistoryLimit) ...[
+                                    if (_hasMore &&
+                                        allRecents.length >= _historyLimit &&
+                                        _historyLimit < _maxHistoryLimit &&
+                                        _searchQuery.isEmpty)
+                                      const SizedBox(width: AppSpacing.sm),
+                                    TextButton.icon(
+                                      icon:
+                                          const Icon(Icons.expand_less_rounded),
+                                      label: Text(context.l10n.showLess),
+                                      onPressed: () {
+                                        setState(() {
+                                          _userExpanded = false;
+                                          _historyLimit =
+                                              _persistedHistoryLimit;
+                                          _hasMore = true;
+                                          _updateStream();
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             );
           },
         ),

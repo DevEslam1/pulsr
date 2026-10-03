@@ -7911,4 +7911,15 @@ class AppLocalizationsAr extends AppLocalizations {
   String failedToApplyLabel(String label) {
     return 'تعذّر تطبيق $label';
   }
+
+  @override
+  String get bitPerfectConflictTitle =>
+      'تعطيل هذه الميزات لاستخدام Bit-Perfect؟';
+
+  @override
+  String get bitPerfectConflictBody =>
+      'يرسل Bit-Perfect الصوت الأصلي دون تعديل إلى DAC عبر USB. هذه الميزات تغيّر الصوت وهي غير متوافقة:';
+
+  @override
+  String get bitPerfectDisableAndEnable => 'تعطيل وتفعيل';
 }

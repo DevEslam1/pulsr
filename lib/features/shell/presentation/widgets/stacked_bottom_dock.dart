@@ -15,6 +15,7 @@ import '../../../../core/responsive/layout_delegate.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../bottom_nav_bar.dart';
 import 'dock_style_picker_sheet.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 enum DockStackMode {
   /// Default: MiniPlayer is placed above BottomNavBar in vertical order.
@@ -155,12 +156,9 @@ class StackedBottomDockState extends State<StackedBottomDock> {
       return navBarTotalHeight + _miniPlayerHeight + 4.0;
     }
     final isStacked = mode != DockStackMode.defaultLayout;
-    final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
     return !isStacked
         ? (navBarTotalHeight + _dockPillGap + _miniPlayerHeight)
-        : (isNavBarOnTop
-            ? (_peekOffset + _miniPlayerHeight)
-            : (navBarTotalHeight + _peekOffset));
+        : (_peekOffset + _miniPlayerHeight);
   }
 
   void _syncDock({required bool hasSong}) {
@@ -458,7 +456,8 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 miniPlayerBottom = 0.0;
                 miniPlayerScale = 1.0;
                 miniPlayerOpacity = 1.0;
-                navBarBottom = _peekOffset;
+                navBarBottom =
+                    _miniPlayerHeight - navBarTotalHeight + _peekOffset;
                 navBarScale = 0.95;
                 navBarOpacity = 0.70;
                 break;
@@ -474,13 +473,13 @@ class StackedBottomDockState extends State<StackedBottomDock> {
 
             final List<BoxShadow> stackedElevationShadow = [
               BoxShadow(
-                color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.20),
+                color: AppColors.scrimAt(p.isDark ? 0.45 : 0.20),
                 blurRadius: 18,
                 spreadRadius: 0,
                 offset: const Offset(0, -4),
               ),
               BoxShadow(
-                color: Colors.black.withValues(alpha: p.isDark ? 0.30 : 0.12),
+                color: AppColors.scrimAt(p.isDark ? 0.30 : 0.12),
                 blurRadius: 12,
                 spreadRadius: -1,
                 offset: const Offset(0, 4),

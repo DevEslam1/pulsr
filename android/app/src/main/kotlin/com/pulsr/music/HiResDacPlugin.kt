@@ -16,6 +16,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioAttributes
 import android.media.AudioTrack
 import android.os.Build
 import android.util.Log
@@ -87,6 +88,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private var eventSink: EventChannel.EventSink? = null
 
     private var bitPerfectRequested: Boolean = false
+    private val mediaAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+        .build()
     private var lastBitPerfectReason: String? = null
     private var selectedDeviceId: Int? = null
     /// True only when the platform actually accepted the preferred-device request.
@@ -219,15 +224,15 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             }
             "setBitPerfectMode" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
-                bitPerfectRequested = enabled
                 val success = applyBitPerfectMode(enabled)
+                if (success) bitPerfectRequested = enabled
                 notifyDeviceChange()
                 result.success(success)
             }
             "setBitPerfectModeDetailed" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
-                bitPerfectRequested = enabled
                 val success = applyBitPerfectMode(enabled)
+                if (success) bitPerfectRequested = enabled
                 notifyDeviceChange()
                 result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
             }
@@ -321,11 +326,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "setTargetOutputFormat", "configureTargetAudio" -> {
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
+                if (sampleRate !in setOf(0, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000) ||
+                    bitDepth !in setOf(0, 16, 24, 32)) {
+                    result.error("INVALID_FORMAT", "Unsupported target sample rate or bit depth", null)
+                    return
+                }
                 targetSampleRate = sampleRate
                 targetBitDepth = bitDepth
                 // Only the exclusive USB path can honour a requested format; re-arm
                 // it so the new target is negotiated rather than merely recorded.
                 val applied = if (bitPerfectRequested) applyBitPerfectMode(true) else false
+                if (bitPerfectRequested && !applied) {
+                    val reason = lastBitPerfectReason
+                    if (applyBitPerfectMode(false)) bitPerfectRequested = false
+                    lastBitPerfectReason = reason
+                }
                 notifyDeviceChange()
                 result.success(applied)
             }
@@ -916,7 +931,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
      * added in API 34 and exposed for USB sinks only. There is no wired
      * equivalent, so nothing else can honestly claim support.
      */
-    private fun isBitPerfectSupportedOnPlatform(): Boolean = Build.VERSION.SDK_INT >= 34
+    private fun isBitPerfectSupportedOnPlatform(): Boolean {
+        if (Build.VERSION.SDK_INT < 34 || audioManager == null) return false
+        val usb = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            .firstOrNull { isUsbOutputType(it.type) } ?: return false
+        return try {
+            audioManager.getSupportedMixerAttributes(usb).any { it.mixerBehavior == 1 }
+        } catch (_: Throwable) { false }
+    }
 
     private fun isDirectSupportedForDevice(device: AudioDeviceInfo?): Boolean {
         if (device == null) return false
@@ -968,7 +990,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
      */
     private fun selectMixerAttributes(supported: List<*>, strictTargetFormat: Boolean = false): Any? {
         val exclusive = supported.filterNotNull().filter { getMixerBehaviorCached(it) == 1 }
-        val pool = exclusive.ifEmpty { supported.filterNotNull() }
+        val pool = exclusive
         if (pool.isEmpty()) return null
         if (targetSampleRate > 0 || targetBitDepth > 0) {
             val match = pool.firstOrNull { attr ->
@@ -1010,13 +1032,25 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // USB path via AudioMixerAttributes (API 34) — true exclusive
         if (usbDevice != null) {
             if (Build.VERSION.SDK_INT < 34) {
-                lastBitPerfectReason = "requires_android_14_for_usb"
-                return false
+                lastBitPerfectReason = if (enabled) "requires_android_14_for_usb" else null
+                return !enabled
             }
             return try {
+                // Clearing is independent of the current capability list. A
+                // device can stop advertising formats after a route change.
+                if (!enabled) {
+                    var clearM = cachedClearMixerMethod
+                    if (clearM == null) {
+                        clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
+                        cachedClearMixerMethod = clearM
+                    }
+                    val ok = (clearM.invoke(audioManager, mediaAttributes, usbDevice) as? Boolean) ?: false
+                    lastBitPerfectReason = if (ok) null else "clear_mixer_attributes_failed"
+                    return ok
+                }
                 var getSupported = cachedGetSupportedMixerMethod
                 if (getSupported == null) {
-                    getSupported = AudioManager::class.java.getMethod("getSupportedAudioMixerAttributes", AudioDeviceInfo::class.java)
+                    getSupported = AudioManager::class.java.getMethod("getSupportedMixerAttributes", AudioDeviceInfo::class.java)
                     cachedGetSupportedMixerMethod = getSupported
                 }
                 val supportedAttributes = getSupported.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
@@ -1025,7 +1059,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     return false
                 }
                 if (enabled) {
-                    val selectedAttr = selectMixerAttributes(supportedAttributes)
+                    val selectedAttr = selectMixerAttributes(supportedAttributes, strictTargetFormat = true)
                     if (selectedAttr == null) {
                         if (lastBitPerfectReason == null) {
                             lastBitPerfectReason = "no_supported_mixer_attributes"
@@ -1035,20 +1069,20 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
                     var setM = cachedSetMixerMethod
                     if (setM == null) {
-                        setM = AudioManager::class.java.getMethod("setAudioMixerAttributes", AudioDeviceInfo::class.java, mixerAttrClass)
+                        setM = AudioManager::class.java.getMethod("setPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java, mixerAttrClass)
                         cachedSetMixerMethod = setM
                     }
-                    val ok = (setM.invoke(audioManager, usbDevice, selectedAttr) as? Boolean) ?: false
+                    val ok = (setM.invoke(audioManager, mediaAttributes, usbDevice, selectedAttr) as? Boolean) ?: false
                     lastBitPerfectReason = if (ok) null else "set_mixer_attributes_failed"
                     ok
                 } else {
                     var clearM = cachedClearMixerMethod
                     if (clearM == null) {
-                        clearM = AudioManager::class.java.getMethod("clearAudioMixerAttributes", AudioDeviceInfo::class.java)
+                        clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
                         cachedClearMixerMethod = clearM
                     }
-                    val ok = (clearM.invoke(audioManager, usbDevice) as? Boolean) ?: false
-                    lastBitPerfectReason = null
+                    val ok = (clearM.invoke(audioManager, mediaAttributes, usbDevice) as? Boolean) ?: false
+                    lastBitPerfectReason = if (ok) null else "clear_mixer_attributes_failed"
                     ok
                 }
             } catch (e: NoSuchMethodException) {
@@ -1297,10 +1331,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             try {
                 var getM = cachedGetMixerMethod
                 if (getM == null) {
-                    getM = AudioManager::class.java.getMethod("getAudioMixerAttributes", AudioDeviceInfo::class.java)
+                    getM = AudioManager::class.java.getMethod("getPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
                     cachedGetMixerMethod = getM
                 }
-                val currentAttr = getM.invoke(audioManager, usbDevice)
+                val currentAttr = getM.invoke(audioManager, mediaAttributes, usbDevice)
                 if (currentAttr != null) {
                     val behavior = getMixerBehaviorCached(currentAttr)
                     if (behavior == 1) {

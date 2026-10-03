@@ -8,7 +8,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
@@ -20,6 +20,7 @@ import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class ManagePlaylistScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
@@ -193,7 +194,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                 ? const SkeletonList(
                     padding: EdgeInsets.only(top: AppSpacing.xs))
                 : _loadError != null
-                    ? EmptyStateWidget(
+                    ? PulsrEmptyState(
                         icon: Icons.error_outline_rounded,
                         title: context.l10n.playlistLoadFailed,
                         subtitle: _loadError!,
@@ -435,6 +436,9 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
             ),
             if (_searchQuery.isNotEmpty)
               IconButton(
+                constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget),
                 icon:
                     Icon(Icons.close_rounded, color: p.textSecondary, size: 18),
                 tooltip: context.l10n.clear,
@@ -504,7 +508,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
         border: Border(top: BorderSide(color: p.hairline, width: 1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: AppColors.scrimAt(0.2),
             blurRadius: 10,
             offset: const Offset(0, -3),
           ),

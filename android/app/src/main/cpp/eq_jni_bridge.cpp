@@ -1207,8 +1207,11 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
             usb.WriteInterleaved(floatBuffer, frameCount, channels);
             std::memset(floatBuffer, 0,
                         static_cast<size_t>(frameCount) * channels * sizeof(float));
+            return processed;
         }
-        return processed;
+        // Negative frame count is an explicit bit-perfect acknowledgment. The
+        // Java PCM tap must skip its gain ramp and copy the original bytes.
+        return engine->wasLastBlockBitPerfect() ? -processed : processed;
     } catch (...) {
         return 0;
     }

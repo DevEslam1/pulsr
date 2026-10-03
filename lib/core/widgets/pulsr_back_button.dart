@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
 
+/// {@category DesignSystem}
 /// A unified back button widget that safely navigates to the previous route,
 /// falling back to the Home page ('/') if no routes can be popped.
 class PulsrBackButton extends StatelessWidget {
@@ -21,6 +23,9 @@ class PulsrBackButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return IconButton(
+      constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget),
       tooltip: MaterialLocalizations.of(context).backButtonTooltip,
       icon: Icon(
         Icons.arrow_back_rounded,

@@ -14,6 +14,7 @@ import 'waveform_seek_bar.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class PlayerSeekBar extends StatefulWidget {
   /// Position shown by the bar.
@@ -92,7 +93,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       );
     } on ProviderNotFoundException {
       // M-2: Only catch missing-provider failures, not all exceptions.
-      final fallback = getIt.isRegistered<SettingsCubit>() ? getIt<SettingsCubit>() : null;
+      final fallback =
+          getIt.isRegistered<SettingsCubit>() ? getIt<SettingsCubit>() : null;
       crossfadeSec = fallback?.state.crossfadeSeconds ?? 0.0;
     }
 
@@ -161,90 +163,97 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     return _withUpNext(seekWidget);
   }
 
-    /// Adds the "Up Next" strip below the seek bar (shared by every theme).
-    Widget _withUpNext(Widget seek) {
-      if (!widget.showUpNext) return seek;
-      final hasNext = context.select<PlayerCubit, bool>((c) {
-        final q = c.state.queue;
-        final i = c.state.currentIndex;
-        return i >= 0 && i + 1 < q.length && q[i + 1].title.isNotEmpty;
-      });
-      if (!hasNext) return seek;
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [seek, _upNextRow(context)],
-      );
+  /// Adds the "Up Next" strip below the seek bar (shared by every theme).
+  Widget _withUpNext(Widget seek) {
+    if (!widget.showUpNext) return seek;
+    final hasNext = context.select<PlayerCubit, bool>((c) {
+      final q = c.state.queue;
+      final i = c.state.currentIndex;
+      return i >= 0 && i + 1 < q.length && q[i + 1].title.isNotEmpty;
+    });
+    if (!hasNext) return seek;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [seek, _upNextRow(context)],
+    );
+  }
+
+  Widget _upNextRow(BuildContext context) {
+    final nextTrackInfo =
+        context.select<PlayerCubit, ({String title, String? artist})?>((c) {
+      final q = c.state.queue;
+      final i = c.state.currentIndex;
+      if (i < 0 || i + 1 >= q.length) return null;
+      final song = q[i + 1];
+      return (title: song.title, artist: song.artist);
+    });
+    if (nextTrackInfo == null || nextTrackInfo.title.isEmpty) {
+      return const SizedBox.shrink();
     }
 
-    Widget _upNextRow(BuildContext context) {
-      final nextTrackInfo = context.select<PlayerCubit, ({String title, String? artist})?>((c) {
-        final q = c.state.queue;
-        final i = c.state.currentIndex;
-        if (i < 0 || i + 1 >= q.length) return null;
-        final song = q[i + 1];
-        return (title: song.title, artist: song.artist);
-      });
-      if (nextTrackInfo == null || nextTrackInfo.title.isEmpty) return const SizedBox.shrink();
+    final p = context.palette;
+    final cubit = context.read<PlayerCubit>();
+    final displayText = (nextTrackInfo.artist != null &&
+            nextTrackInfo.artist!.isNotEmpty &&
+            !nextTrackInfo.title
+                .toLowerCase()
+                .contains(nextTrackInfo.artist!.toLowerCase()))
+        ? '${nextTrackInfo.artist} - ${nextTrackInfo.title}'
+        : nextTrackInfo.title;
 
-      final p = context.palette;
-      final cubit = context.read<PlayerCubit>();
-      final displayText = (nextTrackInfo.artist != null &&
-              nextTrackInfo.artist!.isNotEmpty &&
-              !nextTrackInfo.title.toLowerCase().contains(nextTrackInfo.artist!.toLowerCase()))
-          ? '${nextTrackInfo.artist} - ${nextTrackInfo.title}'
-          : nextTrackInfo.title;
-
-      return Padding(
-        padding: const EdgeInsetsDirectional.only(
-            start: AppSpacing.lg, end: AppSpacing.lg, top: AppSpacing.xxs),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            cubit.toggleQueueVisibility();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(AppRadii.r12),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
-                width: 0.8,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.skip_next_rounded, size: 14, color: widget.activeColor.withValues(alpha: 0.90)),
-                const SizedBox(width: AppSpacing.s6),
-                Text(
-                  'UP NEXT',
-                  style: TextStyle(
-                    color: widget.activeColor.withValues(alpha: 0.90),
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: AppTracking.overline,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    displayText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textSecondary,
-                      fontSize: AppFontSize.label,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+          start: AppSpacing.lg, end: AppSpacing.lg, top: AppSpacing.xxs),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          cubit.toggleQueueVisibility();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+          decoration: BoxDecoration(
+            color: AppColors.highlightSoft,
+            borderRadius: BorderRadius.circular(AppRadii.r12),
+            border: Border.all(
+              color: AppColors.specularAt(0.08),
+              width: 0.8,
             ),
           ),
+          child: Row(
+            children: [
+              Icon(Icons.skip_next_rounded,
+                  size: 14, color: widget.activeColor.withValues(alpha: 0.90)),
+              const SizedBox(width: AppSpacing.s6),
+              Text(
+                'UP NEXT',
+                style: TextStyle(
+                  color: widget.activeColor.withValues(alpha: 0.90),
+                  fontSize: AppFontSize.tiny,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: AppTracking.overline,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  displayText,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
   /// When no position was passed in (preferred path), narrow the position
   /// subscription to this subtree so per-tick rebuilds stop at the seek bar.
@@ -254,13 +263,15 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     return _PlayerPositionScope(builder: build);
   }
 
-  Widget _buildStandardSeekBar(BuildContext context, [double crossfadeSec = 0.0]) {
+  Widget _buildStandardSeekBar(BuildContext context,
+      [double crossfadeSec = 0.0]) {
     bool isPlaying = false;
     try {
       isPlaying = context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
     } on ProviderNotFoundException {
       // M-2: Only catch missing-provider failures, not all exceptions.
-      final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
+      final fallback =
+          getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       isPlaying = fallback?.state.isPlaying ?? false;
     }
     return _withPosition((position) {
@@ -299,56 +310,58 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 value: valueLabel,
                 increasedValue: increasedLabel,
                 decreasedValue: decreasedLabel,
-                onIncrease: () => widget.onSeek(
-                    clampDuration(currentDuration + const Duration(seconds: 10))),
-                onDecrease: () => widget.onSeek(
-                    clampDuration(currentDuration - const Duration(seconds: 10))),
+                onIncrease: () => widget.onSeek(clampDuration(
+                    currentDuration + const Duration(seconds: 10))),
+                onDecrease: () => widget.onSeek(clampDuration(
+                    currentDuration - const Duration(seconds: 10))),
                 child: RepaintBoundary(
                   child: PulsrSlider(
                     value: effectiveValue,
-                  min: 0.0,
-                  max: maxDuration > 0 ? maxDuration : 1.0,
-                  height: 32,
-                  semanticLabel: semanticLabel,
-                  activeColor: widget.activeColor,
-                  inactiveColor: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white.withValues(alpha: 0.14)
-                      : context.palette.hairline.withValues(alpha: 0.8),
-                  isWavy: true,
-                  animateWave: isPlaying,
-                  onChangeStart: (val) {
-                    _tapSeekPending = true;
-                    _tapSeekRatio = val.clamp(0.0, maxDuration.toDouble());
-                    setState(() => _dragValue = _tapSeekRatio);
-                  },
-                  onChanged: (val) {
-                    final clampedVal = val.clamp(0.0, maxDuration.toDouble());
-                    if (_tapSeekRatio != null && (clampedVal - _tapSeekRatio!).abs() > 200) {
-                      _tapSeekPending = false;
-                    }
-                    setState(() => _dragValue = clampedVal);
-                  },
-                  onChangeEnd: (val) {
-                    final target = (_tapSeekPending && _tapSeekRatio != null)
-                        ? _tapSeekRatio!.clamp(0.0, maxDuration.toDouble())
-                        : val.clamp(0.0, maxDuration.toDouble());
-                    widget.onSeek(Duration(milliseconds: target.round()));
-                    setState(() {
-                      _dragValue = null;
-                      _tapSeekPending = false;
-                      _tapSeekRatio = null;
-                    });
-                  },
-                  onChangeCancel: () {
-                    setState(() {
-                      _dragValue = null;
-                      _tapSeekPending = false;
-                      _tapSeekRatio = null;
-                    });
-                  },
+                    min: 0.0,
+                    max: maxDuration > 0 ? maxDuration : 1.0,
+                    height: 32,
+                    semanticLabel: semanticLabel,
+                    activeColor: widget.activeColor,
+                    inactiveColor:
+                        Theme.of(context).brightness == Brightness.dark
+                            ? AppColors.specularStrong
+                            : context.palette.hairline.withValues(alpha: 0.8),
+                    isWavy: true,
+                    animateWave: isPlaying,
+                    onChangeStart: (val) {
+                      _tapSeekPending = true;
+                      _tapSeekRatio = val.clamp(0.0, maxDuration.toDouble());
+                      setState(() => _dragValue = _tapSeekRatio);
+                    },
+                    onChanged: (val) {
+                      final clampedVal = val.clamp(0.0, maxDuration.toDouble());
+                      if (_tapSeekRatio != null &&
+                          (clampedVal - _tapSeekRatio!).abs() > 200) {
+                        _tapSeekPending = false;
+                      }
+                      setState(() => _dragValue = clampedVal);
+                    },
+                    onChangeEnd: (val) {
+                      final target = (_tapSeekPending && _tapSeekRatio != null)
+                          ? _tapSeekRatio!.clamp(0.0, maxDuration.toDouble())
+                          : val.clamp(0.0, maxDuration.toDouble());
+                      widget.onSeek(Duration(milliseconds: target.round()));
+                      setState(() {
+                        _dragValue = null;
+                        _tapSeekPending = false;
+                        _tapSeekRatio = null;
+                      });
+                    },
+                    onChangeCancel: () {
+                      setState(() {
+                        _dragValue = null;
+                        _tapSeekPending = false;
+                        _tapSeekRatio = null;
+                      });
+                    },
+                  ),
                 ),
               ),
-            ),
               const SizedBox(height: AppSpacing.s2),
               // Timestamps
               RepaintBoundary(
@@ -377,16 +390,20 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           Icon(
                             Icons.auto_awesome_rounded,
                             size: 11,
-                            color: context.palette.accent.withValues(alpha: 0.75),
+                            color:
+                                context.palette.accent.withValues(alpha: 0.75),
                           ),
                           const SizedBox(width: AppSpacing.xxs),
                           Text(
                             '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
                             style: TextStyle(
-                              color: context.palette.accent.withValues(alpha: 0.75),
+                              color: context.palette.accent
+                                  .withValues(alpha: 0.75),
                               fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
                             ),
                           ),
                         ],
@@ -423,7 +440,8 @@ class _PlayerPositionScope extends StatelessWidget {
       position = context.select<PlayerCubit, Duration>((c) => c.state.position);
     } on ProviderNotFoundException {
       // M-2: Only catch missing-provider failures, not all exceptions.
-      final fallback = getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
+      final fallback =
+          getIt.isRegistered<PlayerCubit>() ? getIt<PlayerCubit>() : null;
       position = fallback?.state.position ?? Duration.zero;
     }
     return builder(position);

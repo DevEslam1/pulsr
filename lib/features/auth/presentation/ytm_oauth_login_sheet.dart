@@ -353,6 +353,9 @@ class _YtmOAuthLoginSheetState extends State<YtmOAuthLoginSheet> {
             ),
           ),
           IconButton(
+            constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget),
             onPressed: () => _copy(value, label),
             icon: Icon(Icons.copy_rounded, color: p.accent, size: 20),
             tooltip: context.l10n.browseCopy,

@@ -12,6 +12,7 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 // ============================================================================
 // Title formatters
@@ -374,7 +375,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                   final isSelected = t.mode == _selectedMode;
                   return AnimatedScale(
                     scale: isSelected ? 1.0 : 0.92,
-                    duration: const Duration(milliseconds: 200),
+                    duration: PulsrMotion.state,
                     child: GestureDetector(
                       onTap: () {
                         setState(() => _selectedMode = t.mode);
@@ -452,7 +453,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                           widget.cubit.setPlayerThemeMode(t.mode);
                           _pageController.animateToPage(
                             index,
-                            duration: const Duration(milliseconds: 250),
+                            duration: PulsrMotion.standard,
                             curve: Curves.easeOutCubic,
                           );
                         },

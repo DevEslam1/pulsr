@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 /// A premium, interactive custom-painted slider with an organic wavy track.
 ///
 /// Features:
@@ -419,7 +421,7 @@ class _PulsrSliderPainter extends CustomPainter {
 
     // 4. Drop shadow for thumb elevation
     final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.3)
+      ..color = AppColors.scrimAt(0.3)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
     canvas.drawCircle(Offset(thumbX, centerY + 1.5), thumbRadius, shadowPaint);
 

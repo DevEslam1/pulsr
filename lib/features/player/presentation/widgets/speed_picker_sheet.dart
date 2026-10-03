@@ -10,6 +10,7 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:flutter/services.dart';
 
 class SpeedPickerSheet extends StatelessWidget {
   const SpeedPickerSheet({super.key});
@@ -109,166 +110,173 @@ class SpeedPickerSheet extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      context.l10n.playbackSpeed,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: p.textPrimary,
-                          ),
-                    ),
-                    if (currentSpeed != 1.0)
-                      TextButton(
-                        onPressed: () => cubit.setPlaybackSpeed(1.0),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(context.l10n.reset,
-                            style: TextStyle(
-                                color: p.accent,
-                                fontSize: AppFontSize.bodySmall)),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  context.l10n.currentSpeed(formatSpeed(currentSpeed)),
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                ),
-                const SizedBox(height: AppSpacing.s14),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    children: options.map((speed) {
-                      final isSelected = (currentSpeed == speed);
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.xs),
-                        child: ChoiceChip(
-                          label: Text(formatSpeed(speed)),
-                          selected: isSelected,
-                          selectedColor: p.accent.withValues(alpha: 0.2),
-                          backgroundColor: p.surfaceContainer,
-                          labelStyle: TextStyle(
-                            color: isSelected ? p.accent : p.textPrimary,
-                            fontWeight:
-                                isSelected ? FontWeight.w800 : FontWeight.w500,
-                          ),
-                          side: BorderSide(
-                            color: isSelected ? p.accent : p.hairline,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              cubit.setPlaybackSpeed(speed);
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Divider(color: p.hairline),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      context.l10n.pitchShift,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: p.textPrimary,
-                          ),
-                    ),
-                    if ((currentPitch - 1.0).abs() > 0.01)
-                      TextButton(
-                        onPressed: () => cubit.setPlaybackPitch(1.0),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(context.l10n.reset,
-                            style: TextStyle(
-                                color: p.accent,
-                                fontSize: AppFontSize.bodySmall)),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s6),
-                Text(
-                  (currentPitch - 1.0).abs() < 0.01
-                      ? context.l10n.dspOriginalPitch
-                      : '${semitones > 0 ? '+' : ''}$semitones semitones (${currentPitch.toStringAsFixed(2)}x)',
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                PulsrSlider(
-                  value: currentPitch.clamp(0.5, 2.0),
-                  min: 0.5,
-                  max: 2.0,
-                  divisions: 30,
-                  semanticLabel: context.l10n.pitchShift,
-                  onChanged: (value) {
-                    cubit.setPlaybackPitch(value);
-                  },
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      0.75,
-                      0.85,
-                      0.9,
-                      1.0,
-                      1.1,
-                      1.15,
-                      1.25,
-                    ].map((pitch) {
-                      final isSelected = (currentPitch - pitch).abs() < 0.02;
-                      final label = pitch == 1.0
-                          ? context.l10n.dspNormal
-                          : '${pitch > 1.0 ? '+' : ''}${((pitch - 1.0) * 100).round()}%';
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.xs),
-                        child: ChoiceChip(
-                          label: Text(label),
-                          selected: isSelected,
-                          selectedColor: p.accent.withValues(alpha: 0.2),
-                          backgroundColor: p.surfaceContainer,
-                          labelStyle: TextStyle(
-                            color: isSelected ? p.accent : p.textPrimary,
-                            fontWeight:
-                                isSelected ? FontWeight.w800 : FontWeight.w500,
-                            fontSize: AppFontSize.label,
+                      Text(
+                        context.l10n.playbackSpeed,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: p.textPrimary,
+                            ),
+                      ),
+                      if (currentSpeed != 1.0)
+                        TextButton(
+                          onPressed: () => cubit.setPlaybackSpeed(1.0),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          side: BorderSide(
-                            color: isSelected ? p.accent : p.hairline,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              cubit.setPlaybackPitch(pitch);
-                            }
-                          },
+                          child: Text(context.l10n.reset,
+                              style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.bodySmall)),
                         ),
-                      );
-                    }).toList(),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    context.l10n.currentSpeed(formatSpeed(currentSpeed)),
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall),
+                  ),
+                  const SizedBox(height: AppSpacing.s14),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: options.map((speed) {
+                        final isSelected = (currentSpeed == speed);
+                        return Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                              end: AppSpacing.xs),
+                          child: ChoiceChip(
+                            label: Text(formatSpeed(speed)),
+                            selected: isSelected,
+                            selectedColor: p.accent.withValues(alpha: 0.2),
+                            backgroundColor: p.surfaceContainer,
+                            labelStyle: TextStyle(
+                              color: isSelected ? p.accent : p.textPrimary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
+                            ),
+                            side: BorderSide(
+                              color: isSelected ? p.accent : p.hairline,
+                            ),
+                            onSelected: (selected) {
+                              HapticFeedback.selectionClick();
+                              if (selected) {
+                                cubit.setPlaybackSpeed(speed);
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Divider(color: p.hairline),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        context.l10n.pitchShift,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: p.textPrimary,
+                                ),
+                      ),
+                      if ((currentPitch - 1.0).abs() > 0.01)
+                        TextButton(
+                          onPressed: () => cubit.setPlaybackPitch(1.0),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(context.l10n.reset,
+                              style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.bodySmall)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s6),
+                  Text(
+                    (currentPitch - 1.0).abs() < 0.01
+                        ? context.l10n.dspOriginalPitch
+                        : '${semitones > 0 ? '+' : ''}$semitones semitones (${currentPitch.toStringAsFixed(2)}x)',
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  PulsrSlider(
+                    value: currentPitch.clamp(0.5, 2.0),
+                    min: 0.5,
+                    max: 2.0,
+                    divisions: 30,
+                    semanticLabel: context.l10n.pitchShift,
+                    onChanged: (value) {
+                      cubit.setPlaybackPitch(value);
+                    },
+                  ),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        0.75,
+                        0.85,
+                        0.9,
+                        1.0,
+                        1.1,
+                        1.15,
+                        1.25,
+                      ].map((pitch) {
+                        final isSelected = (currentPitch - pitch).abs() < 0.02;
+                        final label = pitch == 1.0
+                            ? context.l10n.dspNormal
+                            : '${pitch > 1.0 ? '+' : ''}${((pitch - 1.0) * 100).round()}%';
+                        return Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                              end: AppSpacing.xs),
+                          child: ChoiceChip(
+                            label: Text(label),
+                            selected: isSelected,
+                            selectedColor: p.accent.withValues(alpha: 0.2),
+                            backgroundColor: p.surfaceContainer,
+                            labelStyle: TextStyle(
+                              color: isSelected ? p.accent : p.textPrimary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
+                              fontSize: AppFontSize.label,
+                            ),
+                            side: BorderSide(
+                              color: isSelected ? p.accent : p.hairline,
+                            ),
+                            onSelected: (selected) {
+                              HapticFeedback.selectionClick();
+                              if (selected) {
+                                cubit.setPlaybackPitch(pitch);
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
+        );
       },
     );
   }

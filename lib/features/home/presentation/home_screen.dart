@@ -1,75 +1,42 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../../core/widgets/empty_state_widget.dart';
-import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
-import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_logo.dart';
-import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
-import '../../../core/widgets/section_header.dart';
-import '../../../core/widgets/pulsr_static_grid.dart';
-import '../../../core/widgets/shimmer_skeleton.dart';
-import '../../../core/widgets/staggered_reveal.dart';
-import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
-import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
-import '../../../core/errors/failures.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../sheets/song_info_sheet.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
-import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
-import '../../../domain/models/ytm_track.dart';
-import '../../ytm_search/cubit/ytm_download_cubit.dart';
-import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../cubit/home_cubit.dart';
+import 'widgets/discovery_chip.dart';
+import 'widgets/online_category_section.dart';
+import 'widgets/quick_actions_row.dart';
+import 'widgets/quick_card.dart';
+import 'widgets/quick_discovery_header.dart';
+import 'widgets/recently_added_section.dart';
+import 'widgets/recently_played_section.dart';
+
+export 'widgets/quick_actions_row.dart';
+export 'widgets/quick_card.dart';
 
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
-import '../../../core/responsive/responsive_values.dart';
-import '../../../core/responsive/adaptive_grid.dart';
-import '../../../core/responsive/pulsr_responsive_tokens.dart';
-
-/// Scales a fixed two-line card title box (34px at the default text size) with
-/// the user's Dynamic Type setting so large text never clips. Pixel-identical
-/// at the 1.0x scale.
-double _scaledTitleBoxHeight(BuildContext context) {
-  final base = Adaptive.isTablet(context) ? AppSpacing.s38 : 34.0;
-  return MediaQuery.textScalerOf(context).scale(base).clamp(base, 78.0);
-}
-
-/// Dynamically calculates the carousel height to comfortably fit card artwork,
-/// dynamic text-scaled title box, artist line, and padding without overflowing.
-double _scaledCarouselHeight(BuildContext context, bool isTablet) {
-  final cardWidth =
-      context.responsive.value(compact: 138.0, medium: 150.0, expanded: 158.0);
-  final titleHeight = _scaledTitleBoxHeight(context);
-  final textScale = MediaQuery.textScalerOf(context).scale(14.0);
-  final artistHeight = textScale * 1.35;
-  return cardWidth +
-      AppSpacing.xs +
-      titleHeight +
-      AppSpacing.s2 +
-      artistHeight +
-      12.0;
-}
+import 'package:pulsr/core/motion/pulsr_motion.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatelessWidget {
   final YtmService? ytmService;
@@ -363,41 +330,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                               visualDensity: VisualDensity.compact,
                             ),
                           ),
-                        Semantics(
-                          button: true,
-                          label: context.l10n.settings,
-                          child: PulsrPressable(
-                            pressedScale: 0.94,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              context.push('/settings');
-                            },
-                            child: Tooltip(
-                              message: context.l10n.settings,
-                              child: Container(
-                                padding: const EdgeInsets.all(AppSpacing.s10),
-                                decoration: BoxDecoration(
-                                  color: p.accentContainer,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.r16),
-                                  border: Border.all(color: p.hairline),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: p.glow,
-                                        blurRadius: 24,
-                                        spreadRadius: -4,
-                                        offset: const Offset(0, 8)),
-                                  ],
-                                ),
-                                child: PulsrLogo(
-                                    size: 26,
-                                    color: p.accent,
-                                    glowColor: p.glow,
-                                    animate: false),
-                              ),
-                            ),
-                          ),
-                        ),
+                        PulsrLogo(
+                            size: 26,
+                            color: p.accent,
+                            glowColor: p.glow,
+                            animate: false),
                       ],
                     ),
                   ),
@@ -450,6 +387,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                               child: Text(context.l10n.openSettings),
                             ),
                             IconButton(
+                              constraints: const BoxConstraints(
+                                  minWidth: AppSpacing.minTouchTarget,
+                                  minHeight: AppSpacing.minTouchTarget),
                               icon: const Icon(Icons.close, size: 16),
                               tooltip: context.l10n.close,
                               // Hide for this session only. Clearing the
@@ -520,7 +460,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                           horizontal: Adaptive.pagePadding(context)),
                       children: [
                         if (AppConfig.ytmEnabled && !offlineOnly) ...[
-                          _DiscoveryChip(
+                          DiscoveryChip(
                             icon: Icons.explore_rounded,
                             label: context.l10n.ytmExplore,
                             iconColor: p.primary,
@@ -528,14 +468,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                           ),
                           const SizedBox(width: AppSpacing.sm),
                         ],
-                        _DiscoveryChip(
+                        DiscoveryChip(
                           icon: Icons.radio_rounded,
                           label: context.l10n.radioTitle,
                           iconColor: p.warning,
                           onTap: () => context.push('/radio'),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        _DiscoveryChip(
+                        DiscoveryChip(
                           icon: Icons.queue_music_rounded,
                           label: context.l10n.queue,
                           iconColor: p.info,
@@ -543,7 +483,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         ),
                         if (AppConfig.ytmEnabled && !offlineOnly) ...[
                           const SizedBox(width: AppSpacing.sm),
-                          _DiscoveryChip(
+                          DiscoveryChip(
                             icon: Icons.downloading_rounded,
                             label: context.l10n.downloadsTitle,
                             iconColor: p.success,
@@ -551,7 +491,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                           ),
                         ],
                         const SizedBox(width: AppSpacing.sm),
-                        _DiscoveryChip(
+                        DiscoveryChip(
                           icon: Icons.apps_rounded,
                           label: context.l10n.browseMoreTools,
                           iconColor: p.textSecondary,
@@ -564,7 +504,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
                   // ---------- Content (Local vs Online) ----------
                   AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
+                    duration: PulsrMotion.standard,
                     switchInCurve: Curves.easeOutCubic,
                     switchOutCurve: Curves.easeInCubic,
                     child: KeyedSubtree(
@@ -686,7 +626,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ---------- Quick Discovery Header (Row 2) ----------
-        const _QuickDiscoveryHeader(),
+        const QuickDiscoveryHeader(),
         const SizedBox(height: AppSpacing.sm),
 
         // ---------- Quick actions ----------
@@ -696,14 +636,14 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           child: _buildQuickActionsRow(
             context,
             [
-              _QuickCard(
+              QuickCard(
                 title: context.l10n.favorites,
                 subtitle: context.l10n.likedTracks,
                 icon: Icons.favorite_rounded,
                 color: p.favorite,
                 onTap: () => context.push('/favorites'),
               ),
-              _QuickCard(
+              QuickCard(
                 title: context.l10n.dailyDrive,
                 subtitle: context.l10n.autoMix,
                 icon: Icons.directions_car_rounded,
@@ -716,7 +656,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   }
                 },
               ),
-              _QuickCard(
+              QuickCard(
                 title: context.l10n.focusFlow,
                 subtitle: context.l10n.topPlayedTracks,
                 icon: Icons.headphones_rounded,
@@ -741,7 +681,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         // rebuild claim (04-01) was overstated — emissions are already scoped
         // to the StreamBuilders below.
         RepaintBoundary(
-          child: _RecentlyPlayedSection(
+          child: RecentlyPlayedSection(
             getSongsUseCase: getSongsUseCase,
             isTablet: isTablet,
           ),
@@ -749,7 +689,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
         // ---------- Recently added (lazy loaded in 50-song batches) ----------
         RepaintBoundary(
-          child: _RecentlyAddedSection(
+          child: RecentlyAddedSection(
             getSongsUseCase: getSongsUseCase,
           ),
         ),
@@ -841,7 +781,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           child: _buildQuickActionsRow(
             context,
             [
-              _QuickCard(
+              QuickCard(
                 title: _ytmAccountService.isLoggedIn
                     ? context.l10n.browseForYou
                     : context.l10n.browseTopHits,
@@ -858,7 +798,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         ? 'Recommended For You'
                         : 'Global Top Hits'),
               ),
-              _QuickCard(
+              QuickCard(
                 title: context.l10n.newReleases,
                 subtitle: context.l10n.browseTrending,
                 icon: Icons.fiber_new_rounded,
@@ -866,7 +806,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                 onTap: () =>
                     setState(() => _selectedOnlineCategory = 'New Releases'),
               ),
-              _QuickCard(
+              QuickCard(
                 title: context.l10n.browseChillLofi,
                 subtitle: context.l10n.browseRelaxing,
                 icon: Icons.spa_rounded,
@@ -902,6 +842,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     label: Text(_categoryLabel(context, cat)),
                     selected: _selectedOnlineCategory == cat,
                     onSelected: (selected) {
+                      HapticFeedback.selectionClick();
                       if (selected) {
                         setState(() => _selectedOnlineCategory = cat);
                       }
@@ -933,10 +874,10 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
+          duration: PulsrMotion.standard,
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
-          child: _OnlineCategorySection(
+          child: OnlineCategorySection(
             key: PageStorageKey('online_cat_$_selectedOnlineCategory'),
             title: _selectedOnlineCategory == 'Recommended For You'
                 ? context.l10n.browseRecommendedYtmTitle
@@ -954,1247 +895,6 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _OnlineCategorySection extends StatefulWidget {
-  final String title;
-  final Future<List<YtmTrack>> future;
-  final PlayerCubit playerCubit;
-  final VoidCallback onRetry;
-
-  const _OnlineCategorySection({
-    super.key,
-    required this.title,
-    required this.future,
-    required this.playerCubit,
-    required this.onRetry,
-  });
-
-  @override
-  State<_OnlineCategorySection> createState() => _OnlineCategorySectionState();
-}
-
-class _OnlineCategorySectionState extends State<_OnlineCategorySection> {
-  /// One background pre-resolve of the list head per loaded category, so the
-  /// first tap doesn't pay the full network resolve.
-  bool _warmedFirst = false;
-
-  @override
-  void didUpdateWidget(_OnlineCategorySection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.title != oldWidget.title || widget.future != oldWidget.future) {
-      _warmedFirst = false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final isTablet = Adaptive.isTablet(context);
-    final size = context.responsive
-        .value(compact: 138.0, medium: 150.0, expanded: 158.0);
-
-    return FutureBuilder<List<YtmTrack>>(
-      future: widget.future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(title: widget.title),
-              SizedBox(
-                height: _scaledCarouselHeight(context, isTablet),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  itemCount: 4,
-                  itemBuilder: (context, index) => Padding(
-                    padding:
-                        const EdgeInsetsDirectional.only(end: AppSpacing.s14),
-                    child: SizedBox(
-                      width: size,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SkeletonBox(
-                              width: size, height: size, radius: AppRadii.r18),
-                          const SizedBox(height: AppSpacing.xs),
-                          SkeletonLine(width: size * 0.75, height: 12),
-                          const SizedBox(height: AppSpacing.s6),
-                          SkeletonLine(width: size * 0.45, height: 10),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-
-        if (snapshot.hasError || (snapshot.data ?? const []).isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.wifi_tethering_error_rounded,
-                      color: p.textTertiary, size: 38),
-                  const SizedBox(height: AppSpacing.s10),
-                  Text(
-                    context.l10n.loadSongsFailed(widget.title),
-                    style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.bodySmall),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextButton.icon(
-                    onPressed: widget.onRetry,
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: Text(context.l10n.retry),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        final tracks = snapshot.data!;
-        final songs = [for (final track in tracks) track.toSongData()];
-        if (!_warmedFirst && songs.isNotEmpty) {
-          _warmedFirst = true;
-          // Warm the top couple of a carousel (kept low: home renders several
-          // carousels, so a larger count would burst resolves across them).
-          widget.playerCubit.warmStreams(songs, count: 2);
-        }
-        final ytmCubit = getIt.isRegistered<YtmDownloadCubit>()
-            ? getIt<YtmDownloadCubit>()
-            : null;
-        final content = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(title: widget.title),
-            SizedBox(
-              height: _scaledCarouselHeight(context, isTablet),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: true,
-                padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
-                itemCount: songs.length,
-                itemBuilder: (context, index) {
-                  final song = songs[index];
-                  return StaggeredReveal(
-                    index: index,
-                    horizontal: true,
-                    groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                    child: _TrendingCard(
-                      song: song,
-                      onTap: () =>
-                          widget.playerCubit.playSong(song, queue: songs),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SectionHeader(
-                title:
-                    '${context.l10n.browseTopChartsSongs} (${songs.length})'),
-            if (context.trackGridColumns > 1)
-              PulsrStaticGrid(
-                crossAxisCount: context.trackGridColumns,
-                mainAxisExtent: 72,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 4,
-                padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
-                itemCount: songs.length,
-                itemBuilder: (context, i) => StaggeredReveal(
-                  index: i,
-                  groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                  child: SongTile(
-                    song: songs[i],
-                    index: i,
-                    onTap: () =>
-                        widget.playerCubit.playSong(songs[i], queue: songs),
-                    trailing: YtmDownloadButton(song: songs[i]),
-                    onMorePressed: () =>
-                        SongInfoSheet.show(context, song: songs[i]),
-                  ),
-                ),
-              )
-            else
-              for (int i = 0; i < songs.length; i++)
-                StaggeredReveal(
-                  index: i,
-                  groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                  child: SongTile(
-                    song: songs[i],
-                    index: i,
-                    onTap: () =>
-                        widget.playerCubit.playSong(songs[i], queue: songs),
-                    trailing: YtmDownloadButton(song: songs[i]),
-                    onMorePressed: () =>
-                        SongInfoSheet.show(context, song: songs[i]),
-                  ),
-                ),
-          ],
-        );
-        if (ytmCubit != null) {
-          return BlocProvider<YtmDownloadCubit>.value(
-            value: ytmCubit,
-            child: content,
-          );
-        }
-        return content;
-      },
-    );
-  }
-}
-
-class _DiscoveryChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color iconColor;
-  final VoidCallback onTap;
-
-  const _DiscoveryChip({
-    required this.icon,
-    required this.label,
-    required this.iconColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Semantics(
-      button: true,
-      label: label,
-      child: Material(
-        color: p.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppRadii.r14),
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap();
-          },
-          borderRadius: BorderRadius.circular(AppRadii.r14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadii.r14),
-              border: Border.all(color: p.hairline),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 15, color: iconColor),
-                const SizedBox(width: AppSpacing.s6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: p.textPrimary,
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrendingCard extends StatelessWidget {
-  final SongsTableData song;
-  final VoidCallback onTap;
-
-  const _TrendingCard({required this.song, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final size = context.responsive
-        .value(compact: 138.0, medium: 150.0, expanded: 158.0);
-
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(end: AppSpacing.s14),
-      child: Semantics(
-        button: true,
-        label: '${song.title}, ${song.artist}',
-        hint: context.l10n.play,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.r20),
-          onTap: onTap,
-          child: SizedBox(
-            width: size,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Stack(
-                  children: [
-                    CachedArtwork(
-                      id: song.id,
-                      remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                      albumId: song.albumId,
-                      type: ArtworkType.AUDIO,
-                      size: size,
-                      borderRadius: AppRadii.r18,
-                    ),
-                    // Scrim keeps the download icon legible over arbitrary artwork.
-                    PositionedDirectional(
-                      end: 6,
-                      bottom: 6,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 44,
-                            minHeight: 44,
-                          ),
-                          child: Center(
-                            child: YtmDownloadButton(song: song),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                SizedBox(
-                  height: _scaledTitleBoxHeight(context),
-                  child: Text(
-                    song.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: AppFontSize.label,
-                      height: 1.25,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s2),
-                Text(
-                  song.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.label),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class QuickActionsRow extends StatelessWidget {
-  final List<Widget> cards;
-
-  const QuickActionsRow({super.key, required this.cards});
-
-  @override
-  Widget build(BuildContext context) {
-    final vp = PulsrViewport.of(context);
-    if (vp.isShortHeight) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          children: [
-            for (int i = 0; i < cards.length; i++) ...[
-              if (i > 0) const SizedBox(width: AppSpacing.s10),
-              SizedBox(width: 140, child: cards[i]),
-            ],
-          ],
-        ),
-      );
-    }
-    final isNarrow = vp.width < 360;
-    if (isNarrow && cards.length == 3) {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: cards[0]),
-              const SizedBox(width: AppSpacing.s10),
-              Expanded(child: cards[1]),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s10),
-          Row(
-            children: [
-              Expanded(child: cards[2]),
-              const SizedBox(width: AppSpacing.s10),
-              const Expanded(child: SizedBox.shrink()),
-            ],
-          ),
-        ],
-      );
-    }
-    return Row(
-      children: [
-        for (int i = 0; i < cards.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppSpacing.s10),
-          Expanded(child: cards[i]),
-        ],
-      ],
-    );
-  }
-}
-
-class QuickCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const QuickCard({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final isCompact = MediaQuery.sizeOf(context).width < 380;
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.r18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.r18),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isCompact ? 10 : 12,
-            vertical: isCompact ? 10 : 12,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                color.withValues(alpha: 0.16),
-                color.withValues(alpha: 0.03)
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(AppRadii.r18),
-            border: Border.all(color: p.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: EdgeInsets.all(isCompact ? 6 : 7),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: isCompact ? 17 : 19),
-              ),
-              SizedBox(height: isCompact ? 8 : 10),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize:
-                      isCompact ? AppFontSize.label : AppFontSize.bodySmall,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: isCompact ? AppFontSize.tiny : AppFontSize.caption,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-typedef _QuickCard = QuickCard;
-
-class _QuickDiscoveryHeader extends StatelessWidget {
-  const _QuickDiscoveryHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final items = [
-      (
-        icon: Icons.person_rounded,
-        label: context.l10n.artists,
-        color: p.accent,
-        onTap: () => context.push('/library?tab=artists'),
-      ),
-      (
-        icon: Icons.album_rounded,
-        label: context.l10n.albums,
-        color: p.error,
-        onTap: () => context.push('/library?tab=albums'),
-      ),
-      (
-        icon: Icons.folder_rounded,
-        label: context.l10n.folders,
-        color: AppColors.mint,
-        onTap: () => context.push('/library?tab=folders'),
-      ),
-      (
-        icon: Icons.calendar_month_rounded,
-        label: context.l10n.decades,
-        color: p.warning,
-        onTap: () => context.push('/year'),
-      ),
-      (
-        icon: Icons.history_rounded,
-        label: context.l10n.recentlyAdded,
-        color: p.info,
-        onTap: () => context.push('/recents'),
-      ),
-    ];
-
-    return SizedBox(
-      height: 48.0,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: EdgeInsets.symmetric(
-          horizontal: Adaptive.pagePadding(context),
-        ),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return _DiscoveryChip(
-            icon: item.icon,
-            label: item.label,
-            iconColor: item.color,
-            onTap: item.onTap,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _RecentlyPlayedSection extends StatefulWidget {
-  final GetSongsUseCase getSongsUseCase;
-  final bool isTablet;
-
-  const _RecentlyPlayedSection({
-    required this.getSongsUseCase,
-    required this.isTablet,
-  });
-
-  @override
-  State<_RecentlyPlayedSection> createState() => _RecentlyPlayedSectionState();
-}
-
-class _RecentlyPlayedSectionState extends State<_RecentlyPlayedSection> {
-  static const int _pageSize = 50;
-  int _currentLimit = _pageSize;
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.position.pixels;
-
-    // Trigger next batch when scrolling within 250px of the horizontal end
-    if (maxScroll - currentScroll <= 250) {
-      _loadMore();
-    }
-  }
-
-  bool _isLoadingMore = false;
-
-  void _loadMore() {
-    if (_isLoadingMore) return;
-    _isLoadingMore = true;
-    setState(() {
-      _currentLimit += _pageSize;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _isLoadingMore = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final playerCubit = context.read<PlayerCubit>();
-
-    return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: widget.getSongsUseCase
-          .watchRecentlyPlayed(limit: _currentLimit)
-          .distinct(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _SectionError(onRetry: () => setState(() {}));
-        }
-        final songs =
-            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-
-        if (songs.isEmpty) return const SizedBox.shrink();
-
-        final hasMore = songs.length >= _currentLimit;
-        final size = widget.isTablet ? 158.0 : 138.0;
-        final totalItemCount = songs.length + (hasMore ? 1 : 0);
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(
-                title: context.l10n.recentlyPlayed,
-                actionLabel: context.l10n.browseSeeAll,
-                onAction: () => context.push('/recents'),
-              ),
-              SizedBox(
-                height: _scaledCarouselHeight(context, widget.isTablet),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  itemCount: totalItemCount,
-                  itemBuilder: (context, index) {
-                    if (index >= songs.length) {
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.s14),
-                        child: Container(
-                          width: size,
-                          height: size,
-                          decoration: BoxDecoration(
-                            color: p.surfaceCard.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(AppRadii.r18),
-                            border: Border.all(color: p.hairline),
-                          ),
-                          child: Center(
-                            child: SizedBox(
-                              width: AppSpacing.lg,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(p.accent),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    final song = songs[index];
-                    return StaggeredReveal(
-                      index: index,
-                      horizontal: true,
-                      groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            end: AppSpacing.s14),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(AppRadii.r20),
-                          onTap: () => playerCubit.playSong(song, queue: songs),
-                          child: SizedBox(
-                            width: size,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Stack(
-                                  children: [
-                                    CachedArtwork(
-                                      id: song.id,
-                                      remoteUrl: song.remoteArtworkUrl ??
-                                          song.artworkUri,
-                                      albumId: song.albumId,
-                                      type: ArtworkType.AUDIO,
-                                      size: size,
-                                      borderRadius: AppRadii.r18,
-                                    ),
-                                    PositionedDirectional(
-                                      end: 8,
-                                      bottom: 8,
-                                      child: ExcludeSemantics(
-                                        child: Container(
-                                          width: 34,
-                                          height: 34,
-                                          decoration: BoxDecoration(
-                                            color: p.accent,
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                  color: p.glow,
-                                                  blurRadius: 14,
-                                                  spreadRadius: 1),
-                                            ],
-                                          ),
-                                          child: Icon(Icons.play_arrow_rounded,
-                                              color: p.onAccent, size: 22),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: AppSpacing.xs),
-                                SizedBox(
-                                  height: _scaledTitleBoxHeight(context),
-                                  child: Text(
-                                    song.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: AppFontSize.label,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.s2),
-                                Text(
-                                  song.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _RecentlyAddedSection extends StatefulWidget {
-  final GetSongsUseCase getSongsUseCase;
-
-  const _RecentlyAddedSection({
-    required this.getSongsUseCase,
-  });
-
-  @override
-  State<_RecentlyAddedSection> createState() => _RecentlyAddedSectionState();
-}
-
-class _RecentlyAddedSectionState extends State<_RecentlyAddedSection> {
-  static const int _pageSize = 50;
-  int _currentLimit = _pageSize;
-  bool _isLoadingMore = false;
-  Timer? _loadMoreTimeoutTimer;
-
-  void _loadMore() {
-    if (_isLoadingMore) return;
-    _loadMoreTimeoutTimer?.cancel();
-    setState(() {
-      _isLoadingMore = true;
-      _currentLimit += _pageSize;
-    });
-    _loadMoreTimeoutTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && _isLoadingMore) {
-        setState(() => _isLoadingMore = false);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _loadMoreTimeoutTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final playerCubit = context.read<PlayerCubit>();
-    final columns = PulsrAdaptiveGrid.songColumns(context);
-
-    return StreamBuilder<Result<List<SongsTableData>>>(
-      stream: widget.getSongsUseCase
-          .watchRecentlyAdded(limit: _currentLimit)
-          .distinct(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          if (_isLoadingMore) {
-            _loadMoreTimeoutTimer?.cancel();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _isLoadingMore) {
-                setState(() => _isLoadingMore = false);
-              }
-            });
-          }
-          return _SectionError(onRetry: () => setState(() {}));
-        }
-        final songs =
-            snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
-
-        if (songs.isEmpty) {
-          if (_isLoadingMore) {
-            _loadMoreTimeoutTimer?.cancel();
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _isLoadingMore) {
-                setState(() => _isLoadingMore = false);
-              }
-            });
-          }
-          return const _EmptyLibrary();
-        }
-
-        final hasMore = songs.length >= _currentLimit;
-        // As soon as the active stream emits, clear the guard so "Load more"
-        // does not remain stuck when reaching the end of the collection.
-        if (_isLoadingMore &&
-            snapshot.connectionState != ConnectionState.waiting) {
-          _loadMoreTimeoutTimer?.cancel();
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _isLoadingMore) {
-              setState(() => _isLoadingMore = false);
-            }
-          });
-        }
-        final loading = _isLoadingMore;
-        final totalItemCount = songs.length + (hasMore ? 1 : 0);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              title: context.l10n.recentlyAdded,
-              actionLabel: context.l10n.browseSeeAll,
-              onAction: () => context.push('/library'),
-              padding: EdgeInsetsDirectional.fromSTEB(
-                Adaptive.pagePadding(context),
-                AppSpacing.xs,
-                Adaptive.pagePadding(context),
-                AppSpacing.xs,
-              ),
-            ),
-            if (columns > 1)
-              PulsrStaticGrid(
-                crossAxisCount: columns,
-                mainAxisExtent: 72,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 4,
-                padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
-                itemCount: totalItemCount,
-                itemBuilder: (context, index) {
-                  if (index >= songs.length) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.sm),
-                        child: OutlinedButton.icon(
-                          onPressed: loading ? null : _loadMore,
-                          icon: loading
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(p.accent),
-                                  ),
-                                )
-                              : const Icon(Icons.expand_more_rounded, size: 18),
-                          label: Text(
-                            context.l10n.browseSeeAll,
-                            style: TextStyle(
-                              color: p.accent,
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final song = songs[index];
-                  return StaggeredReveal(
-                    index: index,
-                    groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                    child: SongTile(
-                      song: song,
-                      onTap: () => playerCubit.playSong(song, queue: songs),
-                      onMorePressed: () =>
-                          SongInfoSheet.show(context, song: song),
-                    ),
-                  );
-                },
-              )
-            else
-              for (int index = 0; index < totalItemCount; index++)
-                if (index >= songs.length)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context),
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Center(
-                      child: OutlinedButton.icon(
-                        onPressed: loading ? null : _loadMore,
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                              color: p.accent.withValues(alpha: 0.3)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.r20),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.s10,
-                          ),
-                        ),
-                        icon: loading
-                            ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(p.accent),
-                                ),
-                              )
-                            : Icon(Icons.expand_more_rounded,
-                                size: 18, color: p.accent),
-                        label: Text(
-                          '${context.l10n.loadMore} (+50)',
-                          style: TextStyle(
-                            color: p.accent,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  StaggeredReveal(
-                    index: index,
-                    groupKey: songs.isEmpty ? '' : '${songs.first.id}',
-                    child: SongTile(
-                      song: songs[index],
-                      onTap: () =>
-                          playerCubit.playSong(songs[index], queue: songs),
-                      onMorePressed: () =>
-                          SongInfoSheet.show(context, song: songs[index]),
-                    ),
-                  ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _SectionError extends StatelessWidget {
-  final VoidCallback onRetry;
-
-  const _SectionError({required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md, vertical: AppSpacing.s14),
-        decoration: BoxDecoration(
-          color: p.error.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(AppRadii.r14),
-          border: Border.all(color: p.error.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.error_outline_rounded, color: p.error),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                context.l10n.libLoadFailed,
-                style: TextStyle(
-                    color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-              ),
-            ),
-            TextButton(
-              onPressed: onRetry,
-              child: Text(context.l10n.retry),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyLibrary extends StatefulWidget {
-  const _EmptyLibrary();
-
-  @override
-  State<_EmptyLibrary> createState() => _EmptyLibraryState();
-}
-
-class _EmptyLibraryState extends State<_EmptyLibrary> {
-  bool _isScanning = false;
-  bool _hasPermission = true;
-  double _scanProgress = 0.0;
-  StreamSubscription<double>? _progressSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPermission();
-  }
-
-  @override
-  void dispose() {
-    _progressSub?.cancel();
-    super.dispose();
-  }
-
-  MediaScannerService? _getScanner() {
-    try {
-      return context.read<MediaScannerService>();
-    } on ProviderNotFoundException catch (_) {
-      try {
-        if (getIt.isRegistered<MediaScannerService>()) {
-          return getIt<MediaScannerService>();
-        }
-      } catch (e, st) {
-        ErrorLogger.log('GetIt lookup for MediaScannerService failed',
-            error: e, stackTrace: st, category: 'HomeScreen');
-      }
-      return null;
-    } catch (e, st) {
-      ErrorLogger.log(
-          'Unexpected error reading MediaScannerService from context',
-          error: e,
-          stackTrace: st,
-          category: 'HomeScreen');
-      return null;
-    }
-  }
-
-  Future<void> _checkPermission() async {
-    try {
-      final scanner = _getScanner();
-      if (scanner == null) return;
-      final granted = await scanner.checkPermission();
-      if (mounted) setState(() => _hasPermission = granted);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to check media permission',
-          error: e, stackTrace: st, category: 'HomeScreen');
-    }
-  }
-
-  Future<void> _requestPermission() async {
-    final shouldProceed = await PulsrDialogHelper.showConfirmDialog(
-      context,
-      title: context.l10n.homePermissionNeeded,
-      message: context.l10n.homePermissionSubtitle,
-      confirmLabel: context.l10n.homeGrantPermission,
-      cancelLabel: context.l10n.cancel,
-      icon: Icons.lock_open_rounded,
-    );
-
-    if (shouldProceed != true) return;
-
-    try {
-      final scanner = _getScanner();
-      if (scanner == null) return;
-      final granted = await scanner.requestPermission();
-      if (mounted) {
-        setState(() => _hasPermission = granted);
-        if (granted) {
-          _scan();
-        }
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Failed to request media permission',
-          error: e, stackTrace: st, category: 'HomeScreen');
-      if (mounted) {
-        setState(() => _hasPermission = false);
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(context.l10n.homePermissionSubtitle)),
-        );
-      }
-    }
-  }
-
-  Future<void> _scan() async {
-    final scanner = _getScanner();
-    if (scanner == null) return;
-
-    setState(() {
-      _isScanning = true;
-      _scanProgress = 0.0;
-    });
-
-    _progressSub?.cancel();
-    _progressSub = scanner.scanProgress.listen((p) {
-      if (mounted) setState(() => _scanProgress = p);
-    });
-
-    try {
-      final count = await scanner.scanDeviceLibrary();
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(context.l10n.scanComplete(count)),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isScanning = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-
-    if (!_hasPermission) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.lg, horizontal: AppSpacing.md),
-        child: EmptyStateWidget(
-          icon: Icons.folder_special_rounded,
-          title: context.l10n.homePermissionNeeded,
-          subtitle: context.l10n.homePermissionSubtitle,
-          primaryActionLabel: context.l10n.homeGrantPermission,
-          primaryActionIcon: Icons.lock_open_rounded,
-          onPrimaryAction: _requestPermission,
-          secondaryActionLabel: context.l10n.hiddenFolders,
-          secondaryActionIcon: Icons.folder_off_rounded,
-          onSecondaryAction: () => context.push('/hidden-folders'),
-        ),
-      );
-    }
-
-    if (_isScanning) {
-      final percent = (_scanProgress * 100).toInt();
-      return Padding(
-        padding: const EdgeInsets.symmetric(
-            vertical: AppSpacing.lg, horizontal: AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            EmptyStateWidget(
-              icon: Icons.hourglass_top_rounded,
-              title: context.l10n.scanningStorage,
-              subtitle: _scanProgress > 0
-                  ? context.l10n.homeScanProgress(percent)
-                  : context.l10n.homeScanningStorageSubtitle,
-              isPrimaryLoading: true,
-              primaryActionLabel: context.l10n.homeScanningLabel,
-            ),
-            if (_scanProgress > 0) ...[
-              const SizedBox(height: AppSpacing.md),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 280),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadii.r8),
-                  child: LinearProgressIndicator(
-                    value: _scanProgress.clamp(0.0, 1.0),
-                    minHeight: 6,
-                    backgroundColor: p.surfaceContainerHigh,
-                    valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.lg, horizontal: AppSpacing.md),
-      child: EmptyStateWidget(
-        icon: Icons.music_off_rounded,
-        title: context.l10n.noMusicYet,
-        subtitle: context.l10n.scanPrompt,
-        primaryActionLabel: context.l10n.scanStorage,
-        primaryActionIcon: Icons.refresh_rounded,
-        onPrimaryAction: _scan,
-        secondaryActionLabel: context.l10n.hiddenFolders,
-        secondaryActionIcon: Icons.folder_off_rounded,
-        onSecondaryAction: () => context.push('/hidden-folders'),
-      ),
     );
   }
 }

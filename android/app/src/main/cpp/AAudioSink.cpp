@@ -81,6 +81,11 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
         AAudioStream_close(stream);
         return false;
     }
+    if (bitPerfect_ && AAudioStream_getSharingMode(stream) != AAUDIO_SHARING_MODE_EXCLUSIVE) {
+        lastError_ = "bit-perfect output requires exclusive sharing";
+        AAudioStream_close(stream);
+        return false;
+    }
     // Direct/bit-perfect output has no OS resampler, and position/timing math
     // below uses config_.sampleRate. If the device silently substituted a
     // different rate or channel count, keeping the requested value would drift
@@ -111,6 +116,7 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     framesWritten_ = 0;
     framesWrittenBase_ = 0;
     readBase_ = 0;
+    readOffset_ = 0;
     lastXRunCount_.store(AAudioStream_getXRunCount(stream), std::memory_order_relaxed);
     disconnected_.store(false, std::memory_order_release);
 
@@ -137,21 +143,21 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
     config_ = config;
     bytesPerFrame_ =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
-    bitPerfect_ = config_.encoding == Encoding::I24Packed;
+    bitPerfect_ = config_.preferExclusive || config_.encoding == Encoding::I24Packed;
     if (bytesPerFrame_ <= 0 || config_.sampleRate <= 0 ||
         config_.channelCount <= 0 || config_.channelCount > 8) {
         lastError_ = "invalid config";
         if (error != nullptr) *error = lastError_;
         return false;
     }
-    if (config_.preferExclusive &&
+    if (bitPerfect_ &&
         TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
         if (error != nullptr) error->clear();
         return true;
     }
-    if (config_.preferExclusive) {
-        LOGW("EXCLUSIVE open failed (%s), falling back to SHARED",
-             lastError_.c_str());
+    if (bitPerfect_) {
+        if (error != nullptr) *error = lastError_;
+        return false;
     }
     if (config_.lowLatency &&
         TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
@@ -183,30 +189,32 @@ bool AAudioSink::RecoverDisconnected() {
     CloseLocked(/* waitForWriters = */ false);
     disconnected_.store(false, std::memory_order_release);
     const int64_t prevFramesWritten = framesWritten_;
-
-    if (config_.preferExclusive &&
-        TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
+    const int64_t prevWrittenBase = framesWrittenBase_;
+    const auto restoreTimeline = [&]() {
         framesWritten_ = prevFramesWritten;
-        framesWrittenBase_ = prevFramesWritten;
+        framesWrittenBase_ = prevWrittenBase;
         AAudioStream* st = stream_.load(std::memory_order_acquire);
         readBase_ = st ? AAudioStream_getFramesRead(st) : 0;
+        // Buffered frames from the disconnected stream cannot be drained.
+        // Account for them as discarded so pending-data/EOS cannot hang.
+        readOffset_ = prevFramesWritten - prevWrittenBase;
+    };
+
+    if (bitPerfect_ &&
+        TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
+        restoreTimeline();
         LOGI("Recovered AAudio stream in EXCLUSIVE mode");
         return true;
     }
+    if (bitPerfect_) return false;
     if (config_.lowLatency &&
         TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
-        framesWritten_ = prevFramesWritten;
-        framesWrittenBase_ = prevFramesWritten;
-        AAudioStream* st = stream_.load(std::memory_order_acquire);
-        readBase_ = st ? AAudioStream_getFramesRead(st) : 0;
+        restoreTimeline();
         LOGI("Recovered AAudio stream in SHARED low-latency mode");
         return true;
     }
     if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE)) {
-        framesWritten_ = prevFramesWritten;
-        framesWrittenBase_ = prevFramesWritten;
-        AAudioStream* st = stream_.load(std::memory_order_acquire);
-        readBase_ = st ? AAudioStream_getFramesRead(st) : 0;
+        restoreTimeline();
         LOGI("Recovered AAudio stream in SHARED mode");
         return true;
     }
@@ -356,8 +364,8 @@ void AAudioSink::Flush() {
     // requestFlush is unsupported on some MMAP streams; ignore the result.
     AAudioStream_requestFlush(st);
     readBase_ = AAudioStream_getFramesRead(st);
+    readOffset_ = 0;
     framesWrittenBase_ = framesWritten_.load(std::memory_order_relaxed);
-    AAudioStream_requestStart(st);
 }
 
 void AAudioSink::SetVolume(float volume) {
@@ -372,7 +380,8 @@ int64_t AAudioSink::FramesRead() const {
     int64_t result = 0;
     if (st != nullptr && !releasing_.load(std::memory_order_acquire)) {
         const int64_t read = AAudioStream_getFramesRead(st);
-        result = read > readBase_ ? read - readBase_ : 0;
+        const int64_t base = readBase_.load(std::memory_order_relaxed);
+        result = readOffset_.load(std::memory_order_relaxed) + (read > base ? read - base : 0);
     }
     activeReaders_.fetch_sub(1, std::memory_order_release);
     return result;
@@ -380,7 +389,8 @@ int64_t AAudioSink::FramesRead() const {
 
 int64_t AAudioSink::FramesWritten() const {
     const int64_t written = framesWritten_.load(std::memory_order_relaxed);
-    return written > framesWrittenBase_ ? written - framesWrittenBase_
+    const int64_t base = framesWrittenBase_.load(std::memory_order_relaxed);
+    return written > base ? written - base
                                         : 0;
 }
 

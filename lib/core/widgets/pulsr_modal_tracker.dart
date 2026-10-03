@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'pulsr_dock_tracker.dart';
 
+/// {@category DesignSystem}
 /// Global tracker for modal routes (dialogs / bottom sheets).
 ///
 /// The app shell (mini player dock, tablet player bar) listens to

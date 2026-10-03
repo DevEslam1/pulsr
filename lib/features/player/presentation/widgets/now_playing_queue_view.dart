@@ -14,6 +14,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../data/db/app_database.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 class NowPlayingQueueView extends StatefulWidget {
   const NowPlayingQueueView({super.key});
@@ -198,8 +199,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                   elevation: elevation,
                                   color: p.surfaceContainerHigh
                                       .withValues(alpha: 0.95),
-                                  shadowColor:
-                                      Colors.black.withValues(alpha: 0.35),
+                                  shadowColor: AppColors.scrimAt(0.35),
                                   borderRadius:
                                       BorderRadius.circular(AppRadii.r16),
                                   child: child,
@@ -260,8 +260,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                       width: 42,
                                       height: 42,
                                       decoration: BoxDecoration(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.5),
+                                        color: AppColors.scrimAt(0.5),
                                         borderRadius:
                                             BorderRadius.circular(AppRadii.r10),
                                       ),

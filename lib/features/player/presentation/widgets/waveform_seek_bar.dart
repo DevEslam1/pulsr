@@ -10,6 +10,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../cubit/player_constants.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Visual rendering style for the waveform seek bar.
 enum WaveformVisualizerStyle {
@@ -133,7 +134,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color inactiveColor = widget.inactiveColor ??
         (isDark
-            ? Colors.white.withValues(alpha: 0.22)
+            ? AppColors.specularAt(0.22)
             : p.hairline.withValues(alpha: 0.8));
 
     final currentDuration = _dragValue != null

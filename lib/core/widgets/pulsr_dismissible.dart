@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 
+/// {@category DesignSystem}
 /// Two-swipe confirmation wrapper for list tiles and cards.
 ///
 /// Interaction model:
@@ -193,7 +194,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
     super.initState();
     _offsetController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: PulsrMotion.standard,
       lowerBound: -1.0,
       upperBound: 1.0,
       value: 0.0,
@@ -201,7 +202,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
 
     _resizeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
+      duration: PulsrMotion.layout,
       value: 0.0,
     );
 

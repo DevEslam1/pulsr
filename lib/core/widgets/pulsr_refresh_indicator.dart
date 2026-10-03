@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/aura_theme.dart';
 import '../utils/pulsr_haptics.dart';
 
+/// {@category DesignSystem}
 /// A branded pull-to-refresh indicator adhering to Pulsr design tokens,
 /// providing tactile haptic feedback on trigger, themed accent indicator,
 /// and surface container backdrop.

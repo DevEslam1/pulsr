@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../motion/pulsr_motion.dart';
 
+/// {@category DesignSystem}
 /// Wraps a list item with a staggered cascading entrance animation (smooth fade
 /// and subtle vertical rise) inspired by Meloplay's staggered list transitions.
 class StaggeredListItem extends StatefulWidget {

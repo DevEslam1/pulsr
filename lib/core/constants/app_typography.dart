@@ -1,5 +1,6 @@
 // lib/core/constants/app_typography.dart
 
+/// {@category DesignSystem}
 /// Canonical type scale for the app.
 ///
 /// Mirrors the Apple HIG / Material 3 idea of a small, fixed set of text sizes
@@ -16,6 +17,7 @@
 /// | body | 14 | default body |
 /// | callout | 15 | emphasised body |
 /// | bodyLarge | 16 | song titles, list primary |
+/// | subtitle | 17 | collapsed app-bar / subheading |
 /// | title | 18 | section/card titles |
 /// | titleLarge | 20 | screen titles |
 /// | headline | 24 | large headings |
@@ -32,6 +34,7 @@ abstract class AppFontSize {
   static const double body = 14;
   static const double callout = 15;
   static const double bodyLarge = 16;
+  static const double subtitle = 17;
   static const double title = 18;
   static const double titleLarge = 20;
   static const double headline = 24;

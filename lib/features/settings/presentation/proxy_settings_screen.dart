@@ -329,6 +329,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                             ],
                           ),
                           IconButton(
+                            constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget),
                             tooltip: context.l10n.close,
                             icon: Icon(Icons.close_rounded,
                                 color: p.textSecondary),
@@ -562,6 +565,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
               ),
               actions: [
                 IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   tooltip: context.l10n.settingsImportPasteProxies,
                   icon: Icon(Icons.file_upload_outlined, color: p.accent),
                   onPressed: () => _showImportDialog(),

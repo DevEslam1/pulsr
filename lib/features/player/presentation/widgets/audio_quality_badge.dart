@@ -126,7 +126,7 @@ class AudioQualityBadge extends StatelessWidget {
                     height: 3,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: AppColors.specularAt(0.5),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.s6),
@@ -137,7 +137,7 @@ class AudioQualityBadge extends StatelessWidget {
                             ? '$deviceShortName • Direct'
                             : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b'),
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: AppColors.specularAt(0.9),
                       fontSize:
                           compact ? AppFontSize.tiny : AppFontSize.caption,
                       fontWeight: FontWeight.w700,

@@ -79,6 +79,26 @@ int main() {
     const int channels = 2;
 
     {
+        // ON -> OFF -> ON must restore processing without leaving a stale DoP
+        // flag or stages mask in control of the PCM path.
+        auto engine = makeEngine();
+        const auto input = makeSignal(frames, channels);
+        for (bool enabled : {true, false, true, false}) {
+            auto snap = baseSnapshot();
+            snap->activeStages = STAGE_PANNER;
+            snap->panner.monoMix = true;
+            snap->bitPerfect.enabled = enabled;
+            snap->bitPerfect.isDop = true; // deliberately stale when disabled
+            engine->publishParams(snap);
+            auto work = input;
+            check(engine->processInterleaved(work.data(), frames, channels) == frames,
+                  "toggle must preserve frame count");
+            check(bitIdentical(work, input) == enabled,
+                  "bypass on must preserve samples; bypass off must restore DSP");
+        }
+    }
+
+    {
         auto engine = makeEngine();
         auto snap = baseSnapshot();
         check(runBlocks(*engine, snap, frames, channels, 8),

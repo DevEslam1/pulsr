@@ -5,6 +5,7 @@ import '../constants/app_colors.dart';
 import '../motion/pulsr_motion.dart';
 import '../widgets/cached_artwork.dart';
 
+/// {@category DesignSystem}
 /// An animated vinyl record disc that smoothly rotates when [isPlaying] is true
 /// and halts when false. Concentric micro-grooves and light reflection provide a
 /// tactile analog aesthetic matching Pulsr's glass & dark/AMOLED UI.
@@ -102,7 +103,7 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                     color: AppColors.vinylDiscBase,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.45),
+                        color: AppColors.scrimLight,
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -128,9 +129,9 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                       center: Alignment.center,
                       colors: [
                         Colors.transparent,
-                        Colors.white.withValues(alpha: 0.06),
+                        AppColors.specularAt(0.06),
                         Colors.transparent,
-                        Colors.white.withValues(alpha: 0.04),
+                        AppColors.highlightSoft,
                         Colors.transparent,
                       ],
                       stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
@@ -159,7 +160,7 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.25),
+                              color: AppColors.specularAt(0.25),
                               width: 1.0,
                             ),
                           ),
@@ -172,7 +173,7 @@ class _SpinningVinylDiscState extends State<SpinningVinylDisc>
                             shape: BoxShape.circle,
                             color: AppColors.vinylSpindle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.4),
+                              color: AppColors.specularAt(0.4),
                               width: 0.6,
                             ),
                           ),
@@ -207,7 +208,7 @@ class _VinylGroovePainter extends CustomPainter {
     final minRadius = maxRadius * 0.48;
 
     final groovePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.04)
+      ..color = AppColors.highlightSoft
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.6;
 

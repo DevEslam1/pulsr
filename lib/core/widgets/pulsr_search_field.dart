@@ -7,6 +7,7 @@ import '../constants/app_typography.dart';
 import '../responsive/pulsr_layout_metrics.dart';
 import '../theme/aura_theme.dart';
 
+/// {@category DesignSystem}
 /// Standard, responsive search input field used across Settings, Library,
 /// Favorites, Recents, and Genre views.
 ///
@@ -180,6 +181,9 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
           ),
           suffixIcon: hasText
               ? IconButton(
+                  constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget),
                   icon: Icon(
                     Icons.clear_rounded,
                     color: p.textSecondary,

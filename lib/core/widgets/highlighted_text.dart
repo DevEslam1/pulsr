@@ -1,6 +1,7 @@
 // lib/core/widgets/highlighted_text.dart
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// A widget that renders [text] with substring occurrences of [query] highlighted
 /// using [matchStyle], while un-matched text retains [baseStyle].
 class PulsrHighlightedText extends StatelessWidget {

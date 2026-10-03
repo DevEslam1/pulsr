@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// {@category DesignSystem}
 /// Raw brand values only. Screens must use `context.palette` (semantic tokens),
 /// never these constants, so Light/Dark/AMOLED all resolve correctly.
 abstract class AppColors {
@@ -81,21 +82,6 @@ abstract class AppColors {
   static const Color lightOutline = Color(0xFFD8DFEC);
   static const Color lightSecondary = Color(0xFF4B4FBE);
 
-  // AMOLED (legacy, deprecated): single source of truth is AuraTheme.amoledTheme
-  // (defect 19-01). Kept only for tests referencing constants; do not use in UI.
-  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
-  static const Color amoledBackground = Color(0xFF000000);
-  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
-  static const Color amoledSurface = Color(0xFF0A0A0A);
-  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
-  static const Color amoledCard = Color(0xFF141414);
-  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
-  static const Color amoledTextPrimary = Color(0xFFFFFFFF);
-  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
-  static const Color amoledTextSecondary = Color(0xFFA0A0A0);
-  @Deprecated('Use context.palette / AuraTheme.amoledTheme instead')
-  static const Color amoledOutline = Color(0xFF222222);
-
   // Audio-quality badge identity tones (fixed, source-identifying).
   static const Color qualityBadgeRose = Color(0xFFE11D48);
   static const Color qualityBadgeCyan = Color(0xFF00F2FF);
@@ -157,4 +143,20 @@ abstract class AppColors {
   static const Color roomPointCenterLine = Color(0xAA4FC3F7);
   static const Color roomPointLeftLine = Color(0xAA81C784);
   static const Color roomPointRightLine = Color(0xAAFFB74D);
+
+  // Overlay tokens: black scrims and white specular highlights. These replace
+  // ad-hoc Colors.black/white.withValues(alpha:) call sites so the overlay
+  // source colours stay centralized. Use scrimAt/specularAt for one-off alphas.
+  static const Color scrim = Color(0xA6000000);
+  static const Color scrimLight = Color(0x73000000);
+  static const Color scrimStrong = Color(0xD9000000);
+  static const Color specular = Color(0x12FFFFFF);
+  static const Color specularStrong = Color(0x24FFFFFF);
+  static const Color highlightSoft = Color(0x0AFFFFFF);
+
+  static Color scrimAt(double alpha) =>
+      const Color(0xFF000000).withValues(alpha: alpha);
+
+  static Color specularAt(double alpha) =>
+      const Color(0xFFFFFFFF).withValues(alpha: alpha);
 }

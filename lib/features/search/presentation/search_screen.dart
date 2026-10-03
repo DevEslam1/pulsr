@@ -9,7 +9,7 @@ import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -323,6 +323,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                   return const SizedBox.shrink();
                                 }
                                 return IconButton(
+                                  constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget),
                                   icon: Icon(Icons.mic_rounded,
                                       color: p.textTertiary),
                                   tooltip: context.l10n.voiceSearch,
@@ -338,6 +341,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                 );
                               }
                               return IconButton(
+                                constraints: const BoxConstraints(
+                                    minWidth: AppSpacing.minTouchTarget,
+                                    minHeight: AppSpacing.minTouchTarget),
                                 icon: Icon(Icons.clear_rounded,
                                     color: p.textTertiary),
                                 tooltip: context.l10n.clear,
@@ -685,7 +691,10 @@ class _SearchScreenState extends State<SearchScreen> {
         color: selected ? p.accent : p.textSecondary,
         fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
       ),
-      onSelected: (_) => _selectLocalFilter(context, filter),
+      onSelected: (_) {
+        HapticFeedback.selectionClick();
+        _selectLocalFilter(context, filter);
+      },
     );
   }
 
@@ -729,7 +738,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     final errorMessage = state.errorMessage;
     if (errorMessage != null && state.results.isEmpty) {
-      return EmptyStateWidget(
+      return PulsrEmptyState(
         icon: Icons.error_outline_rounded,
         title: context.l10n.somethingWentWrong,
         subtitle: errorMessage,
@@ -740,7 +749,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
     if (state.results.isEmpty) {
-      return EmptyStateWidget(
+      return PulsrEmptyState(
         icon: Icons.search_off_rounded,
         title: context.l10n.noResultsFound,
         subtitle: context.l10n.noResultsSubtitle,
@@ -935,7 +944,7 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                 onlineEmpty &&
                 ytmState.errorMessage == null &&
                 localState.errorMessage == null) {
-              return EmptyStateWidget(
+              return PulsrEmptyState(
                 icon: Icons.search_off_rounded,
                 title: context.l10n.noResultsFound,
                 subtitle: '${context.l10n.noResultsSubtitle} "${widget.query}"',
@@ -1352,7 +1361,7 @@ class _OnlineResults extends StatelessWidget {
         final isOffline =
             context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
         if (isOffline) {
-          return EmptyStateWidget(
+          return PulsrEmptyState(
             icon: Icons.wifi_off_rounded,
             title: context.l10n.offlineOnlyMode,
             subtitle: context.l10n.browseYtmSearchScreenDesc,
@@ -1365,7 +1374,7 @@ class _OnlineResults extends StatelessWidget {
         }
 
         if (state.errorMessage != null) {
-          return EmptyStateWidget(
+          return PulsrEmptyState(
             icon: Icons.cloud_off_rounded,
             title: context.l10n.browseSearchFailed,
             subtitle: resolveUiErrorMessage(context, state.errorMessage!),
@@ -1377,7 +1386,7 @@ class _OnlineResults extends StatelessWidget {
 
         if (state.results.isEmpty) {
           if (state.hasSearched) {
-            return EmptyStateWidget(
+            return PulsrEmptyState(
               icon: Icons.search_off_rounded,
               title: context.l10n.browseNoResultsFound,
               subtitle:

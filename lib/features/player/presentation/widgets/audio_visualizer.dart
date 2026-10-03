@@ -20,6 +20,7 @@ import 'visualizer/milkdrop_renderer.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 enum VisualizerStyle {
   off,
@@ -602,7 +603,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   end: 6,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
+                      color: AppColors.scrimAt(0.55),
                       borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Padding(
@@ -631,7 +632,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   start: 6,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
+                      color: AppColors.scrimAt(0.55),
                       borderRadius: BorderRadius.circular(AppRadii.r8),
                     ),
                     child: Padding(

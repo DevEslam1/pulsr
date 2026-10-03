@@ -7,7 +7,9 @@ import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 enum PulsrSwitchSize {
   small,
   medium,
@@ -122,9 +124,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
     final activeFill =
         widget.activeTrackColor ?? widget.activeColor ?? p.accent;
     final inactiveFill = widget.inactiveTrackColor ??
-        (p.isDark
-            ? Colors.white.withValues(alpha: 0.10)
-            : Colors.black.withValues(alpha: 0.08));
+        (p.isDark ? AppColors.specularAt(0.10) : AppColors.scrimAt(0.08));
     final thumbFill = widget.thumbColor ?? Colors.white;
 
     final thumbRadius = (widget.height - 6.0) / 2.0;
@@ -189,7 +189,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                         color: thumbFill,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.22),
+                            color: AppColors.scrimAt(0.22),
                             blurRadius: 4.0,
                             offset: const Offset(0, 1.5),
                           ),

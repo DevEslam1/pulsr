@@ -205,7 +205,8 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                               child: PulsrDismissible(
                                 key: ValueKey('fav_${song.id}'),
                                 startToEndLabel: context.l10n.playNext,
-                                endToStartLabel: context.l10n.removeFromFavorites,
+                                endToStartLabel:
+                                    context.l10n.removeFromFavorites,
                                 backgroundBuilder: (context, isConfirming) =>
                                     PulsrDismissible.buildActionBackground(
                                   context: context,
@@ -288,7 +289,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
   Widget _buildFavoritesEmptyState(
       BuildContext context, PulsrPalette p, int tabIndex) {
     if (tabIndex == 0) {
-      return EmptyStateWidget(
+      return PulsrEmptyState(
         icon: Icons.favorite_border_rounded,
         iconColor: p.favorite,
         title: context.l10n.noLocalFavorites,
@@ -304,7 +305,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          EmptyStateWidget(
+          PulsrEmptyState(
             icon: Icons.cloud_sync_rounded,
             iconColor: p.accent,
             title: isYtmLoggedIn
@@ -558,6 +559,9 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     prefixIcon: Icon(Icons.link_rounded,
                         color: p.textTertiary, size: 20),
                     suffixIcon: IconButton(
+                      constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget),
                       icon: Icon(Icons.content_paste_rounded,
                           color: p.accent, size: 18),
                       tooltip: context.l10n.browsePasteFromClipboard,
@@ -725,7 +729,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     top: 6,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
+                        color: AppColors.scrimAt(0.5),
                         shape: BoxShape.circle,
                       ),
                       child: YtmDownloadButton(
@@ -740,7 +744,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                   end: 6,
                   top: 6,
                   child: Material(
-                    color: Colors.black.withValues(alpha: 0.5),
+                    color: AppColors.scrimAt(0.5),
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),

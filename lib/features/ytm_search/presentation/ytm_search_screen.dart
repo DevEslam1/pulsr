@@ -5,7 +5,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -145,6 +145,9 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                                   color: p.textTertiary),
                               suffixIcon: state.query.isNotEmpty
                                   ? IconButton(
+                                      constraints: const BoxConstraints(
+                                          minWidth: AppSpacing.minTouchTarget,
+                                          minHeight: AppSpacing.minTouchTarget),
                                       icon: Icon(Icons.clear_rounded,
                                           color: p.textTertiary),
                                       tooltip: context.l10n.clear,
@@ -179,7 +182,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
       return const SizedBox.shrink();
     }
     if (_history.isEmpty) {
-      return EmptyStateWidget(
+      return PulsrEmptyState(
         icon: _historyLoadFailed
             ? Icons.sync_problem_rounded
             : Icons.travel_explore_rounded,
@@ -254,7 +257,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     }
 
     if (state.errorMessage != null) {
-      return EmptyStateWidget(
+      return PulsrEmptyState(
         icon: Icons.cloud_off_rounded,
         title: context.l10n.browseSearchFailed,
         subtitle: state.errorMessage!,
@@ -266,7 +269,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
 
     if (state.results.isEmpty) {
       return state.hasSearched
-          ? EmptyStateWidget(
+          ? PulsrEmptyState(
               icon: Icons.search_off_rounded,
               title: context.l10n.browseNoResultsFound,
               subtitle:

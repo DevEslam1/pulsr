@@ -41,6 +41,7 @@ import 'core/services/ytm_url_cache.dart';
 import 'core/utils/error_logger.dart';
 import 'core/utils/ytm_rate_limiter.dart';
 import 'data/audio/audio_handler.dart';
+import 'data/audio/eq_legacy_migration.dart';
 import 'data/db/app_database.dart';
 import 'data/scanner/media_scanner_service.dart';
 import 'domain/repositories/music_repository_interface.dart';
@@ -121,6 +122,12 @@ Future<void> main() async {
   // Rehydrate the GPU budget before first frame (persisted by SettingsCubit).
   try {
     final prefs = await SharedPreferences.getInstance();
+    try {
+      await EqLegacyMigration.run(prefs);
+    } catch (e, st) {
+      ErrorLogger.log('EQ legacy migration failed',
+          error: e, stackTrace: st, category: 'Startup');
+    }
     GpuBudget.setEnabled(prefs.getBool('setting_reduce_motion') ?? false);
   } catch (_) {}
   // Warm native audio capability cache (best-effort, never blocks).

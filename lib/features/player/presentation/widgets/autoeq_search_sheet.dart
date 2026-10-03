@@ -10,6 +10,7 @@ import '../../cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:flutter/services.dart';
 
 /// AutoEQ profile browser backed by the bundled real-AutoEQ dataset
 /// (`headphone_profiles.json`). Profiles carry genuine parametric filters
@@ -114,6 +115,9 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                 ),
               ),
               IconButton(
+                constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget),
                 icon: Icon(Icons.close, color: p.textSecondary),
                 tooltip: context.l10n.close,
                 onPressed: () => Navigator.pop(context),
@@ -163,10 +167,13 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                   backgroundColor: p.surfaceCard,
                   side: BorderSide(color: p.hairline),
                   showCheckmark: false,
-                  onSelected: (_) => setState(() {
-                    _category = cat;
-                    _applyFilter();
-                  }),
+                  onSelected: (_) {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _category = cat;
+                      _applyFilter();
+                    });
+                  },
                 );
               },
             ),

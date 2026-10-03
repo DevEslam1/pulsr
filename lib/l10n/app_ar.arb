@@ -4354,5 +4354,8 @@
   "maxVolume": "الحد الأقصى للصوت",
   "pageLoadingProgress": "تقدّم تحميل الصفحة",
   "albumArtworkLabel": "صورة الألبوم",
-  "failedToApplyLabel": "تعذّر تطبيق {label}"
+  "failedToApplyLabel": "تعذّر تطبيق {label}",
+  "bitPerfectConflictTitle": "تعطيل هذه الميزات لاستخدام Bit-Perfect؟",
+  "bitPerfectConflictBody": "يرسل Bit-Perfect الصوت الأصلي دون تعديل إلى DAC عبر USB. هذه الميزات تغيّر الصوت وهي غير متوافقة:",
+  "bitPerfectDisableAndEnable": "تعطيل وتفعيل"
 }

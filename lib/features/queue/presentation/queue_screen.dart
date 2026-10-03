@@ -9,7 +9,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -251,7 +251,7 @@ class QueueScreen extends StatelessWidget {
             final currentSong = state.currentSong;
 
             if (queue.isEmpty) {
-              return EmptyStateWidget(
+              return PulsrEmptyState(
                 icon: Icons.queue_music_rounded,
                 title: context.l10n.queue,
                 subtitle: context.l10n.noSongsSubtitle,

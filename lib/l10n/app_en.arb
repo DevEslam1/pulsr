@@ -5179,5 +5179,11 @@
   "albumArtworkLabel": "Album artwork",
   "@albumArtworkLabel": {"description":"Accessibility label for album artwork images"},
   "failedToApplyLabel": "Failed to apply {label}",
-  "@failedToApplyLabel": {"description":"Error toast when applying a named setting fails","placeholders":{"label":{"type":"String"}}}
+  "@failedToApplyLabel": {"description":"Error toast when applying a named setting fails","placeholders":{"label":{"type":"String"}}},
+  "bitPerfectConflictTitle": "Disable these to use Bit-Perfect?",
+  "@bitPerfectConflictTitle": {"description":"Title of the dialog listing DSP features that conflict with Bit-Perfect output"},
+  "bitPerfectConflictBody": "Bit-Perfect sends the original, unaltered audio to your USB DAC. These features change the sound and are not compatible:",
+  "@bitPerfectConflictBody": {"description":"Body of the Bit-Perfect conflict dialog"},
+  "bitPerfectDisableAndEnable": "Disable & enable",
+  "@bitPerfectDisableAndEnable": {"description":"Confirm button that disables conflicting DSP features and enables Bit-Perfect"}
 }

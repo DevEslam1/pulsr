@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import '../constants/app_radii.dart';
 import '../performance/gpu_budget.dart';
 import '../theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 enum GlassTier {
   standard,
   liquid,
@@ -151,7 +153,7 @@ class GlassContainer extends StatelessWidget {
         (isLiquid
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: p.isDark ? 0.35 : 0.08),
+                  color: AppColors.scrimAt(p.isDark ? 0.35 : 0.08),
                   blurRadius: 20,
                   offset: const Offset(0, 6),
                 ),
@@ -191,9 +193,9 @@ class GlassContainer extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.white.withValues(alpha: 0.0),
-                      Colors.white.withValues(alpha: p.isDark ? 0.45 : 0.75),
-                      Colors.white.withValues(alpha: 0.0),
+                      AppColors.specularAt(0.0),
+                      AppColors.specularAt(p.isDark ? 0.45 : 0.75),
+                      AppColors.specularAt(0.0),
                     ],
                     stops: const [0.0, 0.5, 1.0],
                   ),

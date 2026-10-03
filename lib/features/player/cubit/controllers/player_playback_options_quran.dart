@@ -195,7 +195,10 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         snapshot.dynamicsPreset,
         enabled: snapshot.isDynamicsEnabled,
       );
-      await setPlaybackSpeed(snapshot.playbackSpeed);
+      // Restore speed directly — not via setPlaybackSpeed — so the restore
+      // does not overwrite the song's per-song speed memory with the Quran
+      // speed that was active just before disabling the mode.
+      await _audioHandler.setSpeed(snapshot.playbackSpeed);
       if (snapshot.isShuffle != s.isShuffle) {
         await _audioHandler.setShuffleMode(
           snapshot.isShuffle
@@ -237,7 +240,9 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       await _audioHandler.setReverb(false, wetDry: 0.0);
       await _audioHandler.setSaturation(false);
       await _audioHandler.setDynamicsPreset(s.dynamicsPreset, enabled: false);
-      await setPlaybackSpeed(1.0);
+      // Use setSpeed directly — not setPlaybackSpeed — to avoid writing 1.0
+      // to the per-song store and triggering a redundant state emit.
+      await _audioHandler.setSpeed(1.0);
     } catch (e, st) {
       ErrorLogger.log('Failed to restore safe defaults while disabling Quran Mode',
           error: e,
@@ -271,9 +276,11 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     ));
 
     try {
-      await _audioHandler.setEqualizerEnabled(true);
-      await _audioHandler.applyPreset(eqPreset);
+      // Lower the preamp BEFORE the EQ boosts go live so the +dB bands never
+      // hit the output without their headroom (momentary clipping = click).
       await _audioHandler.setPreamp(profile.preampDb);
+      await _audioHandler.applyPreset(eqPreset);
+      await _audioHandler.setEqualizerEnabled(true);
       await _audioHandler.setReverb(
         profile.reverbEnabled,
         preset: profile.reverbPreset.wireValue,
@@ -289,7 +296,10 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         profile.dynamicsPreset,
         enabled: profile.dynamicsEnabled,
       );
-      await setPlaybackSpeed(profile.playbackSpeed);
+      // Use setSpeed directly to avoid writing the Quran-mode speed into the
+      // per-song playback store (which would corrupt the song's remembered
+      // speed and be heard as a glitch when effects re-init mid-profile apply).
+      await _audioHandler.setSpeed(profile.playbackSpeed);
     } catch (e, st) {
       ErrorLogger.log('Failed to apply Quran profile',
           error: e,

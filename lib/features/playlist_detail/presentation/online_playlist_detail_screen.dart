@@ -429,6 +429,9 @@ class _OnlinePlaylistDetailScreenState
                   prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
+                          constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget),
                           icon: const Icon(Icons.clear_rounded, size: 18),
                           tooltip: context.l10n.clear,
                           onPressed: () {
@@ -516,6 +519,9 @@ class _OnlinePlaylistDetailScreenState
                     children: [
                       YtmDownloadButton(song: song, iconSize: 18),
                       IconButton(
+                        constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget),
                         icon: Icon(Icons.more_vert_rounded,
                             size: 18, color: p.textTertiary),
                         tooltip:
@@ -554,6 +560,9 @@ class _OnlinePlaylistDetailScreenState
           ),
           actions: [
             IconButton(
+              constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget),
               icon: const Icon(Icons.refresh_rounded),
               tooltip: context.l10n.browseRefreshPlaylist,
               onPressed: _fetchTracks,
@@ -612,7 +621,7 @@ class _OnlinePlaylistDetailScreenState
                     gradient: LinearGradient(
                       colors: [
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.75),
+                        AppColors.scrimAt(0.75),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,

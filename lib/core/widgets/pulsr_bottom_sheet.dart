@@ -10,7 +10,9 @@ import 'pulsr_dialog.dart';
 import 'pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
+/// {@category DesignSystem}
 /// Centralized bottom sheet entry-points and container for the entire app.
 ///
 /// Features:
@@ -94,8 +96,7 @@ class PulsrSheetHelper {
       isDismissible: isDismissible,
       enableDrag: enableDrag,
       backgroundColor: Colors.transparent,
-      barrierColor: barrierColor ??
-          Colors.black.withValues(alpha: p.isDark ? 0.60 : 0.40),
+      barrierColor: barrierColor ?? AppColors.scrimAt(p.isDark ? 0.60 : 0.40),
       builder: (ctx) {
         final built = builder(ctx);
         if (!wrapWithContainer || built is PulsrBottomSheetContainer) {
@@ -215,7 +216,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: p.isDark ? 0.50 : 0.16),
+                  color: AppColors.scrimAt(p.isDark ? 0.50 : 0.16),
                   blurRadius: 36,
                   spreadRadius: 0,
                   offset: const Offset(0, -4),

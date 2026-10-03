@@ -9,6 +9,7 @@ import '../utils/error_logger.dart';
 import '../utils/l10n_extensions.dart';
 import 'artwork_placeholder.dart';
 
+/// {@category DesignSystem}
 /// LRU Memory Bitmap Cache for Artwork images.
 /// Delegates to [ArtworkCacheManager] for persistent disk storage and size bounds.
 class ArtworkLruCache {
@@ -81,8 +82,8 @@ class ArtworkLruCache {
       // Sweep reclaimed targets, then bound the number of live weak keys so a
       // stream of transient large payloads cannot leak map entries.
       _sweepDeadWeakEntries();
-      while (_weakLargeCache.length >= maxCapacity &&
-          _weakLargeCache.isNotEmpty) {
+      while (
+          _weakLargeCache.length >= maxCapacity && _weakLargeCache.isNotEmpty) {
         _weakLargeCache.remove(_weakLargeCache.keys.first);
       }
       _weakLargeCache[key] = WeakReference(bytes);
@@ -330,7 +331,9 @@ class _CachedArtworkState extends State<CachedArtwork> {
             : url);
 
     final uri = Uri.tryParse(targetUrl);
-    if (uri == null || (!uri.isScheme('https') && !uri.isScheme('http'))) return null;
+    if (uri == null || (!uri.isScheme('https') && !uri.isScheme('http'))) {
+      return null;
+    }
     HttpClientRequest? request;
     try {
       request = await getIt<HttpClient>()
@@ -501,12 +504,12 @@ class _CachedArtworkState extends State<CachedArtwork> {
       if (widget.id > 0) {
         pending = _audioQuery
             .queryArtwork(
-              widget.id,
-              widget.type,
-              format: ArtworkFormat.JPEG,
-              size: isHq ? 1000 : (isThumbnail ? 180 : 350),
-              quality: isHq ? 100 : (isThumbnail ? 65 : 80),
-            )
+          widget.id,
+          widget.type,
+          format: ArtworkFormat.JPEG,
+          size: isHq ? 1000 : (isThumbnail ? 180 : 350),
+          quality: isHq ? 100 : (isThumbnail ? 65 : 80),
+        )
             .then((bytes) async {
           if (bytes != null && bytes.isNotEmpty) return bytes;
           // Fallback: try album artwork with the correct MediaStore album ID.

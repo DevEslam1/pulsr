@@ -16,8 +16,9 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/widgets/empty_state_widget.dart';
+import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -29,6 +30,8 @@ import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../sheets/song_info_sheet.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 class FolderDetailScreen extends StatefulWidget {
   final FolderItem folder;
@@ -248,7 +251,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final button = Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(999.0),
+        borderRadius: AppRadii.full,
         onTap: onTap != null
             ? () {
                 HapticFeedback.lightImpact();
@@ -264,7 +267,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             border: Border.all(color: border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: AppColors.scrimAt(0.2),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -297,10 +300,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     final isEnabled = songs.isNotEmpty;
 
     return Material(
-      color: isEnabled ? Colors.white : Colors.white.withValues(alpha: 0.45),
+      color: isEnabled ? Colors.white : AppColors.specularAt(0.45),
       shape: const CircleBorder(),
       elevation: isEnabled ? 8 : 0,
-      shadowColor: Colors.black.withValues(alpha: 0.4),
+      shadowColor: AppColors.scrimAt(0.4),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: isEnabled
@@ -482,63 +485,63 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       image: true,
       label: widget.folder.name,
       child: Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.r20),
-        border: Border.all(
-          color:
-              (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-          width: 1,
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadii.r20),
+          border: Border.all(
+            color:
+                (p.isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.scrimAt(0.35),
+              blurRadius: 28,
+              spreadRadius: -4,
+              offset: const Offset(0, 14),
+            ),
+            BoxShadow(
+              color: p.accent.withValues(alpha: 0.14),
+              blurRadius: 40,
+              spreadRadius: -6,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 28,
-            spreadRadius: -4,
-            offset: const Offset(0, 14),
-          ),
-          BoxShadow(
-            color: p.accent.withValues(alpha: 0.14),
-            blurRadius: 40,
-            spreadRadius: -6,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadii.r20),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            content,
-            if (_isExcluded)
-              Container(
-                color: Colors.black.withValues(alpha: 0.55),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: p.error.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(AppRadii.r8),
-                    ),
-                    child: Text(
-                      context.l10n.browseExcludeFromScan,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadii.r20),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              content,
+              if (_isExcluded)
+                Container(
+                  color: AppColors.scrimAt(0.55),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.error.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(AppRadii.r8),
+                      ),
+                      child: Text(
+                        context.l10n.browseExcludeFromScan,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -597,7 +600,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                 Text(
                   '${Formatters.formatTrackCount(songs.length).toUpperCase()} • ${_formatTotalDuration(totalDurationMs).toUpperCase()}',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: AppFontSize.tiny,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
                     color: p.textTertiary,
@@ -611,7 +614,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: AppFontSize.body,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
                   ),
@@ -622,7 +625,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: AppFontSize.label,
                     color: p.textSecondary,
                   ),
                 ),
@@ -794,9 +797,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         if (isActive)
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.52),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadii.r10),
+                              color: AppColors.scrimAt(0.52),
+                              borderRadius: BorderRadius.circular(AppRadii.r10),
                             ),
                             child: Center(
                               child: NowPlayingIndicator(
@@ -821,7 +823,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           style: TextStyle(
                             color: isActive ? p.accent : p.textPrimary,
                             fontWeight: FontWeight.w600,
-                            fontSize: 15,
+                            fontSize: AppFontSize.callout,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -832,13 +834,16 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: 13,
+                            fontSize: AppFontSize.bodySmall,
                           ),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
                     icon: Icon(
                       Icons.more_horiz_rounded,
                       size: 20,
@@ -950,7 +955,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     if (songs.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
-        child: EmptyStateWidget(
+        child: PulsrEmptyState(
           icon: Icons.music_off_rounded,
           title: context.l10n.browseNoTracksFound,
           subtitle: context.l10n.browseNoTracksInFolder,
@@ -979,7 +984,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     context.l10n.browseTopTracks,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
-                          fontSize: 18,
+                          fontSize: AppFontSize.title,
                           letterSpacing: -0.3,
                         ),
                   ),
@@ -1036,9 +1041,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     // Fluid height for portrait header based on screen dimensions and text scaler
     final textScale =
         MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.3);
-    final headerHeight =
-        (screenHeight * (isTablet ? 0.34 : 0.38) * textScale)
-            .clamp(280.0, isTablet ? 420.0 : 360.0);
+    final headerHeight = (screenHeight * (isTablet ? 0.34 : 0.38) * textScale)
+        .clamp(280.0, isTablet ? 420.0 : 360.0);
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -1046,308 +1050,312 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         body: StreamBuilder<Result<List<SongsTableData>>>(
           stream: _songsStream,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                !snapshot.hasData) {
-              return const SkeletonList(
-                padding: EdgeInsets.only(top: AppSpacing.xl),
-              );
-            }
-            final loadFailed = snapshot.hasError ||
-                (snapshot.data?.fold((l) => true, (_) => false) ?? false);
-            if (loadFailed) {
-              return EmptyStateWidget(
-                icon: Icons.error_outline_rounded,
-                iconColor: p.error,
-                title: context.l10n.couldNotLoadFolderSongs,
-                subtitle: context.l10n.libraryReadError,
-                primaryActionLabel: context.l10n.retry,
-                primaryActionIcon: Icons.refresh_rounded,
-                onPrimaryAction: () => setState(() {}),
-              );
-            }
+            Widget buildContent(List<SongsTableData> songs) {
+              final totalDurationMs =
+                  songs.fold<int>(0, (sum, s) => sum + s.durationMs);
 
-            final songs =
-                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ??
-                    [];
-            final totalDurationMs =
-                songs.fold<int>(0, (sum, s) => sum + s.durationMs);
-
-            // Responsive Layout: Tablet / Landscape Master-Detail Split
-            if (shouldSplit) {
-              return DetailScaffold(
-                leading: const PulsrBackButton(),
-                leftPaneFlex: isLandscape ? 4.2 : 4.0,
-                rightPaneFlex: isLandscape ? 5.8 : 6.0,
-                hero: _buildSplitHero(context, songs, p, totalDurationMs),
-                body: _buildSplitTrackList(context, songs, p),
-              );
-            }
-
-            // Portrait Phone / Narrow View: Collapsing Immersive Apple Music layout
-            return CustomScrollView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              slivers: [
-                // Apple Music Immersive Header (Hero Artwork + Blur Fade + Title + Round Action Buttons)
-                SliverAppBar(
-                  expandedHeight: headerHeight,
-                  pinned: true,
-                  elevation: 0,
-                  backgroundColor: p.bg,
-                  surfaceTintColor: Colors.transparent,
+              // Responsive Layout: Tablet / Landscape Master-Detail Split
+              if (shouldSplit) {
+                return DetailScaffold(
                   leading: const PulsrBackButton(),
-                  title: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _showCollapsedTitle ? 1.0 : 0.0,
-                    child: Text(
-                      folder.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
+                  leftPaneFlex: isLandscape ? 4.2 : 4.0,
+                  rightPaneFlex: isLandscape ? 5.8 : 6.0,
+                  hero: _buildSplitHero(context, songs, p, totalDurationMs),
+                  body: _buildSplitTrackList(context, songs, p),
+                );
+              }
+
+              // Portrait Phone / Narrow View: Collapsing Immersive Apple Music layout
+              return CustomScrollView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                slivers: [
+                  // Apple Music Immersive Header (Hero Artwork + Blur Fade + Title + Round Action Buttons)
+                  SliverAppBar(
+                    expandedHeight: headerHeight,
+                    pinned: true,
+                    elevation: 0,
+                    backgroundColor: p.bg,
+                    surfaceTintColor: Colors.transparent,
+                    leading: const PulsrBackButton(),
+                    title: AnimatedOpacity(
+                      duration: PulsrMotion.state,
+                      opacity: _showCollapsedTitle ? 1.0 : 0.0,
+                      child: Text(
+                        folder.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.subtitle,
+                        ),
                       ),
                     ),
-                  ),
-                  centerTitle: true,
-                  flexibleSpace: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final safeTop = MediaQuery.paddingOf(context).top;
-                      final minExtent = kToolbarHeight + safeTop;
-                      final maxExtent = headerHeight;
-                      final delta = maxExtent - minExtent;
-                      final currentExtent = constraints.maxHeight;
-                      final t = delta > 0
-                          ? ((maxExtent - currentExtent) / delta).clamp(0.0, 1.0)
-                          : 0.0;
-                      final heroContentOpacity =
-                          (1.0 - (t * 2.2)).clamp(0.0, 1.0);
+                    centerTitle: true,
+                    flexibleSpace: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final safeTop = MediaQuery.paddingOf(context).top;
+                        final minExtent = kToolbarHeight + safeTop;
+                        final maxExtent = headerHeight;
+                        final delta = maxExtent - minExtent;
+                        final currentExtent = constraints.maxHeight;
+                        final t = delta > 0
+                            ? ((maxExtent - currentExtent) / delta)
+                                .clamp(0.0, 1.0)
+                            : 0.0;
+                        final heroContentOpacity =
+                            (1.0 - (t * 2.2)).clamp(0.0, 1.0);
 
-                      return FlexibleSpaceBar(
-                        collapseMode: CollapseMode.parallax,
-                        background: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            // 1. Full-bleed Artwork
-                            _buildImmersiveCover(context, songs, p),
+                        return FlexibleSpaceBar(
+                          collapseMode: CollapseMode.parallax,
+                          background: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              // 1. Full-bleed Artwork
+                              _buildImmersiveCover(context, songs, p),
 
-                            // 2. Multi-stop Apple Music gradient overlay
-                            Positioned.fill(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    stops: const [
-                                      0.0,
-                                      0.30,
-                                      0.55,
-                                      0.82,
-                                      1.0,
-                                    ],
-                                    colors: [
-                                      Colors.black.withValues(alpha: 0.45),
-                                      Colors.transparent,
-                                      p.bg.withValues(alpha: 0.35),
-                                      p.bg.withValues(alpha: 0.88),
-                                      p.bg,
+                              // 2. Multi-stop Apple Music gradient overlay
+                              Positioned.fill(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      stops: const [
+                                        0.0,
+                                        0.30,
+                                        0.55,
+                                        0.82,
+                                        1.0,
+                                      ],
+                                      colors: [
+                                        AppColors.scrimLight,
+                                        Colors.transparent,
+                                        p.bg.withValues(alpha: 0.35),
+                                        p.bg.withValues(alpha: 0.88),
+                                        p.bg,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              // 3. Title & Apple Music Action Row [ (i) ] [ (▶) ] [ (★) ]
+                              PositionedDirectional(
+                                start: AppSpacing.lg,
+                                end: AppSpacing.lg,
+                                bottom: AppSpacing.md,
+                                child: Opacity(
+                                  opacity: heroContentOpacity,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        folder.name,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: screenWidth < 360
+                                              ? 22.0
+                                              : (isTablet ? 30.0 : 26.0),
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.5,
+                                          color: Colors.white,
+                                          shadows: const [
+                                            Shadow(
+                                              color: Colors.black54,
+                                              blurRadius: 14,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          _buildGlassCircleButton(
+                                            icon: Icons.info_outline_rounded,
+                                            size: 40,
+                                            iconSize: 20,
+                                            p: p,
+                                            tooltip: 'Folder Details',
+                                            onTap: () => _showFolderOptionsMenu(
+                                                context, songs, p),
+                                          ),
+                                          SizedBox(
+                                            width: screenWidth < 360
+                                                ? AppSpacing.md
+                                                : AppSpacing.xl,
+                                          ),
+                                          _buildBigWhitePlayButton(
+                                              context, p, songs),
+                                          SizedBox(
+                                            width: screenWidth < 360
+                                                ? AppSpacing.md
+                                                : AppSpacing.xl,
+                                          ),
+                                          _buildGlassCircleButton(
+                                            icon: _isExcluded
+                                                ? Icons.visibility_off_rounded
+                                                : Icons.star_rounded,
+                                            iconColor: _isExcluded
+                                                ? p.error
+                                                : Colors.white,
+                                            size: 40,
+                                            iconSize: 22,
+                                            p: p,
+                                            tooltip: _isExcluded
+                                                ? context
+                                                    .l10n.browseIncludeInScan
+                                                : context
+                                                    .l10n.browseExcludeFromScan,
+                                            onTap: _toggleExclusion,
+                                          ),
+                                        ],
+                                      ),
                                     ],
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
-                            // 3. Title & Apple Music Action Row [ (i) ] [ (▶) ] [ (★) ]
-                            PositionedDirectional(
-                              start: AppSpacing.lg,
-                              end: AppSpacing.lg,
-                              bottom: AppSpacing.md,
-                              child: Opacity(
-                                opacity: heroContentOpacity,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      folder.name,
-                                      textAlign: TextAlign.center,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: screenWidth < 360
-                                            ? 22.0
-                                            : (isTablet ? 30.0 : 26.0),
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.5,
-                                        color: Colors.white,
-                                        shadows: const [
-                                          Shadow(
-                                            color: Colors.black54,
-                                            blurRadius: 14,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
+                  // Featured Card & Breadcrumbs & Section Header (Centered with content constraints)
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints:
+                            PulsrLayoutMetrics.contentConstraints(context),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: AppSpacing.xs),
+                            _buildFeaturedCard(
+                                context, songs, p, totalDurationMs),
+                            _buildBreadcrumbs(context, p, folder.path),
+                            const SizedBox(height: AppSpacing.xs),
+
+                            // Top Songs > Header
+                            Padding(
+                              padding: EdgeInsetsDirectional.fromSTEB(
+                                Adaptive.pagePadding(context),
+                                AppSpacing.sm,
+                                Adaptive.pagePadding(context),
+                                AppSpacing.xs,
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    context.l10n.browseTopTracks,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: AppFontSize.title,
+                                          letterSpacing: -0.3,
+                                        ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 20,
+                                    color: p.textTertiary,
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    Formatters.formatTrackCount(songs.length),
+                                    style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        _buildGlassCircleButton(
-                                          icon: Icons.info_outline_rounded,
-                                          size: 40,
-                                          iconSize: 20,
-                                          p: p,
-                                          tooltip: 'Folder Details',
-                                          onTap: () =>
-                                              _showFolderOptionsMenu(
-                                                  context, songs, p),
-                                        ),
-                                        SizedBox(
-                                          width: screenWidth < 360
-                                              ? AppSpacing.md
-                                              : AppSpacing.xl,
-                                        ),
-                                        _buildBigWhitePlayButton(
-                                            context, p, songs),
-                                        SizedBox(
-                                          width: screenWidth < 360
-                                              ? AppSpacing.md
-                                              : AppSpacing.xl,
-                                        ),
-                                        _buildGlassCircleButton(
-                                          icon: _isExcluded
-                                              ? Icons.visibility_off_rounded
-                                              : Icons.star_rounded,
-                                          iconColor: _isExcluded
-                                              ? p.error
-                                              : Colors.white,
-                                          size: 40,
-                                          iconSize: 22,
-                                          p: p,
-                                          tooltip: _isExcluded
-                                              ? context.l10n.browseIncludeInScan
-                                              : context.l10n.browseExcludeFromScan,
-                                          onTap: _toggleExclusion,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                      );
-                    },
-                  ),
-                ),
-
-                // Featured Card & Breadcrumbs & Section Header (Centered with content constraints)
-                SliverToBoxAdapter(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints:
-                          PulsrLayoutMetrics.contentConstraints(context),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: AppSpacing.xs),
-                          _buildFeaturedCard(
-                              context, songs, p, totalDurationMs),
-                          _buildBreadcrumbs(context, p, folder.path),
-                          const SizedBox(height: AppSpacing.xs),
-
-                          // Top Songs > Header
-                          Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
-                              Adaptive.pagePadding(context),
-                              AppSpacing.sm,
-                              Adaptive.pagePadding(context),
-                              AppSpacing.xs,
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  context.l10n.browseTopTracks,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 18,
-                                        letterSpacing: -0.3,
-                                      ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.chevron_right_rounded,
-                                  size: 20,
-                                  color: p.textTertiary,
-                                ),
-                                const Spacer(),
-                                Text(
-                                  Formatters.formatTrackCount(songs.length),
-                                  style: TextStyle(
-                                    color: p.textTertiary,
-                                    fontSize: AppFontSize.caption,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ),
-                ),
 
-                // Song List Items
-                if (songs.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: EmptyStateWidget(
-                        icon: Icons.music_off_rounded,
-                        title: context.l10n.browseNoTracksFound,
-                        subtitle: context.l10n.browseNoTracksInFolder,
+                  // Song List Items
+                  if (songs.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: PulsrEmptyState(
+                          icon: Icons.music_off_rounded,
+                          title: context.l10n.browseNoTracksFound,
+                          subtitle: context.l10n.browseNoTracksInFolder,
+                        ),
                       ),
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                      bottom: PulsrLayoutMetrics.scrollBottom(context),
-                    ),
-                    sliver: SliverList.separated(
-                      itemCount: songs.length,
-                      separatorBuilder: (_, __) => Center(
-                        child: ConstrainedBox(
-                          constraints:
-                              PulsrLayoutMetrics.contentConstraints(context),
-                          child: Padding(
-                            padding: EdgeInsetsDirectional.only(
-                              start: 64 + Adaptive.pagePadding(context),
-                            ),
-                            child: Divider(
-                              height: 1,
-                              thickness: 0.5,
-                              color: p.hairline.withValues(alpha: 0.35),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        bottom: PulsrLayoutMetrics.scrollBottom(context),
+                      ),
+                      sliver: SliverList.separated(
+                        itemCount: songs.length,
+                        separatorBuilder: (_, __) => Center(
+                          child: ConstrainedBox(
+                            constraints:
+                                PulsrLayoutMetrics.contentConstraints(context),
+                            child: Padding(
+                              padding: EdgeInsetsDirectional.only(
+                                start: 64 + Adaptive.pagePadding(context),
+                              ),
+                              child: Divider(
+                                height: 1,
+                                thickness: 0.5,
+                                color: p.hairline.withValues(alpha: 0.35),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      itemBuilder: (context, index) => Center(
-                        child: ConstrainedBox(
-                          constraints:
-                              PulsrLayoutMetrics.contentConstraints(context),
-                          child: _buildSongRow(context, songs, index, p),
+                        itemBuilder: (context, index) => Center(
+                          child: ConstrainedBox(
+                            constraints:
+                                PulsrLayoutMetrics.contentConstraints(context),
+                            child: _buildSongRow(context, songs, index, p),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              );
+            }
+
+            final errorView = PulsrEmptyState(
+              icon: Icons.error_outline_rounded,
+              iconColor: p.error,
+              title: context.l10n.couldNotLoadFolderSongs,
+              subtitle: context.l10n.libraryReadError,
+              primaryActionLabel: context.l10n.retry,
+              primaryActionIcon: Icons.refresh_rounded,
+              onPrimaryAction: () => setState(() {}),
+            );
+
+            return AsyncStateBuilder<Result<List<SongsTableData>>>(
+              snapshot: snapshot,
+              loadingWidget: const SkeletonList(
+                padding: EdgeInsets.only(top: AppSpacing.xl),
+              ),
+              emptyWidget: buildContent(const []),
+              onError: (_) => errorView,
+              onData: (result) => result.fold(
+                (_) => errorView,
+                buildContent,
+              ),
             );
           },
         ),

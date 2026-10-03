@@ -10,21 +10,24 @@ import 'package:just_audio/just_audio.dart';
 /// player or platform that cannot honour the mode keeps the historical sink,
 /// and this function never throws so a fan-out failure can never interrupt
 /// playback.
-Future<void> pushAaudioOutputToPlayers(
+Future<bool> pushAaudioOutputToPlayers(
   bool enabled, {
   bool preferExclusive = true,
   int targetBufferMs = 150,
   Iterable<AudioPlayer> players = const [],
 }) async {
+  var applied = true;
   for (final player in players) {
     try {
-      await player.dspSetAaudioOutput(
+      final accepted = await player.dspSetAaudioOutput(
         enabled,
         preferExclusive: preferExclusive,
         targetBufferMs: targetBufferMs,
       );
+      applied = accepted && applied;
     } catch (_) {
-      // Keep the historical sink path on unsupported platforms.
+      applied = false;
     }
   }
+  return applied;
 }
