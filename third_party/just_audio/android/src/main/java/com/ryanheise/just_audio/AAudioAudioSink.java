@@ -108,12 +108,15 @@ public final class AAudioAudioSink implements AudioSink {
         if (handle == 0L || sampleRate <= 0) {
             return CURRENT_POSITION_NOT_SET;
         }
+        long framesWritten = AaudioNativeBridge.nativeGetFramesWritten(handle);
         long framesRead = AaudioNativeBridge.nativeGetFramesRead(handle);
+        if (framesRead > framesWritten) {
+            framesRead = framesWritten;
+        }
         long positionUs = basePositionUs
                 + (long) (framesRead * (1_000_000.0 / sampleRate));
         if (!sourceEnded) {
             // Never report beyond what the app has actually written.
-            long framesWritten = AaudioNativeBridge.nativeGetFramesWritten(handle);
             long maxUs = basePositionUs
                     + (long) (framesWritten * (1_000_000.0 / sampleRate));
             if (positionUs > maxUs) positionUs = maxUs;
@@ -191,6 +194,7 @@ public final class AAudioAudioSink implements AudioSink {
             int encodedAccessUnitCount) throws InitializationException,
             WriteException {
         if (routePending && configuredFormat != null) {
+            routePending = false;
             Format previousFormat = configuredFormat;
             int previousDevice = openedDeviceId;
             try {
@@ -251,17 +255,6 @@ public final class AAudioAudioSink implements AudioSink {
             return;
         }
         eosWritten = true;
-        // Block until the device has consumed everything written.
-        long deadline = android.os.SystemClock.elapsedRealtime() + 5000;
-        while (handle != 0L
-                && AaudioNativeBridge.nativeGetFramesRead(handle)
-                        < AaudioNativeBridge.nativeGetFramesWritten(handle)) {
-            if (android.os.SystemClock.elapsedRealtime() > deadline) {
-                Log.w(TAG, "playToEndOfStream timed out waiting for drain");
-                break;
-            }
-            android.os.SystemClock.sleep(10);
-        }
         handledEndOfStream = true;
     }
 

@@ -206,8 +206,10 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     packetsPerUrb_ = kPacketsPerUrb;
     bytesPerUrb_ = bytesPerPacket_ * packetsPerUrb_;
 
-    // Power-of-two ring buffer capacity for mask-based indexing (~4 URBs slack).
-    const size_t targetRingBytes = static_cast<size_t>(bytesPerUrb_) * 4;
+    // Power-of-two ring buffer capacity for mask-based indexing (at least 250ms slack).
+    const size_t targetRingBytes = std::max(
+        static_cast<size_t>(bytesPerUrb_) * 32,
+        static_cast<size_t>(sampleRate_ * channels_ * bytesPerSample_ / 4));
     size_t cap = 2048;
     while (cap < targetRingBytes) cap <<= 1;
     ring_.assign(cap, 0);
@@ -337,6 +339,14 @@ void UsbAudioSink::releaseResources() {
     if (claimed_ && fd_ >= 0) {
         int iface = interfaceNumber_;
         ioctl(fd_, USBDEVFS_RELEASEINTERFACE, &iface);
+#if defined(__linux__) || defined(__ANDROID__)
+        // Re-attach the kernel snd-usb-audio driver so system audio routing and ALSA recover immediately
+        struct usbdevfs_ioctl cmd {};
+        cmd.ifno = interfaceNumber_;
+        cmd.ioctl_code = USBDEVFS_CONNECT;
+        cmd.data = nullptr;
+        ioctl(fd_, USBDEVFS_IOCTL, &cmd);
+#endif
     }
     claimed_ = false;
     fd_ = -1;

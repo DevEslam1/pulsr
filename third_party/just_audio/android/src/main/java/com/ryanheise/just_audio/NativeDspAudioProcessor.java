@@ -233,7 +233,15 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             bitPerfect = false;
         }
 
-        if (bitPerfect) {
+        boolean hasActiveGainCurve;
+        synchronized (rampLock) {
+            hasActiveGainCurve = (rampGains != null || Math.abs(staticGain - 1.0f) > 0.0001f);
+        }
+        if (transitionMuted || Math.abs(transitionGain - 1.0f) > 0.0001f) {
+            hasActiveGainCurve = true;
+        }
+
+        if (bitPerfect && !hasActiveGainCurve) {
             clearGainCurve();
             ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
             ByteBuffer original = inputBuffer.duplicate();
@@ -265,6 +273,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                     rampSegmentFrames = 0;
                     rampPosFrames = 0;
                 }
+            } else if (bitPerfect && Math.abs(staticGain - 1.0f) > 0.0001f) {
+                staticGain = 1.0f;
             }
         }
 
@@ -292,6 +302,9 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                     float frac = (float) (exact - seg);
                     gain = curve[seg] + (curve[seg + 1] - curve[seg]) * frac;
                 }
+            } else if (bitPerfect && Math.abs(idleGain - 1.0f) > 0.0001f) {
+                float frac = (float) (i / channelCount) / Math.max(1, processed);
+                gain = idleGain + (1.0f - idleGain) * frac;
             }
             float value = floats.get(i) * gain * profileGain;
             if (outputIsFloat) {
@@ -350,7 +363,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     private FloatBuffer ensureScratch(int sampleCount) {
         if (scratch == null || scratch.capacity() < sampleCount * 4) {
-            scratch = ByteBuffer.allocateDirect(sampleCount * 4).order(ByteOrder.nativeOrder());
+            int targetBytes = Math.max(sampleCount * 4, scratch == null ? 16384 : scratch.capacity() * 2);
+            scratch = ByteBuffer.allocateDirect(targetBytes).order(ByteOrder.nativeOrder());
             scratchFloats = scratch.asFloatBuffer();
         }
         return scratchFloats;

@@ -130,19 +130,23 @@ class StreamResolutionPipeline {
 
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
-      if (cached != null &&
-          cached.expires.isAfter(DateTime.now().add(_expirySafetyMargin))) {
-        _streamCache.remove(cacheKey);
-        _streamCache[cacheKey] = cached;
-        try {
-          getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {}
-        return (
-          url: cached.url,
-          userAgent: cached.userAgent,
-          cookies: cached.cookies,
-          quality: quality,
-        );
+      if (cached != null) {
+        if (cached.expires.isAfter(DateTime.now().add(_expirySafetyMargin))) {
+          _streamCache.remove(cacheKey);
+          _streamCache[cacheKey] = cached;
+          try {
+            getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
+          } catch (_) {}
+          return (
+            url: cached.url,
+            userAgent: cached.userAgent,
+            cookies: cached.cookies,
+            quality: quality,
+          );
+        } else {
+          // Eagerly evict expired stream cache entry
+          _streamCache.remove(cacheKey);
+        }
       }
       final inFlight = _inFlightResolves[cacheKey];
       if (inFlight != null && !inFlight.done) {

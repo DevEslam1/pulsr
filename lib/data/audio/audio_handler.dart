@@ -99,16 +99,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @factoryMethod
   static Future<PulsrAudioHandler> create(
       IMusicRepository repository, YtmService ytmService) async {
-    // The instance is captured so that if AudioService.init times out we can
-    // reuse the very instance its builder produced. A late completion of the
-    // in-flight init then binds THIS handler instead of creating and binding a
-    // second, state-less one (B-2).
-    PulsrAudioHandler? built;
-    // If the platform handshake times out before `builder` runs, this holds the
-    // degraded-mode instance the app has already fallen back to. The builder
-    // adopts it instead of constructing a second, unbound handler, so a late
-    // init success binds the very instance the UI drives (B-2/B-6).
-    PulsrAudioHandler? fallback;
+    final handler = PulsrAudioHandler(repository, ytmService);
     // User preference: keep the media notification after pause so playback
     // can be resumed from the shade. AudioServiceConfig is init-time only,
     // so this takes effect on the next cold start after the toggle changes.
@@ -141,10 +132,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     try {
       final initFuture = AudioService.init(
-        builder: () {
-          built = fallback ?? PulsrAudioHandler(repository, ytmService);
-          return built!;
-        },
+        builder: () => handler,
         config: AudioServiceConfig(
           androidNotificationChannelId: 'com.pulsr.music.audio',
           androidNotificationChannelName: channelName,
@@ -165,12 +153,8 @@ class PulsrAudioHandler extends BaseAudioHandler
           error: e,
           stackTrace: st,
           category: 'AudioHandler');
-      // Fall back to the instance the builder created (if it got that far);
-      // otherwise adopt this one so a late init success binds the same handler
-      // the app is already using instead of orphaning it (B-2/B-6).
-      fallback = built ?? PulsrAudioHandler(repository, ytmService);
-      fallback.platformBridgeDegraded.value = true;
-      return fallback;
+      handler.platformBridgeDegraded.value = true;
+      return handler;
     }
   }
 
@@ -2328,10 +2312,11 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
-      if (cached != null && cached.expires.isAfter(DateTime.now())) {
-        _streamCache.remove(cacheKey);
-        _streamCache[cacheKey] = cached;
-        _memoryManager.touch(cacheKey);
+      if (cached != null) {
+        if (cached.expires.isAfter(DateTime.now())) {
+          _streamCache.remove(cacheKey);
+          _streamCache[cacheKey] = cached;
+          _memoryManager.touch(cacheKey);
         try {
           _latencyTracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
@@ -2368,7 +2353,10 @@ class PulsrAudioHandler extends BaseAudioHandler
           cookies: cached.cookies,
           quality: quality
         );
+      } else {
+        _streamCache.remove(cacheKey);
       }
+    }
       final inFlight = _inFlightResolves[cacheKey];
       if (inFlight != null) {
         return await inFlight;

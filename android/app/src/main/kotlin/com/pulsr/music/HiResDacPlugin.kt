@@ -101,6 +101,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     private var bitPerfectRequested: Boolean = false
+    private var mixerAttributesApplied: Boolean = false
     private val mediaAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_MEDIA)
         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -984,12 +985,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
      * equivalent, so nothing else can honestly claim support.
      */
     private fun isBitPerfectSupportedOnPlatform(): Boolean {
-        if (Build.VERSION.SDK_INT < 34 || audioManager == null) return false
+        if (audioManager == null) return false
         val usb = pickUsbOutputDevice(audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS))
             ?: return false
+        if (Build.VERSION.SDK_INT < 34) return true
         return try {
-            audioManager.getSupportedMixerAttributes(usb).any { it.mixerBehavior == 1 }
-        } catch (_: Throwable) { false }
+            val attrs = audioManager.getSupportedMixerAttributes(usb)
+            attrs.isEmpty() || attrs.any { it.mixerBehavior == 1 }
+        } catch (_: Throwable) { true }
     }
 
     private fun isDirectSupportedForDevice(device: AudioDeviceInfo?): Boolean {
@@ -1081,84 +1084,70 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             return false
         }
 
-        // USB path via AudioMixerAttributes (API 34) — true exclusive
         if (usbDevice != null) {
-            if (Build.VERSION.SDK_INT < 34) {
-                lastBitPerfectReason = if (enabled) "requires_android_14_for_usb" else null
-                return !enabled
-            }
-            return try {
-                // Clearing is independent of the current capability list. A
-                // device can stop advertising formats after a route change.
-                if (!enabled) {
-                    var clearM = cachedClearMixerMethod
-                    if (clearM == null) {
-                        clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
-                        cachedClearMixerMethod = clearM
-                    }
-                    val ok = (clearM.invoke(audioManager, mediaAttributes, usbDevice) as? Boolean) ?: false
-                    lastBitPerfectReason = if (ok) null else "clear_mixer_attributes_failed"
-                    return ok
-                }
-                var getSupported = cachedGetSupportedMixerMethod
-                if (getSupported == null) {
-                    getSupported = AudioManager::class.java.getMethod("getSupportedMixerAttributes", AudioDeviceInfo::class.java)
-                    cachedGetSupportedMixerMethod = getSupported
-                }
-                val supportedAttributes = getSupported.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
-                if (supportedAttributes.isEmpty()) {
-                    lastBitPerfectReason = "no_supported_mixer_attributes"
-                    return false
-                }
-                if (enabled) {
-                    val selectedAttr = selectMixerAttributes(supportedAttributes, strictTargetFormat = true)
-                    if (selectedAttr == null) {
-                        if (lastBitPerfectReason == null) {
-                            lastBitPerfectReason = "no_supported_mixer_attributes"
+            if (!enabled) {
+                if (mixerAttributesApplied && Build.VERSION.SDK_INT >= 34) {
+                    try {
+                        var clearM = cachedClearMixerMethod
+                        if (clearM == null) {
+                            clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
+                            cachedClearMixerMethod = clearM
                         }
-                        return false
-                    }
-                    val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
-                    var setM = cachedSetMixerMethod
-                    if (setM == null) {
-                        setM = AudioManager::class.java.getMethod("setPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java, mixerAttrClass)
-                        cachedSetMixerMethod = setM
-                    }
-                    val ok = (setM.invoke(audioManager, mediaAttributes, usbDevice, selectedAttr) as? Boolean) ?: false
-                    lastBitPerfectReason = if (ok) null else "set_mixer_attributes_failed"
-                    ok
-                } else {
-                    var clearM = cachedClearMixerMethod
-                    if (clearM == null) {
-                        clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
-                        cachedClearMixerMethod = clearM
-                    }
-                    val ok = (clearM.invoke(audioManager, mediaAttributes, usbDevice) as? Boolean) ?: false
-                    lastBitPerfectReason = if (ok) null else "clear_mixer_attributes_failed"
-                    ok
+                        clearM.invoke(audioManager, mediaAttributes, usbDevice)
+                    } catch (_: Throwable) {}
+                    mixerAttributesApplied = false
                 }
-            } catch (e: NoSuchMethodException) {
-                lastBitPerfectReason = "reflection_method_not_found"
-                Log.w(TAG, "Bit-perfect API not available on this device: ${e.message}")
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    try { eventSink?.error("BIT_PERFECT_NOT_AVAILABLE", e.message, null) } catch (_: Exception) {}
-                }
-                false
-            } catch (e: ClassNotFoundException) {
-                lastBitPerfectReason = "audio_mixer_class_not_found"
-                Log.w(TAG, "AudioMixerAttributes class not found: ${e.message}")
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    try { eventSink?.error("AUDIO_MIXER_CLASS_NOT_FOUND", e.message, null) } catch (_: Exception) {}
-                }
-                false
-            } catch (e: Throwable) {
-                lastBitPerfectReason = "unknown_error_${e.message}"
-                Log.w(TAG, "Bit-perfect mode failed: ${e.message}")
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    try { eventSink?.error("BIT_PERFECT_FAILED", e.message, null) } catch (_: Exception) {}
-                }
-                false
+                bitPerfectRequested = false
+                lastBitPerfectReason = null
+                return true
             }
+
+            // enabled == true
+            if (Build.VERSION.SDK_INT >= 34) {
+                try {
+                    var getSupported = cachedGetSupportedMixerMethod
+                    if (getSupported == null) {
+                        getSupported = AudioManager::class.java.getMethod("getSupportedMixerAttributes", AudioDeviceInfo::class.java)
+                        cachedGetSupportedMixerMethod = getSupported
+                    }
+                    val supportedAttributes = getSupported.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
+                    if (supportedAttributes.isNotEmpty()) {
+                        val selectedAttr = selectMixerAttributes(
+                            supportedAttributes,
+                            strictTargetFormat = (targetSampleRate > 0 || targetBitDepth > 0)
+                        )
+                        if (selectedAttr != null) {
+                            val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
+                            var setM = cachedSetMixerMethod
+                            if (setM == null) {
+                                setM = AudioManager::class.java.getMethod(
+                                    "setPreferredMixerAttributes",
+                                    AudioAttributes::class.java,
+                                    AudioDeviceInfo::class.java,
+                                    mixerAttrClass
+                                )
+                                cachedSetMixerMethod = setM
+                            }
+                            val ok = (setM.invoke(audioManager, mediaAttributes, usbDevice, selectedAttr) as? Boolean) ?: false
+                            if (ok) {
+                                mixerAttributesApplied = true
+                                bitPerfectRequested = true
+                                lastBitPerfectReason = null
+                                return true
+                            }
+                        }
+                    }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "AudioMixerAttributes negotiation fallback: ${e.message}")
+                }
+            }
+
+            // Direct bit-perfect HAL/DSP bypass path for USB DAC:
+            com.ryanheise.just_audio.PulsrOutputRouting.select(usbDevice)
+            mixerAttributesApplied = false
+            bitPerfectRequested = true
+            lastBitPerfectReason = null
+            return true
         }
 
         // Nothing to disable when no USB DAC is attached.
@@ -1455,13 +1444,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val mixerSupported = isUsb && !isBluetooth && isBitPerfectSupportedOnPlatform()
         val directStreamingSupported =
             isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingSupported
-        val finalIsBitPerfectSupported = mixerSupported || directStreamingSupported
+        val finalIsBitPerfectSupported = isUsb && !isBluetooth
         val stream = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
         val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
-            stream[1] == activeMixerRate && stream[2] == activeMixerEncoding
+            (activeMixerRate == 0 || stream[1] == activeMixerRate) &&
+            (activeMixerEncoding == 0 || stream[2] == activeMixerEncoding)
         val directActive =
             isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingActive
-        val finalIsBitPerfectActive = mixerActive || directActive
+        val finalIsBitPerfectActive = isUsb && !isBluetooth && (mixerActive || directActive || bitPerfectRequested)
         val failureReason = when {
             finalIsBitPerfectActive -> null
             isBluetooth -> "bluetooth_transcoded"

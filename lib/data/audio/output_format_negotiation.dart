@@ -64,6 +64,10 @@ enum OutputFormatReason {
   /// chosen instead (never a lower one than necessary).
   deviceRateLimited,
 
+  /// The requested rate is below every rate supported by the device; the
+  /// device's minimum rate floor was chosen.
+  deviceFloorLimited,
+
   /// The user explicitly asked for a rate below the track's native rate.
   userRequestedBelowTrack,
 }
@@ -142,7 +146,8 @@ OutputFormatDecision negotiateOutputFormat({
 
   // Bit-perfect / exclusive output negotiates its own mixer attributes; asking
   // the shared output format would fight it. Report the intent, applied:false.
-  if (bitPerfectActive) {
+  // Bluetooth routes are always lossy-transcoded and cannot be bit-perfect exclusive.
+  if (bitPerfectActive && !routesThroughBluetooth(route)) {
     return OutputFormatDecision(
       sampleRate: explicitRate > 0 ? explicitRate : trackRate,
       bitDepth: explicitDepth > 0 ? explicitDepth : trackDepth,
@@ -182,7 +187,9 @@ OutputFormatDecision negotiateOutputFormat({
     // is below every supported rate, the device cannot go lower.
     final atOrBelow = rates.where((r) => r <= desiredRate).toList();
     chosenRate = atOrBelow.isNotEmpty ? atOrBelow.last : rates.first;
-    if (trackRate > 0 &&
+    if (atOrBelow.isEmpty) {
+      reason = OutputFormatReason.deviceFloorLimited;
+    } else if (trackRate > 0 &&
         chosenRate < trackRate &&
         explicitRate > 0 &&
         explicitRate <= trackRate) {

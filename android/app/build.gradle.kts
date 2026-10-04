@@ -228,12 +228,18 @@ tasks.register("testNative") {
                 val proc = ProcessBuilder(if (isWindows) listOf("where", "cmake") else listOf("which", "cmake"))
                     .redirectErrorStream(true).start()
                 val out = proc.inputStream.bufferedReader().readText().trim().lines().firstOrNull()
-                proc.waitFor()
-                out?.takeIf { it.isNotBlank() }
+                val code = proc.waitFor()
+                if (code == 0 && !out.isNullOrBlank()) out else null
             } catch (_: Throwable) { null }
             if (onPath != null) return onPath
 
-            val sdkRoot = System.getenv("ANDROID_HOME")
+            val localProps = file("../local.properties")
+            val sdkFromProps = if (localProps.exists()) {
+                localProps.readLines().firstOrNull { it.startsWith("sdk.dir=") }
+                    ?.substringAfter("=")?.trim()?.replace("\\\\", "/")?.replace("\\", "/")
+            } else null
+            val sdkRoot = sdkFromProps
+                ?: System.getenv("ANDROID_HOME")
                 ?: System.getenv("ANDROID_SDK_ROOT")
                 ?: (if (isWindows) System.getenv("LOCALAPPDATA")?.let { "$it/Android/Sdk" } else null)
             if (sdkRoot != null) {
@@ -251,6 +257,12 @@ tasks.register("testNative") {
 
         fun executeCmd(cmd: List<String>, desc: String, workingDir: File? = null) {
             val pb = ProcessBuilder(cmd).redirectErrorStream(true)
+            if (isWindows) {
+                val env = pb.environment()
+                val currentPath = env["PATH"] ?: ""
+                val windhawkBin = "C:\\Program Files\\Windhawk\\Compiler\\bin"
+                env["PATH"] = "$windhawkBin;$currentPath"
+            }
             if (workingDir != null) pb.directory(workingDir)
             val proc = pb.start()
             proc.inputStream.bufferedReader().useLines { lines ->
@@ -265,6 +277,7 @@ tasks.register("testNative") {
         fun runBuild(configName: String, sanitizers: Boolean) {
             val buildDir = file("build/testNative/$configName").apply { mkdirs() }
             val cmake = findCmake()
+            val ctest = File(File(cmake).parentFile, if (isWindows) "ctest.exe" else "ctest").takeIf { it.exists() }?.absolutePath ?: "ctest"
             val configureArgs = mutableListOf(
                 cmake,
                 "-S", testDir.absolutePath,
@@ -272,6 +285,10 @@ tasks.register("testNative") {
                 "-DCMAKE_BUILD_TYPE=$configName",
                 "-DCMAKE_CXX_COMPILER=$compiler",
             )
+            val ninja = File(File(cmake).parentFile, if (isWindows) "ninja.exe" else "ninja")
+            if (ninja.exists()) {
+                configureArgs += listOf("-G", "Ninja", "-DCMAKE_MAKE_PROGRAM=${ninja.absolutePath.replace('\\', '/')}")
+            }
             if (sanitizers && !isWindows) {
                 configureArgs += "-DPULSR_TEST_SANITIZERS=ON"
             }
@@ -284,9 +301,21 @@ tasks.register("testNative") {
                 "testNative-build-$configName"
             )
 
+            if (isWindows) {
+                val windhawkBin = file("C:/Program Files/Windhawk/Compiler/bin")
+                for (dll in listOf("libc++.dll", "libunwind.dll")) {
+                    val src = File(windhawkBin, dll)
+                    if (src.exists()) {
+                        src.copyTo(File(buildDir, dll), overwrite = true)
+                        val whl = File(buildDir, dll.replace(".dll", ".whl"))
+                        src.copyTo(whl, overwrite = true)
+                    }
+                }
+            }
+
             println("[testNative] Running $configName test suite via CTest ...")
             executeCmd(
-                listOf("ctest", "--test-dir", buildDir.absolutePath, "--output-on-failure"),
+                listOf(ctest, "--test-dir", buildDir.absolutePath, "--output-on-failure"),
                 "testNative-run-$configName"
             )
         }

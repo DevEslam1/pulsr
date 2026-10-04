@@ -369,6 +369,17 @@ class HiResAudioService {
           category: 'HiResAudio');
       return false;
     }
+    final devRates = _cachedOutputInfo?.supportedSampleRates;
+    if (sampleRate > 0 &&
+        devRates != null &&
+        devRates.isNotEmpty &&
+        !devRates.contains(sampleRate)) {
+      ErrorLogger.log(
+        'Rejected sample rate $sampleRate not supported by current device ($devRates)',
+        category: 'HiResAudio',
+      );
+      return false;
+    }
     try {
       final bool? success = await _methodChannel.invokeMethod<bool>(
           'setTargetOutputFormat', {

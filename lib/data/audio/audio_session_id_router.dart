@@ -122,7 +122,6 @@ class AudioSessionIdRouter {
             category: 'AudioSessionIdRouter',
           );
         }
-        await Future.microtask(() {});
       }
     } finally {
       _isDraining = false;

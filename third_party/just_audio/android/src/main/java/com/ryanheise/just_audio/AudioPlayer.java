@@ -434,11 +434,16 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     // never label this fallback as exclusive output.
                     Log.w(TAG, "AAudio output refused; restoring AudioTrack", error);
                     aaudioOutputEnabled = false;
-                    handler.post(() -> {
+                    Runnable doRebuild = () -> {
                         if (player == null) return;
                         rebuildPlayerForOutput();
                         if (!loadedSources.isEmpty()) player.prepare();
-                    });
+                    };
+                    if (android.os.Looper.myLooper() == handler.getLooper()) {
+                        doRebuild.run();
+                    } else {
+                        handler.post(doRebuild);
+                    }
                     return;
                 }
                 cause = cause.getCause();
@@ -512,14 +517,31 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 // device grants the requested sharing mode. Probe a real stream
                 // before accepting/persisting the preference.
                 androidx.media3.common.Format format = player == null ? null : player.getAudioFormat();
-                int rate = format != null && format.sampleRate > 0 ? format.sampleRate : 48000;
-                int channels = format != null && format.channelCount > 0 ? format.channelCount : 2;
+                Integer requestedRate = call.argument("sampleRate");
+                int rate = (requestedRate != null && requestedRate > 0)
+                        ? requestedRate
+                        : (format != null && format.sampleRate > 0 ? format.sampleRate : 48000);
+                Integer requestedChannels = call.argument("channelCount");
+                int channels = (requestedChannels != null && requestedChannels > 0)
+                        ? requestedChannels
+                        : (format != null && format.channelCount > 0 ? format.channelCount : 2);
                 long probe = 0L;
                 try {
                     probe = AaudioNativeBridge.nativeOpen(rate, channels,
                             AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
                             aaudioTargetBufferMs);
                     effective = probe != 0L;
+                    if (effective && format == null && requestedRate == null) {
+                        int otherRate = (rate == 48000) ? 44100 : 48000;
+                        long probeOther = AaudioNativeBridge.nativeOpen(otherRate, channels,
+                                AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
+                                aaudioTargetBufferMs);
+                        if (probeOther != 0L) {
+                            AaudioNativeBridge.nativeClose(probeOther);
+                        } else {
+                            effective = false;
+                        }
+                    }
                 } catch (LinkageError | RuntimeException refused) {
                     effective = false;
                     Log.w(TAG, "AAudio output probe refused", refused);
@@ -1027,7 +1049,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     DefaultAudioSink sink = new DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                        .setAudioProcessors(new AudioProcessor[] { dspProcessor })
+                        .setAudioProcessors(enableFloatOutput ? new AudioProcessor[0] : new AudioProcessor[] { dspProcessor })
                         .build();
                     PulsrOutputRouting.observe(sink);
                     return enableFloatOutput ? new FloatDspAudioSink(sink, dspProcessor) : sink;

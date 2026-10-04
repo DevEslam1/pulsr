@@ -15,6 +15,26 @@ public final class PulsrOutputRouting {
     private static final Map<DefaultAudioSink, Boolean> sinks = new WeakHashMap<>();
     private static final Map<AAudioAudioSink, Boolean> nativeSinks = new WeakHashMap<>();
     private static AudioDeviceInfo preferred;
+    private static Field audioTrackField;
+    private static boolean reflectionWarningLogged = false;
+
+    private static Field getAudioTrackField() {
+        if (audioTrackField != null) return audioTrackField;
+        try {
+            Field field = DefaultAudioSink.class.getDeclaredField("audioTrack");
+            field.setAccessible(true);
+            audioTrackField = field;
+            return field;
+        } catch (ReflectiveOperationException e) {
+            if (!reflectionWarningLogged) {
+                android.util.Log.w("PulsrOutputRouting",
+                    "Media3 DefaultAudioSink.audioTrack reflection unavailable; telemetry will degrade gracefully", e);
+                reflectionWarningLogged = true;
+            }
+            return null;
+        }
+    }
+
     private PulsrOutputRouting() {}
 
     public static synchronized void register(ExoPlayer player, boolean aaudio) {
@@ -44,8 +64,8 @@ public final class PulsrOutputRouting {
             if (sink.isPlaying() && sink.measuredStream()[1] > 0) return true;
         }
         try {
-            Field field = DefaultAudioSink.class.getDeclaredField("audioTrack");
-            field.setAccessible(true);
+            Field field = getAudioTrackField();
+            if (field == null) return false;
             for (DefaultAudioSink sink : sinks.keySet()) {
                 AudioTrack track = (AudioTrack) field.get(sink);
                 if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
@@ -63,8 +83,8 @@ public final class PulsrOutputRouting {
             if (sink.isPlaying()) return measured;
         }
         try {
-            Field field = DefaultAudioSink.class.getDeclaredField("audioTrack");
-            field.setAccessible(true);
+            Field field = getAudioTrackField();
+            if (field == null) return nativeFallback != null ? nativeFallback : new int[] {0, 0, 0};
             AudioTrack fallback = null;
             for (DefaultAudioSink sink : sinks.keySet()) {
                 AudioTrack track = (AudioTrack) field.get(sink);

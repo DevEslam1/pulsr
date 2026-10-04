@@ -1,6 +1,7 @@
 // F8: Multi-output routing (A2DP + speaker simultaneously).
 import 'dart:async';
 import 'package:flutter/services.dart';
+import '../../core/constants/channels.dart';
 
 enum MultiOutputMode {
   systemDefault,
@@ -14,7 +15,7 @@ enum MultiOutputMode {
 /// effects channel and always degrade gracefully to system default.
 class MultiOutputRouter {
   static const MethodChannel _channel =
-      MethodChannel('com.pulsr.music/audio_effects');
+      MethodChannel(PulsrChannels.audioEffects);
 
   MultiOutputMode mode = MultiOutputMode.systemDefault;
   bool lastRouteSupported = true;
