@@ -50,6 +50,15 @@ class UsbExclusivePlugin(
         const val EVENT_CHANNEL = "com.pulsr.music/usb_exclusive_events"
         private const val ACTION_USB_PERMISSION = "com.pulsr.music.USB_PERMISSION"
 
+        /**
+         * Cross-plugin snapshot for [HiResDacPlugin]: the direct UAC2
+         * isochronous sink is streaming / the attached DAC exposes a streaming
+         * endpoint. Bit-Perfect uses this as its fallback when Android does not
+         * advertise exclusive mixer attributes for the DAC.
+         */
+        @Volatile var directStreamingActive: Boolean = false
+        @Volatile var directStreamingSupported: Boolean = false
+
         // UAC class-specific request codes / audio control selectors.
         private const val REQ_SET_CUR = 0x01
         private const val REQ_GET_CUR = 0x81
@@ -73,6 +82,7 @@ class UsbExclusivePlugin(
     private var claimedInterface: UsbInterface? = null
     private var uacVersion: Int = UsbAudioControlParser.UAC_NONE
     private var streamInterfaceNumber: Int? = null
+    private var parsedResult: UsbAudioControlParser.Result? = null
 
     private var minRaw: Int? = null
     private var maxRaw: Int? = null
@@ -324,6 +334,7 @@ class UsbExclusivePlugin(
     }
 
     private fun applyParsed(parsed: UsbAudioControlParser.Result) {
+        parsedResult = parsed
         uacVersion = parsed.uacVersion
         streamInterfaceNumber = parsed.streamingInterface
         volumeUnit = parsed.volumeUnit
@@ -347,13 +358,13 @@ class UsbExclusivePlugin(
             return baseStatus(attached = false, permitted = false, device = null)
         }
         val permitted = usbManager?.hasPermission(device) == true
+        // Keep the FULL parsed result: reconstructing it from the cached summary
+        // fields dropped `streamingEndpoint`, so `streamingSupported` was always
+        // false once a connection was open and the direct bit-perfect toggle
+        // never appeared.
         val parsed: UsbAudioControlParser.Result = if (permitted) {
-            val conn = ensureConnection(device)
-            if (conn != null) {
-                UsbAudioControlParser.Result(uacVersion, volumeUnit, streamInterfaceNumber)
-            } else {
-                parseViaInterfaces(device).also { applyParsed(it) }
-            }
+            ensureConnection(device)
+            parsedResult ?: parseViaInterfaces(device).also { applyParsed(it) }
         } else {
             parseViaInterfaces(device).also { applyParsed(it) }
         }
@@ -366,6 +377,13 @@ class UsbExclusivePlugin(
             }
             claimedStreamingInterface = null
         }
+        directStreamingActive = streaming
+        // Before USB permission is granted only the interface descriptors are
+        // readable; a UAC2 AudioStreaming interface means the direct path is
+        // worth offering (the endpoint is parsed and validated on start).
+        val directCapable = parsed.streamingEndpoint != null ||
+            parsed.streamingInterface != null
+        directStreamingSupported = nativeLoaded && directCapable
 
         val hasVolume = parsed.volumeUnit != null &&
             (parsed.uacVersion == UsbAudioControlParser.UAC1 ||
@@ -382,7 +400,7 @@ class UsbExclusivePlugin(
             "exclusiveActive" to (claimedInterface != null),
             "exclusiveSupported" to hasVolume,
             "streamingActive" to streaming,
-            "streamingSupported" to (nativeLoaded && parsed.streamingEndpoint != null),
+            "streamingSupported" to (nativeLoaded && directCapable),
             "hardwareVolumeDb" to currentVolumeDb(),
             "minVolumeDb" to (minRaw?.let { rawToDb(it) }),
             "maxVolumeDb" to (maxRaw?.let { rawToDb(it) }),
@@ -794,6 +812,7 @@ class UsbExclusivePlugin(
             }
             mainHandler.removeCallbacks(watchdog)
             streaming = true
+            directStreamingActive = true
             currentStreamingRate = sampleRate
             claimedStreamingInterface = iface
             emitState()
@@ -823,6 +842,7 @@ class UsbExclusivePlugin(
             try { nativeUsbStreamStop() } catch (_: Exception) {}
         }
         streaming = false
+        directStreamingActive = false
         currentStreamingRate = 0
         val iface = claimedStreamingInterface
         val conn = connection
@@ -872,6 +892,8 @@ class UsbExclusivePlugin(
             streaming = false
             claimedStreamingInterface = null
         }
+        directStreamingActive = false
+        directStreamingSupported = false
         releaseClaim()
         try { connection?.close() } catch (_: Exception) {}
         connection = null
@@ -879,6 +901,7 @@ class UsbExclusivePlugin(
         volumeUnit = null
         uacVersion = UsbAudioControlParser.UAC_NONE
         streamInterfaceNumber = null
+        parsedResult = null
         minRaw = null
         maxRaw = null
         resRaw = null

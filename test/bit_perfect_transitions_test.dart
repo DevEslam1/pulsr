@@ -183,4 +183,49 @@ void main() {
     await cubit.setAaudioOutputEnabled(false);
     expect(cubit.state.aaudioOutputEnabled, false);
   });
+
+  test('mixer-attribute rejection falls back to Pulsr direct USB streaming',
+      () async {
+    const usbChannel = MethodChannel(PulsrChannels.usbExclusive);
+    final usbCalls = <String>[];
+    var streamingActive = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(usbChannel, (call) async {
+      usbCalls.add(call.method);
+      switch (call.method) {
+        case 'getStatus':
+          return <String, dynamic>{
+            'attached': true,
+            'permitted': true,
+            'streamingSupported': true,
+            'streamingActive': streamingActive,
+          };
+        case 'startStreaming':
+          streamingActive = true;
+          return <String, dynamic>{'success': true, 'resultCode': 0};
+        case 'stopStreaming':
+          streamingActive = false;
+          return <String, dynamic>{'success': true};
+        default:
+          return null;
+      }
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(usbChannel, null);
+    });
+
+    // The platform refuses exclusive mixer attributes on this route.
+    when(() => hires.setBitPerfectMode(any())).thenAnswer((_) async => false);
+    await cubit.setBitPerfectOutput(true);
+
+    expect(cubit.state.bitPerfectOutput, true);
+    expect(usbCalls, contains('startStreaming'));
+    expect(bypassCalls, contains(true));
+
+    await cubit.setBitPerfectOutput(false);
+    expect(cubit.state.bitPerfectOutput, false);
+    expect(usbCalls, contains('stopStreaming'));
+    expect(streamingActive, false);
+  });
 }

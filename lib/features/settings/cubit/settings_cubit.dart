@@ -20,6 +20,7 @@ import '../../../core/services/hires_audio_service.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/services/theme_scheduler_service.dart';
 import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/platform_capabilities.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/dsd_decoder_helper.dart';
@@ -28,6 +29,7 @@ import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/audio/multi_output_router.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
+import '../../../domain/services/usb_exclusive_service.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'proxy_endpoint_validator.dart';
@@ -1060,14 +1062,21 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         if (loadedState.bitPerfectOutput) {
           final applied = await _hiResAudioService.setBitPerfectMode(true);
           if (!applied) {
-            await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-            await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-            loadedState = loadedState.copyWith(
-              bitPerfectOutput: false,
-              strictBitPerfect: false,
-            );
-            safeEmit(state.copyWith(
-                bitPerfectOutput: false, strictBitPerfect: false));
+            // Same fallback as the manual toggle: DACs without platform
+            // exclusive mixer attributes can still run Pulsr's direct USB sink.
+            final direct = await _tryStartDirectUsbStreaming();
+            if (direct) {
+              _bitPerfectViaDirectStream = true;
+            } else {
+              await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+              await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+              loadedState = loadedState.copyWith(
+                bitPerfectOutput: false,
+                strictBitPerfect: false,
+              );
+              safeEmit(state.copyWith(
+                  bitPerfectOutput: false, strictBitPerfect: false));
+            }
           }
         }
         // MQA hook wiring (orphan 20-01): the decoder hook previously defaulted

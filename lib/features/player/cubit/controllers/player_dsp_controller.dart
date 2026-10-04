@@ -27,6 +27,7 @@ import '../../../../domain/models/reverb_preset.dart';
 import '../../../../domain/services/headphone_device_matcher.dart';
 import '../../../../domain/services/settings_profiles_service.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
+import '../../../../domain/services/usb_exclusive_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../player_constants.dart';
 import '../player_state.dart';

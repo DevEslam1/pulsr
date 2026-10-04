@@ -3,11 +3,79 @@ part of 'settings_cubit.dart';
 mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   final Mutex _audioModeMutex = Mutex();
 
+  /// True while Bit-Perfect is running through Pulsr's own UAC2 isochronous
+  /// sink instead of Android's exclusive mixer attributes. Not persisted: the
+  /// boot restore re-establishes it from the saved preference.
+  bool _bitPerfectViaDirectStream = false;
+
+  /// Last direct-sink start failure, surfaced next to the mixer reason so the
+  /// user learns why the fallback did not engage.
+  String? _lastDirectUsbFailure;
+
   Future<void> _pushBitPerfectBypass(bool enabled) async {
     if (getIt.isRegistered<EqualizerManager>()) {
       await getIt<EqualizerManager>().setBypassDspForBitPerfect(enabled);
     } else {
       await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
+    }
+  }
+
+  /// Last-resort Bit-Perfect path for DACs/OS builds without exclusive mixer
+  /// attributes: the direct UAC2 sink writes the PCM straight to the DAC while
+  /// the native DSP tee mutes the HAL path. Returns true when the stream runs.
+  Future<bool> _tryStartDirectUsbStreaming() async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    // AAudio Direct bypasses the ExoPlayer DSP chain the USB tee lives in.
+    if (state.aaudioOutputEnabled) return false;
+    try {
+      final usb = UsbExclusiveService();
+      var status = usb.lastStatus;
+      if (!status.attached || !status.streamingSupported || !status.permitted) {
+        status = await usb.getStatus();
+      }
+      if (!status.attached || !status.streamingSupported) return false;
+      if (!status.permitted) {
+        final granted = await usb.requestPermission();
+        if (!granted) return false;
+      }
+      final res =
+          await usb.startStreaming(sampleRate: _directStreamSampleRate());
+      if (!res.isOk) {
+        _lastDirectUsbFailure = res.toUserMessage();
+        ErrorLogger.log(
+          'Direct USB bit-perfect streaming refused (${res.name})',
+          category: 'SettingsAudioActions',
+        );
+      } else {
+        _lastDirectUsbFailure = null;
+      }
+      return res.isOk;
+    } catch (e, st) {
+      _lastDirectUsbFailure = e.toString();
+      ErrorLogger.log('Direct USB bit-perfect streaming failed',
+          error: e, stackTrace: st, category: 'SettingsAudioActions');
+      return false;
+    }
+  }
+
+  int _directStreamSampleRate() {
+    final deviceRate = state.currentOutputDevice?.sampleRate ?? 0;
+    if (deviceRate > 0) return deviceRate;
+    final rates = [...UsbExclusiveService().lastStatus.supportedRates]..sort();
+    if (rates.isNotEmpty) {
+      return rates.firstWhere((r) => r >= 48000, orElse: () => rates.last);
+    }
+    return 48000;
+  }
+
+  Future<void> _stopDirectUsbStreaming() async {
+    try {
+      // Unconditional: a stale status must never leave the HAL muted with the
+      // switch showing Bit-Perfect as off.
+      await UsbExclusiveService().stopStreaming();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to stop direct USB streaming',
+          error: e, stackTrace: st, category: 'SettingsAudioActions');
     }
   }
 
@@ -116,7 +184,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // animate ON and immediately snap back OFF whenever the route rejected
     // exclusive mode (e.g. USB DAC on Android < 14).
     final prefs = await SharedPreferences.getInstance();
-    final applied = await _hiResAudioService.setBitPerfectMode(enabled);
+    final wasDirect = _bitPerfectViaDirectStream;
+    var applied = await _hiResAudioService.setBitPerfectMode(enabled);
+    if (enabled && !applied) {
+      // Platform refused exclusive mixer attributes (or the DAC never
+      // advertised them). Try Pulsr's own direct USB sink before giving up.
+      applied = await _tryStartDirectUsbStreaming();
+      _bitPerfectViaDirectStream = applied;
+    } else if (enabled) {
+      _bitPerfectViaDirectStream = false;
+    } else if (!enabled && wasDirect) {
+      // Direct mode never configured mixer attributes, so a failed clear must
+      // not keep the switch stuck on. Stopping the sink is the whole disable.
+      await _stopDirectUsbStreaming();
+      _bitPerfectViaDirectStream = false;
+      applied = true;
+    }
     if (!enabled && !applied) {
       safeEmit(state.copyWith(
         errorMessage:
@@ -135,11 +218,15 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       } catch (_) {}
       if (!isClosed) {
         final reason = _hiResAudioService.lastBitPerfectFailureReason;
+        final base = AudioConflicts.bitPerfectReasonMessage(reason) ??
+            'Bit-Perfect output is not supported by the current output device.';
+        final directHint = _lastDirectUsbFailure == null
+            ? ''
+            : ' Direct USB streaming also failed: $_lastDirectUsbFailure.';
         safeEmit(state.copyWith(
           bitPerfectOutput: false,
           strictBitPerfect: false,
-          errorMessage: AudioConflicts.bitPerfectReasonMessage(reason) ??
-              'Bit-Perfect output is not supported by the current output device.',
+          errorMessage: '$base$directHint',
         ));
       }
       await refreshOutputDevice();
@@ -311,7 +398,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final prevFollowRate = state.followTrackSampleRate;
     if (enabled) {
       final block = AudioConflicts.strictBitPerfectBlockedReason(
-          state.currentOutputDevice);
+        state.currentOutputDevice,
+      );
       if (block != null) {
         safeEmit(state.copyWith(errorMessage: block));
         return;
@@ -328,7 +416,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // Confirm with the platform BEFORE emitting: the old optimistic emit made
     // the strict switch animate ON and snap back OFF whenever exclusive mode
     // was refused.
-    final applied = await _hiResAudioService.setBitPerfectMode(true);
+    var applied = await _hiResAudioService.setBitPerfectMode(true);
+    if (!applied) {
+      // Same direct-USB fallback as the normal Bit-Perfect path.
+      applied = await _tryStartDirectUsbStreaming();
+      _bitPerfectViaDirectStream = applied;
+    }
     if (!applied) {
       // Strict bit-perfect is impossible on this device; revert rather than
       // persist a configuration the hardware cannot honour.
@@ -641,6 +734,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> _setAaudioOutputEnabled(bool enabled) async {
     markDirty('aaudioOutputEnabled');
     if (enabled) {
+      // AAudio Direct bypasses the ExoPlayer DSP chain the direct-USB
+      // Bit-Perfect tee lives in; enabling it would silence the DAC.
+      if (_bitPerfectViaDirectStream) {
+        safeEmit(state.copyWith(
+            errorMessage:
+                'Turn off Bit-Perfect before enabling AAudio Direct.'));
+        return;
+      }
       await _forceCrossfadeOffForBitPerfect();
       if (state.dvcEnabled) await setDvcEnabled(false);
     }

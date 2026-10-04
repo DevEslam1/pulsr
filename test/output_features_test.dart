@@ -98,15 +98,17 @@ void main() {
       isBluetooth: true,
     );
 
-    test('blocked when no output device / no exclusive support', () {
+    test('blocked only for no device or a transcoded route', () {
       expect(AudioConflicts.strictBitPerfectBlockedReason(null), isNotNull);
-      expect(
-        AudioConflicts.strictBitPerfectBlockedReason(unsupportedWired),
-        isNotNull,
-      );
       expect(
         AudioConflicts.strictBitPerfectBlockedReason(bluetooth),
         isNotNull,
+      );
+      // A wired route without mixer support is attemptable: the cubit tries the
+      // mixer path and then the direct USB sink, reverting on failure.
+      expect(
+        AudioConflicts.strictBitPerfectBlockedReason(unsupportedWired),
+        isNull,
       );
     });
 

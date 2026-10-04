@@ -640,20 +640,15 @@ class AudioConflicts {
         'Disabled: Bit-Perfect bypass is ON — silence skipping edits the sample stream. Turn off Bit-Perfect (or its DSP bypass) to use it.';
   }
 
-  /// Structural native failure reasons that genuinely cannot change without a
-  /// device/OS change. Transient failures (`target_format_unavailable`,
-  /// `set_mixer_attributes_failed`, channel/unknown errors) deliberately do NOT
-  /// disable the switch: the user must be able to retry, and the user-facing
-  /// error still surfaces from the failed attempt itself.
-  static const Set<String> _structuralBitPerfectFailures = {
-    'requires_android_14_for_usb',
-    'requires_android_14',
-    'usb_not_supported',
+  /// Only a route that provably cannot carry bit-perfect is a hard block:
+  /// Bluetooth transcodes, or no USB DAC at all. Every other native failure
+  /// stays attemptable — the direct UAC2 fallback may still work, and a failed
+  /// attempt surfaces the concrete reason. In particular
+  /// `no_supported_mixer_attributes` is NOT a hard block: it is exactly the
+  /// case the direct USB sink exists for.
+  static const Set<String> _hardBitPerfectFailures = {
     'exclusive_requires_usb_dac',
-    'bluetooth_transcoded',
-    'no_supported_mixer_attributes',
-    'reflection_method_not_found',
-    'audio_mixer_class_not_found',
+    'usb_not_supported',
   };
 
   static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
@@ -663,10 +658,7 @@ class AudioConflicts {
           'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
     }
     final reason = device.bitPerfectFailureReason;
-    // Stale/transient reasons must not permanently lock the switch. The native
-    // layer clears the reason on every audio device topology change; only
-    // structural reasons keep it disabled here.
-    if (reason == null || !_structuralBitPerfectFailures.contains(reason)) {
+    if (reason == null || !_hardBitPerfectFailures.contains(reason)) {
       return null;
     }
     return bitPerfectReasonMessage(reason);
@@ -744,10 +736,8 @@ class AudioConflicts {
       return L10nHolder.current?.conflictNoDeviceDetected ??
           'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
     }
-    if (!device.isBitPerfectSupported) {
-      return L10nHolder.current?.conflictNoExclusiveMixer ??
-          'Cannot enable: this output path does not expose exclusive bit-perfect mixer attributes.';
-    }
+    // Attemptable: the cubit tries the platform mixer path first and then the
+    // direct USB sink, reverting with the concrete reason if both fail.
     return null;
   }
 

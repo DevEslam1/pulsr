@@ -31,13 +31,20 @@ extension PlayerDspFollowRate on PlayerDspController {
             settings.followTrackSampleRate || settings.strictBitPerfect,
       );
       if (rate == null) return;
+      // The direct UAC2 sink (Bit-Perfect fallback) switches rate by
+      // re-starting the isochronous stream; the platform mixer attributes are
+      // not involved on that path.
+      final usb = UsbExclusiveService();
+      final directStreaming = usb.lastStatus.streamingActive;
       // Negotiate the format against the advertised device caps so a device
       // that cannot honour the track's exact rate still receives the highest
       // supported tier instead of a flat exclusive-mixer rejection. Unknown
       // caps request the track rate unchanged (never invent a downgrade).
-      final advertised = (device?.supportedSampleRates ?? const <int>[])
-          .where((r) => r > 0)
-          .toList();
+      final advertised = directStreaming
+          ? usb.lastStatus.supportedRates.where((r) => r > 0).toList()
+          : (device?.supportedSampleRates ?? const <int>[])
+              .where((r) => r > 0)
+              .toList();
       final decision = negotiateOutputFormat(
         request: OutputFormatRequest(
           trackSampleRate: rate,
@@ -54,12 +61,24 @@ extension PlayerDspFollowRate on PlayerDspController {
       );
       if (!decision.applied) return;
       try {
-        final applied = await service.setTargetOutputFormat(
-            sampleRate: decision.sampleRate, bitDepth: decision.bitDepth);
-        if (!applied) {
-          _lastFollowedSampleRate = null;
-          await _settingsCubit!.refreshOutputDevice();
-          return;
+        if (directStreaming) {
+          final res = await usb.startStreaming(sampleRate: decision.sampleRate);
+          if (!res.isOk) {
+            _lastFollowedSampleRate = null;
+            ErrorLogger.log(
+                'Follow-track direct USB rate switch failed (${decision.sampleRate}, ${res.name})',
+                category: 'PlayerDspController');
+            await _settingsCubit!.refreshOutputDevice();
+            return;
+          }
+        } else {
+          final applied = await service.setTargetOutputFormat(
+              sampleRate: decision.sampleRate, bitDepth: decision.bitDepth);
+          if (!applied) {
+            _lastFollowedSampleRate = null;
+            await _settingsCubit!.refreshOutputDevice();
+            return;
+          }
         }
         if (_isClosed()) return;
         _lastFollowedSampleRate = decision.sampleRate;

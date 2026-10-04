@@ -1447,11 +1447,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // the platform only exposes it for USB. Wired hi-res capability is
         // reported separately as isDirectSupported rather than dressed up as
         // bit-perfect, which nothing on the wired path actually configures.
-        val finalIsBitPerfectSupported =
-            isUsb && !isBluetooth && isBitPerfectSupportedOnPlatform()
+        //
+        // Second honest path: Pulsr's own UAC2 isochronous sink (UsbExclusivePlugin)
+        // writes the PCM directly to the DAC while muting the HAL. It is the only
+        // bit-perfect route on DACs/OS builds that do not advertise
+        // MIXER_BEHAVIOR_BIT_PERFECT, so it counts as supported/active too.
+        val mixerSupported = isUsb && !isBluetooth && isBitPerfectSupportedOnPlatform()
+        val directStreamingSupported =
+            isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingSupported
+        val finalIsBitPerfectSupported = mixerSupported || directStreamingSupported
         val stream = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
-        val finalIsBitPerfectActive = isUsb && !isBluetooth && isBitPerfectActive &&
+        val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
             stream[1] == activeMixerRate && stream[2] == activeMixerEncoding
+        val directActive =
+            isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingActive
+        val finalIsBitPerfectActive = mixerActive || directActive
         val failureReason = when {
             finalIsBitPerfectActive -> null
             isBluetooth -> "bluetooth_transcoded"

@@ -212,10 +212,12 @@ void main() {
             _device(reason: 'exclusive_requires_usb_dac')),
         l10n.conflictExclusiveRequiresUsbDac,
       );
+      // No mixer attributes is attemptable (direct USB fallback); it must not
+      // hard-disable the switch.
       expect(
         AudioConflicts.bitPerfectBlockedReason(
             _device(reason: 'no_supported_mixer_attributes')),
-        l10n.conflictNoMixerAttributes,
+        isNull,
       );
     });
 
@@ -232,9 +234,11 @@ void main() {
         AudioConflicts.strictBitPerfectBlockedReason(null),
         l10n.conflictNoDeviceDetected,
       );
+      // A USB DAC without platform mixer support is attemptable via the direct
+      // sink, so strict is not hard-blocked there.
       expect(
         AudioConflicts.strictBitPerfectBlockedReason(_device()),
-        l10n.conflictNoExclusiveMixer,
+        isNull,
       );
       expect(
         AudioConflicts.strictBitPerfectActiveReason(
@@ -349,9 +353,10 @@ void main() {
         AudioConflicts.strictBitPerfectBlockedReason(null),
         contains('no output device'),
       );
+      // Mixer-less USB DACs are attemptable (direct USB fallback).
       expect(
         AudioConflicts.strictBitPerfectBlockedReason(_device()),
-        contains('exclusive bit-perfect'),
+        isNull,
       );
       expect(
         AudioConflicts.strictBitPerfectActiveReason(
@@ -474,15 +479,14 @@ void main() {
       expect(AudioConflicts.bitPerfectReasonMessage('mystery'), isNull);
     });
 
-    test('strictBitPerfectBlockedReason distinguishes all three states', () {
+    test('strictBitPerfectBlockedReason only hard-blocks BT and no device', () {
       expect(
         AudioConflicts.strictBitPerfectBlockedReason(
             _device(isBluetooth: true)),
         isNotNull,
       );
       expect(AudioConflicts.strictBitPerfectBlockedReason(null), isNotNull);
-      expect(
-          AudioConflicts.strictBitPerfectBlockedReason(_device()), isNotNull);
+      expect(AudioConflicts.strictBitPerfectBlockedReason(_device()), isNull);
       expect(
         AudioConflicts.strictBitPerfectBlockedReason(
             _device(isBitPerfectActive: true, isBitPerfectSupported: true)),
@@ -627,32 +631,32 @@ void main() {
       );
     });
 
-    test('transient native failures never lock the Bit-Perfect switch', () {
+    test('only BT or a missing USB DAC hard-locks the Bit-Perfect switch', () {
       for (final reason in const [
         'target_format_unavailable',
         'set_mixer_attributes_failed',
         'clear_mixer_attributes_failed',
         'unknown_error_boom',
         'channel_error',
-      ]) {
-        expect(
-          AudioConflicts.bitPerfectBlockedReason(_device(reason: reason)),
-          isNull,
-          reason: '$reason must stay retryable',
-        );
-      }
-      for (final reason in const [
         'requires_android_14_for_usb',
         'no_supported_mixer_attributes',
-        'usb_not_supported',
-        'exclusive_requires_usb_dac',
         'reflection_method_not_found',
         'audio_mixer_class_not_found',
       ]) {
         expect(
           AudioConflicts.bitPerfectBlockedReason(_device(reason: reason)),
+          isNull,
+          reason: '$reason must stay attemptable (direct USB fallback)',
+        );
+      }
+      for (final reason in const [
+        'usb_not_supported',
+        'exclusive_requires_usb_dac',
+      ]) {
+        expect(
+          AudioConflicts.bitPerfectBlockedReason(_device(reason: reason)),
           isNotNull,
-          reason: '$reason is structural and keeps the switch disabled',
+          reason: '$reason means no usable USB path',
         );
       }
     });
