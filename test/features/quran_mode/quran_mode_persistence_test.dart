@@ -27,6 +27,21 @@ class _QuranAudioHandler extends TestPulsrAudioHandler {
   }
 
   double? lastReverbWetDry;
+  bool? lastSaturationEnabled;
+  double? lastSaturationMix;
+  bool rejectSaturation = false;
+
+  @override
+  Future<void> setSaturation(bool enabled,
+      {double? drive,
+      double? mix,
+      double? tilt,
+      int? mode,
+      bool? multiband}) async {
+    if (rejectSaturation) throw StateError('Native saturation rejected');
+    lastSaturationEnabled = enabled;
+    lastSaturationMix = mix;
+  }
 
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
@@ -121,6 +136,53 @@ void main() {
   });
 
   group('Quran Mode regular profile actions', () {
+    test('warmth activates a dry style, clamps, and zero disables processing',
+        () async {
+      final handler = _QuranAudioHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+          handler: handler, getState: () => state, emit: (s) => state = s);
+      await controller.setQuranModeEnabled(true);
+      expect(state.isSaturationEnabled, isFalse);
+      await controller.setQuranWarmth(1.0);
+      expect(state.isSaturationEnabled, isTrue);
+      expect(state.saturationMix, 0.6);
+      expect(handler.lastSaturationEnabled, isTrue);
+      expect(handler.lastSaturationMix, 0.6);
+      await controller.setQuranWarmth(0.0);
+      expect(state.isSaturationEnabled, isFalse);
+      expect(state.saturationMix, 0.0);
+      expect(handler.lastSaturationEnabled, isFalse);
+    });
+
+    test('rejected warmth preserves the last accepted UI value', () async {
+      final handler = _QuranAudioHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+          handler: handler, getState: () => state, emit: (s) => state = s);
+      await controller.setQuranModeEnabled(true);
+      await controller.setQuranWarmth(0.2);
+      handler.rejectSaturation = true;
+      await controller.setQuranWarmth(0.6);
+      expect(state.saturationMix, 0.2);
+      expect(state.isSaturationEnabled, isTrue);
+      expect(state.errorMessage, contains('Failed to set Quran vocal warmth'));
+    });
+
+    test('warmth ignores edits when Quran mode is off and non-finite values',
+        () async {
+      final handler = _QuranAudioHandler();
+      var state = const PlayerState();
+      final controller = _controller(
+          handler: handler, getState: () => state, emit: (s) => state = s);
+      await controller.setQuranWarmth(0.4);
+      expect(handler.lastSaturationMix, isNull);
+      await controller.setQuranModeEnabled(true);
+      final mix = state.saturationMix;
+      await controller.setQuranWarmth(double.nan);
+      expect(state.saturationMix, mix);
+    });
+
     test('reset reapplies the Quran profile, not the pre-Quran snapshot',
         () async {
       final rock = EqPreset.defaultPresets.firstWhere((p) => p.name == 'Rock');

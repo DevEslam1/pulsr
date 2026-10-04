@@ -219,6 +219,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ? '${(state.saturationMix * 100).round()}%'
                   : '0%',
               onChanged: cubit.setQuranWarmth,
+              applyOnRelease: true,
             ),
 
             // Learning speed
@@ -448,7 +449,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
   }
 }
 
-class _QuranSliderTile extends StatelessWidget {
+class _QuranSliderTile extends StatefulWidget {
   final IconData icon;
   final String title;
   final String subtitle;
@@ -457,6 +458,7 @@ class _QuranSliderTile extends StatelessWidget {
   final bool enabled;
   final String valueLabel;
   final ValueChanged<double> onChanged;
+  final bool applyOnRelease;
 
   const _QuranSliderTile({
     required this.icon,
@@ -467,7 +469,21 @@ class _QuranSliderTile extends StatelessWidget {
     required this.enabled,
     required this.valueLabel,
     required this.onChanged,
+    this.applyOnRelease = false,
   });
+
+  @override
+  State<_QuranSliderTile> createState() => _QuranSliderTileState();
+}
+
+class _QuranSliderTileState extends State<_QuranSliderTile> {
+  double? _dragValue;
+
+  @override
+  void didUpdateWidget(covariant _QuranSliderTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled || widget.value != oldWidget.value) _dragValue = null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -480,25 +496,28 @@ class _QuranSliderTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: p.textSecondary, size: 20),
+              Icon(widget.icon, color: p.textSecondary, size: 20),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title,
+                    Text(widget.title,
                         style: TextStyle(
                             color: p.textPrimary,
                             fontSize: AppFontSize.body,
                             fontWeight: FontWeight.w700)),
-                    Text(subtitle,
+                    Text(widget.subtitle,
                         style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.label)),
                   ],
                 ),
               ),
-              Text(valueLabel,
+              Text(
+                  _dragValue == null
+                      ? widget.valueLabel
+                      : '${(_dragValue! * 100).round()}%',
                   style: TextStyle(
                       color: p.accent,
                       fontSize: AppFontSize.label,
@@ -506,9 +525,23 @@ class _QuranSliderTile extends StatelessWidget {
             ],
           ),
           Slider(
-            value: value.clamp(0.0, max),
-            max: max,
-            onChanged: enabled ? onChanged : null,
+            value: (_dragValue ?? widget.value).clamp(0.0, widget.max),
+            max: widget.max,
+            onChanged: !widget.enabled
+                ? null
+                : (value) {
+                    if (widget.applyOnRelease) {
+                      setState(() => _dragValue = value);
+                    } else {
+                      widget.onChanged(value);
+                    }
+                  },
+            onChangeEnd: widget.enabled && widget.applyOnRelease
+                ? (value) {
+                    setState(() => _dragValue = null);
+                    widget.onChanged(value);
+                  }
+                : null,
             activeColor: p.accent,
             inactiveColor: p.hairline,
           ),

@@ -20,6 +20,61 @@ public final class NativeDspSmoke {
         return buffer.flip();
     }
 
+    private static float[] renderWarmth(NativeDspAudioProcessor processor,
+            int rate, double drive, double mix, double tilt) throws Exception {
+        processor.configure(new AudioProcessor.AudioFormat(rate, 2, C.ENCODING_PCM_FLOAT));
+        processor.flush();
+        processor.setGainCurve(new double[] {1, 1}, 1);
+        AudioEffectsPlugin.nativeSetSaturationParams(drive, mix, tilt, 0, false);
+        AudioEffectsPlugin.nativeSetSaturationEnabled(true);
+        AudioEffectsPlugin.nativeSetActiveStages(1 << 6);
+        int frames = rate / 10;
+        float[] measured = new float[frames];
+        for (int block = 0; block < 10; ++block) {
+            ByteBuffer input = ByteBuffer.allocateDirect(frames * 8).order(ByteOrder.nativeOrder());
+            for (int frame = 0; frame < frames; ++frame) {
+                double time = (block * frames + frame) / (double) rate;
+                float sample = (float) (0.25 * Math.sin(2 * Math.PI * 400 * time)
+                        + 0.08 * Math.sin(2 * Math.PI * 1200 * time));
+                input.putFloat(sample).putFloat(sample);
+            }
+            processor.queueInput(input.flip());
+            ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
+            check(output.remaining() == frames * 8, "warmth must preserve frame count");
+            for (int frame = 0; frame < frames; ++frame) {
+                float left = output.getFloat(), right = output.getFloat();
+                check(Float.isFinite(left) && Math.abs(left) <= 1, "warmth must stay finite/bounded");
+                check(left == right, "warmth must preserve matched stereo input");
+                measured[frame] = left;
+            }
+        }
+        return measured;
+    }
+
+    private static void checkQuranWarmth(NativeDspAudioProcessor processor) throws Exception {
+        for (int rate : new int[] {44100, 48000}) {
+            for (double drive : new double[] {0.15, 0.18, 0.20, 0.22}) {
+                float[] zero = renderWarmth(processor, rate, drive, 0, 0.3);
+                float[] middle = renderWarmth(processor, rate, drive, 0.3, 0.3);
+                float[] maximum = renderWarmth(processor, rate, drive, 0.6, 0.3);
+                double deltaMiddle = 0, deltaMaximum = 0, energy = 0;
+                for (int i = 0; i < zero.length; ++i) {
+                    deltaMiddle += Math.pow(middle[i] - zero[i], 2);
+                    deltaMaximum += Math.pow(maximum[i] - zero[i], 2);
+                    energy += zero[i] * zero[i];
+                }
+                double ratio = Math.sqrt(deltaMaximum / energy);
+                check(ratio > 0.001, "Quran warmth at profile drive must change PCM");
+                check(deltaMaximum > deltaMiddle * 2.5,
+                        "increasing warmth must increase its measured contribution");
+                System.out.println("Warmth " + rate + "Hz drive=" + drive
+                        + " measured relative PCM difference=" + ratio);
+            }
+        }
+        AudioEffectsPlugin.nativeSetSaturationEnabled(false);
+        AudioEffectsPlugin.nativeSetActiveStages(0);
+    }
+
     public static void main(String[] args) throws Exception {
         check(AaudioNativeBridge.ensureAvailable(), "library must load");
         NativeDspAudioProcessor processor = new NativeDspAudioProcessor();
@@ -81,6 +136,7 @@ public final class NativeDspSmoke {
                     check(processor.getTransitionGain() == (muted ? 0 : 1), "fade acknowledgement must report rendered endpoint");
                 }
             }
+            checkQuranWarmth(processor);
         } finally {
             AudioEffectsPlugin.nativeSetBitPerfectParams(false, false);
             AudioEffectsPlugin.nativeSetActiveStages(0);

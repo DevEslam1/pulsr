@@ -179,7 +179,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     try {
       await _audioHandler.withSmoothDspTransition(() async {
         if (!_getState().isQuranModeEnabled) return;
-        final profile = QuranModeProfile.forStyle(_getState().quranReciterStyle);
+        final profile =
+            QuranModeProfile.forStyle(_getState().quranReciterStyle);
         await _audioHandler.setSaturation(enable,
             drive: profile.saturationDrive,
             mix: mix,
@@ -202,8 +203,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       if (isClosed) return;
       final state = _getState();
       _emit(state.copyWith(
-        playback: state.playback.copyWith(
-            errorMessage: 'Failed to set Quran vocal warmth: $e'),
+        playback: state.playback
+            .copyWith(errorMessage: 'Failed to set Quran vocal warmth: $e'),
       ));
     }
   }
