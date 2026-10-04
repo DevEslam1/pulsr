@@ -172,7 +172,7 @@ mixin SettingsOnlineSection
           onTap: () => context.push('/proxy-settings'),
         ),
       ],
-      key: _catById('online').key,
+      key: _catById('network').key,
     );
   }
 }

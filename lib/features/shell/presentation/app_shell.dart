@@ -19,7 +19,6 @@ import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
-import 'nav_destinations.dart';
 import 'widgets/landscape_sidebar.dart';
 import 'widgets/player_shortcut_scope.dart';
 import 'widgets/stacked_bottom_dock.dart';
@@ -43,31 +42,49 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _lastNavMs = 0;
   int _lastPopMs = 0;
   final Stopwatch _backPressStopwatch = Stopwatch();
-  Orientation? _lastAppliedOrientation;
 
   @visibleForTesting
   Stopwatch get backPressStopwatch => _backPressStopwatch;
+
+  bool? _lastImmersiveApplied;
+
+  void _onModalStateChanged() {
+    if (mounted) {
+      _syncSystemUiForOrientation();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _restoreLastShellTab();
+    PulsrModalTracker.isModalOpen.addListener(_onModalStateChanged);
+    unawaited(SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('setting_last_shell_tab');
+    }).catchError((_) {}));
     DockStyleController.load();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final orientation = MediaQuery.orientationOf(context);
-    if (orientation != _lastAppliedOrientation) {
-      _lastAppliedOrientation = orientation;
-      _syncSystemUiForOrientation(orientation);
-    }
+    _syncSystemUiForOrientation();
   }
 
-  void _syncSystemUiForOrientation(Orientation orientation) {
-    if (orientation == Orientation.landscape) {
+  void _syncSystemUiForOrientation([Orientation? orientation]) {
+    final currentOrientation =
+        orientation ?? MediaQuery.orientationOf(context);
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final isModalOpen = PulsrModalTracker.isModalOpen.value;
+
+    final shouldBeImmersive = currentOrientation == Orientation.landscape &&
+        !isKeyboardOpen &&
+        !isModalOpen;
+
+    if (_lastImmersiveApplied == shouldBeImmersive) return;
+    _lastImmersiveApplied = shouldBeImmersive;
+
+    if (shouldBeImmersive) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -88,8 +105,9 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _backPressStopwatch
       ..stop()
       ..reset();
-    if (state == AppLifecycleState.resumed && _lastAppliedOrientation != null) {
-      _syncSystemUiForOrientation(_lastAppliedOrientation!);
+    if (state == AppLifecycleState.resumed) {
+      _lastImmersiveApplied = null;
+      _syncSystemUiForOrientation();
     }
   }
 
@@ -98,39 +116,12 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _backPressStopwatch
       ..stop()
       ..reset();
+    PulsrModalTracker.isModalOpen.removeListener(_onModalStateChanged);
     WidgetsBinding.instance.removeObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
-  void _restoreLastShellTab() {
-    SharedPreferences.getInstance().then((prefs) {
-      if (!mounted) return;
-      final savedTab = prefs.getInt('setting_last_shell_tab');
-      // Derive the upper bound from the live destination list rather than a
-      // hard-coded count so adding/removing a primary tab cannot restore an
-      // out-of-range branch index.
-      final destinationCount = pulsrDestinations(context).length;
-      if (savedTab != null &&
-          savedTab > 0 &&
-          savedTab < destinationCount &&
-          mounted &&
-          widget.navigationShell.currentIndex == 0) {
-        try {
-          widget.navigationShell.goBranch(savedTab);
-        } catch (e, st) {
-          ErrorLogger.log('Failed to restore last shell tab',
-              error: e, stackTrace: st, category: 'Shell');
-          try {
-            widget.navigationShell.goBranch(0);
-          } catch (_) {}
-        }
-      }
-    }).catchError((e, st) {
-      ErrorLogger.log('Failed to restore last shell tab',
-          error: e, stackTrace: st, category: 'Shell');
-    });
-  }
 
   void _onTapNav(int index) {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -160,12 +151,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         widget.navigationShell.goBranch(0);
       } catch (_) {}
     }
-    unawaited(SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt('setting_last_shell_tab', index);
-    }).catchError((e, st) {
-      ErrorLogger.log('Failed to persist last shell tab',
-          error: e, stackTrace: st, category: 'Shell');
-    }));
     if (isSameTab) {
       PrimaryScrollController.maybeOf(context)?.animateTo(
         0.0,
@@ -326,6 +311,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
           onVolumeDown: () => context.read<PlayerCubit>().adjustVolume(-0.05),
           onNext: () => context.read<PlayerCubit>().next(),
           onPrevious: () => context.read<PlayerCubit>().previous(),
+          onToggleFavorite: () => context.read<PlayerCubit>().toggleFavorite(),
           onToggleMute: () => context.read<PlayerCubit>().toggleMute(),
           onToggleLyrics: () => context.read<PlayerCubit>().toggleLyrics(),
           onToggleQueue: () => context.read<PlayerCubit>().toggleQueue(),

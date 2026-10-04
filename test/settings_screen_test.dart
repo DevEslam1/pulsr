@@ -125,19 +125,18 @@ void main() {
 
       // Category filter pills (row is lazily built: scroll to reveal later pills)
       expect(find.text('All'), findsOneWidget);
-      expect(find.text('Audio & Sound'), findsWidgets);
-      expect(find.text('Playback'), findsWidgets);
+      expect(find.text('Sound & Playback'), findsWidgets);
       final pillsRow = find.byWidgetPredicate(
         (w) => w is ListView && w.scrollDirection == Axis.horizontal,
       );
       expect(pillsRow, findsOneWidget);
       for (var i = 0;
-          i < 6 && find.text('Appearance').evaluate().isEmpty;
+          i < 6 && find.text('Appearance & Gestures').evaluate().isEmpty;
           i++) {
         await tester.drag(pillsRow, const Offset(-320, 0));
         await settleAnims(tester);
       }
-      expect(find.text('Appearance'), findsWidgets);
+      expect(find.text('Appearance & Gestures'), findsWidgets);
     });
 
     testWidgets(
@@ -154,7 +153,7 @@ void main() {
 
       // Search result item appears
       expect(find.text('Crossfade & Gapless'), findsOneWidget);
-      expect(find.text('PLAYBACK'), findsOneWidget);
+      expect(find.text('SOUND & PLAYBACK'), findsOneWidget);
 
       // Clear search
       await tester.tap(find.byIcon(Icons.clear_rounded));
@@ -178,18 +177,14 @@ void main() {
         (tester) async {
       await pumpScreen(tester);
 
-      // Tap "Playback" category filter pill
-      final playbackPill = find.widgetWithText(GestureDetector, 'Playback');
-      expect(playbackPill, findsOneWidget);
-      await tester.tap(playbackPill);
+      // Tap "Sound & Playback" category filter pill
+      final soundPill = find.text('Sound & Playback').first;
+      expect(soundPill, findsOneWidget);
+      await tester.tap(soundPill);
       await settleAnims(tester);
 
-      // Only playback section is visible in filtered mode (scroll: lazy list)
-      for (var i = 0; i < 8 && find.text('PLAYBACK').evaluate().isEmpty; i++) {
-        await tester.dragFrom(const Offset(200, 500), const Offset(0, -500));
-        await settleAnims(tester);
-      }
-      expect(find.text('PLAYBACK'), findsWidgets);
+      // Sound section content is visible in filtered mode
+      expect(find.text('SMART AUDIO'), findsWidgets);
     });
 
     testWidgets(
@@ -284,6 +279,20 @@ void main() {
         await tester.drag(find.byType(ListView).first, const Offset(0, -300));
         await settleAnims(tester);
       }
+    });
+
+    testWidgets(
+        'maps legacy category to consolidated category on load',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'settings_last_selected_category': 'playback',
+      });
+      SettingsScreenController.resetSessionCategory();
+
+      await pumpScreen(tester);
+
+      // 'playback' maps to 'sound', so Sound & Playback content is loaded
+      expect(find.text('SMART AUDIO'), findsWidgets);
     });
   });
 }

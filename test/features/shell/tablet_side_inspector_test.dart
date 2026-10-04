@@ -129,7 +129,7 @@ void main() {
 
     final state = tester
         .state<TabletSideInspectorState>(find.byType(TabletSideInspector));
-    state.customWidth = 400.0;
+    state.customWidth = 480.0;
     await tester.pump();
 
     final dragHandleFinder = find.byType(GestureDetector).last;
@@ -141,8 +141,8 @@ void main() {
     await gesture.moveBy(const Offset(-20, 0));
     await tester.pump();
 
-    // Clamped at 400.0, customWidth remains 400.0 and accumulator is reset
-    expect(state.customWidth, equals(400.0));
+    // Clamped at 480.0, customWidth remains 480.0 and accumulator is reset
+    expect(state.customWidth, equals(480.0));
     expect(state.dragDeltaAccumulator, equals(0.0));
 
     await gesture.up();

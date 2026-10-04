@@ -5,7 +5,7 @@ import 'package:pulsr/domain/models/audio_quality_info.dart';
 
 void main() {
   group('AudioQualityInfo Unit Tests', () {
-    test('Calculates FLAC Hi-Res Lossless quality correctly', () {
+    test('Filename cannot certify a FLAC sample rate or bit depth', () {
       const song = SongsTableData(
         id: 1,
         title: 'Hi-Res Track',
@@ -24,8 +24,9 @@ void main() {
 
       final info = AudioQualityInfo.fromSong(song);
       expect(info.format, 'FLAC');
-      expect(info.tier, AudioQualityTier.hiResLossless);
-      expect(info.bitDepth, '24-bit');
+      expect(info.tier, AudioQualityTier.lossless);
+      expect(info.sampleRate, 'Unknown');
+      expect(info.bitDepth, 'Unknown');
       expect(info.bitrateKbps, greaterThan(1411));
       expect(info.shortBadgeLabel, contains('FLAC'));
     });
@@ -50,8 +51,8 @@ void main() {
       final info = AudioQualityInfo.fromSong(song);
       expect(info.format, 'FLAC');
       expect(info.tier, AudioQualityTier.lossless);
-      expect(info.bitDepth, '16-bit');
-      expect(info.sampleRate, '44.1 kHz');
+      expect(info.bitDepth, 'Unknown');
+      expect(info.sampleRate, 'Unknown');
       expect(info.shortBadgeLabel, contains('FLAC'));
     });
 
@@ -163,7 +164,7 @@ void main() {
       );
       final flacInfo = AudioQualityInfo.fromSong(flacSong);
       expect(flacInfo.renderEngineDescription,
-          'ExoPlayer Media3 • 32-bit Float PCM');
+          'ExoPlayer Media3 • output details shown below');
 
       const ytmSong = SongsTableData(
         id: 11,
@@ -181,7 +182,7 @@ void main() {
       );
       final ytmInfo = AudioQualityInfo.fromSong(ytmSong);
       expect(ytmInfo.renderEngineDescription,
-          contains('Hardware Offload (AAC / DSP)'));
+          'ExoPlayer Media3 • output details shown below');
 
       const mp3Song = SongsTableData(
         id: 12,
@@ -200,7 +201,7 @@ void main() {
       );
       final mp3Info = AudioQualityInfo.fromSong(mp3Song);
       expect(mp3Info.renderEngineDescription,
-          contains('Hardware Offload (MP3 / DSP)'));
+          'ExoPlayer Media3 • output details shown below');
     });
   });
 }

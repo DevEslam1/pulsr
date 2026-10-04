@@ -27,11 +27,13 @@ import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
+import '../../library/cubit/library_state.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../sheets/song_info_sheet.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
+import '../../../core/widgets/pulsr_toast.dart';
 
 class FolderDetailScreen extends StatefulWidget {
   final FolderItem folder;
@@ -147,6 +149,47 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       return '$hours hr $minutes min';
     }
     return '$minutes min';
+  }
+
+  Future<void> _toggleFavoriteFolder(List<SongsTableData> songs) async {
+    if (songs.isEmpty) return;
+    HapticFeedback.lightImpact();
+    LibraryCubit? libraryCubit;
+    try {
+      libraryCubit = context.read<LibraryCubit>();
+    } catch (_) {}
+    if (libraryCubit == null) return;
+
+    final currentFavIds = libraryCubit.state.favorites.map((s) => s.id).toSet();
+    final allFavorited = songs.every((s) => currentFavIds.contains(s.id));
+
+    if (allFavorited) {
+      for (final s in songs) {
+        if (currentFavIds.contains(s.id)) {
+          await libraryCubit.toggleFavorite(s.id);
+        }
+      }
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: context.l10n.removeFromFavorites,
+          icon: Icons.favorite_border_rounded,
+        );
+      }
+    } else {
+      for (final s in songs) {
+        if (!currentFavIds.contains(s.id)) {
+          await libraryCubit.toggleFavorite(s.id);
+        }
+      }
+      if (mounted) {
+        PulsrToast.show(
+          context,
+          message: context.l10n.favorite,
+          icon: Icons.favorite_rounded,
+        );
+      }
+    }
   }
 
   void _showFolderOptionsMenu(
@@ -343,7 +386,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         orElse: () => songs.first,
       );
 
-      return SizedBox.expand(
+      final artworkWidget = SizedBox.expand(
         child: FittedBox(
           fit: BoxFit.cover,
           child: CachedArtwork(
@@ -355,6 +398,53 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             highQuality: true,
           ),
         ),
+      );
+
+      if (!_isExcluded) return artworkWidget;
+
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          artworkWidget,
+          PositionedDirectional(
+            top: MediaQuery.paddingOf(context).top + 12,
+            end: AppSpacing.md,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: p.error.withValues(alpha: 0.92),
+                borderRadius: AppRadii.r10All,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black45,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.visibility_off_rounded,
+                      size: 14, color: Colors.white),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    context.l10n.folderPersistentExcludedBadge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -525,16 +615,24 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         vertical: AppSpacing.xs,
                       ),
                       decoration: BoxDecoration(
-                        color: p.error.withValues(alpha: 0.9),
+                        color: p.error.withValues(alpha: 0.92),
                         borderRadius: AppRadii.r8All,
                       ),
-                      child: Text(
-                        context.l10n.browseExcludeFromScan,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.visibility_off_rounded,
+                              size: 14, color: Colors.white),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            context.l10n.folderPersistentExcludedBadge,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -906,7 +1004,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
-        // Action Row: [ ( i ) ] [ ( ▶ ) ] [ ( ★ ) ]
+        // Action Row: [ ( i ) ] [ ( ▶ ) ] [ ( ♥ ) ]
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -927,18 +1025,26 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               iconSize: isShort ? 26 : 30,
             ),
             const SizedBox(width: AppSpacing.md),
-            _buildGlassCircleButton(
-              icon: _isExcluded
-                  ? Icons.visibility_off_rounded
-                  : Icons.star_rounded,
-              iconColor: _isExcluded ? p.error : Colors.white,
-              size: isShort ? 36 : 40,
-              iconSize: isShort ? 18 : 20,
-              p: p,
-              tooltip: _isExcluded
-                  ? context.l10n.browseIncludeInScan
-                  : context.l10n.browseExcludeFromScan,
-              onTap: _toggleExclusion,
+            BlocBuilder<LibraryCubit, LibraryState>(
+              buildWhen: (prev, curr) => prev.favorites != curr.favorites,
+              builder: (context, libState) {
+                final allFavorited = songs.isNotEmpty &&
+                    songs.every(
+                        (s) => libState.favorites.any((fav) => fav.id == s.id));
+                return _buildGlassCircleButton(
+                  icon: allFavorited
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  iconColor: allFavorited ? p.favorite : Colors.white,
+                  size: isShort ? 36 : 40,
+                  iconSize: isShort ? 18 : 20,
+                  p: p,
+                  tooltip: allFavorited
+                      ? context.l10n.removeFromFavorites
+                      : context.l10n.favorite,
+                  onTap: () => _toggleFavoriteFolder(songs),
+                );
+              },
             ),
           ],
         ),
@@ -1199,22 +1305,38 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                                 ? AppSpacing.md
                                                 : AppSpacing.xl,
                                           ),
-                                          _buildGlassCircleButton(
-                                            icon: _isExcluded
-                                                ? Icons.visibility_off_rounded
-                                                : Icons.star_rounded,
-                                            iconColor: _isExcluded
-                                                ? p.error
-                                                : Colors.white,
-                                            size: 40,
-                                            iconSize: 22,
-                                            p: p,
-                                            tooltip: _isExcluded
-                                                ? context
-                                                    .l10n.browseIncludeInScan
-                                                : context
-                                                    .l10n.browseExcludeFromScan,
-                                            onTap: _toggleExclusion,
+                                          BlocBuilder<LibraryCubit,
+                                              LibraryState>(
+                                            buildWhen: (prev, curr) =>
+                                                prev.favorites !=
+                                                curr.favorites,
+                                            builder: (context, libState) {
+                                              final allFavorited = songs
+                                                      .isNotEmpty &&
+                                                  songs.every((s) => libState
+                                                      .favorites
+                                                      .any((fav) =>
+                                                          fav.id == s.id));
+                                              return _buildGlassCircleButton(
+                                                icon: allFavorited
+                                                    ? Icons.favorite_rounded
+                                                    : Icons
+                                                        .favorite_border_rounded,
+                                                iconColor: allFavorited
+                                                    ? p.favorite
+                                                    : Colors.white,
+                                                size: 40,
+                                                iconSize: 22,
+                                                p: p,
+                                                tooltip: allFavorited
+                                                    ? context.l10n
+                                                        .removeFromFavorites
+                                                    : context.l10n.favorite,
+                                                onTap: () =>
+                                                    _toggleFavoriteFolder(
+                                                        songs),
+                                              );
+                                            },
                                           ),
                                         ],
                                       ),

@@ -56,11 +56,36 @@ public final class NativeDspSmoke {
             processor.queueInput(floats);
             ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
             for (int pattern : patterns) check(output.getInt() == pattern, "float bypass must preserve every bit");
+            AudioEffectsPlugin.nativeSetBitPerfectParams(false, false);
+            AudioEffectsPlugin.nativeSetActiveStages(0);
+            for (int rate : new int[] {44100, 48000}) {
+                processor.configure(new AudioProcessor.AudioFormat(rate, 2, C.ENCODING_PCM_FLOAT));
+                processor.flush();
+                processor.setGainCurve(new double[] {0.5, 0.5}, 20);
+                for (boolean muted : new boolean[] {true, false, true, false}) {
+                    check(processor.setTransitionMuted(muted), "profile fade must be accepted");
+                    int frames = rate / 20; // 50ms covers the entire 40ms fade.
+                    ByteBuffer constant = ByteBuffer.allocateDirect(frames * 8).order(ByteOrder.nativeOrder());
+                    for (int i = 0; i < frames * 2; ++i) constant.putFloat(0.5f);
+                    processor.queueInput(constant.flip());
+                    ByteBuffer faded = processor.getOutput().order(ByteOrder.nativeOrder());
+                    float previous = muted ? 0.25f : 0.0f;
+                    for (int frame = 0; frame < frames; ++frame) {
+                        float left = faded.getFloat(), right = faded.getFloat();
+                        check(left == right, "profile fade must preserve stereo balance");
+                        check(Math.abs(left - previous) < 0.0002f, "profile fade must not step or pop");
+                        check(left >= 0 && left <= 0.25001f, "sleep/crossfade gain must remain composed");
+                        previous = left;
+                    }
+                    check(Math.abs(previous - (muted ? 0 : 0.25f)) < 0.00001f, "profile fade endpoint must be exact");
+                    check(processor.getTransitionGain() == (muted ? 0 : 1), "fade acknowledgement must report rendered endpoint");
+                }
+            }
         } finally {
             AudioEffectsPlugin.nativeSetBitPerfectParams(false, false);
             AudioEffectsPlugin.nativeSetActiveStages(0);
             processor.release();
         }
-        System.out.println("PASS: actual Java/JNI PCM16 ON/OFF/ON/OFF and float bitwise bypass, including gain-ramp suppression");
+        System.out.println("PASS: Java/JNI PCM16 and float bypass; independent 44.1/48k profile fades preserve sleep/crossfade gain, stereo and exact endpoints");
     }
 }

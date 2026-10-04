@@ -205,7 +205,7 @@ void main() {
       expect(
         AudioConflicts.bitPerfectBlockedReason(
             _device(reason: 'usb_not_supported')),
-        l10n.conflictRequiresAndroid14,
+        l10n.conflictNoMixerAttributes,
       );
       expect(
         AudioConflicts.bitPerfectBlockedReason(

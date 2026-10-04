@@ -406,6 +406,53 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final StreamPreResolver _streamPreResolver;
   bool _disposed = false;
   bool get isDisposed => _disposed;
+  Future<void> _dspTransitionTail = Future<void>.value();
+
+  /// Change a complete DSP profile while the rendered signal is faded out.
+  /// Poll the actual gain so buffered playback cannot outrun a timed delay.
+  Future<T> withSmoothDspTransition<T>(Future<T> Function() action) async {
+    final previous = _dspTransitionTail;
+    final released = Completer<void>();
+    _dspTransitionTail = released.future;
+    await previous;
+    final muted = <AudioPlayer>[];
+    try {
+      if (_disposed) throw StateError('Audio handler disposed');
+      for (final player in [_playerA, _playerB]) {
+        if (!player.playing) continue;
+        if (await player.dspSetTransitionMuted(true)) muted.add(player);
+      }
+      final deadline = DateTime.now().add(const Duration(seconds: 3));
+      for (final player in muted) {
+        while (player.playing &&
+            player.processingState != ProcessingState.completed) {
+          final gain = await player.dspGetTransitionGain();
+          if (gain != null && gain <= 0.0001) break;
+          if (DateTime.now().isAfter(deadline)) {
+            throw StateError('DSP profile fade did not reach silence');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      }
+      final result = await action();
+      if (muted.isNotEmpty) {
+        if (!await AudioEffectsChannel().awaitControlUpdates()) {
+          throw StateError('DSP profile preparation did not complete');
+        }
+        // Let reset filters and lookahead buffers settle before fading back in.
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+      }
+      return result;
+    } finally {
+      for (final player in muted) {
+        try {
+          await player.dspSetTransitionMuted(false);
+        } catch (_) {}
+      }
+      released.complete();
+    }
+  }
+
   // FIX B9 & C-01: Initialized immediately in constructor to prevent cold-start races.
   PlaybackVolumeController? _volumeController;
   @override
@@ -1156,6 +1203,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   int _engineSwitchGeneration = 0;
+  @override
+  bool _pendingPlaybackStart = false;
 
   /// Whether a completion report at [now] is distinct from a previous one at
   /// [last]. Split out so the debounce window is unit-testable.
@@ -1312,9 +1361,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       targetBufferMs:
           _cachedPrefs?.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
     );
-    // Restore the resampler quality and BPM-sync preference (defaults keep
-    // the historical 64-tap polyphase and plain-duration crossfade).
-    await AudioEffectsChannel().setSincResamplerQuality(
+    // Unsupported optional DSP preferences must not abort player startup.
+    // Android currently handles playback rate conversion itself.
+    await setSincResamplerQuality(
       _cachedPrefs?.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
     );
     // Restore Direct Volume Control. Only the system-stream pinning needs to
@@ -2534,6 +2583,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> stop() async {
+    _pendingPlaybackStart = false;
     _headsetClickTimer?.cancel();
     _headsetClickTimer = null;
     _sleepTimerManager.cancelSleepTimer();

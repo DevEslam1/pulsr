@@ -275,19 +275,36 @@ mixin SettingsSearchResults
   }
 
   String _mapCategoryNameToId(String catName, BuildContext context) {
-    if (catName == context.l10n.settingsCategoryAppearance) return 'appearance';
-    if (catName == context.l10n.audioAndSound ||
-        catName == context.l10n.settingsSearchCategoryAudio) {
-      return 'audio';
+    if (catName == context.l10n.settingsCategoryAppearance ||
+        catName == context.l10n.settingsSectionAppearanceGestures ||
+        catName == context.l10n.gestures) {
+      return 'look';
     }
-    if (catName == context.l10n.playback) return 'playback';
-    if (catName == context.l10n.gestures) return 'gestures';
-    if (catName == context.l10n.settingsCategoryProfiles) return 'profiles';
-    if (catName == context.l10n.navLibrary) return 'library';
-    if (catName == context.l10n.settingsCategoryOnline) return 'online';
-    if (catName == context.l10n.storageAndCache) return 'storage';
-    if (catName == context.l10n.settingsCategoryPrivacy) return 'privacy';
-    if (catName == context.l10n.settingsCategoryAbout) return 'about';
+    if (catName == context.l10n.audioAndSound ||
+        catName == context.l10n.settingsSearchCategoryAudio ||
+        catName == context.l10n.settingsSectionSoundPlayback ||
+        catName == context.l10n.playback ||
+        catName == context.l10n.settingsCategoryProfiles) {
+      return 'sound';
+    }
+    if (catName == context.l10n.navLibrary ||
+        catName == context.l10n.libraryAndScanning ||
+        catName == context.l10n.storageAndCache) {
+      return 'library';
+    }
+    if (catName == context.l10n.settingsCategoryOnline ||
+        catName == context.l10n.youtubeMusicAndOnline ||
+        catName == context.l10n.networkAndProxy) {
+      return 'network';
+    }
+    if (catName == context.l10n.settingsCategoryPrivacy ||
+        catName == context.l10n.privacyAndData) {
+      return 'privacy';
+    }
+    if (catName == context.l10n.settingsCategoryAbout ||
+        catName == context.l10n.about) {
+      return 'about';
+    }
     return 'all';
   }
 
@@ -329,22 +346,151 @@ mixin SettingsSearchResults
     }
     _memoizedSearchLocale = currentLocale;
     _memoizedRelevantFields = relevantFields;
+
+    final lookCat = context.l10n.settingsSectionAppearanceGestures;
+    final soundCat = context.l10n.settingsSectionSoundPlayback;
+    final libraryCat = context.l10n.libraryAndScanning;
+    final networkCat = AppConfig.ytmEnabled
+        ? context.l10n.youtubeMusicAndOnline
+        : context.l10n.networkAndProxy;
+    final privacyCat = context.l10n.privacyAndData;
+    final aboutCat = context.l10n.about;
+
     return _memoizedSearchEntries = [
+      // ════════ 6 TOP-LEVEL DESTINATION ENTRIES ════════
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'sound',
+        category: soundCat,
+        title: soundCat,
+        subtitle: context.l10n.settingsCategoryAudioSubtitle,
+        icon: Icons.graphic_eq_rounded,
+        keywords: [
+          'sound',
+          'audio',
+          'playback',
+          'music',
+          'dsp',
+          'dac',
+          'equalizer',
+          'volume',
+          'smart audio'
+        ],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'look',
+        category: lookCat,
+        title: lookCat,
+        subtitle: context.l10n.settingsCategoryAppearanceSubtitle,
+        icon: Icons.palette_outlined,
+        keywords: [
+          'look',
+          'appearance',
+          'theme',
+          'color',
+          'gestures',
+          'dark',
+          'light',
+          'contrast',
+          'glass'
+        ],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'look');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'library',
+        category: libraryCat,
+        title: libraryCat,
+        subtitle: context.l10n.settingsCategoryLibrarySubtitle,
+        icon: Icons.library_music_outlined,
+        keywords: [
+          'library',
+          'storage',
+          'scan',
+          'folders',
+          'cache',
+          'files',
+          'music'
+        ],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'library');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'network',
+        category: networkCat,
+        title: networkCat,
+        subtitle: context.l10n.settingsCategoryOnlineSubtitle,
+        icon: Icons.cloud_outlined,
+        keywords: [
+          'network',
+          'online',
+          'ytm',
+          'streaming',
+          'proxy',
+          'download',
+          'wifi'
+        ],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'network');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'privacy',
+        category: privacyCat,
+        title: privacyCat,
+        subtitle: context.l10n.settingsCategoryPrivacySubtitle,
+        icon: Icons.shield_outlined,
+        keywords: [
+          'privacy',
+          'data',
+          'backup',
+          'restore',
+          'scrobble',
+          'lastfm',
+          'offline'
+        ],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'privacy');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'about',
+        category: aboutCat,
+        title: aboutCat,
+        subtitle: context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
+        icon: Icons.info_outline_rounded,
+        keywords: ['about', 'version', 'info', 'changelog', 'licenses', 'specs'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'about');
+        },
+      ),
+
+      // ════════ LEAF SETTINGS ENTRIES ════════
+      _SearchItem(
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchThemeModeTitle,
         subtitle: context.l10n.settingsSearchThemeModeSubtitle,
         icon: Icons.brightness_auto_rounded,
         keywords: ['theme', 'dark', 'light', 'amoled', 'black', 'mode'],
         onTap: () {
           _searchController.clear();
-          setState(() => _selectedCategoryId = 'appearance');
+          setState(() => _selectedCategoryId = 'look');
         },
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchAccentColorTitle,
         subtitle: context.l10n.settingsSearchAccentColorSubtitle,
         icon: Icons.color_lens_rounded,
@@ -359,12 +505,12 @@ mixin SettingsSearchResults
         ],
         onTap: () {
           _searchController.clear();
-          setState(() => _selectedCategoryId = 'appearance');
+          setState(() => _selectedCategoryId = 'look');
         },
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsAutoDarkModeTitle,
         subtitle: context.l10n.settingsAutoDarkModeSubtitle,
         icon: Icons.nightlight_round,
@@ -376,12 +522,12 @@ mixin SettingsSearchResults
         onTap: () => cubit.setAutoThemeByTime(!state.autoThemeByTime),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchHighContrastTitle,
         subtitle: context.l10n.settingsHighContrastSubtitle,
         icon: Icons.contrast_rounded,
-        keywords: ['contrast', 'amoled', 'pure black'],
+        keywords: ['contrast', 'amoled', 'pure black', 'accessibility'],
         trailing: Switch.adaptive(
           value: state.highContrast,
           onChanged: cubit.setHighContrast,
@@ -389,8 +535,21 @@ mixin SettingsSearchResults
         onTap: () => cubit.setHighContrast(!state.highContrast),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
+        title: context.l10n.settingsDimWhitePointTitle,
+        subtitle: context.l10n.settingsDimWhitePointSubtitle,
+        icon: Icons.brightness_4_rounded,
+        keywords: ['dim', 'white point', 'comfort', 'eye', 'night'],
+        trailing: Switch.adaptive(
+          value: state.dimWhitePoint,
+          onChanged: cubit.setDimWhitePoint,
+        ),
+        onTap: () => cubit.setDimWhitePoint(!state.dimWhitePoint),
+      ),
+      _SearchItem(
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsReduceMotionTitle,
         subtitle: context.l10n.settingsReduceMotionSubtitle,
         icon: Icons.motion_photos_off_rounded,
@@ -402,8 +561,8 @@ mixin SettingsSearchResults
         onTap: () => cubit.setReduceMotion(!state.reduceMotion),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: 'UI Sound Effects',
         subtitle: 'Play subtle audio feedback for interactions',
         icon: Icons.volume_up_rounded,
@@ -416,8 +575,8 @@ mixin SettingsSearchResults
             SoundFeedbackService.setEnabled(!SoundFeedbackService.enabled),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchNowPlayingThemeTitle,
         subtitle: getThemeModeTitle(state.playerThemeMode, context.l10n),
         icon: Icons.art_track_rounded,
@@ -434,8 +593,8 @@ mixin SettingsSearchResults
             showThemePickerSheet(context, cubit, state.playerThemeMode),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchVisualizerStyleTitle,
         subtitle: getVisualizerStyleTitle(state.visualizerStyle, context.l10n),
         icon: Icons.graphic_eq_rounded,
@@ -444,8 +603,8 @@ mixin SettingsSearchResults
             context, cubit, state.visualizerStyle),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.colorSource,
         subtitle: getColorSourceTitle(state.themeColorSource, context.l10n),
         icon: Icons.palette_outlined,
@@ -454,8 +613,8 @@ mixin SettingsSearchResults
             showColorSourcePickerSheet(context, cubit, state.themeColorSource),
       ),
       _SearchItem(
-        categoryId: 'appearance',
-        category: context.l10n.settingsCategoryAppearance,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.language,
         subtitle: getLanguageTitle(state.languageCode, context.l10n),
         icon: Icons.language_rounded,
@@ -464,8 +623,8 @@ mixin SettingsSearchResults
             showLanguagePickerSheet(context, cubit, state.languageCode),
       ),
       _SearchItem(
-        categoryId: 'audio',
-        category: context.l10n.settingsSearchCategoryAudio,
+        categoryId: 'sound',
+        category: soundCat,
         title: context.l10n.equalizerAndSoundEffects,
         subtitle: context.l10n.settingsSearchEqualizerSubtitle,
         icon: Icons.equalizer_rounded,
@@ -483,13 +642,13 @@ mixin SettingsSearchResults
             EqualizerSheet.show(context);
           } else {
             _searchController.clear();
-            setState(() => _selectedCategoryId = 'audio');
+            setState(() => _selectedCategoryId = 'sound');
           }
         },
       ),
       _SearchItem(
-        categoryId: 'audio',
-        category: context.l10n.settingsSearchCategoryAudio,
+        categoryId: 'sound',
+        category: soundCat,
         title: context.l10n.settingsSearchBitPerfectTitle,
         subtitle: context.l10n.settingsSearchBitPerfectSubtitle,
         icon: Icons.album_rounded,
@@ -497,24 +656,24 @@ mixin SettingsSearchResults
         pro: true,
         onTap: () {
           _searchController.clear();
-          setState(() => _selectedCategoryId = 'audio');
+          setState(() => _selectedCategoryId = 'sound');
         },
       ),
       _SearchItem(
-        categoryId: 'playback',
-        category: context.l10n.playback,
+        categoryId: 'sound',
+        category: soundCat,
         title: context.l10n.settingsSearchCrossfadeTitle,
         subtitle: context.l10n.settingsSearchCrossfadeSubtitle,
         icon: Icons.play_circle_outline_rounded,
         keywords: ['crossfade', 'gapless', 'transition', 'seconds', 'fade'],
         onTap: () {
           _searchController.clear();
-          setState(() => _selectedCategoryId = 'playback');
+          setState(() => _selectedCategoryId = 'sound');
         },
       ),
       _SearchItem(
-        categoryId: 'playback',
-        category: context.l10n.playback,
+        categoryId: 'sound',
+        category: soundCat,
         title: context.l10n.sleepTimer,
         subtitle: context.l10n.settingsSearchSleepTimerSubtitle,
         icon: Icons.timer_outlined,
@@ -522,20 +681,20 @@ mixin SettingsSearchResults
         onTap: () => SleepTimerSheet.show(context),
       ),
       _SearchItem(
-        categoryId: 'gestures',
-        category: context.l10n.gestures,
+        categoryId: 'look',
+        category: lookCat,
         title: context.l10n.settingsSearchSwipeTitle,
         subtitle: context.l10n.settingsSearchSwipeSubtitle,
         icon: Icons.swipe_rounded,
         keywords: ['swipe', 'miniplayer', 'gesture', 'left', 'right', 'volume'],
         onTap: () {
           _searchController.clear();
-          setState(() => _selectedCategoryId = 'gestures');
+          setState(() => _selectedCategoryId = 'look');
         },
       ),
       _SearchItem(
         categoryId: 'library',
-        category: context.l10n.navLibrary,
+        category: libraryCat,
         title: context.l10n.settingsSearchRescanTitle,
         subtitle: context.l10n.settingsSearchRescanSubtitle,
         icon: Icons.refresh_rounded,
@@ -544,7 +703,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
-        category: context.l10n.navLibrary,
+        category: libraryCat,
         title: context.l10n.settingsRebuildSearchIndexTitle,
         subtitle: context.l10n.settingsRebuildSearchIndexSubtitle,
         icon: Icons.manage_search_rounded,
@@ -553,7 +712,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
-        category: context.l10n.navLibrary,
+        category: libraryCat,
         title: context.l10n.hiddenAndExcludedFolders,
         subtitle: context.l10n.settingsSearchHiddenFoldersSubtitle,
         icon: Icons.folder_off_rounded,
@@ -562,7 +721,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
-        category: context.l10n.navLibrary,
+        category: libraryCat,
         title: context.l10n.shortAudioFilter,
         subtitle: context.l10n.ignoreFilesUnder(state.minDurationSec),
         icon: Icons.filter_list_rounded,
@@ -571,8 +730,8 @@ mixin SettingsSearchResults
             _showDurationFilterDialog(context, cubit, state.minDurationSec),
       ),
       _SearchItem(
-        categoryId: 'online',
-        category: context.l10n.settingsSearchCategoryNetwork,
+        categoryId: 'network',
+        category: networkCat,
         title: context.l10n.proxySettings,
         subtitle: context.l10n.settingsSearchProxySubtitle,
         icon: Icons.vpn_lock_rounded,
@@ -581,8 +740,8 @@ mixin SettingsSearchResults
         onTap: () => context.push('/proxy-settings'),
       ),
       _SearchItem(
-        categoryId: 'online',
-        category: context.l10n.settingsSearchCategoryNetwork,
+        categoryId: 'network',
+        category: networkCat,
         title: context.l10n.settingsSearchQualityTitle,
         subtitle: context.l10n.settingsSearchQualitySubtitle,
         icon: Icons.wifi_tethering_rounded,
@@ -595,20 +754,20 @@ mixin SettingsSearchResults
         ),
       ),
       _SearchItem(
-        categoryId: 'storage',
-        category: context.l10n.settingsSearchCategoryStorage,
+        categoryId: 'library',
+        category: libraryCat,
         title: context.l10n.settingsSearchCacheTitle,
         subtitle: context.l10n.settingsSearchCacheSubtitle,
         icon: Icons.storage_rounded,
         keywords: ['cache', 'storage', 'clear', 'artwork', 'mb', 'disk'],
         onTap: () {
           _searchController.clear();
-          setState(() => _selectedCategoryId = 'storage');
+          setState(() => _selectedCategoryId = 'library');
         },
       ),
       _SearchItem(
         categoryId: 'privacy',
-        category: context.l10n.settingsSearchCategoryPrivacy,
+        category: privacyCat,
         title: context.l10n.settingsScrobblingTitle,
         subtitle: context.l10n.settingsSearchScrobblingSubtitle,
         icon: Icons.equalizer_outlined,
@@ -617,7 +776,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'privacy',
-        category: context.l10n.settingsSearchCategoryPrivacy,
+        category: privacyCat,
         title: context.l10n.settingsSearchPrivacyTitle,
         subtitle: context.l10n.settingsSearchPrivacySubtitle,
         icon: Icons.security_rounded,
@@ -626,7 +785,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'about',
-        category: context.l10n.settingsSearchCategoryAbout,
+        category: aboutCat,
         title: context.l10n.about,
         subtitle:
             context.l10n.settingsSearchAboutSubtitle(AppConfig.appVersion),

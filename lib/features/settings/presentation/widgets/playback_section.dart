@@ -64,6 +64,8 @@ class PlaybackSection extends StatelessWidget {
           onTap: () => SleepTimerSheet.show(context),
         ),
         settingsCardDivider(p),
+        const PlaybackPresetsTile(),
+        settingsCardDivider(p),
         _switchTile(
           context,
           Icons.graphic_eq_rounded,
@@ -138,8 +140,6 @@ class PlaybackSection extends StatelessWidget {
         ),
         settingsCardDivider(p),
         const _AudioNormalizationSettingTile(),
-        settingsCardDivider(p),
-        const _PlaybackPresetsTile(),
       ],
     );
   }
@@ -172,6 +172,8 @@ class PlaybackSection extends StatelessWidget {
           context.l10n.sleepTimerSubtitle,
           onTap: () => SleepTimerSheet.show(context),
         ),
+        settingsCardDivider(p),
+        const PlaybackPresetsTile(),
         settingsCardDivider(p),
         _switchTile(
           context,
@@ -343,8 +345,6 @@ class PlaybackSection extends StatelessWidget {
         settingsCardDivider(p),
         // F-27: manual loudness normalization.
         const _AudioNormalizationSettingTile(),
-        settingsCardDivider(p),
-        const _PlaybackPresetsTile(),
       ],
     );
   }
@@ -632,8 +632,8 @@ class _AudioNormalizationSettingTileState
 
 /// One-tap playback presets: Maximum Quality (audiophile), Smooth Playback
 /// (balanced), Poor Network (data saver).
-class _PlaybackPresetsTile extends StatelessWidget {
-  const _PlaybackPresetsTile();
+class PlaybackPresetsTile extends StatelessWidget {
+  const PlaybackPresetsTile({super.key});
 
   @override
   Widget build(BuildContext context) {

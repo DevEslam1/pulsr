@@ -59,7 +59,11 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   Future<void> _switchPlaybackEngine({required bool toGapless}) async {
     final generation = ++_engineSwitchGeneration;
     final resumePos = _activePlayer.position;
-    final wasPlaying = _activePlayer.playing;
+    // During source preparation, the native player may still be stopped even
+    // though loadQueue has accepted an autoplay request. Preserve that intent
+    // when startup settings switch the engine before the first decoded frame.
+    final wasPlaying = _activePlayer.playing || _pendingPlaybackStart ||
+        playbackState.value.playing;
     try {
       if (toGapless) {
         await _loadGaplessQueue(
@@ -443,6 +447,7 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   int get _currentIndex;
 
   int get _engineSwitchGeneration;
+  bool get _pendingPlaybackStart;
   set _engineSwitchGeneration(int value);
 
   EqualizerManager get _equalizerManager;

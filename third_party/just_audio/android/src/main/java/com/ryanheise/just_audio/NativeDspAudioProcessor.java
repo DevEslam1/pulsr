@@ -162,6 +162,15 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     }
 
     private ByteBuffer scratch;
+    // Independent of the sleep/crossfade curve: profile edits may temporarily
+    // fade the complete chain without replacing another owner's envelope.
+    private volatile boolean transitionMuted;
+    private volatile float transitionGain = 1.0f;
+    public boolean setTransitionMuted(boolean muted) {
+        transitionMuted = muted;
+        return NATIVE_AVAILABLE;
+    }
+    public float getTransitionGain() { return transitionGain; }
     private FloatBuffer scratchFloats;
 
     @Override
@@ -262,7 +271,15 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         final int lastIdx = curve == null ? 0 : curve.length - 1;
         final boolean outputIsFloat = outputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
         ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
+        float profileGain = transitionGain;
+        final float profileTarget = transitionMuted ? 0.0f : 1.0f;
+        final float profileStep = 1.0f / Math.max(1, inputAudioFormat.sampleRate * 0.04f);
         for (int i = 0; i < processed * channelCount; i++) {
+            if (i % channelCount == 0) {
+                profileGain = profileTarget < profileGain
+                        ? Math.max(profileTarget, profileGain - profileStep)
+                        : Math.min(profileTarget, profileGain + profileStep);
+            }
             float gain = idleGain;
             if (curve != null) {
                 // Piecewise-linear interpolation between curve points, per frame.
@@ -276,7 +293,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                     gain = curve[seg] + (curve[seg + 1] - curve[seg]) * frac;
                 }
             }
-            float value = floats.get(i) * gain;
+            float value = floats.get(i) * gain * profileGain;
             if (outputIsFloat) {
                 // Emit straight float32: no 16-bit re-quantisation after DSP.
                 output.putFloat(value);
@@ -284,6 +301,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 output.putShort(Pcm16Quantizer.fromFloat(value));
             }
         }
+        transitionGain = profileGain;
         inputBuffer.position(limit);
         output.flip();
     }
@@ -311,6 +329,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onReset() {
+        transitionMuted = false;
+        transitionGain = 1.0f;
         scratch = null;
         scratchFloats = null;
         synchronized (rampLock) {

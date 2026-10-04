@@ -50,6 +50,7 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
                      AAudio_convertResultToText(r);
         return false;
     }
+    AAudioStreamBuilder_setDeviceId(builder, config_.deviceId);
     AAudioStreamBuilder_setFormat(builder, ToAaudioFormat(config_.encoding));
     AAudioStreamBuilder_setSampleRate(builder, config_.sampleRate);
     AAudioStreamBuilder_setChannelCount(builder, config_.channelCount);
@@ -431,6 +432,15 @@ int32_t AAudioSink::BufferCapacityFrames() const {
     }
     activeReaders_.fetch_sub(1, std::memory_order_release);
     return cap;
+}
+
+int32_t AAudioSink::DeviceId() const {
+    activeReaders_.fetch_add(1, std::memory_order_acquire);
+    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    const int32_t id = st != nullptr && !releasing_.load(std::memory_order_acquire)
+        ? AAudioStream_getDeviceId(st) : 0;
+    activeReaders_.fetch_sub(1, std::memory_order_release);
+    return id;
 }
 
 int32_t AAudioSink::FramesPerBurst() const {

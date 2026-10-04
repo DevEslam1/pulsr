@@ -158,6 +158,44 @@ int main() {
         check(collapsed, "mono downmix must write 0.5*(L+R) to both channels");
     }
 
+    for (bool governor : {false, true}) {
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = STAGE_REVERB;
+        snap->reverb.enabled = true;
+        snap->reverb.wetDry = 0.12;
+        snap->reverb.preparedIr = PreparedIr::createSynthetic(
+            48000.0, static_cast<int>(ReverbPreset::Room), 0.5f);
+        engine->setSampleRate(48000.0);
+        engine->setAutoDegradeMonitorEnabled(false);
+        engine->publishParams(snap);
+        const auto input = makeSignal(frames, channels);
+        for (int b = 0; b < 40; ++b) {
+            auto work = input;
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        if (governor) {
+            engine->triggerStageAutoDegrade(STAGE_REVERB);
+        } else {
+            engine->updateParams([](DspParamSnapshot& params) {
+                params.activeStages = 0;
+                params.reverb.enabled = false;
+            });
+        }
+        auto first = input;
+        engine->processInterleaved(first.data(), frames, channels);
+        check(!bitIdentical(first, input), "reverb disable must retain its fade instead of cutting directly to dry");
+        check(engine->reverb().isRamping(), "reverb must still be fading immediately after disable");
+        for (int b = 0; b < 100; ++b) {
+            auto work = input;
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        check(!engine->reverb().isRamping(), "cleared stage mask must allow the reverb fade to finish");
+        auto settled = input;
+        engine->processInterleaved(settled.data(), frames, channels);
+        check(bitIdentical(settled, input), "reverb must become bit-transparent after its fade");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " bypass transparency check(s) failed." << std::endl;
         return 1;

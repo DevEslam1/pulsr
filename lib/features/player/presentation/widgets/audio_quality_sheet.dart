@@ -64,8 +64,10 @@ class AudioQualitySheet extends StatelessWidget {
                   c.state.currentOutputDevice,
                   c.state.bitPerfectOutput,
                 ));
+    final currentSong = context
+        .select<PlayerCubit, SongsTableData?>((c) => c.state.currentSong);
     final info = AudioQualityInfo.fromSong(
-      song,
+      currentSong ?? song,
       streamingQuality: streamingQuality,
     );
 
@@ -310,10 +312,10 @@ class AudioQualitySheet extends StatelessWidget {
                           ? '-'
                           : bits.contains('24')
                               ? (bits.contains('float') || bits.contains('32')
-                                  ? '32f/24'
+                                  ? '32/24'
                                   : '24')
                               : (bits.contains('float') || bits.contains('32')
-                                  ? '32f'
+                                  ? '32'
                                   : '-');
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +354,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.s2),
                           Text(
-                            context.l10n.dsdPcmNote,
+                            'Capability probe only; hardware output format is not measured.',
                             style: TextStyle(
                               fontSize: AppFontSize.tiny,
                               color: p.textSecondary,
@@ -444,14 +446,16 @@ class AudioQualitySheet extends StatelessWidget {
                         _buildSpecItem(
                           context,
                           icon: Icons.speed_rounded,
-                          label: context.l10n.dspSourceBitrate,
+                          label: info.bitrateEstimated
+                              ? 'Container average (estimated)'
+                              : context.l10n.dspSourceBitrate,
                           value: info.bitrateKbps != null
                               ? '${info.bitrateKbps} kbps'
-                              : context.l10n.dspVariableBitrate,
+                              : 'Unknown',
                           subValue:
                               info.tier == AudioQualityTier.hiResLossless ||
                                       info.tier == AudioQualityTier.lossless
-                                  ? context.l10n.dspBitPerfectLosslessStream
+                                  ? 'Lossless source (output fidelity separate)'
                                   : context.l10n.dspCompressedStream,
                           p: p,
                         ),
@@ -588,7 +592,7 @@ class AudioQualitySheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    outputDevice?.deviceName ?? context.l10n.phoneSpeaker,
+                    outputDevice?.deviceName ?? 'Output route unverified',
                     style: TextStyle(
                       color: p.textPrimary,
                       fontWeight: FontWeight.w800,
@@ -596,13 +600,7 @@ class AudioQualitySheet extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    context.l10n.activeSystemOutputDesc(
-                      (outputDevice != null
-                              ? (outputDevice.sampleRate ~/ 1000)
-                              : 48)
-                          .toString(),
-                      (outputDevice?.bitDepth ?? 16).toString(),
-                    ),
+                    _outputStreamDescription(outputDevice),
                     style: TextStyle(
                         color: p.textSecondary, fontSize: AppFontSize.caption),
                   ),
@@ -648,9 +646,17 @@ class AudioQualitySheet extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: AppRadii.r14All,
-                  onTap: () {
+                  onTap: () async {
                     HapticFeedback.selectionClick();
-                    cubit?.selectOutputDevice(dev.id);
+                    final applied =
+                        await cubit?.selectOutputDevice(dev.id) ?? false;
+                    if (!applied && context.mounted) {
+                      ScaffoldMessenger.maybeOf(context)
+                          ?.showSnackBar(const SnackBar(
+                        content: Text(
+                            'Output switch unavailable for this playback engine.'),
+                      ));
+                    }
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -689,16 +695,11 @@ class AudioQualitySheet extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                context.l10n.deviceOutputSpecsDesc(
-                                  dev.typeName,
-                                  (dev.sampleRates.isEmpty
-                                          ? 48
-                                          : (dev.sampleRates.reduce(
-                                                  (a, b) => a > b ? a : b) ~/
-                                              1000))
-                                      .toString(),
-                                  dev.maxBitDepth.toString(),
-                                ),
+                                dev.isCurrent
+                                    ? 'Active route • ${_outputStreamDescription(outputDevice)}'
+                                    : dev.isPreferred
+                                        ? 'Requested route • waiting for playback confirmation'
+                                        : '${dev.typeName} • available output',
                                 style: TextStyle(
                                   color: p.textSecondary,
                                   fontSize: AppFontSize.caption,
@@ -934,10 +935,10 @@ class AudioQualitySheet extends StatelessWidget {
     // filter, so a hi-res tier the device cannot honour is never advertised.
     final supportedRates = HiResAudioService.supportedSampleRateOptions(
       deviceSampleRates: outputDevice?.supportedSampleRates ?? const [],
-      directFormats: outputDevice?.directFormats ?? const [],
+      directFormats: const [],
     );
     final options = <(int, String, String)>[
-      (0, 'Auto', 'Native'),
+      (0, 'Auto', 'System managed'),
       for (final rate in supportedRates)
         (rate, _sampleRateLabel(rate), _sampleRateTag(rate)),
     ];
@@ -947,6 +948,10 @@ class AudioQualitySheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+            'Format follows the playback engine. Manual conversion is unavailable.',
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.caption)),
         if (isBitPerfectActive)
           Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -963,7 +968,7 @@ class AudioQualitySheet extends StatelessWidget {
                 const Icon(Icons.lock_rounded, color: goldAccent, size: 13),
                 const SizedBox(width: AppSpacing.s6),
                 Text(
-                  'Bit-Perfect Active • Locked to source track (${info.sampleRate})',
+                  'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
                   style: const TextStyle(
                     color: goldAccent,
                     fontSize: AppFontSize.caption,
@@ -988,7 +993,7 @@ class AudioQualitySheet extends StatelessWidget {
                     title: opt.$2,
                     subtitle: opt.$3,
                     isSelected: isSelected,
-                    isEnabled: !isBitPerfectActive,
+                    isEnabled: opt.$1 == 0 && !isBitPerfectActive,
                     activeColor: activeColor,
                     palette: p,
                     onTap: () {
@@ -1013,7 +1018,6 @@ class AudioQualitySheet extends StatelessWidget {
     Color activeColor,
     AudioQualityInfo info,
   ) {
-    final isUsbDac = outputDevice?.isUsbDac == true;
     final isBitPerfectEnabled = cubit?.state.bitPerfectOutput == true;
     final blockedReason = AudioConflicts.bitPerfectBlockedReason(outputDevice);
     final isBitPerfectActive =
@@ -1022,10 +1026,10 @@ class AudioQualitySheet extends StatelessWidget {
         isBitPerfectActive ? 0 : (outputDevice?.targetBitDepth ?? 0);
 
     final bitDepthOptions = [
-      (0, 'Auto', 'Source'),
+      (0, 'Auto', 'System managed'),
       (16, '16-bit', 'Standard'),
       (24, '24-bit', 'Hi-Res HD'),
-      (32, '32-bit Float', 'Audiophile'),
+      (32, '32-bit', 'PCM'),
     ];
 
     const goldAccent = AppColors.dacGold;
@@ -1033,6 +1037,10 @@ class AudioQualitySheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+            'Format follows the playback engine. Manual conversion is unavailable.',
+            style: TextStyle(
+                color: p.textSecondary, fontSize: AppFontSize.caption)),
         if (isBitPerfectActive)
           Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -1049,7 +1057,7 @@ class AudioQualitySheet extends StatelessWidget {
                 const Icon(Icons.lock_rounded, color: goldAccent, size: 13),
                 const SizedBox(width: AppSpacing.s6),
                 Text(
-                  'Bit-Perfect Active • Locked to source track (${info.bitDepth})',
+                  'Exclusive mixer • ${_outputStreamDescription(outputDevice)}',
                   style: const TextStyle(
                     color: goldAccent,
                     fontSize: AppFontSize.caption,
@@ -1074,7 +1082,7 @@ class AudioQualitySheet extends StatelessWidget {
                     title: opt.$2,
                     subtitle: opt.$3,
                     isSelected: isSelected,
-                    isEnabled: !isBitPerfectActive,
+                    isEnabled: opt.$1 == 0 && !isBitPerfectActive,
                     activeColor: activeColor,
                     palette: p,
                     onTap: () {
@@ -1198,11 +1206,9 @@ class AudioQualitySheet extends StatelessWidget {
                                 ? blockedReason
                                 : (isBitPerfectEnabled
                                     ? (isBitPerfectActive
-                                        ? (isUsbDac
-                                            ? context.l10n.bpDirectActiveUsb
-                                            : context.l10n.bpDirectActiveWired)
+                                        ? 'Exclusive mixer configured; hardware fidelity not verified'
                                         : context.l10n.bpPassThroughArmed)
-                                    : context.l10n.bpBypassesAndroidMixer),
+                                    : 'Requests exclusive USB mixing where supported'),
                             style: TextStyle(
                               color:
                                   blockedReason != null && !isBitPerfectEnabled
@@ -1387,7 +1393,7 @@ class AudioQualitySheet extends StatelessWidget {
     Color activeColor,
   ) {
     final bool isBitPerfect = settingsState?.bitPerfectOutput == true &&
-        outputDevice?.isUsbDac == true;
+        outputDevice?.isBitPerfectActive == true;
     final bool isDsd = info.format.toUpperCase().contains('DSD') ||
         info.codecName.toUpperCase().contains('DSD');
 
@@ -1420,14 +1426,11 @@ class AudioQualitySheet extends StatelessWidget {
         : (activeStages.isEmpty
             ? 'None (Clean Path)'
             : activeStages.join(' + '));
-    final String resamplerLabel = isBitPerfect
-        ? 'Direct 1:1 Stream'
-        : (outputDevice != null && outputDevice.targetSampleRate > 0
-            ? 'Polyphase Sinc FIR (${info.sampleRate} → ${outputDevice.targetSampleRate ~/ 1000} kHz)'
-            : 'Polyphase FIR Streaming Resampler');
-    final String driverLabel = isBitPerfect
-        ? 'AAudio Direct / Bit-Perfect Track'
-        : 'Shared System AudioTrack';
+    const String resamplerLabel =
+        'Platform conversion • not measured by this app';
+    final String driverLabel = settingsState?.aaudioOutputEnabled == true
+        ? 'AAudio • ${_outputStreamDescription(outputDevice)}'
+        : 'Media3 AudioTrack • ${_outputStreamDescription(outputDevice)}';
     final String dacLabel = outputDevice?.deviceName ??
         (outputDevice?.isUsbDac == true ? 'USB Hi-Res DAC' : 'Internal DAC');
 
@@ -1522,8 +1525,7 @@ class AudioQualitySheet extends StatelessWidget {
           _SignalChainNode(
             step: 5,
             title: context.l10n.dspHardwareEndpoint,
-            detail:
-                '$dacLabel (${outputDevice != null && outputDevice.targetSampleRate > 0 ? "${outputDevice.targetSampleRate ~/ 1000} kHz" : (outputDevice != null ? "${outputDevice.sampleRate ~/ 1000} kHz" : "48 kHz")} / ${outputDevice?.bitDepth ?? 24}-bit)',
+            detail: '$dacLabel • hardware format not verified',
             icon: outputDevice?.isUsbDac == true
                 ? Icons.usb_rounded
                 : Icons.speaker_rounded,
@@ -1723,6 +1725,13 @@ class _OptionPill extends StatelessWidget {
   }
 }
 
+String _outputStreamDescription(AudioOutputInfo? output) {
+  if (output == null || output.sampleRate <= 0 || output.bitDepth <= 0) {
+    return 'App stream format unverified';
+  }
+  return 'App stream: ${_sampleRateLabel(output.sampleRate)} / ${output.bitDepth}-bit ${output.pcmEncoding == 4 ? "float" : "PCM"}';
+}
+
 String _sampleRateLabel(int rate) {
   switch (rate) {
     case 44100:
@@ -1800,10 +1809,12 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     Color activeColor,
   ) {
     final connected = outputDevice?.btCodecConnected ?? false;
+    final canConfigure = outputDevice?.canConfigureBluetooth == true &&
+        outputDevice?.isBluetooth == true;
     final reason = outputDevice?.btReason;
-    final codecName = outputDevice?.btCodecName ?? 'AAC';
-    final sampleRateHz = outputDevice?.btSampleRateHz ?? 44100;
-    final bitDepth = outputDevice?.btBitDepth ?? 16;
+    final codecName = outputDevice?.btCodecName ?? 'Unknown';
+    final sampleRateHz = outputDevice?.btSampleRateHz ?? 0;
+    final bitDepth = outputDevice?.btBitDepth ?? 0;
     final ldacMode = outputDevice?.btLdacQualityMode;
     final selectableCodecs = outputDevice?.btSelectableCodecs ?? const [];
     final selectableRates = outputDevice?.btSelectableSampleRates ?? const [];
@@ -1931,9 +1942,8 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                             ),
                           ),
                           Text(
-                            '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz'
-                            ' · $bitDepth-bit'
-                            '${isLdac && ldacMode != null ? ' · ${ldacModes[ldacMode.clamp(0, 3)].$3}' : ''}',
+                            '${sampleRateHz > 0 ? _sampleRateLabel(sampleRateHz) : "Rate unknown"}'
+                            '${bitDepth > 0 ? " / $bitDepth-bit" : " / Depth unknown"}',
                             style: TextStyle(
                               fontSize: AppFontSize.label,
                               color: p.textSecondary,
@@ -2012,7 +2022,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     padding:
                         const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                     child: GestureDetector(
-                      onTap: isActive
+                      onTap: isActive ||
+                              !canConfigure ||
+                              !selectableCodecs.contains(c)
                           ? null
                           : () async {
                               HapticFeedback.selectionClick();
@@ -2055,7 +2067,11 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                                 fontWeight: isActive
                                     ? FontWeight.w800
                                     : FontWeight.w500,
-                                color: isActive ? accent : p.textSecondary,
+                                color: isActive
+                                    ? accent
+                                    : canConfigure
+                                        ? p.textSecondary
+                                        : p.textTertiary,
                                 letterSpacing: AppTracking.label,
                               ),
                             ),
@@ -2103,7 +2119,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     ),
                     const SizedBox(height: AppSpacing.s6),
                     GestureDetector(
-                      onTap: selectableRates.isEmpty || cubit == null
+                      onTap: !canConfigure ||
+                              selectableRates.isEmpty ||
+                              cubit == null
                           ? null
                           : () => _showBtOptionPicker(
                                 context: context,
@@ -2132,7 +2150,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           children: [
                             Expanded(
                               child: Text(
-                                '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz',
+                                (sampleRateHz > 0
+                                    ? _sampleRateLabel(sampleRateHz)
+                                    : 'Rate unknown'),
                                 style: const TextStyle(
                                   color: _btAccent,
                                   fontSize: AppFontSize.body,
@@ -2140,7 +2160,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                                 ),
                               ),
                             ),
-                            if (selectableRates.isNotEmpty && cubit != null)
+                            if (canConfigure &&
+                                selectableRates.isNotEmpty &&
+                                cubit != null)
                               const Icon(
                                 Icons.arrow_drop_down_rounded,
                                 color: _btAccent,
@@ -2169,7 +2191,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     ),
                     const SizedBox(height: AppSpacing.s6),
                     GestureDetector(
-                      onTap: selectableDepths.isEmpty || cubit == null
+                      onTap: !canConfigure ||
+                              selectableDepths.isEmpty ||
+                              cubit == null
                           ? null
                           : () => _showBtOptionPicker(
                                 context: context,
@@ -2197,7 +2221,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           children: [
                             Expanded(
                               child: Text(
-                                '$bitDepth-bit',
+                                bitDepth > 0 ? '$bitDepth-bit' : 'Unknown',
                                 style: const TextStyle(
                                   color: _btAccent,
                                   fontSize: AppFontSize.body,
@@ -2205,7 +2229,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                                 ),
                               ),
                             ),
-                            if (selectableDepths.isNotEmpty && cubit != null)
+                            if (canConfigure &&
+                                selectableDepths.isNotEmpty &&
+                                cubit != null)
                               const Icon(
                                 Icons.arrow_drop_down_rounded,
                                 color: _btAccent,
@@ -2284,15 +2310,17 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                       (i) => Padding(
                         padding: const EdgeInsetsDirectional.only(start: 3),
                         child: GestureDetector(
-                          onTap: () async {
-                            HapticFeedback.selectionClick();
-                            final ok =
-                                await cubit?.setBluetoothLdacQuality(i) ??
-                                    false;
-                            if (!ok && context.mounted) {
-                              _showBtRefused(context, cubit);
-                            }
-                          },
+                          onTap: !canConfigure
+                              ? null
+                              : () async {
+                                  HapticFeedback.selectionClick();
+                                  final ok =
+                                      await cubit?.setBluetoothLdacQuality(i) ??
+                                          false;
+                                  if (!ok && context.mounted) {
+                                    _showBtRefused(context, cubit);
+                                  }
+                                },
                           child: Container(
                             width: 20,
                             height: 20,

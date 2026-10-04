@@ -78,3 +78,6 @@
 -keep class org.mozilla.** { *; }
 -dontwarn org.mozilla.javascript.**
 -keep class org.mozilla.javascript.** { *; }
+
+# Preserve the measured app AudioTrack field used by the output diagnostics.
+-keepclassmembers class androidx.media3.exoplayer.audio.DefaultAudioSink { android.media.AudioTrack audioTrack; }

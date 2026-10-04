@@ -41,7 +41,6 @@ class _RecentsScreenState extends State<RecentsScreen> {
   static const int _maxHistoryLimit = 500;
   int _historyLimit = _persistedHistoryLimit;
   bool _hasMore = true;
-  bool _userExpanded = false;
   late final GetSongsUseCase _getSongsUseCase;
   late Stream<dynamic> _recentStream;
 
@@ -419,68 +418,46 @@ class _RecentsScreenState extends State<RecentsScreen> {
                             ),
                           ),
                         ),
-                      if ((_hasMore &&
-                              allRecents.length >= _historyLimit &&
-                              _historyLimit < _maxHistoryLimit &&
-                              _searchQuery.isEmpty) ||
-                          (_userExpanded &&
-                              _historyLimit > _persistedHistoryLimit &&
-                              allRecents.length > _persistedHistoryLimit))
+                      if (_hasMore &&
+                          allRecents.length >= _historyLimit &&
+                          _historyLimit < _maxHistoryLimit &&
+                          _searchQuery.isEmpty)
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 vertical: AppSpacing.md),
                             child: Center(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (_hasMore &&
-                                      allRecents.length >= _historyLimit &&
-                                      _historyLimit < _maxHistoryLimit &&
-                                      _searchQuery.isEmpty)
-                                    TextButton.icon(
-                                      icon:
-                                          const Icon(Icons.expand_more_rounded),
-                                      label: Text(context.l10n.loadMoreHistory),
-                                      onPressed: () {
-                                        if (allRecents.length < _historyLimit) {
-                                          setState(() => _hasMore = false);
-                                          return;
-                                        }
-                                        setState(() {
-                                          _userExpanded = true;
-                                          _historyLimit = (_historyLimit + 100)
-                                              .clamp(_persistedHistoryLimit,
-                                                  _maxHistoryLimit);
-                                          _updateStream();
-                                        });
-                                      },
-                                    ),
-                                  if (_userExpanded &&
-                                      _historyLimit > _persistedHistoryLimit &&
-                                      allRecents.length >
-                                          _persistedHistoryLimit) ...[
-                                    if (_hasMore &&
-                                        allRecents.length >= _historyLimit &&
-                                        _historyLimit < _maxHistoryLimit &&
-                                        _searchQuery.isEmpty)
-                                      const SizedBox(width: AppSpacing.sm),
-                                    TextButton.icon(
-                                      icon:
-                                          const Icon(Icons.expand_less_rounded),
-                                      label: Text(context.l10n.showLess),
-                                      onPressed: () {
-                                        setState(() {
-                                          _userExpanded = false;
-                                          _historyLimit =
-                                              _persistedHistoryLimit;
-                                          _hasMore = true;
-                                          _updateStream();
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                ],
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.lg,
+                                    vertical: AppSpacing.sm,
+                                  ),
+                                  backgroundColor: (context.palette.isDark
+                                          ? Colors.white
+                                          : Colors.black)
+                                      .withValues(alpha: 0.06),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: AppRadii.r12All,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.expand_more_rounded, size: 20),
+                                label: Text(
+                                  '${context.l10n.loadMoreHistory} (${allRecents.length})',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                onPressed: () {
+                                  if (allRecents.length < _historyLimit) {
+                                    setState(() => _hasMore = false);
+                                    return;
+                                  }
+                                  setState(() {
+                                    _historyLimit = (_historyLimit + 100)
+                                        .clamp(_persistedHistoryLimit,
+                                            _maxHistoryLimit);
+                                    _updateStream();
+                                  });
+                                },
                               ),
                             ),
                           ),

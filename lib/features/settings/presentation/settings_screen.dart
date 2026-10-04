@@ -33,9 +33,11 @@ import '../cubit/settings_state.dart';
 import '../../../core/utils/platform_capabilities.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
+import 'widgets/audio_setup_wizard.dart';
 import 'widgets/audio_sound_section.dart';
 import 'widgets/automation_rules_sheet.dart';
 import 'widgets/backup_section.dart';
+import 'widgets/cast_section.dart';
 import 'widgets/device_profiles_section.dart';
 import 'widgets/download_settings_tiles.dart';
 import 'widgets/experience_mode_section.dart';
@@ -160,7 +162,7 @@ class SettingsScreenState extends State<SettingsScreen>
         }
         final effectiveCategoryId =
             (isTabletView && selectedCategoryId == 'all')
-                ? 'audio'
+                ? 'sound'
                 : selectedCategoryId;
 
         return Scaffold(

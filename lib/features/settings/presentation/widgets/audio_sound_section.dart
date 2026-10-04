@@ -1,14 +1,14 @@
 // lib/features/settings/presentation/widgets/audio_sound_section.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/prefs_keys.dart';
-import '../../../../core/widgets/pulsr_bottom_sheet.dart';
-import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
@@ -31,6 +31,7 @@ import 'settings_conflict_card.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
+import 'studio_bridge_footer.dart';
 import 'usb_dac_section.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -42,19 +43,47 @@ part 'audio_dsp_section.dart';
 part 'audio_gain_section.dart';
 part 'audio_diagnostic_section.dart';
 
-/// Sound engine: equalizer, DSP engine, output device / bit-perfect,
-/// ReplayGain and battery optimization for background audio.
-class AudioSoundSection extends StatefulWidget {
+/// Loudness and gain controls: ReplayGain segmented control + preamp sliders, DVC, resampler.
+class AudioGainSection extends StatelessWidget {
   final SettingsState state;
 
-  const AudioSoundSection({super.key, required this.state});
+  const AudioGainSection({super.key, required this.state});
 
   @override
-  State<AudioSoundSection> createState() => _AudioSoundSectionState();
+  Widget build(BuildContext context) {
+    return SettingsSection(
+      icon: Icons.volume_up_rounded,
+      title: context.l10n.expGainTitle,
+      children: [
+        RepaintBoundary(
+          child: _GainSection(
+            state: state,
+            onResolveReplayGainConflict: (ctx, cubit) async {
+              await cubit.setBypassDspOnBitPerfect(false);
+              if (!ctx.mounted) return;
+              ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(SnackBar(
+                behavior: SnackBarBehavior.floating,
+                content: Text(ctx.l10n.bpResolved),
+              ));
+            },
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _AudioSoundSectionState extends State<AudioSoundSection> {
-  // B-24: Read hasPcmDspPath in initState and re-read on didChangeDependencies
+/// Effects & DSP surface: collapsed disclosure in Normal mode; expanded list in Professional.
+class AudioEffectsDspSection extends StatefulWidget {
+  final SettingsState state;
+
+  const AudioEffectsDspSection({super.key, required this.state});
+
+  @override
+  State<AudioEffectsDspSection> createState() => _AudioEffectsDspSectionState();
+}
+
+class _AudioEffectsDspSectionState extends State<AudioEffectsDspSection> {
   bool _hasPcmDspPath = false;
 
   @override
@@ -67,18 +96,6 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _hasPcmDspPath = AudioEffectsChannel().hasPcmDspPath;
-  }
-
-  /// Resolves the ReplayGain ↔ Bit-Perfect-bypass conflict by disabling the
-  /// bypass (keeps Bit-Perfect output ON, unlocks the ReplayGain controls).
-  Future<void> _resolveReplayGainConflict(
-      BuildContext context, SettingsCubit cubit) async {
-    await cubit.setBypassDspOnBitPerfect(false);
-    if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-      behavior: SnackBarBehavior.floating,
-      content: Text(context.l10n.bpResolved),
-    ));
   }
 
   Future<void> _autoCalibrateBluetoothLatency(
@@ -97,118 +114,8 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
     ));
   }
 
-  /// Curated sound section for Normal mode: what a non-technical listener needs
-  /// and nothing else. Smart Audio (in Settings → Sound) runs the advanced
-  /// pipeline automatically.
-  Widget _buildNormal(BuildContext context) {
-    final p = context.palette;
-    final device = widget.state.currentOutputDevice;
-    final deviceLabel = device == null
-        ? context.l10n.settingsConnectedDeviceQuality
-        : '${device.deviceName}  •  '
-            '${(device.sampleRate ~/ 1000)} kHz / ${device.bitDepth}-bit'
-            '${device.isBluetooth ? '  •  Bluetooth' : ''}';
-    return SettingsSection(
-      icon: Icons.graphic_eq_rounded,
-      title: context.l10n.audioAndSound,
-      children: [
-        SettingsNavTile(
-          Icons.equalizer_rounded,
-          context.l10n.equalizerAndSoundEffects,
-          PlatformCapabilities.hasEqualizer
-              ? context.l10n.equalizerSubtitle
-              : context.l10n.settingsNotAvailablePlatform,
-          onTap: PlatformCapabilities.hasEqualizer
-              ? () => EqualizerSheet.show(context)
-              : null,
-        ),
-        settingsCardDivider(p),
-        SettingsNavTile(
-          Icons.speaker_rounded,
-          context.l10n.settingsOutputAudioQuality,
-          deviceLabel,
-          onTap: () {
-            final currentSong = context.read<PlayerCubit>().state.currentSong ??
-                SongsTableData(
-                  id: 0,
-                  title: context.l10n.settingsHardwareAudioOutput,
-                  artist: context.l10n.settingsMasterAudioEngine,
-                  album: context.l10n.settingsInternalUsbDac,
-                  durationMs: 0,
-                  path: '',
-                  source: SongSource.local,
-                  isFavorite: false,
-                  isMissing: false,
-                  isDownloaded: false,
-                  playCount: 0,
-                  lastPositionMs: 0,
-                );
-            AudioQualitySheet.show(context, currentSong, p.accent);
-          },
-        ),
-        settingsCardDivider(p),
-        const BatteryOptimizationCard(),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        widget.state.isProfessional
-            ? _buildProfessional(context)
-            : _buildNormal(context),
-        const CastSection(),
-      ],
-    );
-  }
-
-  // B-25: Split _buildProfessional into 4 sub-widgets: _OutputSection, _DspSection, _GainSection, _DiagnosticSection wrapped in RepaintBoundary
-  Widget _buildProfessional(BuildContext context) {
-    final p = context.palette;
-    return SettingsSection(
-      icon: Icons.graphic_eq_rounded,
-      title: context.l10n.audioAndSound,
-      children: [
-        RepaintBoundary(
-          child: _OutputSection(
-            state: widget.state,
-            onShowDspPreference: _showDspPreferencePickerSheet,
-          ),
-        ),
-        settingsCardDivider(p),
-        RepaintBoundary(
-          child: _DspSection(
-            state: widget.state,
-            hasPcmDspPath: _hasPcmDspPath,
-          ),
-        ),
-        settingsCardDivider(p),
-        RepaintBoundary(
-          child: _GainSection(
-            state: widget.state,
-            onResolveReplayGainConflict: _resolveReplayGainConflict,
-          ),
-        ),
-        settingsCardDivider(p),
-        RepaintBoundary(
-          child: _DiagnosticSection(
-            state: widget.state,
-            onCalibrateBt: _autoCalibrateBluetoothLatency,
-            onExportLogs: _exportSessionLogs,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Exports the per-session audio telemetry JSONL and hands it to the OS share
-  /// sheet. Best-effort: a missing/failed export surfaces a message, never a throw.
   Future<void> _exportSessionLogs(BuildContext context) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    // Captured before async gaps (no context-across-gap).
     final noLogsText = context.l10n.noSessionLogs;
     final exportFailedText = context.l10n.exportFailed;
     final shareText = context.l10n.settingsSessionLogsShareText;
@@ -231,63 +138,139 @@ class _AudioSoundSectionState extends State<AudioSoundSection> {
     }
   }
 
-  void _showDspPreferencePickerSheet(
-      BuildContext context, SettingsCubit cubit, String currentPref) {
+  @override
+  Widget build(BuildContext context) {
     final p = context.palette;
-    final options = [
-      (
-        'native',
-        context.l10n.dspEngineNative,
-        context.l10n.settingsDspNativeDesc
-      ),
-      ('oem', context.l10n.dspEngineOem, context.l10n.settingsDspOemDesc),
-      ('auto', context.l10n.dspEngineAuto, context.l10n.settingsDspAutoDesc),
-    ];
+    final l10n = context.l10n;
 
-    PulsrSheetHelper.showPulsrSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-              vertical: AppSpacing.s20, horizontal: AppSpacing.md),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                context.l10n.dspEnginePreference,
-                style: const TextStyle(
-                    fontSize: AppFontSize.title, fontWeight: FontWeight.w700),
+    if (!widget.state.isProfessional) {
+      return SettingsSection(
+        icon: Icons.tune_rounded,
+        title: l10n.expEqTitle,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: AppRadii.cardRadius,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                showStudioExplainerSheet(context);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.14),
+                        borderRadius: AppRadii.r10All,
+                      ),
+                      child: Icon(Icons.auto_awesome_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                l10n.expEqTitle,
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.bodySmall,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.s6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: p.accent.withValues(alpha: 0.15),
+                                  borderRadius: AppRadii.full,
+                                ),
+                                child: Text(
+                                  'PRO',
+                                  style: TextStyle(
+                                    color: p.accent,
+                                    fontSize: AppFontSize.tiny,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          Text(
+                            l10n.expEqPro,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded,
+                        color: p.textTertiary, size: 20),
+                  ],
+                ),
               ),
-              const SizedBox(height: AppSpacing.md),
-              ...options.map((opt) {
-                final isSelected = currentPref == opt.$1;
-                return ListTile(
-                  title: Text(opt.$2,
-                      style: TextStyle(
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.normal)),
-                  subtitle: Text(opt.$3,
-                      style: TextStyle(
-                          color: p.textSecondary, fontSize: AppFontSize.label)),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle, color: p.accent)
-                      : null,
-                  onTap: () {
-                    cubit.setDspPreference(opt.$1);
-                    Navigator.pop(sheetContext);
-                    PulsrToast.show(
-                      context,
-                      message: '${opt.$2}: ${opt.$3}',
-                    );
-                  },
-                );
-              }),
-            ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SettingsSection(
+      icon: Icons.tune_rounded,
+      title: l10n.expEqTitle,
+      children: [
+        RepaintBoundary(
+          child: _DspSection(
+            state: widget.state,
+            hasPcmDspPath: _hasPcmDspPath,
           ),
         ),
-      ),
+        settingsCardDivider(p),
+        RepaintBoundary(
+          child: _DiagnosticSection(
+            state: widget.state,
+            onCalibrateBt: _autoCalibrateBluetoothLatency,
+            onExportLogs: _exportSessionLogs,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Unified composite sound section for backwards compatibility.
+class AudioSoundSection extends StatelessWidget {
+  final SettingsState state;
+
+  const AudioSoundSection({super.key, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SettingsSection(
+          icon: Icons.speaker_group_outlined,
+          title: context.l10n.settingsOutputAudioQuality,
+          children: [
+            DeviceAdaptiveOutputSection(state: state),
+          ],
+        ),
+        AudioGainSection(state: state),
+        AudioEffectsDspSection(state: state),
+        const CastSection(),
+      ],
     );
   }
 }

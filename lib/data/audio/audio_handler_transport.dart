@@ -53,6 +53,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> pause() async {
+    if (_pendingPlaybackStart) _playGeneration++;
+    _pendingPlaybackStart = false;
     // A deliberate pause invalidates any pending interruption snapshot so a
     // later call can still pause us (B-1); the previous code only cleared the
     // "was playing" half, leaving the active flag set.
@@ -208,7 +210,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
             if (wasPlaying) {
               await playSongAt(fallbackIdx);
             } else {
-              await _loadSongPaused(fallbackIdx);
+              await _loadSongPaused(fallbackIdx, initialPosition: Duration.zero);
             }
           } else {
             // True end-of-queue: restart the current track instead of
@@ -230,7 +232,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         if (wasPlaying) {
           await playSongAt(nextIdx);
         } else {
-          await _loadSongPaused(nextIdx);
+          await _loadSongPaused(nextIdx, initialPosition: Duration.zero);
         }
       } else {
         // True end-of-queue: same no-dismiss policy as the gapless path.
@@ -323,7 +325,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       if (wasPlaying) {
         await playSongAt(prevIdx);
       } else {
-        await _loadSongPaused(prevIdx);
+        await _loadSongPaused(prevIdx, initialPosition: Duration.zero);
       }
     } else {
       await _activePlayer.seek(Duration.zero);
@@ -851,7 +853,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> _loadGaplessQueue(
       {Duration? initialPosition, bool preload = true});
 
-  Future<void> _loadSongPaused(int index);
+  Future<void> _loadSongPaused(int index, {Duration? initialPosition});
+  bool get _pendingPlaybackStart;
+  set _pendingPlaybackStart(bool value);
 
   Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);

@@ -16,6 +16,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   double _vol = 1.0;
+  @override
+  Future<T> withSmoothDspTransition<T>(Future<T> Function() action) => action();
   int setVolumeCallCount = 0;
   @override
   double get minPlaybackSpeed => 0.5;

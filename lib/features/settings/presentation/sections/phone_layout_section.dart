@@ -10,10 +10,6 @@ mixin PhoneLayoutSection
         SettingsPrivacyBackupSection,
         TabletLayoutSection,
         State<SettingsScreen> {
-  bool _soundPlaybackExpanded = true;
-  bool _appearanceGesturesExpanded = true;
-  bool _systemPrivacyExpanded = true;
-
   // Requires: provided by the composing class (same library).
   @override
   ScrollController get _scrollController;
@@ -59,88 +55,6 @@ mixin PhoneLayoutSection
     final horizontalPad = Adaptive.pagePadding(context);
 
     if (_selectedCategoryId == 'all') {
-      if (context.isLandscape && !Adaptive.isTablet(context)) {
-        return ListView(
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsetsDirectional.only(
-            bottom: bottomInset,
-            top: AppSpacing.md,
-            start: horizontalPad,
-            end: horizontalPad,
-          ),
-          children: [
-            if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
-              const SettingsHeroCard(),
-            _experienceModeCard(context),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _buildSuperSection(
-                    context,
-                    title: context.l10n.settingsSectionSoundPlayback,
-                    icon: Icons.graphic_eq_rounded,
-                    isExpanded: _soundPlaybackExpanded,
-                    onToggle: () => setState(
-                        () => _soundPlaybackExpanded = !_soundPlaybackExpanded),
-                    children: [
-                      ..._buildCategoryWidgets(context, 'audio', state, cubit),
-                      ..._buildCategoryWidgets(
-                          context, 'playback', state, cubit),
-                      if (state.isProfessional)
-                        ..._buildCategoryWidgets(
-                            context, 'profiles', state, cubit),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildSuperSection(
-                        context,
-                        title: context.l10n.settingsSectionAppearanceGestures,
-                        icon: Icons.palette_outlined,
-                        isExpanded: _appearanceGesturesExpanded,
-                        onToggle: () => setState(() =>
-                            _appearanceGesturesExpanded =
-                                !_appearanceGesturesExpanded),
-                        children: [
-                          ..._buildCategoryWidgets(
-                              context, 'appearance', state, cubit),
-                          ..._buildCategoryWidgets(
-                              context, 'gestures', state, cubit),
-                        ],
-                      ),
-                      _buildSuperSection(
-                        context,
-                        title: context.l10n.settingsSectionSystemPrivacy,
-                        icon: Icons.settings_suggest_rounded,
-                        isExpanded: _systemPrivacyExpanded,
-                        onToggle: () => setState(() =>
-                            _systemPrivacyExpanded = !_systemPrivacyExpanded),
-                        children: [
-                          ..._buildCategoryWidgets(
-                              context, 'library', state, cubit),
-                          ..._buildCategoryWidgets(
-                              context, 'online', state, cubit),
-                          ..._buildCategoryWidgets(
-                              context, 'storage', state, cubit),
-                          _buildPrivacyBackupSection(context),
-                          ..._buildCategoryWidgets(
-                              context, 'about', state, cubit),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-      }
       return ListView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),
@@ -151,59 +65,16 @@ mixin PhoneLayoutSection
           end: horizontalPad,
         ),
         children: [
-          if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
+          if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled) ...[
             const SettingsHeroCard(),
-          _experienceModeCard(context),
-          const SizedBox(height: AppSpacing.sm),
-          _buildSuperSection(
-            context,
-            title: context.l10n.settingsSectionSoundPlayback,
-            icon: Icons.graphic_eq_rounded,
-            isExpanded: _soundPlaybackExpanded,
-            onToggle: () => setState(
-                () => _soundPlaybackExpanded = !_soundPlaybackExpanded),
-            children: [
-              ..._buildCategoryWidgets(context, 'audio', state, cubit),
-              ..._buildCategoryWidgets(context, 'playback', state, cubit),
-              if (state.isProfessional)
-                ..._buildCategoryWidgets(context, 'profiles', state, cubit),
-            ],
-          ),
-          _buildSuperSection(
-            context,
-            title: context.l10n.settingsSectionAppearanceGestures,
-            icon: Icons.palette_outlined,
-            isExpanded: _appearanceGesturesExpanded,
-            onToggle: () => setState(() =>
-                _appearanceGesturesExpanded = !_appearanceGesturesExpanded),
-            children: [
-              ..._buildCategoryWidgets(context, 'appearance', state, cubit),
-              ..._buildCategoryWidgets(context, 'gestures', state, cubit),
-            ],
-          ),
-          _buildSuperSection(
-            context,
-            title: context.l10n.settingsSectionSystemPrivacy,
-            icon: Icons.settings_suggest_rounded,
-            isExpanded: _systemPrivacyExpanded,
-            onToggle: () => setState(
-                () => _systemPrivacyExpanded = !_systemPrivacyExpanded),
-            children: [
-              ..._buildCategoryWidgets(context, 'library', state, cubit),
-              ..._buildCategoryWidgets(context, 'online', state, cubit),
-              ..._buildCategoryWidgets(context, 'storage', state, cubit),
-              _buildPrivacyBackupSection(context),
-              ..._buildCategoryWidgets(context, 'about', state, cubit),
-            ],
-          ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          ..._buildDashboardCards(context, state, cubit),
         ],
       );
     }
 
-    final categories = _getCategories(context, pro: state.isProfessional);
-    // A category can disappear when Professional mode is turned off (e.g.
-    // `profiles`). Fall back to the first available category so the hero
-    // header and body can never disagree or leave an empty titled screen.
+    final categories = _getCategories(context, pro: state.isProfessional, state: state);
     final selectedId = categories.any((c) => c.id == _selectedCategoryId)
         ? _selectedCategoryId
         : categories.first.id;
@@ -237,9 +108,6 @@ mixin PhoneLayoutSection
           children: [
             _buildCategoryHeroHeader(context, currentCat),
             const SizedBox(height: AppSpacing.md),
-            if (selectedId == 'audio') ...[
-              _experienceModeCard(context),
-            ],
             ..._buildCategoryWidgets(context, selectedId, state, cubit),
           ],
         ),
@@ -247,20 +115,285 @@ mixin PhoneLayoutSection
     );
   }
 
-  Widget _buildSuperSection(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required bool isExpanded,
-    required VoidCallback onToggle,
-    required List<Widget> children,
-  }) {
-    return _SuperSectionCard(
-      title: title,
-      icon: icon,
-      isExpanded: isExpanded,
-      onToggle: onToggle,
-      children: children,
+  List<Widget> _buildDashboardCards(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+    final categories = _getCategories(context, pro: state.isProfessional, state: state);
+
+    return categories.map((cat) {
+      Widget statusLine;
+      Widget? topAction;
+
+      switch (cat.id) {
+        case 'sound':
+          final dev = state.currentOutputDevice;
+          final devName = dev?.deviceName ?? context.l10n.settingsAudioOutputDevice;
+          final rate = dev != null
+              ? '${(dev.sampleRate / 1000).toStringAsFixed(dev.sampleRate % 1000 == 0 ? 0 : 1)} kHz / ${dev.bitDepth}-bit'
+              : '44.1 kHz / 16-bit';
+          final isBitPerfect = dev?.isBitPerfectActive == true || state.bitPerfectOutput;
+
+          topAction = Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+            child: PulsrPressable(
+              pressedScale: 0.985,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                AudioSetupWizardSheet.show(context, cubit: cubit);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.s10),
+                decoration: BoxDecoration(
+                  color: p.accentContainer.withValues(alpha: 0.45),
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.auto_awesome_rounded, color: p.accent, size: 18),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            context.l10n.settingsSetUpSound,
+                            style: TextStyle(
+                              color: p.accent,
+                              fontWeight: FontWeight.w800,
+                              fontSize: AppFontSize.label,
+                            ),
+                          ),
+                          Text(
+                            context.l10n.settingsSetUpSoundDesc,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.tiny,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_rounded, color: p.accent, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          );
+
+          statusLine = Row(
+            children: [
+              Flexible(
+                child: Text(
+                  '$devName • $rate',
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isBitPerfect) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.dacGold.withValues(alpha: 0.16),
+                    borderRadius: AppRadii.full,
+                    border: Border.all(
+                        color: AppColors.dacGold.withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    context.l10n.bitPerfectLabel,
+                    style: TextStyle(
+                      color: p.warning,
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+          break;
+
+        case 'look':
+          final themeName = switch (state.themeMode) {
+            AppThemeMode.system => context.l10n.systemDefault,
+            AppThemeMode.light => context.l10n.themeLight,
+            AppThemeMode.dark => context.l10n.themeDark,
+            AppThemeMode.amoled => context.l10n.amoledLabel,
+          };
+          final langName = getLanguageTitle(state.languageCode, context.l10n);
+          statusLine = Text(
+            '$themeName • $langName (${state.languageCode.toUpperCase()})',
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
+          break;
+
+        case 'library':
+          statusLine = Text(
+            state.scanResultCount != null
+                ? context.l10n.lastScanTracks(state.scanResultCount!)
+                : 'Min ${state.minDurationSec}s filter',
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
+          break;
+
+        case 'network':
+          statusLine = Text(
+            '${state.proxyEnabled ? "Proxy ON" : "Proxy OFF"} • ${getQualityTitle(state.streamingQuality, context.l10n)}',
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
+          break;
+
+        case 'privacy':
+          statusLine = Text(
+            context.l10n.settingsCategoryPrivacySubtitle,
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
+          break;
+
+        case 'about':
+        default:
+          statusLine = Text(
+            'Pulsr v${AppConfig.appVersion} • Audiophile Engine',
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          );
+          break;
+      }
+
+      return _DashboardCategoryCard(
+        cat: cat,
+        statusLine: statusLine,
+        topAction: topAction,
+        onTap: () => _selectCategory(cat.id),
+      );
+    }).toList();
+  }
+}
+
+class _DashboardCategoryCard extends StatelessWidget {
+  final _SettingsCategoryItem cat;
+  final Widget statusLine;
+  final Widget? topAction;
+  final VoidCallback onTap;
+
+  const _DashboardCategoryCard({
+    required this.cat,
+    required this.statusLine,
+    this.topAction,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (topAction != null) topAction!,
+          Semantics(
+            button: true,
+            label: cat.title,
+            child: PulsrPressable(
+              pressedScale: 0.985,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onTap();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer,
+                  borderRadius: AppRadii.cardRadius,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: cat.tintColor.withValues(alpha: 0.16),
+                        borderRadius: AppRadii.r12All,
+                      ),
+                      child: Icon(cat.icon, color: cat.tintColor, size: 22),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cat.title,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: AppFontSize.body,
+                              letterSpacing: AppTracking.heading,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xxs),
+                          statusLine,
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: p.textTertiary,
+                      size: 22,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -422,6 +422,28 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     @Override
     public void onPlayerError(PlaybackException error) {
+        if (aaudioOutputEnabled && error instanceof ExoPlaybackException
+                && ((ExoPlaybackException) error).type == ExoPlaybackException.TYPE_RENDERER) {
+            Throwable cause = ((ExoPlaybackException) error).getRendererException();
+            while (cause != null) {
+                if (cause instanceof AudioSink.ConfigurationException
+                        || cause instanceof AudioSink.InitializationException
+                        || cause instanceof AudioSink.WriteException) {
+                    // A stream can be refused after the setting was accepted
+                    // (a new song or device). Recover once with the mixed sink;
+                    // never label this fallback as exclusive output.
+                    Log.w(TAG, "AAudio output refused; restoring AudioTrack", error);
+                    aaudioOutputEnabled = false;
+                    handler.post(() -> {
+                        if (player == null) return;
+                        rebuildPlayerForOutput();
+                        if (!loadedSources.isEmpty()) player.prepare();
+                    });
+                    return;
+                }
+                cause = cause.getCause();
+            }
+        }
         if (error instanceof ExoPlaybackException) {
             final ExoPlaybackException exoError = (ExoPlaybackException)error;
             switch (exoError.type) {
@@ -475,7 +497,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             Boolean exclusive = call.argument("preferExclusive");
             Integer bufferMs = call.argument("targetBufferMs");
             boolean enabled = requested != null && requested;
-            boolean changed = aaudioOutputEnabled != (enabled && Build.VERSION.SDK_INT >= 28);
+            boolean changed = false;
             if (exclusive != null) {
                 changed |= aaudioPreferExclusive != exclusive;
                 aaudioPreferExclusive = exclusive;
@@ -485,6 +507,27 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 aaudioTargetBufferMs = bufferMs;
             }
             boolean effective = enabled && Build.VERSION.SDK_INT >= 28 && AaudioNativeBridge.ensureAvailable();
+            if (effective && !aaudioOutputEnabled) {
+                // Library availability alone says nothing about whether this
+                // device grants the requested sharing mode. Probe a real stream
+                // before accepting/persisting the preference.
+                androidx.media3.common.Format format = player == null ? null : player.getAudioFormat();
+                int rate = format != null && format.sampleRate > 0 ? format.sampleRate : 48000;
+                int channels = format != null && format.channelCount > 0 ? format.channelCount : 2;
+                long probe = 0L;
+                try {
+                    probe = AaudioNativeBridge.nativeOpen(rate, channels,
+                            AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
+                            aaudioTargetBufferMs);
+                    effective = probe != 0L;
+                } catch (LinkageError | RuntimeException refused) {
+                    effective = false;
+                    Log.w(TAG, "AAudio output probe refused", refused);
+                } finally {
+                    if (probe != 0L) AaudioNativeBridge.nativeClose(probe);
+                }
+            }
+            changed = aaudioOutputEnabled != effective || (effective && changed);
             aaudioOutputEnabled = effective;
             if (changed) rebuildPlayerForOutput();
             result.success(effective == enabled);
@@ -557,6 +600,14 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             }
             case "dspClearGainCurve":
                 result.success(dspAudioProcessor != null && dspAudioProcessor.clearGainCurve());
+                break;
+            case "dspSetTransitionMuted":
+                result.success(!aaudioOutputEnabled && dspAudioProcessor != null &&
+                        dspAudioProcessor.setTransitionMuted(Boolean.TRUE.equals(call.argument("muted"))));
+                break;
+            case "dspGetTransitionGain":
+                result.success(!aaudioOutputEnabled && dspAudioProcessor != null
+                        ? (double) dspAudioProcessor.getTransitionGain() : null);
                 break;
             case "setSpeed":
                 setSpeed((float) ((double) ((Double) call.argument("speed"))));
@@ -918,6 +969,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         PlaybackParameters params = player.getPlaybackParameters();
         AudioAttributes attributes = player.getAudioAttributes();
         player.removeListener(this);
+        PulsrOutputRouting.unregister(player);
         player.release();
         player = null;
         if (dspAudioProcessor != null) {
@@ -963,18 +1015,21 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     // any construction failure so playback is never broken.
                     if (aaudioOutputEnabled) {
                         try {
-                            return new AAudioAudioSink(aaudioPreferExclusive,
+                            AAudioAudioSink nativeSink = new AAudioAudioSink(aaudioPreferExclusive,
                                 aaudioTargetBufferMs);
+                            PulsrOutputRouting.observe(nativeSink);
+                            return nativeSink;
                         } catch (Throwable t) {
                             Log.w(TAG, "AAudio sink unavailable, using DefaultAudioSink: "
                                 + t.getMessage());
                         }
                     }
-                    AudioSink sink = new DefaultAudioSink.Builder(context)
+                    DefaultAudioSink sink = new DefaultAudioSink.Builder(context)
                         .setEnableFloatOutput(enableFloatOutput)
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                         .setAudioProcessors(new AudioProcessor[] { dspProcessor })
                         .build();
+                    PulsrOutputRouting.observe(sink);
                     return enableFloatOutput ? new FloatDspAudioSink(sink, dspProcessor) : sink;
                 }
             };
@@ -999,6 +1054,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
             }
             player = builder.build();
+            PulsrOutputRouting.register(player, aaudioOutputEnabled);
             // Pulsr fork: sample-accurate seeking. EXACT forces the decoder to
             // pre-roll from the previous sync point and discard up to the
             // requested sample, giving frame-accurate (0-sample error) seeks
@@ -1271,7 +1327,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         loadedSources.clear();
         clearAudioEffects();
         if (player != null) {
-            player.release();
+            PulsrOutputRouting.unregister(player);
+        player.release();
             player = null;
             processingState = ProcessingState.idle;
             broadcastImmediatePlaybackEvent();

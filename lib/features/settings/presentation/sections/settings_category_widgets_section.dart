@@ -10,7 +10,7 @@ mixin SettingsCategoryWidgetsSection
         SettingsOnlineSection,
         SettingsPrivacyBackupSection,
         State<SettingsScreen> {
-  /// Always-visible Normal/Professional switch shown at the top of Settings.
+  /// Normal/Professional switch rendered above the Studio/DSP disclosure in Sound.
   Widget _experienceModeCard(BuildContext context) => _section(
         context,
         context.l10n.experienceModeTitle,
@@ -47,25 +47,57 @@ mixin SettingsCategoryWidgetsSection
     SettingsCubit cubit,
   ) {
     switch (catId) {
-      case 'audio':
+      case 'sound':
         return [
-          _section(
-            context,
-            context.l10n.smartAudioTitle,
-            context.l10n.settingsSmartAudioSectionSubtitle,
-            [
-              const Padding(
+          // A. Smart Audio (prominent, first)
+          SettingsSection(
+            isProminent: true,
+            icon: Icons.auto_awesome_rounded,
+            title: context.l10n.smartAudioTitle,
+            subtitle: context.l10n.settingsSmartAudioSectionSubtitle,
+            trailing: TextButton.icon(
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+              ),
+              icon: const Icon(Icons.tune_rounded, size: 16),
+              label: Text(
+                context.l10n.settingsSetUpSound,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              onPressed: () =>
+                  AudioSetupWizardSheet.show(context, cubit: cubit),
+            ),
+            children: const [
+              Padding(
                 padding: EdgeInsetsDirectional.fromSTEB(
                     AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                 child: SmartAudioSection(),
               ),
             ],
           ),
-          _catSection(context, 'audio', AudioSoundSection(state: state)),
-        ];
-      case 'playback':
-        return [
-          _catSection(context, 'playback', PlaybackSection(state: state)),
+
+          // B. Output Device Card (device-adaptive surface)
+          _catSection(
+            context,
+            'sound',
+            SettingsSection(
+              icon: Icons.speaker_group_rounded,
+              title: context.l10n.settingsHardwareAudioOutput,
+              children: [
+                DeviceAdaptiveOutputSection(
+                  state: state,
+                  onShowDspPreference: (sheetContext, cubit, pref) {
+                    // Reuse existing dsp preference picker
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          // C. Playback Behavior
+          PlaybackSection(state: state),
           _section(
             context,
             context.l10n.quranMode,
@@ -80,64 +112,80 @@ mixin SettingsCategoryWidgetsSection
               ),
             ],
           ),
+
+          // D. Loudness & Gain
+          AudioGainSection(state: state),
+
+          // Experience Mode Placement (above Studio/DSP disclosure)
+          _experienceModeCard(context),
+
+          // E. Effects & DSP
+          AudioEffectsDspSection(state: state),
+
+          // F. Device Profiles & Automation (Professional only)
+          if (state.isProfessional) ...[
+            _section(
+              context,
+              context.l10n.deviceProfilesTitle,
+              context.l10n.settingsDeviceProfilesSectionSubtitle,
+              [
+                const Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      AppSpacing.xs),
+                  child: DeviceProfilesSection(),
+                ),
+              ],
+            ),
+            _section(
+              context,
+              context.l10n.automationRules,
+              context.l10n.settingsAutomationSectionSubtitle,
+              [
+                _navTile(
+                  context,
+                  Icons.auto_awesome_rounded,
+                  context.l10n.automationRules,
+                  context.l10n.settingsAutomationTileSubtitle,
+                  onTap: () => showAutomationRulesSheet(context),
+                ),
+              ],
+            ),
+          ],
+
+          const CastSection(),
         ];
-      case 'appearance':
-        return [_buildAppearanceSection(context, state, cubit)];
-      case 'gestures':
-        return [_buildGesturesSection(context, state, cubit)];
-      case 'profiles':
-        // Professional-only surface; Smart Audio now lives in Audio & Sound.
-        if (!state.isProfessional) return const [];
+
+      case 'look':
         return [
-          _section(
-            context,
-            context.l10n.deviceProfilesTitle,
-            context.l10n.settingsDeviceProfilesSectionSubtitle,
-            [
-              const Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
-                child: DeviceProfilesSection(),
-              ),
-            ],
-            key: _catById('profiles').key,
-          ),
-          _section(
-            context,
-            context.l10n.automationRules,
-            context.l10n.settingsAutomationSectionSubtitle,
-            [
-              _navTile(
-                context,
-                Icons.auto_awesome_rounded,
-                context.l10n.automationRules,
-                context.l10n.settingsAutomationTileSubtitle,
-                onTap: () => showAutomationRulesSheet(context),
-              ),
-            ],
-            key: _catById('automation').key,
-          ),
+          _buildAppearanceSection(context, state, cubit),
+          _buildAccessibilitySection(context, state, cubit),
+          _buildGesturesSection(context, state, cubit),
         ];
+
       case 'library':
-        return [_buildLibrarySection(context, state, cubit)];
-      case 'online':
-        return [_buildOnlineSection(context, state, cubit)];
-      case 'storage':
         return [
+          _buildLibrarySection(context, state, cubit),
           _section(
             context,
             context.l10n.storageAndCache,
             context.l10n.settingsStorageSectionSubtitle,
             [const StorageCacheSection()],
-            key: _catById('storage').key,
           ),
         ];
+
+      case 'network':
+        return [_buildOnlineSection(context, state, cubit)];
+
       case 'privacy':
         return [
           if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)
             const SettingsHeroCard(),
           _buildPrivacyBackupSection(context),
         ];
+
       case 'about':
         return [
           _section(
@@ -145,6 +193,15 @@ mixin SettingsCategoryWidgetsSection
             context.l10n.about,
             context.l10n.settingsAboutSectionSubtitle,
             [
+              _navTile(
+                context,
+                Icons.tune_rounded,
+                context.l10n.experienceModeTitle,
+                state.isProfessional
+                    ? context.l10n.experienceModeProfessional
+                    : context.l10n.experienceModeNormal,
+                onTap: () => showStudioExplainerSheet(context),
+              ),
               _navTile(
                 context,
                 Icons.info_outline_rounded,
@@ -170,6 +227,7 @@ mixin SettingsCategoryWidgetsSection
             key: _catById('about').key,
           ),
         ];
+
       default:
         return [];
     }

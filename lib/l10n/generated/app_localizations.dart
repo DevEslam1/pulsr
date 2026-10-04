@@ -14219,6 +14219,384 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Shift later'**
   String get lyricsShiftLater;
+
+  /// Action to launch the Audio Setup Wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Set up sound'**
+  String get settingsSetUpSound;
+
+  /// Description for Audio Setup Wizard action
+  ///
+  /// In en, this message translates to:
+  /// **'3-step sound configuration wizard'**
+  String get settingsSetUpSoundDesc;
+
+  /// Title for advanced disclosure in output section
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get settingsAdvancedAudioTitle;
+
+  /// Subtitle for advanced disclosure in output section
+  ///
+  /// In en, this message translates to:
+  /// **'Low-level buffer, float path and negotiation'**
+  String get settingsAdvancedAudioDesc;
+
+  /// Title for accessibility and comfort settings section
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility & Comfort'**
+  String get settingsAccessibilityAndComfort;
+
+  /// Subtitle for accessibility and comfort settings section
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast, motion, visual comfort and sound effects'**
+  String get settingsAccessibilityAndComfortSubtitle;
+
+  /// Title of Audio Setup Wizard bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Setup Wizard'**
+  String get settingsWizardTitle;
+
+  /// Wizard Step 1 title
+  ///
+  /// In en, this message translates to:
+  /// **'Output Type'**
+  String get settingsWizardStep1Title;
+
+  /// Wizard Step 1 subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Select your primary listening hardware'**
+  String get settingsWizardStep1Subtitle;
+
+  /// Wizard Step 2 title
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Priority'**
+  String get settingsWizardStep2Title;
+
+  /// Wizard Step 2 subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how audio processing is prioritized'**
+  String get settingsWizardStep2Subtitle;
+
+  /// Wizard Step 3 title
+  ///
+  /// In en, this message translates to:
+  /// **'Track Transitions'**
+  String get settingsWizardStep3Title;
+
+  /// Wizard Step 3 subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Choose gapless playback or crossfade'**
+  String get settingsWizardStep3Subtitle;
+
+  /// Preset choice for bit-perfect maximum fidelity
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum Fidelity'**
+  String get settingsWizardFidelity;
+
+  /// Description for Maximum Fidelity preset
+  ///
+  /// In en, this message translates to:
+  /// **'Direct bit-perfect streaming with all DSP bypassed'**
+  String get settingsWizardFidelityDesc;
+
+  /// Preset choice for balanced listening
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get settingsWizardBalanced;
+
+  /// Description for Balanced preset
+  ///
+  /// In en, this message translates to:
+  /// **'Smooth playback, loudness normalization and rich EQ'**
+  String get settingsWizardBalancedDesc;
+
+  /// Preset choice for saving data
+  ///
+  /// In en, this message translates to:
+  /// **'Save Data'**
+  String get settingsWizardDataSaver;
+
+  /// Description for Save Data preset
+  ///
+  /// In en, this message translates to:
+  /// **'Lower streaming bitrate and efficient buffering'**
+  String get settingsWizardDataSaverDesc;
+
+  /// Button to apply audio setup wizard selections
+  ///
+  /// In en, this message translates to:
+  /// **'Apply Setup'**
+  String get settingsWizardApply;
+
+  /// No description provided for @dockStyleDefaultBestFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for balanced one-handed navigation and full controls'**
+  String get dockStyleDefaultBestFor;
+
+  /// No description provided for @dockStyleSystemBestFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for compact screens and maximum content visibility'**
+  String get dockStyleSystemBestFor;
+
+  /// No description provided for @dockStyleMiniTopBestFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for active music listening and quick playback access'**
+  String get dockStyleMiniTopBestFor;
+
+  /// No description provided for @dockStyleNavTopBestFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Best for deep library exploration and playlist browsing'**
+  String get dockStyleNavTopBestFor;
+
+  /// No description provided for @dockStylePreviewBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Preview'**
+  String get dockStylePreviewBadge;
+
+  /// No description provided for @dockStyleNowPlaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing'**
+  String get dockStyleNowPlaying;
+
+  /// No description provided for @shortcutHelpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard Shortcuts'**
+  String get shortcutHelpTitle;
+
+  /// No description provided for @shortcutHelpSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Desktop and tablet quick navigation keys'**
+  String get shortcutHelpSubtitle;
+
+  /// No description provided for @shortcutPlayPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Play / Pause'**
+  String get shortcutPlayPause;
+
+  /// No description provided for @shortcutPlayPauseDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle playback state'**
+  String get shortcutPlayPauseDesc;
+
+  /// No description provided for @shortcutSeekForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast Forward'**
+  String get shortcutSeekForward;
+
+  /// No description provided for @shortcutSeekForwardDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump forward 10 seconds'**
+  String get shortcutSeekForwardDesc;
+
+  /// No description provided for @shortcutSeekBackward.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewind'**
+  String get shortcutSeekBackward;
+
+  /// No description provided for @shortcutSeekBackwardDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump backward 10 seconds'**
+  String get shortcutSeekBackwardDesc;
+
+  /// No description provided for @shortcutVolumeUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Up'**
+  String get shortcutVolumeUp;
+
+  /// No description provided for @shortcutVolumeUpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase volume by 5%'**
+  String get shortcutVolumeUpDesc;
+
+  /// No description provided for @shortcutVolumeDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume Down'**
+  String get shortcutVolumeDown;
+
+  /// No description provided for @shortcutVolumeDownDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease volume by 5%'**
+  String get shortcutVolumeDownDesc;
+
+  /// No description provided for @shortcutNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Track'**
+  String get shortcutNext;
+
+  /// No description provided for @shortcutNextDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip to the next song in queue'**
+  String get shortcutNextDesc;
+
+  /// No description provided for @shortcutPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Track'**
+  String get shortcutPrevious;
+
+  /// No description provided for @shortcutPreviousDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart track or skip to previous song'**
+  String get shortcutPreviousDesc;
+
+  /// No description provided for @shortcutMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Mute'**
+  String get shortcutMute;
+
+  /// No description provided for @shortcutMuteDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute or restore audio level'**
+  String get shortcutMuteDesc;
+
+  /// No description provided for @shortcutLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Lyrics'**
+  String get shortcutLyrics;
+
+  /// No description provided for @shortcutLyricsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide synchronized lyrics'**
+  String get shortcutLyricsDesc;
+
+  /// No description provided for @shortcutQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Queue'**
+  String get shortcutQueue;
+
+  /// No description provided for @shortcutQueueDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Open or close the playback queue panel'**
+  String get shortcutQueueDesc;
+
+  /// No description provided for @shortcutFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Favorite'**
+  String get shortcutFavorite;
+
+  /// No description provided for @shortcutFavoriteDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Add or remove current track from favorites'**
+  String get shortcutFavoriteDesc;
+
+  /// No description provided for @shortcutHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts Guide'**
+  String get shortcutHelp;
+
+  /// No description provided for @shortcutHelpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show keyboard shortcut bindings sheet'**
+  String get shortcutHelpDesc;
+
+  /// Label for library browse overflow tabs
+  ///
+  /// In en, this message translates to:
+  /// **'Browse'**
+  String get browseOverflowLabel;
+
+  /// Title for multi-select batch actions bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Batch Actions'**
+  String get batchActionsSheetTitle;
+
+  /// Selected count caption for batch actions
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected · Actions'**
+  String batchActionsSelected(int count);
+
+  /// Summary label for total genre count
+  ///
+  /// In en, this message translates to:
+  /// **'All genres'**
+  String get browseAllGenresFallback;
+
+  /// Time filter for 7 days in stats
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get statsTimeRange7Days;
+
+  /// Time filter for 30 days in stats
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get statsTimeRange30Days;
+
+  /// Time filter for all time in stats
+  ///
+  /// In en, this message translates to:
+  /// **'All time'**
+  String get statsTimeRangeAllTime;
+
+  /// Header title for unified favorites screen
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites Collection'**
+  String get unifiedFavoritesHeader;
+
+  /// Header subtitle for unified favorites screen
+  ///
+  /// In en, this message translates to:
+  /// **'All your starred and liked tracks in one place'**
+  String get unifiedFavoritesHeaderSubtitle;
+
+  /// Button to open dedicated favorites screen
+  ///
+  /// In en, this message translates to:
+  /// **'Open Full Favorites'**
+  String get unifiedFavoritesViewAll;
+
+  /// Badge showing folder is excluded from library scan
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded from scan'**
+  String get folderPersistentExcludedBadge;
 }
 
 class _AppLocalizationsDelegate

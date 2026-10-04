@@ -19,6 +19,9 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../sheets/song_info_sheet.dart';
 
 class LibraryStatsScreen extends StatefulWidget {
   final IMusicRepository? musicRepository;
@@ -42,15 +45,41 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
   /// retry banner instead of silently showing under-counted stats.
   String? _loadError;
 
+  int _timeRangeIndex = 2; // 0: 7 days, 1: 30 days, 2: all time
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadTimeRangePreference();
     _musicRepository = widget.musicRepository ??
         (getIt.isRegistered<IMusicRepository>()
             ? getIt<IMusicRepository>()
             : null);
     _loadAllSongs();
+  }
+
+  Future<void> _loadTimeRangePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _timeRangeIndex = prefs.getInt('stats_time_range_filter') ?? 2;
+      });
+    }
+  }
+
+  Future<void> _setTimeRange(int index) async {
+    setState(() => _timeRangeIndex = index);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('stats_time_range_filter', index);
+  }
+
+  List<SongsTableData> _filterSongsByTimeRange(List<SongsTableData> songs) {
+    if (_timeRangeIndex == 2) return songs;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final days = _timeRangeIndex == 0 ? 7 : 30;
+    final cutoffMs = nowMs - (days * 24 * 60 * 60 * 1000);
+    return songs.where((s) => (s.lastPlayed ?? 0) >= cutoffMs).toList();
   }
 
   DateTime? _lastLoadedAt;
@@ -189,7 +218,8 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                 (totalSizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2);
 
             // Most played songs
-            final topPlayed = List<SongsTableData>.from(songs)
+            final statsSongs = _filterSongsByTimeRange(songs);
+            final topPlayed = List<SongsTableData>.from(statsSongs)
               ..sort((a, b) => b.playCount.compareTo(a.playCount));
             final topSongs =
                 topPlayed.where((s) => s.playCount > 0).take(10).toList();
@@ -396,6 +426,25 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   subtitle: context.l10n.browseMostPlayedTracksSubtitle,
                   icon: Icons.leaderboard_rounded,
                   p: p,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                PulsrSegmentedControl(
+                  segments: [
+                    PulsrSegment(
+                      label: context.l10n.statsTimeRange7Days,
+                      icon: Icons.date_range_rounded,
+                    ),
+                    PulsrSegment(
+                      label: context.l10n.statsTimeRange30Days,
+                      icon: Icons.calendar_month_rounded,
+                    ),
+                    PulsrSegment(
+                      label: context.l10n.statsTimeRangeAllTime,
+                      icon: Icons.all_inclusive_rounded,
+                    ),
+                  ],
+                  selectedIndex: _timeRangeIndex,
+                  onChanged: _setTimeRange,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 if (topSongs.isEmpty)
@@ -694,6 +743,13 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                   ),
                 ],
                 const SizedBox(width: AppSpacing.s6),
+                IconButton(
+                  icon: Icon(Icons.more_vert_rounded,
+                      color: p.textTertiary, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: context.l10n.browseMoreOptions,
+                  onPressed: () => SongInfoSheet.show(context, song: song),
+                ),
                 Icon(Icons.play_circle_outline_rounded,
                     color: p.accent, size: 22),
               ],

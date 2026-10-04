@@ -1392,6 +1392,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setCrossfeedEnabled", "setCrossfeedParams", "setCrossfeedMode",
                 "setLimiterEnabled", "setLimiterParams",
                 "setReverbEnabled", "setReverbPreset", "setReverbWetDry", "setReverbParams",
+                "awaitDspControlUpdates",
                 "setReverbCrossChannel", "loadImpulseResponse", "setCacheBudgetBytes",
                 "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
                 "setSincResamplerEnabled", "setSincResamplerQuality", "setSincResamplerRates",
@@ -1850,6 +1851,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                     recalculateActiveStages()
                     result.success(true)
+                }
+
+                "awaitDspControlUpdates" -> {
+                    // Acknowledge only after earlier IR/preparation jobs finish.
+                    safeReverbExecute(onDropped = { result.success(false) }) {
+                        result.success(!disposed.get())
+                    }
                 }
 
                 "setReverbPreset" -> {

@@ -7928,4 +7928,207 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lyricsShiftLater => 'تأخير';
+
+  @override
+  String get settingsSetUpSound => 'إعداد الصوت';
+
+  @override
+  String get settingsSetUpSoundDesc => 'معالج إعداد الصوت في 3 خطوات سريعة';
+
+  @override
+  String get settingsAdvancedAudioTitle => 'متقدم';
+
+  @override
+  String get settingsAdvancedAudioDesc =>
+      'حجم الذاكرة الوسيطة ومسار التعويم والتفاوض';
+
+  @override
+  String get settingsAccessibilityAndComfort => 'إمكانية الوصول والراحة';
+
+  @override
+  String get settingsAccessibilityAndComfortSubtitle =>
+      'التباين، الحركة، الراحة البصرية وتأثيرات الصوت';
+
+  @override
+  String get settingsWizardTitle => 'معالج إعداد الصوت';
+
+  @override
+  String get settingsWizardStep1Title => 'نوع الإخراج';
+
+  @override
+  String get settingsWizardStep1Subtitle => 'حدد جهاز الاستماع الأساسي';
+
+  @override
+  String get settingsWizardStep2Title => 'أولوية الصوت';
+
+  @override
+  String get settingsWizardStep2Subtitle => 'اختر كيفية تحسين معالجة الصوت';
+
+  @override
+  String get settingsWizardStep3Title => 'الانتقال بين المقاطع';
+
+  @override
+  String get settingsWizardStep3Subtitle => 'اختر تشغيل متصل أو تلاشي متقاطع';
+
+  @override
+  String get settingsWizardFidelity => 'أقصى دقة';
+
+  @override
+  String get settingsWizardFidelityDesc =>
+      'بث مباشر Bit-Perfect مع تجاوز كافة معالجات DSP';
+
+  @override
+  String get settingsWizardBalanced => 'متوازن';
+
+  @override
+  String get settingsWizardBalancedDesc =>
+      'تشغيل سلس وتسوية مستوى الصوت ومُعادل غني';
+
+  @override
+  String get settingsWizardDataSaver => 'توفير البيانات';
+
+  @override
+  String get settingsWizardDataSaverDesc => 'معدل بث أقل وذاكرة مؤقتة فعالة';
+
+  @override
+  String get settingsWizardApply => 'تطبيق الإعداد';
+
+  @override
+  String get dockStyleDefaultBestFor =>
+      'الأفضل للتصفح المتوازن بيد واحدة مع التحكم الكامل';
+
+  @override
+  String get dockStyleSystemBestFor =>
+      'الأفضل للشاشات المدمجة وأقصى مساحة للمحتوى';
+
+  @override
+  String get dockStyleMiniTopBestFor =>
+      'الأفضل للاستماع النشط والوصول السريع إلى المشغل';
+
+  @override
+  String get dockStyleNavTopBestFor =>
+      'الأفضل للاستكشاف العميق للمكتبة وقوائم التشغيل';
+
+  @override
+  String get dockStylePreviewBadge => 'معاينة مباشرة';
+
+  @override
+  String get dockStyleNowPlaying => 'قيد التشغيل الآن';
+
+  @override
+  String get shortcutHelpTitle => 'اختصارات لوحة المفاتيح';
+
+  @override
+  String get shortcutHelpSubtitle =>
+      'مفاتيح التنقل السريع لسطح المكتب والأجهزة اللوحية';
+
+  @override
+  String get shortcutPlayPause => 'تشغيل / إيقاف مؤقت';
+
+  @override
+  String get shortcutPlayPauseDesc => 'تبديل حالة التشغيل';
+
+  @override
+  String get shortcutSeekForward => 'تقديم سريع';
+
+  @override
+  String get shortcutSeekForwardDesc => 'القفز للأمام 10 ثوانٍ';
+
+  @override
+  String get shortcutSeekBackward => 'إرجاع';
+
+  @override
+  String get shortcutSeekBackwardDesc => 'القفز للخلف 10 ثوانٍ';
+
+  @override
+  String get shortcutVolumeUp => 'رفع الصوت';
+
+  @override
+  String get shortcutVolumeUpDesc => 'زيادة مستوى الصوت بنسبة 5%';
+
+  @override
+  String get shortcutVolumeDown => 'خفض الصوت';
+
+  @override
+  String get shortcutVolumeDownDesc => 'تقليل مستوى الصوت بنسبة 5%';
+
+  @override
+  String get shortcutNext => 'المقطع التالي';
+
+  @override
+  String get shortcutNextDesc =>
+      'الانتقال إلى الأغنية التالية في قائمة الانتظار';
+
+  @override
+  String get shortcutPrevious => 'المقطع السابق';
+
+  @override
+  String get shortcutPreviousDesc =>
+      'إعادة تشغيل المقطع أو الرجوع للأغنية السابقة';
+
+  @override
+  String get shortcutMute => 'كتم الصوت';
+
+  @override
+  String get shortcutMuteDesc => 'كتم أو استعادة مستوى الصوت';
+
+  @override
+  String get shortcutLyrics => 'تبديل الكلمات';
+
+  @override
+  String get shortcutLyricsDesc => 'إظهار أو إخفاء كلمات الأغاني المتزامنة';
+
+  @override
+  String get shortcutQueue => 'تبديل قائمة الانتظار';
+
+  @override
+  String get shortcutQueueDesc => 'فتح أو إغلاق لوحة قائمة الانتظار';
+
+  @override
+  String get shortcutFavorite => 'تبديل المفضلة';
+
+  @override
+  String get shortcutFavoriteDesc => 'إضافة أو إزالة المقطع الحالي من المفضلة';
+
+  @override
+  String get shortcutHelp => 'دليل الاختصارات';
+
+  @override
+  String get shortcutHelpDesc => 'عرض قائمة اختصارات لوحة المفاتيح';
+
+  @override
+  String get browseOverflowLabel => 'تصفح';
+
+  @override
+  String get batchActionsSheetTitle => 'إجراءات مجمعة';
+
+  @override
+  String batchActionsSelected(int count) {
+    return '$count محددة · الإجراءات';
+  }
+
+  @override
+  String get browseAllGenresFallback => 'جميع الأنواع';
+
+  @override
+  String get statsTimeRange7Days => '٧ أيام';
+
+  @override
+  String get statsTimeRange30Days => '٣٠ يوماً';
+
+  @override
+  String get statsTimeRangeAllTime => 'كل الوقت';
+
+  @override
+  String get unifiedFavoritesHeader => 'مجموعة المفضلة';
+
+  @override
+  String get unifiedFavoritesHeaderSubtitle =>
+      'جميع مقاطعك المفضلة والمميزة في مكان واحد';
+
+  @override
+  String get unifiedFavoritesViewAll => 'فتح المفضلة بالكامل';
+
+  @override
+  String get folderPersistentExcludedBadge => 'مستبعد من الفحص';
 }

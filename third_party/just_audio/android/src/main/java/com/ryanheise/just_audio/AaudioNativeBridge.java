@@ -39,6 +39,10 @@ public final class AaudioNativeBridge {
     public static native long nativeOpen(int sampleRate, int channelCount,
             int encoding, boolean preferExclusive, int targetBufferMs);
 
+    public static native long nativeOpenForDevice(int sampleRate, int channelCount,
+            int encoding, boolean preferExclusive, int targetBufferMs, int deviceId);
+    public static native int nativeGetDeviceId(long handle);
+
     /** Releases the stream and the native object. Idempotent with 0. */
     public static native void nativeClose(long handle);
 

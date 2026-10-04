@@ -1,6 +1,8 @@
 package com.ryanheise.just_audio;
 
 import android.util.Log;
+import android.media.AudioDeviceInfo;
+import android.media.AudioFormat;
 
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.AuxEffectInfo;
@@ -45,7 +47,23 @@ public final class AAudioAudioSink implements AudioSink {
     private boolean skipSilenceEnabled = false;
     private int audioSessionId = C.AUDIO_SESSION_ID_UNSET;
 
-    private boolean playing = false;
+    private volatile boolean playing = false;
+    private volatile int[] measuredStream = new int[] {0, 0, 0};
+    private int preferredDeviceId = 0;
+    private int openedDeviceId = 0;
+    private boolean routePending = false;
+
+    int[] measuredStream() { return measuredStream; }
+    boolean isPlaying() { return playing; }
+
+    @Override
+    public void setPreferredDevice(AudioDeviceInfo device) {
+        int id = device == null ? 0 : device.getId();
+        if (id == preferredDeviceId) return;
+        preferredDeviceId = id;
+        routePending = handle != 0L;
+    }
+
     private boolean eosWritten = false;
     private boolean handledEndOfStream = false;
     // Position base: the presentation time of the first buffer written after
@@ -126,9 +144,9 @@ public final class AAudioAudioSink implements AudioSink {
         closeHandle();
         long newHandle;
         try {
-            newHandle = AaudioNativeBridge.nativeOpen(inputFormat.sampleRate,
+            newHandle = AaudioNativeBridge.nativeOpenForDevice(inputFormat.sampleRate,
                     inputFormat.channelCount, encoding, preferExclusive,
-                    targetBufferMs);
+                    targetBufferMs, preferredDeviceId);
         } catch (UnsatisfiedLinkError e) {
             throw new ConfigurationException(e, inputFormat);
         }
@@ -139,6 +157,11 @@ public final class AAudioAudioSink implements AudioSink {
                     + "ch", inputFormat);
         }
         handle = newHandle;
+        openedDeviceId = preferredDeviceId;
+        routePending = false;
+        measuredStream = new int[] {AaudioNativeBridge.nativeGetDeviceId(handle),
+                inputFormat.sampleRate, inputFormat.pcmEncoding == C.ENCODING_PCM_24BIT
+                    ? AudioFormat.ENCODING_PCM_24BIT_PACKED : inputFormat.pcmEncoding};
         configuredFormat = inputFormat;
         sampleRate = inputFormat.sampleRate;
         channelCount = inputFormat.channelCount;
@@ -167,6 +190,18 @@ public final class AAudioAudioSink implements AudioSink {
     public boolean handleBuffer(ByteBuffer buffer, long presentationStartUs,
             int encodedAccessUnitCount) throws InitializationException,
             WriteException {
+        if (routePending && configuredFormat != null) {
+            Format previousFormat = configuredFormat;
+            int previousDevice = openedDeviceId;
+            try {
+                configure(previousFormat, 0, null);
+            } catch (ConfigurationException refused) {
+                preferredDeviceId = previousDevice;
+                try { configure(previousFormat, 0, null); }
+                catch (ConfigurationException restoreFailed) { /* existing initialization error below */ }
+                if (listener != null) listener.onAudioSinkError(refused);
+            }
+        }
         if (handle == 0L) {
             throw new InitializationException(0,
                     configuredFormat != null ? configuredFormat.sampleRate : 0,
@@ -194,6 +229,7 @@ public final class AAudioAudioSink implements AudioSink {
                 throw new WriteException(-1, configuredFormat,
                         /* isRecoverable= */ false);
             }
+            updateMeasuredRoute();
             buffer.position(buffer.position() + written);
             return !buffer.hasRemaining();
         }
@@ -204,6 +240,7 @@ public final class AAudioAudioSink implements AudioSink {
             throw new WriteException(-1, configuredFormat,
                     /* isRecoverable= */ false);
         }
+        updateMeasuredRoute();
         buffer.position(offset + written);
         return !buffer.hasRemaining();
     }
@@ -339,7 +376,14 @@ public final class AAudioAudioSink implements AudioSink {
         closeHandle();
     }
 
+    private void updateMeasuredRoute() {
+        int device = AaudioNativeBridge.nativeGetDeviceId(handle);
+        int[] previous = measuredStream;
+        if (previous[0] != device) measuredStream = new int[] {device, previous[1], previous[2]};
+    }
+
     private void closeHandle() {
+        measuredStream = new int[] {0, 0, 0};
         if (handle != 0L) {
             long toClose = handle;
             handle = 0L;

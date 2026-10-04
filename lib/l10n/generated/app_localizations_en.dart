@@ -7981,4 +7981,209 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lyricsShiftLater => 'Shift later';
+
+  @override
+  String get settingsSetUpSound => 'Set up sound';
+
+  @override
+  String get settingsSetUpSoundDesc => '3-step sound configuration wizard';
+
+  @override
+  String get settingsAdvancedAudioTitle => 'Advanced';
+
+  @override
+  String get settingsAdvancedAudioDesc =>
+      'Low-level buffer, float path and negotiation';
+
+  @override
+  String get settingsAccessibilityAndComfort => 'Accessibility & Comfort';
+
+  @override
+  String get settingsAccessibilityAndComfortSubtitle =>
+      'Contrast, motion, visual comfort and sound effects';
+
+  @override
+  String get settingsWizardTitle => 'Audio Setup Wizard';
+
+  @override
+  String get settingsWizardStep1Title => 'Output Type';
+
+  @override
+  String get settingsWizardStep1Subtitle =>
+      'Select your primary listening hardware';
+
+  @override
+  String get settingsWizardStep2Title => 'Audio Priority';
+
+  @override
+  String get settingsWizardStep2Subtitle =>
+      'Choose how audio processing is prioritized';
+
+  @override
+  String get settingsWizardStep3Title => 'Track Transitions';
+
+  @override
+  String get settingsWizardStep3Subtitle =>
+      'Choose gapless playback or crossfade';
+
+  @override
+  String get settingsWizardFidelity => 'Maximum Fidelity';
+
+  @override
+  String get settingsWizardFidelityDesc =>
+      'Direct bit-perfect streaming with all DSP bypassed';
+
+  @override
+  String get settingsWizardBalanced => 'Balanced';
+
+  @override
+  String get settingsWizardBalancedDesc =>
+      'Smooth playback, loudness normalization and rich EQ';
+
+  @override
+  String get settingsWizardDataSaver => 'Save Data';
+
+  @override
+  String get settingsWizardDataSaverDesc =>
+      'Lower streaming bitrate and efficient buffering';
+
+  @override
+  String get settingsWizardApply => 'Apply Setup';
+
+  @override
+  String get dockStyleDefaultBestFor =>
+      'Best for balanced one-handed navigation and full controls';
+
+  @override
+  String get dockStyleSystemBestFor =>
+      'Best for compact screens and maximum content visibility';
+
+  @override
+  String get dockStyleMiniTopBestFor =>
+      'Best for active music listening and quick playback access';
+
+  @override
+  String get dockStyleNavTopBestFor =>
+      'Best for deep library exploration and playlist browsing';
+
+  @override
+  String get dockStylePreviewBadge => 'Live Preview';
+
+  @override
+  String get dockStyleNowPlaying => 'Now Playing';
+
+  @override
+  String get shortcutHelpTitle => 'Keyboard Shortcuts';
+
+  @override
+  String get shortcutHelpSubtitle => 'Desktop and tablet quick navigation keys';
+
+  @override
+  String get shortcutPlayPause => 'Play / Pause';
+
+  @override
+  String get shortcutPlayPauseDesc => 'Toggle playback state';
+
+  @override
+  String get shortcutSeekForward => 'Fast Forward';
+
+  @override
+  String get shortcutSeekForwardDesc => 'Jump forward 10 seconds';
+
+  @override
+  String get shortcutSeekBackward => 'Rewind';
+
+  @override
+  String get shortcutSeekBackwardDesc => 'Jump backward 10 seconds';
+
+  @override
+  String get shortcutVolumeUp => 'Volume Up';
+
+  @override
+  String get shortcutVolumeUpDesc => 'Increase volume by 5%';
+
+  @override
+  String get shortcutVolumeDown => 'Volume Down';
+
+  @override
+  String get shortcutVolumeDownDesc => 'Decrease volume by 5%';
+
+  @override
+  String get shortcutNext => 'Next Track';
+
+  @override
+  String get shortcutNextDesc => 'Skip to the next song in queue';
+
+  @override
+  String get shortcutPrevious => 'Previous Track';
+
+  @override
+  String get shortcutPreviousDesc => 'Restart track or skip to previous song';
+
+  @override
+  String get shortcutMute => 'Toggle Mute';
+
+  @override
+  String get shortcutMuteDesc => 'Mute or restore audio level';
+
+  @override
+  String get shortcutLyrics => 'Toggle Lyrics';
+
+  @override
+  String get shortcutLyricsDesc => 'Show or hide synchronized lyrics';
+
+  @override
+  String get shortcutQueue => 'Toggle Queue';
+
+  @override
+  String get shortcutQueueDesc => 'Open or close the playback queue panel';
+
+  @override
+  String get shortcutFavorite => 'Toggle Favorite';
+
+  @override
+  String get shortcutFavoriteDesc =>
+      'Add or remove current track from favorites';
+
+  @override
+  String get shortcutHelp => 'Shortcuts Guide';
+
+  @override
+  String get shortcutHelpDesc => 'Show keyboard shortcut bindings sheet';
+
+  @override
+  String get browseOverflowLabel => 'Browse';
+
+  @override
+  String get batchActionsSheetTitle => 'Batch Actions';
+
+  @override
+  String batchActionsSelected(int count) {
+    return '$count selected · Actions';
+  }
+
+  @override
+  String get browseAllGenresFallback => 'All genres';
+
+  @override
+  String get statsTimeRange7Days => '7 days';
+
+  @override
+  String get statsTimeRange30Days => '30 days';
+
+  @override
+  String get statsTimeRangeAllTime => 'All time';
+
+  @override
+  String get unifiedFavoritesHeader => 'Favorites Collection';
+
+  @override
+  String get unifiedFavoritesHeaderSubtitle =>
+      'All your starred and liked tracks in one place';
+
+  @override
+  String get unifiedFavoritesViewAll => 'Open Full Favorites';
+
+  @override
+  String get folderPersistentExcludedBadge => 'Excluded from scan';
 }

@@ -17,9 +17,29 @@ mixin SettingsScreenController on State<SettingsScreen> {
 
   Timer? _searchDebounce;
 
+  static String _sessionCategoryId = 'all';
+
+  @visibleForTesting
+  static void resetSessionCategory() => _sessionCategoryId = 'all';
+
+  /// Maps legacy category IDs from earlier versions onto the 6 consolidated destination IDs.
+  static String normalizeCategoryId(String id) {
+    return switch (id) {
+      'audio' || 'playback' || 'profiles' || 'automation' => 'sound',
+      'appearance' || 'gestures' => 'look',
+      'storage' || 'library' => 'library',
+      'online' => 'network',
+      'privacy' => 'privacy',
+      'about' => 'about',
+      _ => id,
+    };
+  }
+
   void _selectCategory(String catId) {
-    if (_selectedCategoryId == catId) return;
-    setState(() => _selectedCategoryId = catId);
+    final normalized = normalizeCategoryId(catId);
+    if (_selectedCategoryId == normalized) return;
+    _sessionCategoryId = normalized;
+    setState(() => _selectedCategoryId = normalized);
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         0.0,
@@ -27,17 +47,28 @@ mixin SettingsScreenController on State<SettingsScreen> {
         curve: context.motionCurve(Curves.easeOutCubic),
       );
     }
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString('settings_last_selected_category', catId);
-    }).catchError((_) {});
   }
 
   void _restoreLastCategory() {
+    // Normalise session category if stale
+    _sessionCategoryId = normalizeCategoryId(_sessionCategoryId);
+    if (_selectedCategoryId != _sessionCategoryId &&
+        (_categoryIds.contains(_sessionCategoryId) || _sessionCategoryId == 'all')) {
+      setState(() => _selectedCategoryId = _sessionCategoryId);
+    }
+    // Read and map any legacy disk-persisted category from prior versions
     SharedPreferences.getInstance().then((prefs) {
-      final savedCat = prefs.getString('settings_last_selected_category');
-      if (savedCat != null && _categoryIds.contains(savedCat) && mounted) {
-        setState(() => _selectedCategoryId = savedCat);
+      final saved = prefs.getString('settings_last_selected_category');
+      if (saved != null) {
+        final mapped = normalizeCategoryId(saved);
+        if (_categoryIds.contains(mapped) || mapped == 'all') {
+          if (mounted && _selectedCategoryId != mapped) {
+            _sessionCategoryId = mapped;
+            setState(() => _selectedCategoryId = mapped);
+          }
+        }
       }
+      prefs.remove('settings_last_selected_category');
     }).catchError((_) {});
   }
 

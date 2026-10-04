@@ -782,6 +782,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // Net gain check for conditional limiter insertion
     const uint32_t rawStages = snapshot->activeStages;
     const uint32_t degraded = autoDegradedStages_.load();
+    // Stage masks change independently of parameter snapshots (including the
+    // thermal governor). Drive the reverb envelope from the effective mask,
+    // and keep processing its fade after that mask is cleared.
+    reverb_.setEnabled((rawStages & ~degraded & STAGE_REVERB) && snapshot->reverb.enabled);
     const uint32_t stages = rawStages & ~degraded;
     bool hasNetPositiveGain = smoothedReplayGain_ > 1.001 || smoothedDirectVolume_ > 1.001;
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
@@ -828,6 +832,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                               dvcActive ||
                               (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4) ||
                               crossfeed_.isRamping() || stereoWidth_.isRamping() ||
+                              reverb_.isRamping() ||
                               loudnessContour_.isRamping() || dynamicEq_.isRamping() ||
                               subCrossover_.isRamping();
 
@@ -889,7 +894,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         // 5. Convolution Reverb Stage (Stereo channels 0 and 1)
-        if ((stages & STAGE_REVERB) && (snapshot->reverb.enabled || reverb_.isRamping()) && channels >= 2) {
+        if (reverb_.isRamping() && channels >= 2) {
             reverb_.processInterleaved(buffer, frames, channels);
             blockLatency += reverb_.getReverbLatencyFrames();
         }

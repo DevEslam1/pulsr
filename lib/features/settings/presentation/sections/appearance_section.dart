@@ -179,122 +179,6 @@ mixin SettingsAppearanceSection
           _divider(p),
         ],
         _divider(p),
-        _switchTile(
-          context,
-          Icons.contrast_rounded,
-          context.l10n.settingsHighContrastTitle,
-          context.l10n.settingsHighContrastSubtitle,
-          value: state.highContrast,
-          onChanged: cubit.setHighContrast,
-        ),
-        _divider(p),
-        _switchTile(
-          context,
-          Icons.brightness_4_rounded,
-          context.l10n.settingsDimWhitePointTitle,
-          context.l10n.settingsDimWhitePointSubtitle,
-          value: state.dimWhitePoint,
-          onChanged: cubit.setDimWhitePoint,
-        ),
-        _divider(p),
-        _switchTile(
-          context,
-          Icons.motion_photos_off_rounded,
-          context.l10n.settingsReduceMotionTitle,
-          context.l10n.settingsReduceMotionSubtitle,
-          value: state.reduceMotion,
-          onChanged: cubit.setReduceMotion,
-        ),
-        _divider(p),
-        ValueListenableBuilder<bool>(
-          valueListenable: SoundFeedbackService.enabledNotifier,
-          builder: (context, soundEnabled, _) {
-            return _switchTile(
-              context,
-              Icons.volume_up_rounded,
-              'UI Sound Effects',
-              'Play subtle audio feedback for interactions',
-              value: soundEnabled,
-              onChanged: (val) => SoundFeedbackService.setEnabled(val),
-            );
-          },
-        ),
-        _divider(p),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.blur_on_rounded, size: 22, color: p.accent),
-                  const SizedBox(width: AppSpacing.s14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Builder(
-                          builder: (_) {
-                            final title = context.l10n.settingsLiquidGlassTitle;
-                            return Text(
-                              title,
-                              style: TextStyle(
-                                color: p.textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: AppFontSize.callout,
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.s2),
-                        Builder(
-                          builder: (_) {
-                            final subtitle =
-                                context.l10n.settingsLiquidGlassSubtitle;
-                            return Text(
-                              subtitle,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.label,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${(state.liquidGlassTint * 100).round()}%',
-                    style: TextStyle(
-                      color: p.accent,
-                      fontWeight: FontWeight.w800,
-                      fontSize: AppFontSize.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: p.accent,
-                  inactiveTrackColor: p.accent.withValues(alpha: 0.15),
-                  thumbColor: p.accent,
-                  overlayColor: p.accent.withValues(alpha: 0.12),
-                  trackHeight: 3,
-                ),
-                child: Slider(
-                  value: state.liquidGlassTint,
-                  min: 0.0,
-                  max: 1.0,
-                  divisions: 20,
-                  onChanged: cubit.setLiquidGlassTint,
-                ),
-              ),
-            ],
-          ),
-        ),
-        _divider(p),
         _navTile(
           context,
           Icons.art_track_rounded,
@@ -351,7 +235,128 @@ mixin SettingsAppearanceSection
               showLanguagePickerSheet(context, cubit, state.languageCode),
         ),
       ],
-      key: _catById('appearance').key,
+      key: _catById('look').key,
+    );
+  }
+
+  /// Consolidated Accessibility & Comfort settings section
+  Widget _buildAccessibilitySection(
+    BuildContext context,
+    SettingsState state,
+    SettingsCubit cubit,
+  ) {
+    final p = context.palette;
+
+    return _section(
+      context,
+      context.l10n.settingsAccessibilityAndComfort,
+      context.l10n.settingsAccessibilityAndComfortSubtitle,
+      [
+        _switchTile(
+          context,
+          Icons.contrast_rounded,
+          context.l10n.settingsHighContrastTitle,
+          context.l10n.settingsHighContrastSubtitle,
+          value: state.highContrast,
+          onChanged: cubit.setHighContrast,
+        ),
+        _divider(p),
+        _switchTile(
+          context,
+          Icons.brightness_4_rounded,
+          context.l10n.settingsDimWhitePointTitle,
+          context.l10n.settingsDimWhitePointSubtitle,
+          value: state.dimWhitePoint,
+          onChanged: cubit.setDimWhitePoint,
+        ),
+        _divider(p),
+        _switchTile(
+          context,
+          Icons.motion_photos_off_rounded,
+          context.l10n.settingsReduceMotionTitle,
+          context.l10n.settingsReduceMotionSubtitle,
+          value: state.reduceMotion,
+          onChanged: cubit.setReduceMotion,
+        ),
+        _divider(p),
+        ValueListenableBuilder<bool>(
+          valueListenable: SoundFeedbackService.enabledNotifier,
+          builder: (context, soundEnabled, _) {
+            return _switchTile(
+              context,
+              Icons.volume_up_rounded,
+              'UI Sound Effects',
+              'Play subtle audio feedback for interactions',
+              value: soundEnabled,
+              onChanged: (val) => SoundFeedbackService.setEnabled(val),
+            );
+          },
+        ),
+        _divider(p),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.blur_on_rounded, size: 22, color: p.accent),
+                  const SizedBox(width: AppSpacing.s14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.settingsLiquidGlassTitle,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.callout,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s2),
+                        Text(
+                          context.l10n.settingsLiquidGlassSubtitle,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.label,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${(state.liquidGlassTint * 100).round()}%',
+                    style: TextStyle(
+                      color: p.accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: AppFontSize.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: p.accent,
+                  inactiveTrackColor: p.accent.withValues(alpha: 0.15),
+                  thumbColor: p.accent,
+                  overlayColor: p.accent.withValues(alpha: 0.12),
+                  trackHeight: 3,
+                ),
+                child: Slider(
+                  value: state.liquidGlassTint,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 20,
+                  onChanged: cubit.setLiquidGlassTint,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

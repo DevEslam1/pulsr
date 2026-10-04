@@ -1,6 +1,6 @@
 part of 'audio_handler.dart';
 
-mixin PulsrAudioQueueEngine on BaseAudioHandler {
+mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   Future<Map<String, dynamic>?> _readCrashPositionRecovery();
 
   Future<void> restoreLastPlaybackSession() async {
@@ -563,7 +563,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     );
   }
 
+  @override
   void _broadcastState(PlaybackEvent event) {
+    if (event.processingState == ProcessingState.ready && _activePlayer.playing) {
+      _pendingPlaybackStart = false;
+    }
     // Player events are already filtered to the active player by
     // setupPlayerListeners' isTargetActive(); the previous identical() guard
     // here compared _activePlayer against its own definition and was always
@@ -738,8 +742,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     return generation != _playGeneration;
   }
 
-  Future<void> _loadSongPaused(int index) async {
+  Future<void> _loadSongPaused(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
+    _pendingPlaybackStart = false;
     final generation = ++_playGeneration;
     final song = _songs[index];
     _currentIndex = index;
@@ -767,10 +772,16 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
         (song.path.startsWith('ytmusic://') ||
             song.path.isEmpty ||
             (!song.path.startsWith('content:') && song.isDownloaded != true))) {
-      _pendingLazyPosition = Duration.zero;
+      _pendingLazyPosition = initialPosition ?? Duration.zero;
       _broadcastState(_activePlayer.playbackEvent);
       return;
     }
+    final source = await _resolveAudioSource(song, item);
+    if (await _isGenerationCancelled(generation)) return;
+    await _activePlayer.setAudioSource(source,
+        initialPosition: initialPosition ?? Duration.zero, preload: false);
+    if (await _isGenerationCancelled(generation)) return;
+    _broadcastState(_activePlayer.playbackEvent);
   }
 
   // --- QUEUE & PLAYBACK COMMANDS ---
@@ -778,6 +789,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       {int initialIndex = 0,
       Duration? initialPosition,
       bool autoPlay = true}) async {
+    _pendingPlaybackStart = songs.isNotEmpty && autoPlay;
     if (songs.isEmpty) {
       _songs = [];
       _currentIndex = 0;
@@ -925,7 +937,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
       if (autoPlay) {
         await playSongAt(_currentIndex, initialPosition: initialPosition);
       } else {
-        await _loadSongPaused(_currentIndex);
+        await _loadSongPaused(_currentIndex, initialPosition: initialPosition);
       }
     }
   }
@@ -999,6 +1011,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   Future<void> _loadGaplessQueue(
       {Duration? initialPosition, bool preload = true}) async {
     if (_songs.isEmpty) return;
+    _pendingPlaybackStart = preload;
     final songsSnapshot = List<SongsTableData>.from(_songs);
     final generation = ++_playGeneration;
     _gaplessLoadGeneration++;
@@ -1061,10 +1074,24 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     try {
       // Soft-landing fade so the stop doesn't click, then cleanly stop any
       // existing playing source to release hanging native sockets.
+      final sources = await Future.wait(songsSnapshot.map((queuedSong) {
+        final art = queuedSong.artworkUri != null
+            ? Uri.tryParse(queuedSong.artworkUri!)
+            : null;
+        return _resolveAudioSource(
+            queuedSong, PulsrAudioHandler._songToMediaItem(queuedSong, art));
+      }));
       if (await _isGenerationCancelled(generation)) return;
       try {
         await _activePlayer.stop();
       } catch (_) {}
+
+      if (await _isGenerationCancelled(generation)) return;
+      await _activePlayer.setAudioSources(sources,
+          initialIndex: targetIndex,
+          initialPosition: initialPosition ?? Duration.zero,
+          preload: preload);
+      if (await _isGenerationCancelled(generation)) return;
 
       try {
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
@@ -1256,6 +1283,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   /// when not shuffling, or when no valid next exists. Peeking is idempotent and
   /// does not record shuffle history, so repeated calls return the SAME pick the
   /// real advance later consumes.
+  @override
   SongsTableData? _nonGaplessShuffleNextSong() {
     if (_gaplessMode || !_activePlayer.shuffleModeEnabled) return null;
     final idx = _getNextIndex(peek: true);
@@ -1285,6 +1313,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
+    _pendingPlaybackStart = true;
     cancelPrefetches();
     // playSongAt takes over the active player with a single source; clear any
     // in-flight gapless load target so a stalled one cannot keep
@@ -1371,6 +1400,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
     );
 
     try {
+      final source = await _resolveAudioSource(song, item);
+      if (await _isGenerationCancelled(generation)) return;
+      await _activePlayer.setAudioSource(source,
+          initialPosition: initialPosition ?? Duration.zero);
+      if (await _isGenerationCancelled(generation)) return;
       final targetVolume = _calculateReplayGainVolume(song);
       try {
         await _activePlayer.dspClearGainCurve();
@@ -1477,22 +1511,29 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   // Abstract contract supplied by the composing PulsrAudioHandler (same
   // library). Declaring these here keeps the mixin stateless and lets the
   // analyser type-check each mixin against the host's private members.
+  @override
   AudioPlayer get _activePlayer;
 
   AudioSessionIdRouter get _audioSessionIdRouter;
 
   double _calculateReplayGainVolume(SongsTableData? song);
 
+  @override
   int get _consecutiveFailures;
+  @override
   set _consecutiveFailures(int value);
 
+  @override
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag);
 
+  @override
   CrossfadeManager get _crossfadeManager;
 
+  @override
   int get _currentIndex;
   set _currentIndex(int value);
 
+  @override
   StreamController<String> get _errorSubject;
 
   Stopwatch get _gaplessStopwatch;
@@ -1500,6 +1541,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   bool get _gaplessLoaded;
   set _gaplessLoaded(bool value);
 
+  @override
   bool get _gaplessMode;
 
   int? get _gaplessTargetIndex;
@@ -1514,6 +1556,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   int get _generationCounter;
   set _generationCounter(int value);
 
+  @override
   AudioPlayer get _inactivePlayer;
 
   bool get _isManualSkip;
@@ -1529,6 +1572,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
   double get _pitch;
 
   int get _playGeneration;
+  set _pendingPlaybackStart(bool value);
   set _playGeneration(int value);
 
   int? get _playerASessionId;
@@ -1537,8 +1581,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   StreamController<Duration> get _positionSubject;
 
+  @override
   int get _preloadCountForCurrentBucket;
 
+  @override
   IMusicRepository get _repository;
 
   void _saveCurrentPosition();
@@ -1547,6 +1593,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   List<int> get _shuffleHistory;
 
+  @override
   List<SongsTableData> get _songs;
   set _songs(List<SongsTableData> value);
 
@@ -1556,10 +1603,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler {
 
   double get _volume;
 
+  @override
   void cancelPrefetches();
 
   Duration get compensatedPosition;
 
+  @override
   SongsTableData? get currentSong;
 
   set _pendingLazyPosition(Duration? value);

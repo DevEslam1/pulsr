@@ -68,7 +68,6 @@ mixin SettingsGesturesSection
           ),
         ),
       ],
-      key: _catById('gestures').key,
     );
   }
 }

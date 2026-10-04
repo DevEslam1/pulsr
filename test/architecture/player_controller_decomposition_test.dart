@@ -1,6 +1,8 @@
 // test/architecture/player_controller_decomposition_test.dart
 // FIX-A1: Unit tests verifying the 5 decomposed player controllers in isolation
 import 'package:flutter_test/flutter_test.dart';
+import 'package:audio_service/audio_service.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:mutex/mutex.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -56,6 +58,15 @@ void main() {
 
     test('PlayerTransportController delegates play and pause correctly',
         () async {
+      final playback = BehaviorSubject<PlaybackState>.seeded(PlaybackState());
+      addTearDown(playback.close);
+      when(() => mockAudioHandler.playbackState).thenAnswer((_) => playback);
+      when(() => mockAudioHandler.play()).thenAnswer((_) async {
+        playback.add(playback.value.copyWith(playing: true));
+      });
+      when(() => mockAudioHandler.pause()).thenAnswer((_) async {
+        playback.add(playback.value.copyWith(playing: false));
+      });
       var state = const PlayerState();
       final controller = PlayerTransportController(
         audioHandler: mockAudioHandler,

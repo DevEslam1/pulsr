@@ -49,8 +49,7 @@ class AudioDirectFormat {
           supported == other.supported;
 
   @override
-  int get hashCode =>
-      Object.hash(encoding, sampleRate, supported);
+  int get hashCode => Object.hash(encoding, sampleRate, supported);
 }
 
 class AudioDeviceEntry {
@@ -74,8 +73,8 @@ class AudioDeviceEntry {
     required this.typeName,
     required this.isCurrent,
     this.isPreferred = false,
-    this.sampleRates = const [44100, 48000],
-    this.maxBitDepth = 16,
+    this.sampleRates = const <int>[],
+    this.maxBitDepth = 0,
   });
 
   factory AudioDeviceEntry.fromMap(Map<dynamic, dynamic> map) {
@@ -93,8 +92,8 @@ class AudioDeviceEntry {
       typeName: (map['typeName'] as String?)?.trim() ?? 'Output Device',
       isCurrent: (map['isCurrent'] as bool?) ?? false,
       isPreferred: (map['isPreferred'] as bool?) ?? false,
-      sampleRates: rates.isNotEmpty ? rates : const [44100, 48000],
-      maxBitDepth: (map['maxBitDepth'] as num?)?.toInt() ?? 16,
+      sampleRates: rates.isNotEmpty ? rates : const <int>[],
+      maxBitDepth: (map['maxBitDepth'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -140,6 +139,7 @@ class AudioOutputInfo {
   final String deviceName;
   final bool isUsbDac;
   final int sampleRate;
+  final int pcmEncoding;
   final int bitDepth;
   final bool isBitPerfectActive;
   final bool isBitPerfectSupported;
@@ -176,6 +176,7 @@ class AudioOutputInfo {
   final int? btBitDepth; // 16 / 24 / 32
   final int?
       btLdacQualityMode; // 0=Best Effort, 1=Mobile, 2=Standard, 3=Maximum (990kbps)
+  final bool canConfigureBluetooth;
   final bool btCodecConnected; // true when codec status was read successfully
   final bool
       btA2dpPresent; // true when A2DP device detected in audio routing (even without permission)
@@ -190,10 +191,11 @@ class AudioOutputInfo {
     required this.deviceName,
     required this.isUsbDac,
     required this.sampleRate,
+    this.pcmEncoding = 0,
     required this.bitDepth,
     required this.isBitPerfectActive,
     this.isBitPerfectSupported = false,
-    this.supportedSampleRates = const [44100, 48000],
+    this.supportedSampleRates = const <int>[],
     this.availableDevices = const [],
     this.targetSampleRate = 0,
     this.targetBitDepth = 0,
@@ -214,6 +216,7 @@ class AudioOutputInfo {
     this.btSampleRateHz,
     this.btBitDepth,
     this.btLdacQualityMode,
+    this.canConfigureBluetooth = false,
     this.btCodecConnected = false,
     this.btA2dpPresent = false,
     this.btReason,
@@ -244,11 +247,12 @@ class AudioOutputInfo {
       deviceName:
           (map['deviceName'] as String?)?.trim() ?? 'Default Audio Output',
       isUsbDac: (map['isUsbDac'] as bool?) ?? false,
-      sampleRate: (map['sampleRate'] as num?)?.toInt() ?? 44100,
-      bitDepth: (map['bitDepth'] as num?)?.toInt() ?? 16,
+      sampleRate: (map['sampleRate'] as num?)?.toInt() ?? 0,
+      pcmEncoding: (map['pcmEncoding'] as num?)?.toInt() ?? 0,
+      bitDepth: (map['bitDepth'] as num?)?.toInt() ?? 0,
       isBitPerfectActive: (map['isBitPerfectActive'] as bool?) ?? false,
       isBitPerfectSupported: (map['isBitPerfectSupported'] as bool?) ?? false,
-      supportedSampleRates: rates.isNotEmpty ? rates : const [44100, 48000],
+      supportedSampleRates: rates.isNotEmpty ? rates : const <int>[],
       availableDevices: devices,
       targetSampleRate: (map['targetSampleRate'] as num?)?.toInt() ?? 0,
       targetBitDepth: (map['targetBitDepth'] as num?)?.toInt() ?? 0,
@@ -278,6 +282,7 @@ class AudioOutputInfo {
       btSampleRateHz: (map['btSampleRateHz'] as num?)?.toInt(),
       btBitDepth: (map['btBitDepth'] as num?)?.toInt(),
       btLdacQualityMode: (map['btLdacQualityMode'] as num?)?.toInt(),
+      canConfigureBluetooth: map['canConfigureBluetooth'] == true,
       btCodecConnected: (map['btCodecConnected'] as bool?) ?? false,
       btA2dpPresent: (map['btA2dpPresent'] as bool?) ?? false,
       btReason: map['btReason'] as String?,
@@ -313,6 +318,7 @@ class AudioOutputInfo {
       'deviceName': deviceName,
       'isUsbDac': isUsbDac,
       'sampleRate': sampleRate,
+      'pcmEncoding': pcmEncoding,
       'bitDepth': bitDepth,
       'isBitPerfectActive': isBitPerfectActive,
       'isBitPerfectSupported': isBitPerfectSupported,
@@ -336,6 +342,7 @@ class AudioOutputInfo {
       'btSampleRateHz': btSampleRateHz,
       'btBitDepth': btBitDepth,
       'btLdacQualityMode': btLdacQualityMode,
+      'canConfigureBluetooth': canConfigureBluetooth,
       'btCodecConnected': btCodecConnected,
       'btA2dpPresent': btA2dpPresent,
       'btReason': btReason,
@@ -350,6 +357,7 @@ class AudioOutputInfo {
     String? deviceName,
     bool? isUsbDac,
     int? sampleRate,
+    int? pcmEncoding,
     int? bitDepth,
     bool? isBitPerfectActive,
     bool? isBitPerfectSupported,
@@ -373,6 +381,7 @@ class AudioOutputInfo {
     int? btSampleRateHz,
     int? btBitDepth,
     int? btLdacQualityMode,
+    bool? canConfigureBluetooth,
     bool? btCodecConnected,
     bool? btA2dpPresent,
     String? btReason,
@@ -385,6 +394,7 @@ class AudioOutputInfo {
       deviceName: deviceName ?? this.deviceName,
       isUsbDac: isUsbDac ?? this.isUsbDac,
       sampleRate: sampleRate ?? this.sampleRate,
+      pcmEncoding: pcmEncoding ?? this.pcmEncoding,
       bitDepth: bitDepth ?? this.bitDepth,
       isBitPerfectActive: isBitPerfectActive ?? this.isBitPerfectActive,
       isBitPerfectSupported:
@@ -411,6 +421,8 @@ class AudioOutputInfo {
       btSampleRateHz: btSampleRateHz ?? this.btSampleRateHz,
       btBitDepth: btBitDepth ?? this.btBitDepth,
       btLdacQualityMode: btLdacQualityMode ?? this.btLdacQualityMode,
+      canConfigureBluetooth:
+          canConfigureBluetooth ?? this.canConfigureBluetooth,
       btCodecConnected: btCodecConnected ?? this.btCodecConnected,
       btA2dpPresent: btA2dpPresent ?? this.btA2dpPresent,
       btReason: btReason ?? this.btReason,
@@ -431,6 +443,7 @@ class AudioOutputInfo {
           deviceName == other.deviceName &&
           isUsbDac == other.isUsbDac &&
           sampleRate == other.sampleRate &&
+          pcmEncoding == other.pcmEncoding &&
           bitDepth == other.bitDepth &&
           isBitPerfectActive == other.isBitPerfectActive &&
           isBitPerfectSupported == other.isBitPerfectSupported &&
@@ -454,6 +467,7 @@ class AudioOutputInfo {
           btSampleRateHz == other.btSampleRateHz &&
           btBitDepth == other.btBitDepth &&
           btLdacQualityMode == other.btLdacQualityMode &&
+          canConfigureBluetooth == other.canConfigureBluetooth &&
           btCodecConnected == other.btCodecConnected &&
           btA2dpPresent == other.btA2dpPresent &&
           btReason == other.btReason &&
@@ -467,6 +481,7 @@ class AudioOutputInfo {
         deviceName,
         isUsbDac,
         sampleRate,
+        pcmEncoding,
         bitDepth,
         isBitPerfectActive,
         isBitPerfectSupported,
@@ -490,6 +505,7 @@ class AudioOutputInfo {
         btSampleRateHz,
         btBitDepth,
         btLdacQualityMode,
+        canConfigureBluetooth,
         btCodecConnected,
         btA2dpPresent,
         btReason,

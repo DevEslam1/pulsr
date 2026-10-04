@@ -1257,6 +1257,23 @@ class AudioPlayer {
     }
   }
 
+  /// Fades profile changes separately from sleep and crossfade envelopes.
+  Future<bool> dspSetTransitionMuted(bool muted) async {
+    if (_disposed || !_active || _platformValue == null) return false;
+    return await MethodChannel(
+          'com.ryanheise.just_audio.methods.${_platformValue!.id}',
+        ).invokeMethod<bool>('dspSetTransitionMuted', {'muted': muted}) ??
+        false;
+  }
+
+  /// Actual render-thread gain; a requested mute alone is not an acknowledgement.
+  Future<double?> dspGetTransitionGain() async {
+    if (_disposed || !_active || _platformValue == null) return null;
+    return MethodChannel(
+      'com.ryanheise.just_audio.methods.${_platformValue!.id}',
+    ).invokeMethod<double>('dspGetTransitionGain');
+  }
+
   /// Pulsr fork: requests the opt-in 24/32-bit float DSP path on this player's
   /// audio sink. When enabled, the vendored Android fork configures ExoPlayer's
   /// audio sink for float output and [NativeDspAudioProcessor] forwards float
@@ -1639,11 +1656,10 @@ class AudioPlayer {
     final pluginLoadRequest = _pluginLoadRequest;
     final activationNumber = ++_activationCount;
 
-    /// Tells whether we've been interrupted.
-    bool wasInterrupted() =>
-        _activationCount != activationNumber ||
-        pluginLoadRequest != _pluginLoadRequest ||
-        _disposed;
+    /// Source replacement cancels its own load, not the shared native player
+    /// initialization. Aborting initialization left _platform as a failed
+    /// future, so a replacement source and subsequent volume calls also failed.
+    bool wasInterrupted() => _activationCount != activationNumber || _disposed;
 
     final durationCompleter = Completer<Duration?>();
 
@@ -1920,7 +1936,7 @@ class AudioPlayer {
       subscribeToEvents(platform);
 
       try {
-        final initialSeekValues = pluginLoadRequest?.initialSeekValues ??
+        final initialSeekValues = _pluginLoadRequest?.initialSeekValues ??
             (index: currentIndex, position: position);
         final duration = await _load(
           platform,

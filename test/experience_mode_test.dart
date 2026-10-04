@@ -88,7 +88,7 @@ void main() {
       await tester.pumpWidget(harness(const SettingsState()));
       await tester.pump();
 
-      expect(find.text('Output & Audio Quality'), findsOneWidget);
+      expect(find.text('OUTPUT & AUDIO QUALITY'), findsOneWidget);
       expect(find.text('Room Correction'), findsNothing);
       expect(find.text('Bit-Perfect USB Pass-Through'), findsNothing);
       expect(find.text('DSP Signal Inspector & Debug'), findsNothing);

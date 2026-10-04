@@ -29,9 +29,10 @@ mixin TabletLayoutSection
     String activeCatId,
   ) {
     final p = context.palette;
-    final categories = _getCategories(context, pro: state.isProfessional);
+    final categories = _getCategories(context, pro: state.isProfessional, state: state);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final masterWidth = screenWidth < 1000 ? 280.0 : 320.0;
+    final effectiveActiveId = activeCatId == 'all' ? 'sound' : activeCatId;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +59,7 @@ mixin TabletLayoutSection
                       const SizedBox(height: AppSpacing.xxs),
                   itemBuilder: (context, i) {
                     final cat = categories[i];
-                    final isSelected = activeCatId == cat.id;
+                    final isSelected = effectiveActiveId == cat.id;
 
                     return PulsrPressable(
                       pressedScale: 0.985,
@@ -166,7 +167,7 @@ mixin TabletLayoutSection
           child: RepaintBoundary(
             child: _searchQuery.isNotEmpty
                 ? _buildSearchResultsList(context, state, cubit)
-                : _buildDetailPane(context, state, cubit, activeCatId),
+                : _buildDetailPane(context, state, cubit, effectiveActiveId),
           ),
         ),
       ],
@@ -179,9 +180,10 @@ mixin TabletLayoutSection
     SettingsCubit cubit,
     String activeCatId,
   ) {
-    final categories = _getCategories(context, pro: state.isProfessional);
+    final effectiveId = activeCatId == 'all' ? 'sound' : activeCatId;
+    final categories = _getCategories(context, pro: state.isProfessional, state: state);
     final currentCat = categories.firstWhere(
-      (c) => c.id == activeCatId,
+      (c) => c.id == effectiveId,
       orElse: () => categories.first,
     );
     final bottomInset = PulsrLayoutMetrics.scrollBottom(context);
@@ -201,7 +203,7 @@ mixin TabletLayoutSection
         ),
       ),
       child: KeyedSubtree(
-        key: ValueKey(activeCatId),
+        key: ValueKey(effectiveId),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
@@ -216,10 +218,7 @@ mixin TabletLayoutSection
               children: [
                 _buildCategoryHeroHeader(context, currentCat),
                 const SizedBox(height: AppSpacing.md),
-                if (activeCatId == 'audio') ...[
-                  _experienceModeCard(context),
-                ],
-                ..._buildCategoryWidgets(context, activeCatId, state, cubit),
+                ..._buildCategoryWidgets(context, effectiveId, state, cubit),
               ],
             ),
           ),

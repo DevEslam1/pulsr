@@ -93,7 +93,6 @@ class _QuranModePanelState extends State<QuranModePanel> {
         final cubit = context.read<PlayerCubit>();
         final enabled = state.isQuranModeEnabled;
         final style = state.quranReciterStyle;
-        final profile = QuranModeProfile.forStyle(style);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,14 +210,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
               icon: Icons.local_fire_department_rounded,
               title: context.l10n.dspVocalWarmth,
               subtitle: context.l10n.dspVocalWarmthDesc,
-              value: state.saturationMix.clamp(0.0, 0.6),
+              value: state.isSaturationEnabled
+                  ? state.saturationMix.clamp(0.0, 0.6)
+                  : 0.0,
               max: 0.6,
               enabled: enabled,
-              valueLabel: '${(state.saturationMix * 100).round()}%',
-              onChanged: (v) => cubit.setSaturation(true,
-                  drive: profile.saturationDrive,
-                  mix: v,
-                  tilt: profile.saturationTilt),
+              valueLabel: state.isSaturationEnabled
+                  ? '${(state.saturationMix * 100).round()}%'
+                  : '0%',
+              onChanged: cubit.setQuranWarmth,
             ),
 
             // Learning speed

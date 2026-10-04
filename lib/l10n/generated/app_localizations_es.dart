@@ -8041,4 +8041,212 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get lyricsShiftLater => 'Atrasar';
+
+  @override
+  String get settingsSetUpSound => 'Configurar sonido';
+
+  @override
+  String get settingsSetUpSoundDesc =>
+      'Asistente de configuración de sonido en 3 pasos';
+
+  @override
+  String get settingsAdvancedAudioTitle => 'Avanzado';
+
+  @override
+  String get settingsAdvancedAudioDesc =>
+      'Búfer de bajo nivel, ruta float y negociación';
+
+  @override
+  String get settingsAccessibilityAndComfort => 'Accesibilidad y confort';
+
+  @override
+  String get settingsAccessibilityAndComfortSubtitle =>
+      'Contraste, movimiento, confort visual y efectos de sonido';
+
+  @override
+  String get settingsWizardTitle => 'Asistente de sonido';
+
+  @override
+  String get settingsWizardStep1Title => 'Tipo de salida';
+
+  @override
+  String get settingsWizardStep1Subtitle =>
+      'Selecciona tu dispositivo de escucha principal';
+
+  @override
+  String get settingsWizardStep2Title => 'Prioridad de audio';
+
+  @override
+  String get settingsWizardStep2Subtitle =>
+      'Elige la prioridad de procesamiento de audio';
+
+  @override
+  String get settingsWizardStep3Title => 'Transiciones';
+
+  @override
+  String get settingsWizardStep3Subtitle =>
+      'Elige reproducción continua o fundido';
+
+  @override
+  String get settingsWizardFidelity => 'Máxima fidelidad';
+
+  @override
+  String get settingsWizardFidelityDesc =>
+      'Transmisión directa bit-perfect sin procesamiento DSP';
+
+  @override
+  String get settingsWizardBalanced => 'Equilibrado';
+
+  @override
+  String get settingsWizardBalancedDesc =>
+      'Reproducción suave, normalización y ecualización';
+
+  @override
+  String get settingsWizardDataSaver => 'Ahorro de datos';
+
+  @override
+  String get settingsWizardDataSaverDesc =>
+      'Menor tasa de bits y búfer eficiente';
+
+  @override
+  String get settingsWizardApply => 'Aplicar configuración';
+
+  @override
+  String get dockStyleDefaultBestFor =>
+      'Ideal para navegación equilibrada con una mano y controles completos';
+
+  @override
+  String get dockStyleSystemBestFor =>
+      'Ideal para pantallas compactas y máxima visibilidad de contenido';
+
+  @override
+  String get dockStyleMiniTopBestFor =>
+      'Ideal para escucha activa y acceso rápido a la reproducción';
+
+  @override
+  String get dockStyleNavTopBestFor =>
+      'Ideal para exploración profunda de la biblioteca y listas';
+
+  @override
+  String get dockStylePreviewBadge => 'Vista previa en vivo';
+
+  @override
+  String get dockStyleNowPlaying => 'Reproduciendo';
+
+  @override
+  String get shortcutHelpTitle => 'Atajos de teclado';
+
+  @override
+  String get shortcutHelpSubtitle =>
+      'Teclas de navegación rápida para escritorio y tableta';
+
+  @override
+  String get shortcutPlayPause => 'Reproducir / Pausar';
+
+  @override
+  String get shortcutPlayPauseDesc => 'Alternar estado de reproducción';
+
+  @override
+  String get shortcutSeekForward => 'Avance rápido';
+
+  @override
+  String get shortcutSeekForwardDesc => 'Avanzar 10 segundos';
+
+  @override
+  String get shortcutSeekBackward => 'Rebobinar';
+
+  @override
+  String get shortcutSeekBackwardDesc => 'Retroceder 10 segundos';
+
+  @override
+  String get shortcutVolumeUp => 'Subir volumen';
+
+  @override
+  String get shortcutVolumeUpDesc => 'Aumentar volumen un 5%';
+
+  @override
+  String get shortcutVolumeDown => 'Bajar volumen';
+
+  @override
+  String get shortcutVolumeDownDesc => 'Reducir volumen un 5%';
+
+  @override
+  String get shortcutNext => 'Siguiente pista';
+
+  @override
+  String get shortcutNextDesc => 'Pasar a la siguiente canción en la cola';
+
+  @override
+  String get shortcutPrevious => 'Pista anterior';
+
+  @override
+  String get shortcutPreviousDesc => 'Reiniciar canción o volver a la anterior';
+
+  @override
+  String get shortcutMute => 'Silenciar';
+
+  @override
+  String get shortcutMuteDesc => 'Silenciar o restaurar el nivel de audio';
+
+  @override
+  String get shortcutLyrics => 'Alternar letras';
+
+  @override
+  String get shortcutLyricsDesc => 'Mostrar u ocultar letras sincronizadas';
+
+  @override
+  String get shortcutQueue => 'Alternar cola';
+
+  @override
+  String get shortcutQueueDesc => 'Abrir o cerrar el panel de la cola';
+
+  @override
+  String get shortcutFavorite => 'Alternar favorito';
+
+  @override
+  String get shortcutFavoriteDesc =>
+      'Añadir o quitar la pista actual de favoritos';
+
+  @override
+  String get shortcutHelp => 'Guía de atajos';
+
+  @override
+  String get shortcutHelpDesc =>
+      'Mostrar panel con todos los atajos de teclado';
+
+  @override
+  String get browseOverflowLabel => 'Explorar';
+
+  @override
+  String get batchActionsSheetTitle => 'Acciones en lote';
+
+  @override
+  String batchActionsSelected(int count) {
+    return '$count seleccionados · Acciones';
+  }
+
+  @override
+  String get browseAllGenresFallback => 'Todos los géneros';
+
+  @override
+  String get statsTimeRange7Days => '7 días';
+
+  @override
+  String get statsTimeRange30Days => '30 días';
+
+  @override
+  String get statsTimeRangeAllTime => 'Todo el tiempo';
+
+  @override
+  String get unifiedFavoritesHeader => 'Colección de favoritos';
+
+  @override
+  String get unifiedFavoritesHeaderSubtitle =>
+      'Todas tus pistas favoritas y destacadas en un solo lugar';
+
+  @override
+  String get unifiedFavoritesViewAll => 'Abrir favoritos completos';
+
+  @override
+  String get folderPersistentExcludedBadge => 'Excluido del escaneo';
 }

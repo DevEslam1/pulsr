@@ -40,20 +40,42 @@ class _TabletLyricsData {
   int get hashCode => Object.hash(songId, remoteId, lyricsSlice);
 }
 
+/// Data descriptor for an extensible panel tab inside [TabletSideInspector].
+class SideInspectorTabDescriptor {
+  final String id;
+  final String Function(BuildContext context) label;
+  final IconData icon;
+  final Widget Function(BuildContext context, bool isSelected)? headerWidget;
+  final Widget Function(BuildContext context) builder;
+
+  const SideInspectorTabDescriptor({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.builder,
+    this.headerWidget,
+  });
+}
+
 class TabletSideInspector extends StatefulWidget {
   final VoidCallback onClose;
+  final List<SideInspectorTabDescriptor>? customTabs;
 
   const TabletSideInspector({
     super.key,
     required this.onClose,
+    this.customTabs,
   });
+
+  static const double minWidth = 280.0;
+  static const double maxWidth = 480.0;
 
   @override
   State<TabletSideInspector> createState() => TabletSideInspectorState();
 }
 
 class TabletSideInspectorState extends State<TabletSideInspector> {
-  int _selectedTabIndex = 0; // 0: Queue, 1: Lyrics
+  int _selectedTabIndex = 0;
   double? _customWidth;
   bool _isDragging = false;
   double? _lastScreenWidth;
@@ -68,6 +90,66 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
   @visibleForTesting
   double get dragDeltaAccumulator => _dragDeltaAccumulator;
 
+  List<SideInspectorTabDescriptor> _resolveTabs(Color activeColor) {
+    if (widget.customTabs != null && widget.customTabs!.isNotEmpty) {
+      return widget.customTabs!;
+    }
+    return [
+      SideInspectorTabDescriptor(
+        id: 'queue',
+        label: (context) => context.l10n.queue,
+        icon: Icons.queue_music_rounded,
+        headerWidget: (context, isSelected) =>
+            BlocSelector<PlayerCubit, PlayerState, int>(
+          selector: (state) => state.queue.length,
+          builder: (context, queueCount) {
+            final p = context.palette;
+            return Text(
+              '${context.l10n.queue} ($queueCount)',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: AppFontSize.label,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? p.onAccent : p.textSecondary,
+              ),
+            );
+          },
+        ),
+        builder: (context) => const Padding(
+          padding: EdgeInsets.all(AppSpacing.xs),
+          child: NowPlayingQueueView(),
+        ),
+      ),
+      SideInspectorTabDescriptor(
+        id: 'lyrics',
+        label: (context) => context.l10n.lyricsLabel,
+        icon: Icons.lyrics_rounded,
+        builder: (context) => Padding(
+          padding: const EdgeInsets.all(AppSpacing.xs),
+          child: BlocSelector<PlayerCubit, PlayerState, _TabletLyricsData>(
+            selector: (state) => _TabletLyricsData(
+              songId: state.currentSong?.id,
+              remoteId: state.currentSong?.remoteId,
+              lyricsSlice: state.lyricsSlice,
+            ),
+            builder: (context, lyricsData) => LyricsView(
+              key: (lyricsData.songId != null || lyricsData.remoteId != null)
+                  ? ValueKey(
+                      'lyrics_${lyricsData.songId}_${lyricsData.remoteId}')
+                  : const ValueKey('lyrics_empty'),
+              lyrics: lyricsData.lyricsSlice.lyrics,
+              isLoading: lyricsData.lyricsSlice.isLoadingLyrics,
+              activeColor: activeColor,
+              source: lyricsData.lyricsSlice.lyricsSource,
+              onLineTapped: (pos) => context.read<PlayerCubit>().seek(pos),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -78,7 +160,8 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
       if (_customWidth != null) {
         // Proportionally scale _customWidth so rotation doesn't cause a visual jump
         final ratio = _customWidth! / _lastScreenWidth!;
-        _customWidth = (ratio * currentWidth).clamp(280.0, 400.0);
+        _customWidth = (ratio * currentWidth)
+            .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
       }
     }
     _lastScreenWidth = currentWidth;
@@ -87,10 +170,15 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-
     final activeColor = p.accent;
-    final defaultWidth = (Adaptive.widthOf(context) * 0.35).clamp(280.0, 400.0);
-    final inspectorWidth = (_customWidth ?? defaultWidth).clamp(280.0, 400.0);
+    final tabs = _resolveTabs(activeColor);
+
+    final defaultWidth = (Adaptive.widthOf(context) * 0.35)
+        .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
+    final inspectorWidth = (_customWidth ?? defaultWidth)
+        .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
+
+    final safeTabIndex = _selectedTabIndex.clamp(0, tabs.length - 1);
 
     return Container(
       width: inspectorWidth,
@@ -104,7 +192,8 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                 : p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
             GpuBudget.isGpuSaverActive
                 ? p.surfaceContainer
-                : p.surfaceContainer.withValues(alpha: p.isDark ? 0.72 : 0.84),
+                : p.surfaceContainer
+                    .withValues(alpha: p.isDark ? 0.72 : 0.84),
           ],
         ),
         border: BorderDirectional(
@@ -128,10 +217,12 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                     // Header with Tabs & Close Button
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s14, vertical: AppSpacing.s10),
+                        horizontal: AppSpacing.s14,
+                        vertical: AppSpacing.s10,
+                      ),
                       child: Row(
                         children: [
-                          // Segmented Selector
+                          // Data-driven Segmented Selector
                           Expanded(
                             child: Container(
                               padding: const EdgeInsets.all(3),
@@ -142,125 +233,80 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                               ),
                               child: Row(
                                 children: [
-                                  Expanded(
-                                    child: Semantics(
-                                      button: true,
-                                      selected: _selectedTabIndex == 0,
-                                      label: context.l10n.queue,
-                                      child: GestureDetector(
-                                        onTap: () => setState(
-                                            () => _selectedTabIndex = 0),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: AppSpacing.s6),
-                                          decoration: BoxDecoration(
-                                            color: _selectedTabIndex == 0
-                                                ? p.accent
-                                                : Colors.transparent,
-                                            borderRadius: AppRadii.r8All,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.queue_music_rounded,
-                                                size: 15,
-                                                color: _selectedTabIndex == 0
-                                                    ? p.onAccent
-                                                    : p.textSecondary,
-                                              ),
-                                              const SizedBox(
-                                                  width: AppSpacing.s6),
-                                              Flexible(
-                                                child: BlocSelector<PlayerCubit,
-                                                    PlayerState, int>(
-                                                  selector: (state) =>
-                                                      state.queue.length,
-                                                  builder:
-                                                      (context, queueCount) =>
-                                                          Text(
-                                                    'Queue ($queueCount)',
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: TextStyle(
-                                                      fontSize:
-                                                          AppFontSize.label,
-                                                      fontWeight:
-                                                          _selectedTabIndex == 0
-                                                              ? FontWeight.w800
-                                                              : FontWeight.w600,
-                                                      color:
-                                                          _selectedTabIndex == 0
-                                                              ? p.onAccent
-                                                              : p.textSecondary,
-                                                    ),
-                                                  ),
+                                  for (int i = 0; i < tabs.length; i++) ...[
+                                    if (i > 0)
+                                      const SizedBox(width: AppSpacing.xxs),
+                                    Expanded(
+                                      child: Semantics(
+                                        button: true,
+                                        selected: safeTabIndex == i,
+                                        label: tabs[i].label(context),
+                                        child: GestureDetector(
+                                          onTap: () => setState(
+                                              () => _selectedTabIndex = i),
+                                          child: Container(
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                              vertical: AppSpacing.s6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: safeTabIndex == i
+                                                  ? p.accent
+                                                  : Colors.transparent,
+                                              borderRadius: AppRadii.r8All,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  tabs[i].icon,
+                                                  size: 15,
+                                                  color: safeTabIndex == i
+                                                      ? p.onAccent
+                                                      : p.textSecondary,
                                                 ),
-                                              ),
-                                            ],
+                                                const SizedBox(
+                                                    width: AppSpacing.s6),
+                                                Flexible(
+                                                  child: tabs[i].headerWidget !=
+                                                          null
+                                                      ? tabs[i].headerWidget!(
+                                                          context,
+                                                          safeTabIndex == i,
+                                                        )
+                                                      : Text(
+                                                          tabs[i]
+                                                              .label(context),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize:
+                                                                AppFontSize
+                                                                    .label,
+                                                            fontWeight:
+                                                                safeTabIndex ==
+                                                                        i
+                                                                    ? FontWeight
+                                                                        .w800
+                                                                    : FontWeight
+                                                                        .w600,
+                                                            color: safeTabIndex ==
+                                                                    i
+                                                                ? p.onAccent
+                                                                : p
+                                                                    .textSecondary,
+                                                          ),
+                                                        ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.xxs),
-                                  Expanded(
-                                    child: Semantics(
-                                      button: true,
-                                      selected: _selectedTabIndex == 1,
-                                      label: context.l10n.lyricsLabel,
-                                      child: GestureDetector(
-                                        onTap: () => setState(
-                                            () => _selectedTabIndex = 1),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: AppSpacing.s6),
-                                          decoration: BoxDecoration(
-                                            color: _selectedTabIndex == 1
-                                                ? p.accent
-                                                : Colors.transparent,
-                                            borderRadius: AppRadii.r8All,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.lyrics_rounded,
-                                                size: 15,
-                                                color: _selectedTabIndex == 1
-                                                    ? p.onAccent
-                                                    : p.textSecondary,
-                                              ),
-                                              const SizedBox(
-                                                  width: AppSpacing.s6),
-                                              Flexible(
-                                                child: Text(
-                                                  context.l10n.lyricsLabel,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: AppFontSize.label,
-                                                    fontWeight:
-                                                        _selectedTabIndex == 1
-                                                            ? FontWeight.w800
-                                                            : FontWeight.w600,
-                                                    color:
-                                                        _selectedTabIndex == 1
-                                                            ? p.onAccent
-                                                            : p.textSecondary,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -281,38 +327,9 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                     ),
                     Divider(height: 1, thickness: 1, color: p.hairline),
 
-                    // Content Area
+                    // Content Area built dynamically from active tab descriptor
                     Expanded(
-                      child: _selectedTabIndex == 0
-                          ? const Padding(
-                              padding: EdgeInsets.all(AppSpacing.xs),
-                              child: NowPlayingQueueView(),
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.all(AppSpacing.xs),
-                              child: BlocSelector<PlayerCubit, PlayerState,
-                                  _TabletLyricsData>(
-                                selector: (state) => _TabletLyricsData(
-                                  songId: state.currentSong?.id,
-                                  remoteId: state.currentSong?.remoteId,
-                                  lyricsSlice: state.lyricsSlice,
-                                ),
-                                builder: (context, lyricsData) => LyricsView(
-                                  key: (lyricsData.songId != null ||
-                                          lyricsData.remoteId != null)
-                                      ? ValueKey(
-                                          'lyrics_${lyricsData.songId}_${lyricsData.remoteId}')
-                                      : const ValueKey('lyrics_empty'),
-                                  lyrics: lyricsData.lyricsSlice.lyrics,
-                                  isLoading:
-                                      lyricsData.lyricsSlice.isLoadingLyrics,
-                                  activeColor: activeColor,
-                                  source: lyricsData.lyricsSlice.lyricsSource,
-                                  onLineTapped: (pos) =>
-                                      context.read<PlayerCubit>().seek(pos),
-                                ),
-                              ),
-                            ),
+                      child: tabs[safeTabIndex].builder(context),
                     ),
                   ],
                 ),
@@ -338,8 +355,11 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                         _dragDeltaAccumulator += delta;
                         if (_dragDeltaAccumulator.abs() >= 1.0) {
                           final current = _customWidth ?? defaultWidth;
-                          final newWidth = (current + _dragDeltaAccumulator)
-                              .clamp(280.0, 400.0);
+                          final newWidth =
+                              (current + _dragDeltaAccumulator).clamp(
+                            TabletSideInspector.minWidth,
+                            TabletSideInspector.maxWidth,
+                          );
                           _dragDeltaAccumulator = 0.0;
                           if (newWidth != _customWidth) {
                             setState(() {

@@ -188,11 +188,16 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
             controller: _searchController,
             hintText: context.l10n.searchPlaceholder,
             onChanged: (val) {
+              final trimmed = val.trim().toLowerCase();
+              if (trimmed.isEmpty) {
+                GenreCategory.clearCache();
+              }
               if (mounted) {
-                setState(() => _searchQuery = val.trim().toLowerCase());
+                setState(() => _searchQuery = trimmed);
               }
             },
             onClear: () {
+              GenreCategory.clearCache();
               if (mounted) setState(() => _searchQuery = '');
             },
           ),
@@ -219,6 +224,7 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                 primaryActionLabel: context.l10n.clear,
                 primaryActionIcon: Icons.clear_rounded,
                 onPrimaryAction: () {
+                  GenreCategory.clearCache();
                   _searchController.clear();
                   setState(() => _searchQuery = '');
                 },
@@ -226,6 +232,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
             ),
           )
         else ...[
+          _buildAllGenresSummary(context, widget.genres, p),
+          const SizedBox(height: AppSpacing.sm),
           for (final category in categories) ...[
             _buildCategoryGroup(context, category, effectiveGenres, p),
             const SizedBox(height: AppSpacing.sm),
@@ -250,7 +258,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
-        initiallyExpanded: true,
+        key: PageStorageKey<String>('genre_cat_${cat.name}_${_searchQuery.isNotEmpty}'),
+        initiallyExpanded: _searchQuery.isNotEmpty && matching.isNotEmpty,
         shape: const Border(),
         leading: Container(
           padding: const EdgeInsets.all(AppSpacing.xs),
@@ -323,6 +332,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
+        key: PageStorageKey<String>('genre_uncat_${_searchQuery.isNotEmpty}'),
+        initiallyExpanded: _searchQuery.isNotEmpty && uncategorized.isNotEmpty,
         shape: const Border(),
         leading: Container(
           padding: const EdgeInsets.all(AppSpacing.xs),
@@ -372,6 +383,58 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
                   ),
                 );
               }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllGenresSummary(
+      BuildContext context, List<GenreItem> genres, PulsrPalette p) {
+    final totalSongs = genres.fold<int>(0, (sum, g) => sum + g.songCount);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: p.surfaceCard,
+        borderRadius: AppRadii.r14All,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: p.primary.withValues(alpha: 0.12),
+              borderRadius: AppRadii.r8All,
+            ),
+            child: Icon(Icons.auto_awesome_motion_rounded,
+                color: p.primary, size: 18),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  context.l10n.browseAllGenresFallback,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.callout,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${genres.length} ${context.l10n.genres} • $totalSongs ${context.l10n.songs}',
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

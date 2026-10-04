@@ -10,6 +10,14 @@ import '../../domain/models/dsp_debug_report.dart';
 import '../../domain/models/dsp_telemetry.dart';
 
 class AudioEffectsChannel {
+  Future<bool> awaitControlUpdates() async {
+    if (!PlatformCapabilities.isAndroid) return true;
+    return await _channel
+            .invokeMethod<bool>('awaitDspControlUpdates')
+            .timeout(const Duration(seconds: 5)) ??
+        false;
+  }
+
   /// Test-only observation of the last value pushed to the native
   /// bit-perfect DSP-bypass switch (null = nothing pushed yet).
   @visibleForTesting

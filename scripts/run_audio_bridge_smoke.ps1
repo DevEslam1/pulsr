@@ -35,7 +35,9 @@ $javaSources = @(
     (Join-Path $PSScriptRoot 'audio_bridge_smoke/AudioEffectsPlugin.java'),
     (Join-Path $PSScriptRoot 'audio_bridge_smoke/NativeDspSmoke.java'),
     (Join-Path $PSScriptRoot 'audio_bridge_smoke/AaudioSinkSmoke.java'),
-    (Join-Path $PSScriptRoot 'audio_bridge_smoke/FloatSinkSmoke.java')
+    (Join-Path $PSScriptRoot 'audio_bridge_smoke/FloatSinkSmoke.java'),
+    (Join-Path $PSScriptRoot 'audio_bridge_smoke/OutputRoutingSmoke.java'),
+    (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/PulsrOutputRouting.java')
 )
 Invoke-AuditTool (Join-Path $JdkRoot 'bin/javac.exe') (@('--release', '17', '-cp', "$commonJar;$exoplayerJar;$androidJar", '-h', $headers, '-d', $classes) + $javaSources)
 
@@ -57,8 +59,16 @@ $remote = '/data/local/tmp/pulsr_audio_audit'
 Invoke-AuditTool $adb @('-s', $Serial, 'shell', 'mkdir', '-p', $remote)
 Invoke-AuditTool $adb @('-s', $Serial, 'push', (Join-Path $dex 'classes.dex'), "$remote/classes.dex")
 Invoke-AuditTool $adb @('-s', $Serial, 'push', $NativeLibrary, "$remote/libpulsr_dsp.so")
-$runtime = Join-Path $SdkRoot "ndk/$NdkVersion/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so"
+$deviceAbi = (& $adb -s $Serial shell getprop ro.product.cpu.abi).Trim()
+$runtimeTriple = switch ($deviceAbi) {
+    'arm64-v8a' { 'aarch64-linux-android' }
+    'armeabi-v7a' { 'arm-linux-androideabi' }
+    'x86_64' { 'x86_64-linux-android' }
+    'x86' { 'i686-linux-android' }
+    default { throw "Unsupported device ABI: $deviceAbi" }
+}
+$runtime = Join-Path $SdkRoot "ndk/$NdkVersion/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/$runtimeTriple/libc++_shared.so"
 Invoke-AuditTool $adb @('-s', $Serial, 'push', $runtime, "$remote/libc++_shared.so")
-foreach ($main in @('AaudioBridgeSmoke', 'NativeDspSmoke', 'AaudioSinkSmoke', 'FloatSinkSmoke')) {
+foreach ($main in @('AaudioBridgeSmoke', 'NativeDspSmoke', 'AaudioSinkSmoke', 'FloatSinkSmoke', 'OutputRoutingSmoke')) {
     Invoke-AuditTool $adb @('-s', $Serial, 'shell', "CLASSPATH=$remote/classes.dex LD_LIBRARY_PATH=$remote app_process /system/bin com.ryanheise.just_audio.$main")
 }

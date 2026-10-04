@@ -45,10 +45,10 @@ void main() {
       expect(info.tier, AudioQualityTier.standardQuality);
     });
 
-    test('plain MP3 with no header defaults to a high-quality MP3 tier', () {
+    test('plain MP3 without metadata has unverified source quality', () {
       final info = AudioQualityInfo.fromSong(_song(path: '/m/a.mp3'));
       expect(info.format, 'MP3');
-      expect(info.tier, AudioQualityTier.highQuality);
+      expect(info.tier, AudioQualityTier.standardQuality);
     });
 
     test('FLAC with a 24/96 header is classified Hi-Res lossless', () {
@@ -85,13 +85,18 @@ void main() {
       expect(info.format, 'MQA');
     });
 
-    test('a YouTube stream defaults to a 256k AAC high-quality tier', () {
+    test(
+        'a YouTube stream without metadata does not invent its codec or bitrate',
+        () {
       final info = AudioQualityInfo.fromSong(_song(
         source: SongSource.youtube,
         path: 'ytmusic://abc',
       ));
-      expect(info.format, 'AAC');
-      expect(info.tier, AudioQualityTier.highQuality);
+      expect(info.format, 'Unknown');
+      expect(info.bitrateKbps, isNull);
+      expect(info.sampleRate, 'Unknown');
+      expect(info.bitDepth, 'Unknown');
+      expect(info.tierLabel, 'Stream quality unverified');
     });
 
     test('a YouTube stream with a low explicit bitrate is compact', () {

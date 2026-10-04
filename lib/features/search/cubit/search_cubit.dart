@@ -35,14 +35,71 @@ class SearchCubit extends PulsrCubit<SearchState> {
   @visibleForTesting
   bool get isHistoryLoaded => _historyLoaded;
 
+  // ── Constants ───────────────────────────────────────────────────────
+  @visibleForTesting
+  static const int historyMax = 10;
+
+  /// Single bound applied to the query at every stage of the pipeline
+  /// (FTS query, fuzzy post-filter and suggestions).
+  static const int maxQueryLength = 64;
+
+  /// NOTE: currently not applied anywhere. The FTS window is [_searchLimit].
+  static const int maxResultCount = 200;
+
+  /// Explicit limit so a one-letter query can't load the whole library.
+  static const int _searchLimit = 500;
+
+  static const Duration _debounce = Duration(milliseconds: 300);
+  static const String _historyKey = 'search_history';
+  static const String _filterKey = 'search_selected_filter';
+  static const List<String> filterOptions = [
+    'All',
+    'Songs',
+    'Artists',
+    'Albums',
+    'FLAC',
+    'MP3',
+    'Lossless',
+  ];
+  static const String _savedSearchesKey = 'saved_searches';
+  static const int savedSearchMax = 10;
+  static const int suggestionMax = 5;
+
+  /// Reactive list of saved searches (query + filter), kept outside the
+  /// freezed state so no code generation is required.
+  final ValueNotifier<List<String>> savedSearches =
+      ValueNotifier<List<String>>(const []);
+  late final Future<void> savedSearchesReady;
+
+  // ── Pipeline bookkeeping ────────────────────────────────────────────
+  /// Bumped for every new query/filter/clear. Invalidates in-flight work.
+  int _generation = 0;
+
+  /// Bumped for every emission of the DB stream. A slow emission (fuzzy
+  /// fallback awaits a second query) must not overwrite a newer one.
+  int _emission = 0;
+
+  List<String>? _cachedExcludedFolders;
+  DateTime? _lastExcludedFetch;
+
+  bool _isStale(int generation) => generation != _generation || isClosed;
+
+  void _cancelSearch() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _searchSub?.cancel();
+    removeFromComposite(_searchSub);
+    _searchSub = null;
+  }
+
+  // ── Loading / persistence ───────────────────────────────────────────
   Future<void> _loadHistoryAsync() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_historyKey) ?? [];
       if (!isClosed) {
         _historyLoaded = true;
-        final currentHistory = state.history;
-        final merged = <String>[...currentHistory];
+        final merged = <String>[...state.history];
         for (final item in list) {
           if (!merged.any((m) => m.toLowerCase() == item.toLowerCase())) {
             merged.add(item);
@@ -55,77 +112,6 @@ class SearchCubit extends PulsrCubit<SearchState> {
           error: e, stackTrace: st, category: 'SearchCubit');
     }
   }
-
-  void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
-  }
-
-  void setFilter(String filter) {
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
-    safeEmit(state.copyWith(selectedFilter: filter));
-    unawaited(_persistFilter(filter));
-    _executeSearch(state.query, filterOverride: filter);
-  }
-
-  void onQueryChanged(String query) {
-    _generation++;
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
-    _searchSub?.cancel();
-    removeFromComposite(_searchSub);
-    _searchSub = null;
-    safeEmit(state.copyWith(query: query));
-    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
-      _executeSearch(query);
-    }));
-  }
-
-  int _generation = 0;
-  List<String>? _cachedExcludedFolders;
-  DateTime? _lastExcludedFetch;
-
-  // FIX-L07: Expose historyMax for testing
-  @visibleForTesting
-  static const int historyMax = 10;
-
-  /// Single bound applied to the query at every stage of the pipeline.
-  /// The FTS query and the fuzzy post-filter MUST use the same length: if the
-  /// post-filter tests a prefix of the real needle it admits false positives
-  /// (defect 08-02).
-  static const int maxQueryLength = 64;
-
-  /// Maximum number of matches handed to the UI. Must stay >= the repository
-  /// FTS window (music_repository.dart passes 'limit ?? 200'), so the
-  /// presentation layer never truncates what the data layer was willing to
-  /// return (defect 08-01).
-  static const int maxResultCount = 200;
-  static const String _historyKey = 'search_history';
-
-  // ── C-04: filter chips ──────────────────────────────────────────────
-  static const String _filterKey = 'search_selected_filter';
-  static const List<String> filterOptions = [
-    'All',
-    'Songs',
-    'Artists',
-    'Albums',
-    'FLAC',
-    'MP3',
-    'Lossless',
-  ];
-
-  // ── C-05: saved searches ────────────────────────────────────────────
-  static const String _savedSearchesKey = 'saved_searches';
-  static const int savedSearchMax = 10;
-
-  /// Reactive list of saved searches (query + filter). Kept outside the freezed
-  /// state so no code generation is required.
-  final ValueNotifier<List<String>> savedSearches =
-      ValueNotifier<List<String>>(const []);
-  late final Future<void> savedSearchesReady;
-
-  // ── C-02: autocomplete ──────────────────────────────────────────────
-  static const int suggestionMax = 5;
 
   Future<void> _loadFilter() async {
     try {
@@ -161,10 +147,77 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
   }
 
+  // ── Public API: query / filter ──────────────────────────────────────
+  void clearError() {
+    safeEmit(state.copyWith(errorMessage: null));
+  }
+
+  void setFilter(String filter) {
+    if (filter == state.selectedFilter) return;
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    safeEmit(state.copyWith(selectedFilter: filter));
+    unawaited(_persistFilter(filter));
+    _executeSearch(state.query, filterOverride: filter);
+  }
+
+  /// [immediate] skips the debounce (chip taps, suggestions, deep links).
+  /// An empty query always clears at once instead of waiting for the debounce
+  /// (previously stale results lingered for 300 ms after deleting the text).
+  void onQueryChanged(String query, {bool immediate = false}) {
+    _generation++;
+    _cancelSearch();
+    safeEmit(state.copyWith(query: query));
+    if (immediate || query.trim().isEmpty) {
+      _executeSearch(query);
+      return;
+    }
+    _debounceTimer = autoTimer(Timer(_debounce, () => _executeSearch(query)));
+  }
+
+  /// Applies a saved search atomically: filter and query are set together, so
+  /// the old query is never searched with the new filter.
+  void applySavedSearch(String query, String filter) {
+    final f = filterOptions.contains(filter) ? filter : 'All';
+    if (f != state.selectedFilter) {
+      safeEmit(state.copyWith(selectedFilter: f));
+      unawaited(_persistFilter(f));
+    }
+    onQueryChanged(query, immediate: true);
+  }
+
+  void useHistoryQuery(String q) => onQueryChanged(q, immediate: true);
+
+  /// Re-runs the current query right away (retry buttons).
+  void retry() => _executeSearch(state.query);
+
+  /// Pull-to-refresh: re-runs the query and completes when it has settled, so
+  /// the RefreshIndicator spinner reflects real work.
+  Future<void> refresh() async {
+    if (state.query.trim().isEmpty) return;
+    unawaited(_executeSearch(state.query));
+    try {
+      await stream
+          .firstWhere((s) => !s.isLoading)
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Timeout / closed: the indicator just stops.
+    }
+  }
+
+  void clearQuery() {
+    _generation++;
+    _cancelSearch();
+    safeEmit(state.copyWith(
+        query: '', results: [], isLoading: false, errorMessage: null));
+  }
+
+  // ── Saved searches ──────────────────────────────────────────────────
+  bool isSaved(String query, String filter) => savedSearches.value
+      .contains(encodeSavedSearch(query.trim(), filter));
+
   /// Saves the current query + filter (deduped, capped at [savedSearchMax]).
   Future<void> saveCurrentSearch() async {
-    // Ensure the initial load has completed, otherwise it could overwrite the
-    // entry we are about to write with the pre-load (empty) snapshot.
     await savedSearchesReady;
     if (isClosed) return;
     final query = state.query.trim();
@@ -218,12 +271,16 @@ class SearchCubit extends PulsrCubit<SearchState> {
     return (query: entry, filter: 'All');
   }
 
-  /// C-02: up to [suggestionMax] suggestions for [query] drawn from search
-  /// history and library title/artist prefixes.
+  // ── Autocomplete ────────────────────────────────────────────────────
+  /// Up to [suggestionMax] suggestions from history and library title/artist
+  /// prefixes. Respects excluded folders and the shared query bound.
   Future<List<String>> suggestionsFor(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
-    final q = normalize(trimmed);
+    final bounded = trimmed.length > maxQueryLength
+        ? trimmed.substring(0, maxQueryLength)
+        : trimmed;
+    final q = normalize(bounded);
     final seen = <String>{};
     final out = <String>[];
 
@@ -240,7 +297,13 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
     if (out.length < suggestionMax) {
       try {
-        final res = await _searchUseCase.searchSongs(trimmed, limit: 20).first;
+        // BUG FIX: suggestions used to ignore excluded folders and could leak
+        // songs the user had hidden.
+        final excluded = await _excludedFolders();
+        final res = await _searchUseCase
+            .searchSongs(bounded, excludedFolders: excluded, limit: 20)
+            .first
+            .timeout(const Duration(seconds: 2));
         final songs = res.fold((_) => <SongsTableData>[], (r) => r);
         for (final s in songs) {
           if (out.length >= suggestionMax) break;
@@ -258,32 +321,33 @@ class SearchCubit extends PulsrCubit<SearchState> {
     return out;
   }
 
-  Timer? _historyDebounceTimer;
-
-  Future<void> _persistHistory(String query) async {
-    final q = query.trim();
-    if (q.isEmpty || q.length < 2) return;
-    _historyDebounceTimer?.cancel();
-    _historyDebounceTimer =
-        autoTimer(Timer(const Duration(milliseconds: 400), () async {
-      await historyReady;
+  // ── History ─────────────────────────────────────────────────────────
+  /// Records a search the user actually committed to (submit, tapped result,
+  /// tapped suggestion/recent). BUG FIX: history used to be written
+  /// automatically after any pause while typing, so it filled up with
+  /// fragments like "bea", "beat", "beatl".
+  Future<void> commitQuery([String? query]) async {
+    final raw = (query ?? state.query).trim();
+    if (raw.length < 2) return;
+    final q =
+        raw.length > maxQueryLength ? raw.substring(0, maxQueryLength) : raw;
+    await historyReady;
+    if (isClosed) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
       if (isClosed) return;
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        if (isClosed) return;
-        final existing =
-            prefs.getStringList(_historyKey) ?? List.from(state.history);
-        final updated = [
-          q,
-          ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
-        ].take(historyMax).toList();
-        await prefs.setStringList(_historyKey, updated);
-        if (!isClosed) safeEmit(state.copyWith(history: updated));
-      } catch (e, st) {
-        ErrorLogger.log('Failed to persist search history',
-            error: e, stackTrace: st, category: 'SearchCubit');
-      }
-    }));
+      final existing =
+          prefs.getStringList(_historyKey) ?? List<String>.from(state.history);
+      final updated = [
+        q,
+        ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
+      ].take(historyMax).toList();
+      await prefs.setStringList(_historyKey, updated);
+      if (!isClosed) safeEmit(state.copyWith(history: updated));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist search history',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
   }
 
   Future<void> clearHistory() async {
@@ -314,13 +378,32 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
   }
 
-  void useHistoryQuery(String q) => onQueryChanged(q);
+  // ── Search pipeline ─────────────────────────────────────────────────
+  /// Excluded folders, cached for 5 s while typing. BUG FIX: a failed lookup
+  /// used to be cached as "no exclusions" for 5 s, briefly showing hidden
+  /// songs. Failures now fall back to the last known list and aren't cached.
+  Future<List<String>> _excludedFolders() async {
+    final cached = _cachedExcludedFolders;
+    final fetched = _lastExcludedFetch;
+    if (cached != null &&
+        fetched != null &&
+        DateTime.now().difference(fetched).inSeconds <= 5) {
+      return cached;
+    }
+    final res = await _folderUseCases.getExcludedFolders();
+    return res.fold((_) => cached ?? const <String>[], (r) {
+      _cachedExcludedFolders = r;
+      _lastExcludedFetch = DateTime.now();
+      return r;
+    });
+  }
 
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
     final generation = ++_generation;
     _searchSub?.cancel();
     removeFromComposite(_searchSub);
     _searchSub = null;
+
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
       safeEmit(
@@ -328,75 +411,55 @@ class SearchCubit extends PulsrCubit<SearchState> {
       return;
     }
 
-    // Limit search query to 64 chars to avoid CPU starvation on huge pastes
     final boundedQuery = trimmed.length > maxQueryLength
         ? trimmed.substring(0, maxQueryLength)
         : trimmed;
 
-    safeEmit(state.copyWith(isLoading: true));
+    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
 
     try {
-      // Cache excluded folders for 5 seconds to reduce DB round-trips while typing
-      final now = DateTime.now();
-      if (_cachedExcludedFolders == null ||
-          _lastExcludedFetch == null ||
-          now.difference(_lastExcludedFetch!).inSeconds > 5) {
-        final excludedRes = await _folderUseCases.getExcludedFolders();
-        if (generation != _generation || isClosed) return;
-        _cachedExcludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
-        _lastExcludedFetch = now;
-      }
+      final excluded = await _excludedFolders();
+      if (_isStale(generation)) return;
 
-      final excluded = _cachedExcludedFolders ?? const <String>[];
-
-      // FIX-H4: Explicit limit 500 to prevent unbounded query load
       _searchSub = autoSub(
         _searchUseCase.searchSongs(boundedQuery,
-            excludedFolders: excluded, limit: 500),
+            excludedFolders: excluded, limit: _searchLimit),
         (result) async {
-          if (generation != _generation || isClosed) return;
+          final emission = ++_emission;
+          bool stale() => _isStale(generation) || emission != _emission;
+          if (stale()) return;
+
           await result.fold(
             (failure) async => safeEmit(state.copyWith(
                 isLoading: false, errorMessage: failure.message)),
             (allResults) async {
-              // B-15: Ensure fuzzy post-filter uses normalize(boundedQuery) to match FTS bounded query
               final q = normalize(boundedQuery);
               final filter = filterOverride ?? state.selectedFilter;
               var filtered = _filterWithFuzzy(allResults, q, filter);
 
               if (filtered.isEmpty && boundedQuery.length >= 2) {
-                // FIX-M03: Query by 2-character prefix instead of querying the entire database,
-                // and cap candidate results at 500 to avoid UI/memory starvation.
                 try {
                   final prefixRes = await _searchUseCase
                       .searchSongs(boundedQuery.substring(0, 2),
-                          excludedFolders: excluded, limit: 500)
+                          excludedFolders: excluded, limit: _searchLimit)
                       .first;
-                  if (generation != _generation || isClosed) return;
-                  var candidates =
+                  // BUG FIX: re-check against the *emission*, not just the
+                  // generation, so a slow fallback can't overwrite a newer
+                  // emission of the same live stream.
+                  if (stale()) return;
+                  final candidates =
                       prefixRes.fold((l) => <SongsTableData>[], (r) => r);
-                  if (candidates.length > 500) {
-                    ErrorLogger.log(
-                      'Fuzzy fallback candidate pool capped at 500 (was ${candidates.length})',
-                      category: 'SearchCubit',
-                    );
-                    candidates = candidates.take(500).toList();
-                  }
-                  filtered = _filterWithFuzzy(candidates, q, filter);
+                  filtered = _filterWithFuzzy(
+                      candidates.take(_searchLimit).toList(), q, filter);
                 } catch (e, st) {
-                  ErrorLogger.log(
-                    'Fuzzy fallback search failed',
-                    error: e,
-                    stackTrace: st,
-                    category: 'SearchCubit',
-                  );
+                  ErrorLogger.log('Fuzzy fallback search failed',
+                      error: e, stackTrace: st, category: 'SearchCubit');
                 }
               }
 
-              if (generation != _generation || isClosed) return;
+              if (stale()) return;
               safeEmit(state.copyWith(
                   results: filtered, isLoading: false, errorMessage: null));
-              if (filtered.isNotEmpty) unawaited(_persistHistory(boundedQuery));
             },
           );
         },
@@ -408,9 +471,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
     }
   }
 
-  // FIX-D02: Guard stale searches before addError to avoid firing BlocObserver on aborted queries
   void _failSearch(int generation, Object error, StackTrace stackTrace) {
-    if (generation != _generation || isClosed) return;
+    if (_isStale(generation)) return;
     addError(error, stackTrace);
     final message = error is AppFailure ? error.message : 'Search failed';
     safeEmit(state.copyWith(isLoading: false, errorMessage: message));
@@ -424,25 +486,11 @@ class SearchCubit extends PulsrCubit<SearchState> {
           List<SongsTableData> songs, String rawQ, String filter) =>
       SearchAlgorithmUtils.filterWithFuzzy(songs, rawQ, filter);
 
-  void clearQuery() {
-    _generation++;
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
-    _searchSub?.cancel();
-    removeFromComposite(_searchSub);
-    _searchSub = null;
-    safeEmit(state.copyWith(
-        query: '', results: [], isLoading: false, errorMessage: null));
-  }
-
   @override
   Future<void> close() async {
     _debounceTimer?.cancel();
-    _historyDebounceTimer?.cancel();
     _searchSub?.cancel();
     await super.close();
-    // Dispose after the cubit is marked closed so in-flight loads/saves bail out
-    // before writing to the notifier.
     savedSearches.value = const [];
     savedSearches.dispose();
   }

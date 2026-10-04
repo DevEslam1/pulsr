@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element_parameter
 part of '../library_screen.dart';
 
 mixin LibraryCollectionsTabs on State<LibraryScreen> {
@@ -5,6 +6,21 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   Widget _buildAlbumsTab(BuildContext context, LibraryState state) {
     final p = context.palette;
     final albums = state.albums;
+
+    if (albums.isEmpty) {
+      if (state.isLoading) {
+        return SkeletonList(
+          padding: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+        );
+      }
+      return _buildEmpty(
+        context,
+        title: context.l10n.noAlbumsFound,
+        subtitle: context.l10n.noSongsSubtitle,
+        icon: Icons.album_rounded,
+      );
+    }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
@@ -140,6 +156,21 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   Widget _buildArtistsTab(BuildContext context, LibraryState state) {
     final p = context.palette;
     final artists = state.artists;
+
+    if (artists.isEmpty) {
+      if (state.isLoading) {
+        return SkeletonList(
+          padding: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+        );
+      }
+      return _buildEmpty(
+        context,
+        title: context.l10n.browseNoArtistsFound,
+        subtitle: context.l10n.noSongsSubtitle,
+        icon: Icons.person_outline_rounded,
+      );
+    }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
@@ -289,6 +320,22 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   Widget _buildGenresTab(BuildContext context, LibraryState state) {
     final p = context.palette;
     final genres = state.genres;
+
+    if (genres.isEmpty) {
+      if (state.isLoading) {
+        return SkeletonList(
+          padding: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+        );
+      }
+      return _buildEmpty(
+        context,
+        title: context.l10n.browseNoGenresFound,
+        subtitle: context.l10n.browseScanForGenres,
+        icon: Icons.category_rounded,
+      );
+    }
+
     return Column(
       children: [
         _buildLayoutToggleHeader(
@@ -361,6 +408,20 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
 
   Widget _buildYearsTab(BuildContext context, LibraryState state) {
     final years = state.years;
+    if (years.isEmpty) {
+      if (state.isLoading) {
+        return SkeletonList(
+          padding: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+        );
+      }
+      return _buildEmpty(
+        context,
+        title: context.l10n.browseNoYearsFound,
+        subtitle: context.l10n.noSongsSubtitle,
+        icon: Icons.calendar_today_rounded,
+      );
+    }
     return _chipCategoryGrid(
       context,
       count: years.length,
@@ -418,4 +479,15 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
 
   // Requires: provided by the composing class (same library).
   void _setGenreHierarchy(bool value);
+
+  // Requires: provided by the composing class (same library).
+  Widget _buildEmpty(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    String? actionLabel,
+    IconData? actionIcon,
+    VoidCallback? onAction,
+  });
 }

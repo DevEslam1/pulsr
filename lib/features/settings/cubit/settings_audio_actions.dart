@@ -392,13 +392,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await refreshOutputDevice();
   }
 
-  /// Requests the media route move to [deviceId]. Returns true only when the
-  /// platform actually accepted it; otherwise the system output panel is opened
-  /// so the user can switch, since an unprivileged app cannot force the route.
+  /// Requests an app media route and reads back the outcome while playing.
+  /// Failure stays in the app; device taps never open a settings page.
   Future<bool> selectOutputDevice(int deviceId) async {
     final res = await _hiResAudioService.selectOutputDevice(deviceId);
-    if (!res.success && res.requiresSystemPicker) {
-      await _hiResAudioService.openOutputSwitcher();
+    if (!res.success) {
+      safeEmit(state.copyWith(
+          errorMessage:
+              'Could not switch the playback output (${res.error ?? "unavailable"}).'));
     }
     await refreshOutputDevice();
     return res.success;
@@ -412,42 +413,32 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   }
 
   Future<void> setTargetOutputSampleRate(int sampleRate) async {
-    if (state.currentOutputDevice != null) {
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            targetSampleRate: sampleRate,
-          ),
-        ),
-      );
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('target_output_sample_rate', sampleRate);
-    final bitDepth = state.currentOutputDevice?.targetBitDepth ?? 0;
-    await _hiResAudioService.setTargetOutputFormat(
+    final applied = await _hiResAudioService.setTargetOutputFormat(
       sampleRate: sampleRate,
-      bitDepth: bitDepth,
+      bitDepth: state.currentOutputDevice?.targetBitDepth ?? 0,
     );
+    if (applied) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('target_output_sample_rate', sampleRate);
+    } else {
+      safeEmit(state.copyWith(
+          errorMessage: 'This output cannot apply the requested sample rate.'));
+    }
     await refreshOutputDevice();
   }
 
   Future<void> setTargetOutputBitDepth(int bitDepth) async {
-    if (state.currentOutputDevice != null) {
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            targetBitDepth: bitDepth,
-          ),
-        ),
-      );
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('target_output_bit_depth', bitDepth);
-    final sampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
-    await _hiResAudioService.setTargetOutputFormat(
-      sampleRate: sampleRate,
+    final applied = await _hiResAudioService.setTargetOutputFormat(
+      sampleRate: state.currentOutputDevice?.targetSampleRate ?? 0,
       bitDepth: bitDepth,
     );
+    if (applied) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('target_output_bit_depth', bitDepth);
+    } else {
+      safeEmit(state.copyWith(
+          errorMessage: 'This output cannot apply the requested bit depth.'));
+    }
     await refreshOutputDevice();
   }
 
@@ -455,60 +446,24 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// stock ROM refused it (SystemApi) — caller must offer Developer Options.
   Future<bool> setBluetoothCodec(String codec) async {
     // Optimistic UI: update btCodecName immediately
-    if (state.currentOutputDevice != null) {
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            btCodecName: codec,
-          ),
-        ),
-      );
-    }
     final ok = await _hiResAudioService.setBluetoothCodec(codec);
     await refreshOutputDevice();
     return ok;
   }
 
   Future<bool> setBluetoothSampleRate(int hz) async {
-    if (state.currentOutputDevice != null) {
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            btSampleRateHz: hz,
-          ),
-        ),
-      );
-    }
     final ok = await _hiResAudioService.setBluetoothSampleRate(hz);
     await refreshOutputDevice();
     return ok;
   }
 
   Future<bool> setBluetoothBitDepth(int bits) async {
-    if (state.currentOutputDevice != null) {
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            btBitDepth: bits,
-          ),
-        ),
-      );
-    }
     final ok = await _hiResAudioService.setBluetoothBitDepth(bits);
     await refreshOutputDevice();
     return ok;
   }
 
   Future<bool> setBluetoothLdacQuality(int mode) async {
-    if (state.currentOutputDevice != null) {
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            btLdacQualityMode: mode,
-          ),
-        ),
-      );
-    }
     final ok = await _hiResAudioService.setBluetoothLdacQuality(mode);
     await refreshOutputDevice();
     return ok;
@@ -543,35 +498,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     try {
       final info = await _hiResAudioService.getAudioOutputInfo();
       final caps = await DsdDecoderHelper.probeDopCapabilities();
-      final previous = state.currentOutputDevice;
-      // Drop stale DAC targets when the route changes (e.g. USB -> speaker/BT);
-      // otherwise a 192k DAC request is re-sent to the phone speaker.
-      final routeChanged = previous != null &&
-          (previous.deviceName != info.deviceName ||
-              previous.activeDeviceType != info.activeDeviceType ||
-              previous.isBluetooth != info.isBluetooth ||
-              previous.isUsbDac != info.isUsbDac);
-      final savedSampleRate = (!routeChanged &&
-              previous?.targetSampleRate != null &&
-              previous!.targetSampleRate > 0)
-          ? previous.targetSampleRate
-          : 0;
-      final savedBitDepth = (!routeChanged &&
-              previous?.targetBitDepth != null &&
-              previous!.targetBitDepth > 0)
-          ? previous.targetBitDepth
-          : 0;
-
       if (isClosed) return;
       safeEmit(
         state.copyWith(
-          currentOutputDevice: info.copyWith(
-            targetSampleRate: info.targetSampleRate != 0
-                ? info.targetSampleRate
-                : savedSampleRate,
-            targetBitDepth:
-                info.targetBitDepth != 0 ? info.targetBitDepth : savedBitDepth,
-          ),
+          currentOutputDevice: info,
           dsdDopSupported: caps.canUseDop,
         ),
       );

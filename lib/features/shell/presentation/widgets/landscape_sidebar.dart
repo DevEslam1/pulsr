@@ -179,10 +179,16 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
 
     return MouseRegion(
       onEnter: (_) {
-        if (mode == SidebarRailMode.iconOnly) _triggerPeek();
+        if (mode == SidebarRailMode.iconOnly ||
+            mode == SidebarRailMode.compact) {
+          _triggerPeek();
+        }
       },
       child: GestureDetector(
-        onLongPress: mode == SidebarRailMode.iconOnly ? _triggerPeek : null,
+        onLongPress: (mode == SidebarRailMode.iconOnly ||
+                mode == SidebarRailMode.compact)
+            ? _triggerPeek
+            : null,
         child: AnimatedContainer(
           duration: context.motionMs(240),
           curve: context.motionCurve(Curves.easeOutCubic),
@@ -249,10 +255,6 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                       vertical: AppSpacing.xxs,
                                     ),
                                     children: [
-                                      if (isExtended)
-                                        _SectionHeader(
-                                            title: context.l10n.sidebarBrowse,
-                                            p: p),
                                       for (final item in primaryItems) ...[
                                         _SidebarNavItem(
                                           icon: item.icon,
@@ -277,24 +279,18 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                         const SizedBox(height: AppSpacing.xxs),
                                       ],
 
-                                      const SizedBox(height: AppSpacing.s10),
-                                      if (isExtended)
-                                        _SectionHeader(
-                                            title:
-                                                context.l10n.sidebarCollection,
-                                            p: p)
-                                      else
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.s14,
-                                              vertical: AppSpacing.s6),
-                                          child: Divider(
-                                            height: 1,
-                                            thickness: 1,
-                                            color: p.hairline
-                                                .withValues(alpha: 0.3),
-                                          ),
+                                      // Single subtle divider between primary items and secondary items
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.s14,
+                                            vertical: AppSpacing.s6),
+                                        child: Divider(
+                                          height: 1,
+                                          thickness: 1,
+                                          color: p.hairline
+                                              .withValues(alpha: 0.35),
                                         ),
+                                      ),
 
                                       for (final item in secondaryItems) ...[
                                         _SidebarNavItem(
@@ -323,23 +319,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                       // Optional Side Inspector (Queue/Lyrics) Shortcut
                                       if (widget.onToggleSideInspector !=
                                           null) ...[
-                                        const SizedBox(height: AppSpacing.s10),
-                                        if (isExtended)
-                                          _SectionHeader(
-                                              title: context.l10n.sidebarPanel,
-                                              p: p)
-                                        else
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: AppSpacing.s14,
-                                                vertical: AppSpacing.s6),
-                                            child: Divider(
-                                              height: 1,
-                                              thickness: 1,
-                                              color: p.hairline
-                                                  .withValues(alpha: 0.3),
-                                            ),
-                                          ),
+                                        const SizedBox(height: AppSpacing.xxs),
                                         _SidebarNavItem(
                                           icon: Icons.vertical_split_outlined,
                                           activeIcon:
@@ -431,85 +411,68 @@ class _SidebarBrandHeader extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.md, AppSpacing.md, AppSpacing.sm, AppSpacing.xs),
-      child: ClipRect(
-        child: Row(
-          children: [
-            PulsrLogo(
-              size: 32,
-              color: p.accent,
-              glowColor: p.glow,
-              animate: false,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'PULSR',
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: AppTracking.widest,
-                      fontSize: AppFontSize.bodyLarge,
-                    ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTight = constraints.maxWidth < 190;
+        return Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.md, AppSpacing.sm, AppSpacing.xs),
+          child: ClipRect(
+            child: Row(
+              children: [
+                PulsrLogo(
+                  size: 32,
+                  color: p.accent,
+                  glowColor: p.glow,
+                  animate: false,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'PULSR',
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: AppTracking.widest,
+                          fontSize: AppFontSize.bodyLarge,
+                        ),
+                      ),
+                      if (!isTight)
+                        Text(
+                          context.l10n.studioAudio,
+                          style: TextStyle(
+                            color: p.accent,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: AppTracking.wide,
+                            fontSize: AppFontSize.micro,
+                          ),
+                        ),
+                    ],
                   ),
-                  Text(
-                    context.l10n.studioAudio,
-                    style: TextStyle(
-                      color: p.accent,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: AppTracking.wide,
-                      fontSize: AppFontSize.micro,
-                    ),
+                ),
+                IconButton(
+                  tooltip: context.l10n.sidebarCollapse,
+                  iconSize: 18,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    Icons.keyboard_double_arrow_left_rounded,
+                    color: p.textTertiary,
                   ),
-                ],
-              ),
+                  onPressed: onToggle,
+                ),
+              ],
             ),
-            IconButton(
-              tooltip: context.l10n.sidebarCollapse,
-              iconSize: 18,
-              visualDensity: VisualDensity.compact,
-              icon: Icon(
-                Icons.keyboard_double_arrow_left_rounded,
-                color: p.textTertiary,
-              ),
-              onPressed: onToggle,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final PulsrPalette p;
-
-  const _SectionHeader({required this.title, required this.p});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-          AppSpacing.sm, AppSpacing.s6, AppSpacing.sm, AppSpacing.s6),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: AppFontSize.tiny,
-          fontWeight: FontWeight.w800,
-          letterSpacing: AppTracking.wide,
-          color: p.textTertiary.withValues(alpha: 0.65),
-        ),
-      ),
-    );
-  }
-}
 
 class _SidebarNavItem extends StatelessWidget {
   final IconData icon;

@@ -127,6 +127,9 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> setQuranAmbience(double v) =>
       playbackOptionsController.setQuranAmbience(v);
 
+  Future<void> setQuranWarmth(double value) =>
+      playbackOptionsController.setQuranWarmth(value);
+
   Future<void> reapplyQuranProfile() =>
       playbackOptionsController.reapplyQuranProfile();
 

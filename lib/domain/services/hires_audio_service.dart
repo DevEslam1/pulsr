@@ -89,10 +89,7 @@ class HiResAudioService {
     };
     final supported = ladder.where((rate) => reported.contains(rate)).toList()
       ..sort();
-    if (supported.isNotEmpty) return supported;
-    // No capability report at all: fall back to the only universally safe rates
-    // rather than presenting unsupported hi-res tiers.
-    return ladder.where((r) => r == 44100 || r == 48000).toList();
+    return supported;
   }
 
   /// T2 pure decision: the track rate that should be pushed to the native
@@ -160,8 +157,8 @@ class HiResAudioService {
       const fb = AudioOutputInfo(
           deviceName: 'Default Audio Output',
           isUsbDac: false,
-          sampleRate: 44100,
-          bitDepth: 16,
+          sampleRate: 0,
+          bitDepth: 0,
           isBitPerfectActive: false);
       _cachedOutputInfo = fb;
       return fb;
@@ -195,8 +192,8 @@ class HiResAudioService {
     const fallback = AudioOutputInfo(
       deviceName: 'Default Audio Output',
       isUsbDac: false,
-      sampleRate: 44100,
-      bitDepth: 16,
+      sampleRate: 0,
+      bitDepth: 0,
       isBitPerfectActive: false,
     );
     _cachedOutputInfo = fallback;

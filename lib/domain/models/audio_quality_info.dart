@@ -24,6 +24,7 @@ class AudioQualityInfo {
   final String format;
   final String codecName;
   final int? bitrateKbps;
+  final bool bitrateEstimated;
   final String sampleRate;
   final String bitDepth;
   final String channels;
@@ -37,6 +38,7 @@ class AudioQualityInfo {
   const AudioQualityInfo({
     required this.format,
     required this.codecName,
+    this.bitrateEstimated = false,
     required this.bitrateKbps,
     required this.sampleRate,
     required this.bitDepth,
@@ -54,16 +56,7 @@ class AudioQualityInfo {
     if (AudioFormats.requiresNativeDecoder(format)) {
       return 'Unavailable • native decoder not bundled in this build';
     }
-    if (tier == AudioQualityTier.hiResLossless ||
-        tier == AudioQualityTier.lossless) {
-      return 'ExoPlayer Media3 • 32-bit Float PCM';
-    } else if (format == 'AAC' || codecName.contains('AAC')) {
-      return 'ExoPlayer Media3 • Hardware Offload (AAC / DSP)';
-    } else if (format == 'MP3' || format == 'OPUS' || format == 'OGG') {
-      return 'ExoPlayer Media3 • Hardware Offload ($format / DSP)';
-    } else {
-      return 'ExoPlayer Media3 • Direct AudioSink';
-    }
+    return 'ExoPlayer Media3 • output details shown below';
   }
 
   factory AudioQualityInfo.fromSong(
@@ -79,9 +72,9 @@ class AudioQualityInfo {
         format: 'AUDIO',
         codecName: 'Standard Audio',
         bitrateKbps: null,
-        sampleRate: '44.1 kHz',
-        bitDepth: '16-bit',
-        channels: 'Stereo',
+        sampleRate: 'Unknown',
+        bitDepth: 'Unknown',
+        channels: 'Not verified',
         tier: AudioQualityTier.standardQuality,
         tierLabel: 'Standard Audio',
         shortBadgeLabel: 'STANDARD',
@@ -94,23 +87,20 @@ class AudioQualityInfo {
     final path = song.path.toLowerCase();
 
     // YouTube Music online streaming track (not yet downloaded)
-    if ((song.source == SongSource.youtube ||
-            path.startsWith('ytmusic://')) &&
+    if ((song.source == SongSource.youtube || path.startsWith('ytmusic://')) &&
         song.isDownloaded != true) {
-      final defaultKbps = streamingQuality == YtmAudioQuality.low
-          ? 64
-          : streamingQuality == YtmAudioQuality.medium
-              ? 128
-              : 160;
+      const defaultKbps = 0;
       final kbps = explicitBitrateKbps ??
           (song.bitrateKbps != null && song.bitrateKbps! > 0
               ? song.bitrateKbps!
               : defaultKbps);
-      final rawCodec = explicitFormat ?? song.codec ?? 'AAC';
-      final format = rawCodec.toUpperCase().contains('OPUS') ||
-              rawCodec.toUpperCase().contains('WEBM')
-          ? 'OPUS'
-          : 'AAC';
+      final rawCodec = explicitFormat ?? song.codec;
+      final format = rawCodec == null
+          ? 'Unknown'
+          : rawCodec.toUpperCase().contains('OPUS') ||
+                  rawCodec.toUpperCase().contains('WEBM')
+              ? 'OPUS'
+              : rawCodec.toUpperCase();
       final tier = kbps >= 160
           ? AudioQualityTier.highQuality
           : kbps >= 128
@@ -119,22 +109,27 @@ class AudioQualityInfo {
       return AudioQualityInfo(
         format: format,
         codecName: 'YouTube Music Stream ($format)',
-        bitrateKbps: kbps,
+        bitrateKbps: kbps > 0 ? kbps : null,
         sampleRate: song.sampleRate != null && song.sampleRate! > 0
             ? '${(song.sampleRate! / 1000).toStringAsFixed(1)} kHz'
-            : (format == 'OPUS' ? '48.0 kHz' : '44.1 kHz'),
+            : 'Unknown',
         bitDepth: song.bitDepth != null && song.bitDepth! > 0
             ? '${song.bitDepth}-bit'
-            : '16-bit',
-        channels: 'Stereo (2.0)',
+            : 'Unknown',
+        channels: 'Not verified',
         tier: tier,
-        tierLabel: kbps >= 160
-            ? 'High Quality Stream'
-            : kbps >= 128
-                ? 'Medium Quality Stream'
-                : 'Data Saver Stream',
-        shortBadgeLabel: '$format • ${kbps}k',
-        description: 'Online YouTube Music audio stream ($kbps kbps $format)',
+        tierLabel: kbps <= 0
+            ? 'Stream quality unverified'
+            : kbps >= 160
+                ? 'High Quality Stream'
+                : kbps >= 128
+                    ? 'Medium Quality Stream'
+                    : 'Data Saver Stream',
+        shortBadgeLabel:
+            kbps > 0 ? '$format • ${kbps}k' : '$format • rate unknown',
+        description: kbps > 0
+            ? 'Online YouTube Music audio stream ($kbps kbps $format)'
+            : 'Online stream • actual bitrate is unverified',
         badgeColor: AppColors.qualityBadgeRose,
         icon: Icons.wifi_tethering_rounded,
       );
@@ -152,8 +147,6 @@ class AudioQualityInfo {
     final int? realSampleRate = explicitSampleRate ?? song.sampleRate;
     final int? realBitDepth = explicitBitDepth ?? song.bitDepth;
     final String? realCodec = (explicitFormat ?? song.codec)?.toLowerCase();
-    final bool hasRealHeader =
-        song.codec != null || song.sampleRate != null || song.bitDepth != null;
 
     // Calculate bitrate if fileSize and durationMs are available
     int? calculatedBitrate = explicitBitrateKbps ?? song.bitrateKbps;
@@ -195,27 +188,7 @@ class AudioQualityInfo {
     final bool hasRealHiRes = (realBitDepth != null && realBitDepth >= 24) ||
         (realSampleRate != null && realSampleRate > 48000);
 
-    final bool isHiRes = isLosslessFormat &&
-        (hasRealHiRes ||
-            // Filename heuristics are a last resort, used only when no real
-            // header is available to trust.
-            (!hasRealHeader &&
-                ((calculatedBitrate != null && calculatedBitrate >= 1411) ||
-                    RegExp(r'(?:^|[\s_\-\.\/])24bit(?:$|[\s_\-\.\/])',
-                            caseSensitive: false)
-                        .hasMatch(path) ||
-                    RegExp(r'(?:^|[\s_\-\.\/])hi-?res(?:$|[\s_\-\.\/])',
-                            caseSensitive: false)
-                        .hasMatch(path) ||
-                    RegExp(r'(?:^|[\s_\-\.\/])master(?:$|[\s_\-\.\/])',
-                            caseSensitive: false)
-                        .hasMatch(path) ||
-                    RegExp(r'[\s_\-\.\/]96k(?:hz)?[\s_\-\.\/]',
-                            caseSensitive: false)
-                        .hasMatch(path) ||
-                    RegExp(r'[\s_\-\.\/]192k(?:hz)?[\s_\-\.\/]',
-                            caseSensitive: false)
-                        .hasMatch(path))));
+    final bool isHiRes = isLosslessFormat && hasRealHiRes;
 
     final AudioQualityTier tier;
     final String tierLabel;
@@ -264,7 +237,7 @@ class AudioQualityInfo {
           ? '$formatLabel • ${calculatedBitrate}k'
           : '$formatLabel • HI-RES';
       description =
-          'Studio Master 24-bit • Up to 192 kHz lossless bit-perfect stream';
+          'Lossless source • output fidelity depends on the active playback path';
       badgeColor = AppColors.amberDeep; // Gold Shimmer
       icon = Icons.workspace_premium_rounded;
       sampleRate = resolvedSampleRate;
@@ -283,7 +256,7 @@ class AudioQualityInfo {
           ? '$formatLabel • ${calculatedBitrate}k'
           : '$formatLabel • LOSSLESS';
       description =
-          'CD Quality 16-bit / 44.1 kHz • Exact bit-perfect reproduction';
+          'Lossless source • output fidelity depends on the active playback path';
       badgeColor = AppColors.qualityBadgeCyan; // Electric Cyan
       icon = Icons.diamond_rounded;
       sampleRate = resolvedSampleRate;
@@ -402,12 +375,30 @@ class AudioQualityInfo {
       format: isMqa ? 'MQA' : formatLabel,
       codecName: isMqa ? 'Master Quality Authenticated (MQA)' : codecName,
       bitrateKbps: calculatedBitrate,
-      sampleRate: sampleRate,
-      bitDepth: bitDepth,
-      channels: 'Stereo (2.0)',
-      tier: tier,
-      tierLabel: isMqa ? 'MQA (core unfold)' : tierLabel,
-      shortBadgeLabel: isMqa ? 'MQA' : shortBadgeLabel,
+      bitrateEstimated: explicitBitrateKbps == null &&
+          song.bitrateKbps == null &&
+          calculatedBitrate != null,
+      sampleRate:
+          realSampleRate != null && realSampleRate > 0 ? sampleRate : 'Unknown',
+      bitDepth: isDsd
+          ? '1-bit DSD'
+          : realBitDepth != null && realBitDepth > 0
+              ? bitDepth
+              : 'Unknown',
+      channels: 'Not verified',
+      tier: !isLosslessFormat && calculatedBitrate == null
+          ? AudioQualityTier.standardQuality
+          : tier,
+      tierLabel: !isLosslessFormat && calculatedBitrate == null
+          ? 'Source quality unverified'
+          : isMqa
+              ? 'MQA (core unfold)'
+              : tierLabel,
+      shortBadgeLabel: !isLosslessFormat && calculatedBitrate == null
+          ? '$formatLabel • bitrate unknown'
+          : isMqa
+              ? 'MQA'
+              : shortBadgeLabel,
       description: isMqa
           ? 'MQA-encoded stream. Core unfold is handled in-app; full '
               'authenticated/native MQA rendering is not available in this '

@@ -598,9 +598,11 @@ class AudioConflicts {
     switch (reason) {
       case 'requires_android_14_for_usb':
       case 'requires_android_14':
-      case 'usb_not_supported':
         return L10nHolder.current?.conflictRequiresAndroid14 ??
             'Requires Android 14+ for USB bit-perfect output.';
+      case 'usb_not_supported':
+        return L10nHolder.current?.conflictNoMixerAttributes ??
+            'Android does not advertise an exclusive bit-perfect mixer configuration for this USB DAC.';
       case 'exclusive_requires_usb_dac':
         return L10nHolder.current?.conflictExclusiveRequiresUsbDac ??
             'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';

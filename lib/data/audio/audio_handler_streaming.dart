@@ -296,9 +296,16 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     );
   }
 
-  /// Resampler quality (0=Fast/linear .. 3=Ultra/64-tap). Best-effort push.
+  /// Restores optional native playback quality without blocking initialization.
   Future<void> setSincResamplerQuality(int quality) async {
-    await AudioEffectsChannel().setSincResamplerQuality(quality);
+    final effects = AudioEffectsChannel();
+    if (!effects.isPlaybackSincResamplerSupported) return;
+    try {
+      await effects.setSincResamplerQuality(quality);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore optional playback resampler quality',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   /// BPM-synced crossfade toggle on the shared crossfade manager.

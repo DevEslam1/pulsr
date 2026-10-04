@@ -12,6 +12,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/widgets/pulsr_switch.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../core/utils/adaptive.dart';
@@ -25,7 +26,6 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
-import '../../../core/widgets/pulsr_static_grid.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../../core/utils/formatters.dart';
@@ -67,7 +67,6 @@ enum LibraryTabItem {
 
   static const List<LibraryTabItem> defaultTabs = [
     LibraryTabItem.songs,
-    LibraryTabItem.downloaded,
     LibraryTabItem.albums,
     LibraryTabItem.artists,
     LibraryTabItem.favorites,
@@ -173,7 +172,6 @@ class _LibraryScreenState extends State<LibraryScreen>
         LibrarySongsTab,
         LibraryCollectionsTabs,
         LibraryFavoritesTab {
-  @override
   late TabController _tabController;
   @override
   final ScrollController _songsScrollController = ScrollController();
@@ -576,97 +574,18 @@ class _LibraryScreenState extends State<LibraryScreen>
                         icon: const Icon(Icons.select_all_rounded),
                         tooltip: context.l10n.selectAllAction,
                         onPressed: () => cubit.selectAllSongs()),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
-                      icon: const Icon(Icons.playlist_add_rounded),
-                      tooltip: context.l10n.addToPlaylist,
-                      onPressed: () async {
-                        final selected = await cubit.getSelectedSongs();
-                        if (!context.mounted) return;
-                        if (selected.isNotEmpty) {
-                          AddToPlaylistSheet.show(
-                            context,
-                            song: selected.first,
-                            songs: selected,
-                          );
-                        }
-                      },
+                    FilledButton.tonalIcon(
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        backgroundColor: p.accent.withValues(alpha: 0.18),
+                        foregroundColor: p.accent,
+                      ),
+                      icon: const Icon(Icons.tune_rounded, size: 18),
+                      label: Text(context.l10n.batchActionsSheetTitle),
+                      onPressed: () => _showBatchActionsSheet(
+                          context, state, cubit, playerCubit),
                     ),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
-                      icon: const Icon(Icons.edit_note_rounded),
-                      tooltip: context.l10n.browseBatchEditTags,
-                      onPressed: () async {
-                        final selected = await cubit.getSelectedSongs();
-                        if (!context.mounted) return;
-                        if (selected.isNotEmpty) {
-                          cubit.clearSelection();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => TagEditorScreen(
-                                song: selected.first,
-                                batchSongs: selected,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
-                      icon: const Icon(Icons.queue_music_rounded),
-                      tooltip: context.l10n.addToQueue,
-                      onPressed: () async {
-                        final selected = await cubit.getSelectedSongs();
-                        if (!context.mounted) return;
-                        SoundFeedbackService.playSuccess(mirrorHaptics: true);
-                        for (final s in selected) {
-                          playerCubit.addToQueue(s);
-                        }
-                        cubit.clearSelection();
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(
-                                context.l10n.addedToQueue(selected.length))));
-                      },
-                    ),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget),
-                      icon: Icon(Icons.delete_outline_rounded, color: p.error),
-                      tooltip: context.l10n.delete,
-                      onPressed: () async {
-                        final count = state.selectedSongIds.length;
-                        final confirmed =
-                            await PulsrDialogHelper.showConfirmDialog(
-                          context,
-                          title: context.l10n.delete,
-                          message:
-                              context.l10n.deleteMultipleConfirmation(count),
-                          icon: Icons.delete_outline_rounded,
-                          confirmLabel: context.l10n.delete,
-                          cancelLabel: context.l10n.cancel,
-                          isDestructive: true,
-                        );
-                        if (confirmed != true || !context.mounted) return;
-                        SoundFeedbackService.playWarning(mirrorHaptics: true);
-                        final removed = await cubit.deleteSelectedSongs();
-                        if (!context.mounted || removed <= 0) return;
-                        ScaffoldMessenger.of(context)
-                          ..clearSnackBars()
-                          ..showSnackBar(SnackBar(
-                            content: Text(removed == 1
-                                ? context.l10n.songDeleted
-                                : context.l10n.songsDeleted),
-                          ));
-                      },
-                    ),
+                    const SizedBox(width: AppSpacing.sm),
                   ],
                 )
               : AppBar(
@@ -676,8 +595,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                       constraints: const BoxConstraints(
                           minWidth: AppSpacing.minTouchTarget,
                           minHeight: AppSpacing.minTouchTarget),
-                      icon: const Icon(Icons.add_rounded),
-                      tooltip: context.l10n.libraryManageTabs,
+                      icon: const Icon(Icons.dashboard_customize_rounded),
+                      tooltip:
+                          '${context.l10n.browseOverflowLabel} · ${context.l10n.libraryManageTabs}',
                       onPressed: () => _showManageTabsSheet(context, state),
                     ),
                     IconButton(
@@ -803,7 +723,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         behavior: HitTestBehavior.opaque,
         onLongPress: () {
           HapticFeedback.mediumImpact();
-          _showManageTabsSheet(context, state, initialOrganizeMode: true);
+          _showManageTabsSheet(context, state);
         },
         child: Container(
           color: Colors.transparent,
@@ -841,13 +761,128 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  void _showBatchActionsSheet(
+    BuildContext context,
+    LibraryState state,
+    LibraryCubit cubit,
+    PlayerCubit playerCubit,
+  ) {
+    final count = state.selectedSongIds.length;
+    final p = context.palette;
+
+    PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        return PulsrBottomSheet(
+          title: Text(
+            context.l10n.batchActionsSheetTitle,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(
+            context.l10n.batchActionsSelected(count),
+            style: TextStyle(color: p.textSecondary),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.playlist_add_rounded),
+                title: Text(context.l10n.addToPlaylist),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final selected = await cubit.getSelectedSongs();
+                  if (!context.mounted) return;
+                  if (selected.isNotEmpty) {
+                    AddToPlaylistSheet.show(
+                      context,
+                      song: selected.first,
+                      songs: selected,
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.queue_music_rounded),
+                title: Text(context.l10n.addToQueue),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final selected = await cubit.getSelectedSongs();
+                  if (!context.mounted) return;
+                  SoundFeedbackService.playSuccess(mirrorHaptics: true);
+                  for (final s in selected) {
+                    playerCubit.addToQueue(s);
+                  }
+                  cubit.clearSelection();
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content:
+                          Text(context.l10n.addedToQueue(selected.length))));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_note_rounded),
+                title: Text(context.l10n.browseBatchEditTags),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final selected = await cubit.getSelectedSongs();
+                  if (!context.mounted) return;
+                  if (selected.isNotEmpty) {
+                    cubit.clearSelection();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => TagEditorScreen(
+                          song: selected.first,
+                          batchSongs: selected,
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete_outline_rounded, color: p.error),
+                title: Text(
+                  context.l10n.delete,
+                  style: TextStyle(
+                    color: p.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final confirmed = await PulsrDialogHelper.showConfirmDialog(
+                    context,
+                    title: context.l10n.delete,
+                    message: context.l10n.deleteMultipleConfirmation(count),
+                    icon: Icons.delete_outline_rounded,
+                    confirmLabel: context.l10n.delete,
+                    cancelLabel: context.l10n.cancel,
+                    isDestructive: true,
+                  );
+                  if (confirmed != true || !context.mounted) return;
+                  SoundFeedbackService.playWarning(mirrorHaptics: true);
+                  final removed = await cubit.deleteSelectedSongs();
+                  if (!context.mounted || removed <= 0) return;
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(SnackBar(
+                      content: Text(removed == 1
+                          ? context.l10n.songDeleted
+                          : context.l10n.songsDeleted),
+                    ));
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showManageTabsSheet(
     BuildContext context,
-    LibraryState state, {
-    bool initialOrganizeMode = false,
-  }) {
-    bool isOrganizeMode = initialOrganizeMode;
-
+    LibraryState state,
+  ) {
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
@@ -876,49 +911,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                         ),
                         const SizedBox(height: AppSpacing.s2),
                         Text(
-                          isOrganizeMode
-                              ? modalContext.l10n.libraryTabsReorder(
-                                  _activeTabs.length,
-                                  LibraryTabItem.values.length)
-                              : modalContext.l10n.libraryTabsLongPress(
-                                  _activeTabs.length,
-                                  LibraryTabItem.values.length),
+                          modalContext.l10n.libraryTabsReorder(
+                              _activeTabs.length, LibraryTabItem.values.length),
                           style: TextStyle(
                             fontSize: AppFontSize.caption,
                             color: p.textSecondary,
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      setSheetState(() {
-                        isOrganizeMode = !isOrganizeMode;
-                      });
-                    },
-                    icon: Icon(
-                      isOrganizeMode
-                          ? Icons.check_rounded
-                          : Icons.swap_vert_rounded,
-                      size: 16,
-                    ),
-                    label: Text(
-                      isOrganizeMode
-                          ? modalContext.l10n.done
-                          : modalContext.l10n.edit,
-                      style: TextStyle(
-                        fontSize: AppFontSize.label,
-                        fontWeight:
-                            isOrganizeMode ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: p.accent,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs,
-                      ),
                     ),
                   ),
                   TextButton.icon(
@@ -940,48 +940,104 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                 ],
               ),
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onLongPress: () {
-                  HapticFeedback.mediumImpact();
-                  setSheetState(() {
-                    isOrganizeMode = !isOrganizeMode;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.md,
-                    AppSpacing.xs,
-                    AppSpacing.md,
-                    AppSpacing.lg,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(sheetContext).size.height * 0.58,
                   ),
-                  child: AnimatedSwitcher(
-                    duration: modalContext.motionMs(220),
-                    child: isOrganizeMode
-                        ? _buildOrganizeList(
-                            modalContext,
-                            sheetContext,
-                            state,
-                            p,
-                            inactiveTabs,
-                            setSheetState,
-                            onToggleMode: () {
-                              setSheetState(() {
-                                isOrganizeMode = false;
-                              });
-                            },
-                          )
-                        : _buildTabsGrid(
-                            modalContext,
-                            sheetContext,
-                            state,
-                            setSheetState,
-                            onEnterOrganize: () {
-                              setSheetState(() {
-                                isOrganizeMode = true;
-                              });
-                            },
+                  child: ReorderableListView.builder(
+                    key: ValueKey(
+                        'reorder_list_${_activeTabs.map((t) => t.name).join('_')}'),
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    proxyDecorator: (child, index, animation) {
+                      return AnimatedBuilder(
+                        animation: animation,
+                        builder: (context, child) {
+                          return Material(
+                            color: Colors.transparent,
+                            elevation: 6,
+                            shadowColor: Colors.black45,
+                            borderRadius: AppRadii.r18All,
+                            child: child,
+                          );
+                        },
+                        child: child,
+                      );
+                    },
+                    itemCount: _activeTabs.length,
+                    itemBuilder: (context, i) {
+                      final item = _activeTabs[i];
+                      return _buildReorderTabRow(
+                        modalContext,
+                        key: ValueKey('reorder_item_${item.name}'),
+                        item: item,
+                        state: state,
+                        index: i,
+                        p: p,
+                        onRemove: () {
+                          _toggleTab(item);
+                          setSheetState(() {});
+                        },
+                      );
+                    },
+                    footer: inactiveTabs.isEmpty
+                        ? null
+                        : Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.s6),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.xxs,
+                                    vertical: AppSpacing.xs,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.add_rounded,
+                                          size: 16, color: p.textSecondary),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Text(
+                                        modalContext.l10n.libraryInactiveTabs(
+                                            inactiveTabs.length),
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.caption,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: AppTracking.label,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ...inactiveTabs.map(
+                                  (item) => _buildInactiveTabRow(
+                                    modalContext,
+                                    key: ValueKey('inactive_${item.name}'),
+                                    item: item,
+                                    state: state,
+                                    p: p,
+                                    onAdd: () {
+                                      _toggleTab(item);
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                    onReorderItem: (oldIndex, newIndex) {
+                      _onReorderTabs(oldIndex, newIndex);
+                      setSheetState(() {});
+                    },
                   ),
                 ),
               ),
@@ -989,150 +1045,6 @@ class _LibraryScreenState extends State<LibraryScreen>
           },
         );
       },
-    );
-  }
-
-  Widget _buildTabsGrid(
-    BuildContext modalContext,
-    BuildContext sheetContext,
-    LibraryState state,
-    StateSetter setSheetState, {
-    required VoidCallback onEnterOrganize,
-  }) {
-    return PulsrStaticGrid(
-      key: ValueKey('tabs_grid_${_activeTabs.map((t) => t.name).join('_')}'),
-      crossAxisCount: sheetContext.isTablet ? 3 : 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      mainAxisExtent: 74,
-      itemCount: LibraryTabItem.values.length,
-      itemBuilder: (_, i) {
-        final item = LibraryTabItem.values[i];
-        final isActive = _activeTabs.contains(item);
-        return _buildTabSelectionCard(
-          modalContext,
-          key: ValueKey('tab_card_${item.name}_$isActive'),
-          item: item,
-          state: state,
-          isActive: isActive,
-          onToggle: () {
-            _toggleTab(item);
-            setSheetState(() {});
-          },
-          onLongPress: () {
-            HapticFeedback.mediumImpact();
-            onEnterOrganize();
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildOrganizeList(
-    BuildContext modalContext,
-    BuildContext sheetContext,
-    LibraryState state,
-    PulsrPalette p,
-    List<LibraryTabItem> inactiveTabs,
-    StateSetter setSheetState, {
-    required VoidCallback onToggleMode,
-  }) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(sheetContext).size.height * 0.58,
-      ),
-      child: ReorderableListView.builder(
-        key: ValueKey(
-            'reorder_list_${_activeTabs.map((t) => t.name).join('_')}'),
-        shrinkWrap: true,
-        physics: const BouncingScrollPhysics(),
-        buildDefaultDragHandles: false,
-        proxyDecorator: (child, index, animation) {
-          return AnimatedBuilder(
-            animation: animation,
-            builder: (context, child) {
-              return Material(
-                color: Colors.transparent,
-                elevation: 6,
-                shadowColor: Colors.black45,
-                borderRadius: AppRadii.r18All,
-                child: child,
-              );
-            },
-            child: child,
-          );
-        },
-        itemCount: _activeTabs.length,
-        itemBuilder: (context, i) {
-          final item = _activeTabs[i];
-          return _buildReorderTabRow(
-            modalContext,
-            key: ValueKey('reorder_item_${item.name}'),
-            item: item,
-            state: state,
-            index: i,
-            p: p,
-            onRemove: () {
-              _toggleTab(item);
-              setSheetState(() {});
-            },
-            onLongPress: () {
-              HapticFeedback.mediumImpact();
-              onToggleMode();
-            },
-          );
-        },
-        footer: inactiveTabs.isEmpty
-            ? null
-            : Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xxs,
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.add_rounded,
-                              size: 16, color: p.textSecondary),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            modalContext.l10n
-                                .libraryInactiveTabs(inactiveTabs.length),
-                            style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: AppTracking.label,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ...inactiveTabs.map(
-                      (item) => _buildInactiveTabRow(
-                        modalContext,
-                        key: ValueKey('inactive_${item.name}'),
-                        item: item,
-                        state: state,
-                        p: p,
-                        onAdd: () {
-                          _toggleTab(item);
-                          setSheetState(() {});
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-        onReorderItem: (oldIndex, newIndex) {
-          _onReorderTabs(oldIndex, newIndex);
-          setSheetState(() {});
-        },
-      ),
     );
   }
 
@@ -1144,7 +1056,6 @@ class _LibraryScreenState extends State<LibraryScreen>
     required int index,
     required PulsrPalette p,
     required VoidCallback onRemove,
-    required VoidCallback onLongPress,
   }) {
     final itemColor = item.color(p);
     return Container(
@@ -1158,83 +1069,69 @@ class _LibraryScreenState extends State<LibraryScreen>
           width: 1.0,
         ),
       ),
-      child: InkWell(
-        onLongPress: onLongPress,
-        borderRadius: AppRadii.r18All,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              ReorderableDragStartListener(
-                index: index,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                    start: AppSpacing.xs,
-                    end: AppSpacing.s10,
-                  ),
-                  child: Icon(
-                    Icons.drag_indicator_rounded,
-                    color: p.textSecondary,
-                    size: 22,
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          children: [
+            ReorderableDragStartListener(
+              index: index,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  start: AppSpacing.xs,
+                  end: AppSpacing.s10,
+                ),
+                child: Icon(
+                  Icons.drag_indicator_rounded,
+                  color: p.textSecondary,
+                  size: 22,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: itemColor.withValues(alpha: 0.15),
-                  borderRadius: AppRadii.r12All,
-                ),
-                child: Icon(item.icon, color: itemColor, size: 20),
+            ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: itemColor.withValues(alpha: 0.15),
+                borderRadius: AppRadii.r12All,
               ),
-              const SizedBox(width: AppSpacing.s10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title(context),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppFontSize.body,
-                      ),
+              child: Icon(item.icon, color: itemColor, size: 20),
+            ),
+            const SizedBox(width: AppSpacing.s10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppFontSize.body,
                     ),
-                    const SizedBox(height: AppSpacing.s2),
-                    Text(
-                      item.subtitle(context, state),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                      ),
+                  ),
+                  const SizedBox(height: AppSpacing.s2),
+                  Text(
+                    item.subtitle(context, state),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.label,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              if (_activeTabs.length > 1)
-                IconButton(
-                  constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
-                  icon:
-                      const Icon(Icons.remove_circle_outline_rounded, size: 20),
-                  color: AppColors.error.withValues(alpha: 0.8),
-                  splashRadius: 20,
-                  tooltip: context.l10n.remove,
-                  onPressed: onRemove,
-                )
-              else
-                const SizedBox(width: 40),
-            ],
-          ),
+            ),
+            PulsrSwitch(
+              value: true,
+              onChanged: _activeTabs.length > 1 ? (_) => onRemove() : null,
+            ),
+          ],
         ),
       ),
     );
@@ -1260,178 +1157,67 @@ class _LibraryScreenState extends State<LibraryScreen>
           width: 1.0,
         ),
       ),
-      child: InkWell(
-        onTap: onAdd,
-        borderRadius: AppRadii.r18All,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  start: AppSpacing.xs,
-                  end: AppSpacing.s10,
-                ),
-                child: Icon(
-                  Icons.add_rounded,
-                  color: p.textSecondary.withValues(alpha: 0.5),
-                  size: 22,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: itemColor.withValues(alpha: 0.12),
-                  borderRadius: AppRadii.r12All,
-                ),
-                child: Icon(item.icon,
-                    color: itemColor.withValues(alpha: 0.7), size: 20),
-              ),
-              const SizedBox(width: AppSpacing.s10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title(context),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppFontSize.body,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s2),
-                    Text(
-                      item.subtitle(context, state),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget),
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
-                color: p.accent,
-                splashRadius: 20,
-                tooltip: context.l10n.addTab,
-                onPressed: onAdd,
-              ),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
         ),
-      ),
-    );
-  }
-
-  Widget _buildTabSelectionCard(
-    BuildContext context, {
-    Key? key,
-    required LibraryTabItem item,
-    required LibraryState state,
-    required bool isActive,
-    required VoidCallback onToggle,
-    required VoidCallback onLongPress,
-  }) {
-    final p = context.palette;
-    final itemColor = item.color(p);
-    final title = item.title(context);
-    final subtitle = item.subtitle(context, state);
-
-    return Material(
-      key: key,
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onToggle,
-        onLongPress: onLongPress,
-        borderRadius: AppRadii.r18All,
-        child: AnimatedContainer(
-          duration: context.motionMs(180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-          decoration: BoxDecoration(
-            color: isActive
-                ? itemColor.withValues(alpha: 0.12)
-                : p.surfaceContainer,
-            borderRadius: AppRadii.r18All,
-            border: Border.all(
-              color: isActive ? itemColor.withValues(alpha: 0.65) : p.hairline,
-              width: isActive ? 1.5 : 1.0,
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: AppSpacing.xs,
+                end: AppSpacing.s10,
+              ),
+              child: Icon(
+                Icons.drag_indicator_rounded,
+                color: p.textSecondary.withValues(alpha: 0.25),
+                size: 22,
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: itemColor.withValues(alpha: isActive ? 0.25 : 0.12),
-                  borderRadius: AppRadii.r12All,
-                ),
-                child: Icon(item.icon, color: itemColor, size: 20),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: itemColor.withValues(alpha: 0.12),
+                borderRadius: AppRadii.r12All,
               ),
-              const SizedBox(width: AppSpacing.s10),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isActive ? itemColor : p.textPrimary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: AppFontSize.body,
-                      ),
+              child: Icon(item.icon,
+                  color: itemColor.withValues(alpha: 0.7), size: 20),
+            ),
+            const SizedBox(width: AppSpacing.s10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppFontSize.body,
                     ),
-                    const SizedBox(height: AppSpacing.s2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              AnimatedContainer(
-                duration: context.motionMs(180),
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isActive ? itemColor : p.surfaceContainerHigh,
-                  border: Border.all(
-                    color: isActive ? itemColor : p.hairline,
-                    width: 1.5,
                   ),
-                ),
-                child: Icon(
-                  isActive ? Icons.check_rounded : Icons.add_rounded,
-                  size: 16,
-                  color: isActive ? p.onAccent : p.textTertiary,
-                ),
+                  const SizedBox(height: AppSpacing.s2),
+                  Text(
+                    item.subtitle(context, state),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.label,
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            PulsrSwitch(
+              value: false,
+              onChanged: (_) => onAdd(),
+            ),
+          ],
         ),
       ),
     );
@@ -1469,22 +1255,26 @@ class _LibraryScreenState extends State<LibraryScreen>
       color: p.accent,
       backgroundColor: p.surfaceContainer,
       onRefresh: () => _handleRefresh(context),
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: PulsrEmptyState(
-              icon: icon,
-              title: title,
-              subtitle: subtitle,
-              primaryActionLabel: actionLabel ?? context.l10n.scanStorage,
-              primaryActionIcon:
-                  actionIcon ?? Icons.center_focus_strong_rounded,
-              onPrimaryAction: onAction ?? () => _handleRefresh(context),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+            ),
+            child: Center(
+              child: PulsrEmptyState(
+                icon: icon,
+                title: title,
+                subtitle: subtitle,
+                primaryActionLabel: actionLabel ?? context.l10n.scanStorage,
+                primaryActionIcon:
+                    actionIcon ?? Icons.center_focus_strong_rounded,
+                onPrimaryAction: onAction ?? () => _handleRefresh(context),
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

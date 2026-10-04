@@ -214,12 +214,12 @@ void main() {
       expect(filtered, [352800, 384000, 705600, 768000]);
     });
 
-    test('falls back to 44.1/48 when nothing is reported', () {
+    test('offers no invented rates when nothing is reported', () {
       final filtered = HiResAudioService.supportedSampleRateOptions(
         deviceSampleRates: const [],
         directFormats: const [],
       );
-      expect(filtered, [44100, 48000]);
+      expect(filtered, isEmpty);
     });
 
     test('ladder/target sets match the honest envelope', () {

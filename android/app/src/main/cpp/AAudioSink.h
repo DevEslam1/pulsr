@@ -41,6 +41,7 @@ public:
         Encoding encoding = Encoding::Int16;
         bool preferExclusive = true;   // require EXCLUSIVE and unity gain
         bool lowLatency = true;        // PERFORMANCE_MODE_LOW_LATENCY on SHARED
+        int32_t deviceId = 0;          // 0 follows platform policy
         int32_t targetBufferMs = 150;  // 0 => device default capacity
     };
 
@@ -70,6 +71,7 @@ public:
     bool IsExclusive() const { return exclusive_; }
     int32_t BufferCapacityFrames() const;
     int32_t FramesPerBurst() const;
+    int32_t DeviceId() const;
     int64_t GetTimestampLatencyFrames() const;
     double GetOutputLatencyMs() const;
     int32_t SampleRate() const { return config_.sampleRate; }

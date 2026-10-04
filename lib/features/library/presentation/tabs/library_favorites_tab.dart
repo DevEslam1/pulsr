@@ -49,6 +49,79 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
             ),
           ),
 
+          // ---------- Link to Dedicated Favorites Surface ----------
+          Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(
+              Adaptive.pagePadding(context),
+              0,
+              Adaptive.pagePadding(context),
+              8,
+            ),
+            child: Material(
+              color: p.surfaceCard,
+              borderRadius: AppRadii.r18All,
+              child: InkWell(
+                borderRadius: AppRadii.r18All,
+                onTap: () => context.push('/favorites'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: p.favorite.withValues(alpha: 0.15),
+                          borderRadius: AppRadii.r12All,
+                        ),
+                        child: Icon(Icons.favorite_rounded,
+                            color: p.favorite, size: 22),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.unifiedFavoritesHeader,
+                              style: TextStyle(
+                                fontSize: AppFontSize.callout,
+                                fontWeight: FontWeight.w700,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              context.l10n.unifiedFavoritesHeaderSubtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                color: p.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        context.l10n.unifiedFavoritesViewAll,
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                          color: p.accent,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          size: 12, color: p.accent),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           // ---------- Quick Play Header (if songs exist in current tab) ----------
           if (currentFavorites.isNotEmpty)
             Padding(
@@ -140,16 +213,34 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
           // ---------- Content (List / Grid or Empty State) ----------
           Expanded(
             child: currentFavorites.isEmpty
-                ? CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _buildFavoritesEmptyState(
-                            context, p, _favTabFilter),
-                      ),
-                    ],
-                  )
+                ? (state.isLoading
+                    ? SkeletonList(
+                        padding: EdgeInsetsDirectional.fromSTEB(
+                          Adaptive.pagePadding(context),
+                          16,
+                          Adaptive.pagePadding(context),
+                          160,
+                        ),
+                      )
+                    : _buildEmpty(
+                        context,
+                        title: _favTabFilter == 0
+                            ? context.l10n.noLocalFavorites
+                            : context.l10n.noOnlineFavorites,
+                        subtitle: _favTabFilter == 0
+                            ? context.l10n.noLocalFavoritesSubtitle
+                            : context.l10n.browseSyncPullSubtitle,
+                        icon: Icons.favorite_border_rounded,
+                        actionLabel: _favTabFilter == 1 && AppConfig.ytmEnabled
+                            ? context.l10n.syncYouTubeMusic
+                            : null,
+                        actionIcon: _favTabFilter == 1 && AppConfig.ytmEnabled
+                            ? Icons.sync_rounded
+                            : null,
+                        onAction: _favTabFilter == 1 && AppConfig.ytmEnabled
+                            ? () => _syncYtmLikes(context)
+                            : null,
+                      ))
                 : (isGrid
                     ? GridView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -286,72 +377,6 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
   bool _isOnlineFavorite(SongsTableData s) => isOnlineFavorite(s);
 
-  Widget _buildFavoritesEmptyState(
-      BuildContext context, PulsrPalette p, int tabIndex) {
-    if (tabIndex == 0) {
-      return PulsrEmptyState(
-        icon: Icons.favorite_border_rounded,
-        iconColor: p.favorite,
-        title: context.l10n.noLocalFavorites,
-        subtitle: context.l10n.noLocalFavoritesSubtitle,
-        primaryActionLabel: context.l10n.songs,
-        primaryActionIcon: Icons.library_music_rounded,
-        onPrimaryAction: () => _tabController.animateTo(0),
-      );
-    } else {
-      final ytmAccount = getIt<YtmAccountService>();
-      final isYtmLoggedIn = ytmAccount.isLoggedIn;
-
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          PulsrEmptyState(
-            icon: Icons.cloud_sync_rounded,
-            iconColor: p.accent,
-            title: isYtmLoggedIn
-                ? context.l10n.ytmConnected
-                : context.l10n.noOnlineFavorites,
-            subtitle: isYtmLoggedIn
-                ? context.l10n.browseSyncPullSubtitle
-                : context.l10n.connectYtmSubtitle,
-            primaryActionLabel: AppConfig.ytmEnabled
-                ? (isYtmLoggedIn
-                    ? context.l10n.syncYouTubeMusic
-                    : context.l10n.connectYtmAccount)
-                : context.l10n.navLibrary,
-            primaryActionIcon: AppConfig.ytmEnabled
-                ? Icons.cloud_sync_rounded
-                : Icons.library_music_rounded,
-            onPrimaryAction: () {
-              if (AppConfig.ytmEnabled) {
-                _syncYtmLikes(context);
-              } else {
-                _tabController.animateTo(0);
-              }
-            },
-          ),
-          if (AppConfig.ytmEnabled) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-              child: TextButton.icon(
-                onPressed: () => _showImportYtmFavoritesDialog(context),
-                icon: const Icon(Icons.link_rounded, size: 18),
-                label: Text(context.l10n.importByPlaylistLink),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-              child: TextButton.icon(
-                onPressed: () => context.push('/ytm-search'),
-                icon: const Icon(Icons.travel_explore_rounded, size: 18),
-                label: Text(context.l10n.searchYtm),
-              ),
-            ),
-          ],
-        ],
-      );
-    }
-  }
 
   void _downloadFavorites(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
@@ -785,15 +810,22 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     );
   }
 
+  Widget _buildEmpty(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    String? actionLabel,
+    IconData? actionIcon,
+    VoidCallback? onAction,
+  });
+
   // Requires: provided by the composing class (same library).
   int get _favTabFilter;
   set _favTabFilter(int value);
 
   // Requires: provided by the composing class (same library).
   Future<void> _handleRefresh(BuildContext context);
-
-  // Requires: provided by the composing class (same library).
-  TabController get _tabController;
 
   // Requires: provided by the composing class (same library).
   TextEditingController get _importYtmController;

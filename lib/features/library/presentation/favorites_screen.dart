@@ -9,6 +9,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/song_classification.dart';
+import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
@@ -193,168 +194,168 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         ),
                       ),
 
-                      // ---------- Hero Banner Card ----------
+                      // ---------- Compact Tinted Header Card ----------
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: EdgeInsetsDirectional.fromSTEB(
                             Adaptive.pagePadding(context),
                             0,
                             Adaptive.pagePadding(context),
-                            16,
+                            14,
                           ),
                           child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.s20),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: _favTabFilter == 0
-                                    ? [
-                                        p.favorite.withValues(alpha: 0.88),
-                                        AppColors.roseDeep,
-                                      ]
-                                    : [
-                                        AppColors.netflixRed,
-                                        AppColors.ytRedDeep,
-                                      ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: AppRadii.r24All,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (_favTabFilter == 0
-                                          ? p.favorite
-                                          : AppColors.netflixRed)
-                                      .withValues(alpha: 0.35),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            decoration: BoxDecoration(
+                              color: (p.isDark ? Colors.white : Colors.black)
+                                  .withValues(alpha: 0.05),
+                              borderRadius: AppRadii.r18All,
+                              border: Border.all(
+                                color: (p.isDark ? Colors.white : Colors.black)
+                                    .withValues(alpha: 0.08),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.specularAt(0.22),
-                                        borderRadius: AppRadii.r14All,
-                                      ),
-                                      child: Icon(
-                                        _favTabFilter == 0
-                                            ? Icons.favorite_rounded
-                                            : Icons.cloud_rounded,
-                                        color: Colors.white,
-                                        size: 28,
-                                      ),
+                                if (songs.isNotEmpty)
+                                  CachedArtwork(
+                                    id: songs.first.id,
+                                    albumId: songs.first.albumId,
+                                    remoteUrl: songs.first.remoteArtworkUrl ??
+                                        songs.first.artworkUri,
+                                    size: 52,
+                                    borderRadius: AppRadii.r12,
+                                  )
+                                else
+                                  Container(
+                                    width: 52,
+                                    height: 52,
+                                    decoration: BoxDecoration(
+                                      color: (_favTabFilter == 0
+                                              ? p.favorite
+                                              : AppColors.catAudio)
+                                          .withValues(alpha: 0.15),
+                                      borderRadius: AppRadii.r12All,
                                     ),
-                                    const Spacer(),
-                                    if (_favTabFilter == 1 &&
-                                        AppConfig.ytmEnabled &&
-                                        songs.any((s) =>
-                                            s.remoteId != null &&
-                                            s.remoteId!.isNotEmpty))
-                                      IconButton.filledTonal(
-                                        constraints: const BoxConstraints(
-                                            minWidth: AppSpacing.minTouchTarget,
-                                            minHeight:
-                                                AppSpacing.minTouchTarget),
-                                        style: IconButton.styleFrom(
-                                          backgroundColor:
-                                              AppColors.specularAt(0.2),
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        icon: const Icon(Icons.download_rounded,
-                                            size: 20),
-                                        tooltip: context.l10n
-                                            .browseDownloadAllOnlineFavorites,
-                                        onPressed: () =>
-                                            _downloadFavorites(context, songs),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: AppSpacing.md),
-                                Text(
-                                  _favTabFilter == 0
-                                      ? l10n.favorites
-                                      : '${l10n.online} ${l10n.favorites}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: AppFontSize.headline,
-                                    fontWeight: FontWeight.w900,
+                                    child: Icon(
+                                      _favTabFilter == 0
+                                          ? Icons.favorite_rounded
+                                          : Icons.cloud_rounded,
+                                      color: _favTabFilter == 0
+                                          ? p.favorite
+                                          : p.accent,
+                                      size: 26,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: AppSpacing.xxs),
-                                Text(
-                                  '${l10n.tracksCount(songs.length)}${songs.isNotEmpty ? ' • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs))}' : ''}',
-                                  style: TextStyle(
-                                    color: AppColors.specularAt(0.85),
-                                    fontSize: AppFontSize.bodySmall,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                if (songs.isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.md),
-                                  Row(
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Expanded(
-                                        child: FilledButton.icon(
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: Colors.black87,
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: AppSpacing.sm),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: AppRadii.r14All,
-                                            ),
-                                          ),
-                                          icon: const Icon(
-                                              Icons.play_arrow_rounded,
-                                              size: 24),
-                                          label: Text(
-                                            l10n.playAll,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w800),
-                                          ),
-                                          onPressed: () => playerCubit.playSong(
-                                            songs.first,
-                                            queue: songs,
-                                          ),
+                                      Text(
+                                        '${Formatters.formatTrackCount(songs.length).toUpperCase()}${songs.isNotEmpty ? " • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs)).toUpperCase()}" : ""}',
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.tiny,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.8,
+                                          color: p.textTertiary,
                                         ),
                                       ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      IconButton.filled(
-                                        constraints: const BoxConstraints(
-                                            minWidth: AppSpacing.minTouchTarget,
-                                            minHeight:
-                                                AppSpacing.minTouchTarget),
-                                        style: IconButton.styleFrom(
-                                          backgroundColor:
-                                              AppColors.specularAt(0.2),
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.all(
-                                              AppSpacing.sm),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: AppRadii.r14All,
-                                          ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _favTabFilter == 0
+                                            ? l10n.favorites
+                                            : '${l10n.online} ${l10n.favorites}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: AppFontSize.callout,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.2,
                                         ),
-                                        icon: const Icon(Icons.shuffle_rounded,
-                                            size: 22),
-                                        tooltip: l10n.shuffle,
-                                        onPressed: () {
-                                          final shuffled =
-                                              List<SongsTableData>.from(songs)
-                                                ..shuffle();
-                                          playerCubit.playSong(
-                                            shuffled.first,
-                                            queue: shuffled,
-                                          );
-                                        },
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        l10n.tracksCount(songs.length),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.label,
+                                          color: p.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
+                                ),
+                                if (songs.isNotEmpty) ...[
+                                  const SizedBox(width: AppSpacing.xs),
+                                  IconButton.filledTonal(
+                                    constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor:
+                                          p.accent.withValues(alpha: 0.15),
+                                      foregroundColor: p.accent,
+                                    ),
+                                    icon: const Icon(Icons.play_arrow_rounded,
+                                        size: 22),
+                                    tooltip: l10n.playAll,
+                                    onPressed: () => playerCubit.playSong(
+                                      songs.first,
+                                      queue: songs,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xxs),
+                                  IconButton.filledTonal(
+                                    constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: p.surfaceContainerHigh,
+                                      foregroundColor: p.textPrimary,
+                                    ),
+                                    icon: const Icon(Icons.shuffle_rounded,
+                                        size: 18),
+                                    tooltip: l10n.shuffle,
+                                    onPressed: () {
+                                      final shuffled =
+                                          List<SongsTableData>.from(songs)
+                                            ..shuffle();
+                                      playerCubit.playSong(
+                                        shuffled.first,
+                                        queue: shuffled,
+                                      );
+                                    },
+                                  ),
+                                  if (_favTabFilter == 1 &&
+                                      AppConfig.ytmEnabled &&
+                                      songs.any((s) =>
+                                          s.remoteId != null &&
+                                          s.remoteId!.isNotEmpty)) ...[
+                                    const SizedBox(width: AppSpacing.xxs),
+                                    IconButton.filledTonal(
+                                      constraints: const BoxConstraints(
+                                          minWidth: AppSpacing.minTouchTarget,
+                                          minHeight: AppSpacing.minTouchTarget),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            p.accent.withValues(alpha: 0.15),
+                                        foregroundColor: p.accent,
+                                      ),
+                                      icon: const Icon(Icons.download_rounded,
+                                          size: 18),
+                                      tooltip: context.l10n
+                                          .browseDownloadAllOnlineFavorites,
+                                      onPressed: () =>
+                                          _downloadFavorites(context, songs),
+                                    ),
+                                  ],
                                 ],
                               ],
                             ),
