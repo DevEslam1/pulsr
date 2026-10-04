@@ -25,9 +25,15 @@ class QuranModeScreen extends StatelessWidget {
           title: Text(context.l10n.quranMode,
               style: TextStyle(fontWeight: FontWeight.w800)),
         ),
-        body: const SingleChildScrollView(
-          padding: EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: const SingleChildScrollView(
+              padding:
+                  EdgeInsets.only(top: AppSpacing.xxs, bottom: AppSpacing.xl),
           child: QuranModePanel(),
+            ),
+          ),
         ),
       ),
     );

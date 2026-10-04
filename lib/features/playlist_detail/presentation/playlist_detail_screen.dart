@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/playlist_detail/presentation/playlist_detail_screen.dart
 import 'dart:io';
 
@@ -429,8 +430,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     : ListView.builder(
                         addAutomaticKeepAlives: false,
                         addRepaintBoundaries: true,
-                        padding: const EdgeInsets.only(
-                            bottom: AppSpacing.scrollBottom),
+                        padding: EdgeInsets.only(
+                            bottom: PulsrLayoutMetrics.scrollBottom(context)),
                         itemCount: songs.length + 1,
                         itemBuilder: (context, index) {
                           if (index == 0) {

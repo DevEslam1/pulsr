@@ -4431,5 +4431,6 @@
   "audioQualityFormatFollowsEngine": "El formato sigue al motor de reproducción. La conversión manual no está disponible.",
   "upNext": "A CONTINUACIÓN",
   "proBadge": "PRO",
-  "nowPlayingPreview": "▶ Reproduciendo ahora"
+  "nowPlayingPreview": "▶ Reproduciendo ahora",
+  "compactView": "Vista compacta"
 }

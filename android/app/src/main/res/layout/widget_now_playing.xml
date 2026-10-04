@@ -69,8 +69,8 @@
 
             <ImageButton
                 android:id="@+id/widget_favorite"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:padding="8.5dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_heart"
@@ -78,8 +78,8 @@
 
             <ImageButton
                 android:id="@+id/btn_prev"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="5dp"
                 android:padding="8.5dp"
                 android:background="@drawable/widget_secondary_button_background"
@@ -99,8 +99,8 @@
 
             <ImageButton
                 android:id="@+id/btn_next"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:padding="8.5dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_skip_next"
@@ -170,7 +170,7 @@
             android:layout_marginStart="6dp"
             android:text="0:00"
             android:textColor="#A7B0C0"
-            android:textSize="11.5sp"
+            android:textSize="12sp"
             android:fontFamily="sans-serif-medium" />
 
         <ImageView
@@ -208,7 +208,7 @@
             android:layout_marginEnd="6dp"
             android:text="0:00"
             android:textColor="#A7B0C0"
-            android:textSize="11.5sp"
+            android:textSize="12sp"
             android:fontFamily="sans-serif-medium" />
 
         <!-- Quick Fast-Forward 10s button -->

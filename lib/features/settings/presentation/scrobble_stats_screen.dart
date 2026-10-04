@@ -1,4 +1,7 @@
+import 'package:pulsr/core/widgets/pulsr_key_value.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart' show DateFormat;
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +30,7 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   int _lastScrobbleTime = 0;
   int _totalScrobbles = 0;
   List<int> _last7DaysScrobbles = [0, 0, 0, 0, 0, 0, 0];
-  List<String> _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  DateTime _chartDate = DateTime.now();
   List<MapEntry<String, int>> _topArtists = [];
   bool _isLoading = true;
 
@@ -83,7 +86,6 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
         } catch (_) {}
       }
 
-      const weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
       final now = DateTime.now();
       final days = List.generate(7, (i) {
         final d = now.subtract(Duration(days: 6 - i));
@@ -92,17 +94,12 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
         return (dailyLog[key] as int?) ?? 0;
       });
 
-      final labels = List.generate(7, (i) {
-        final d = now.subtract(Duration(days: 6 - i));
-        return weekdayLetters[d.weekday - 1];
-      });
-
       if (mounted) {
         setState(() {
           _lastScrobbleTime = lastTime;
           _totalScrobbles = total;
           _last7DaysScrobbles = days;
-          _dayLabels = labels;
+          _chartDate = now;
           _topArtists = sortedArtists.take(5).toList();
           _isLoading = false;
         });
@@ -123,13 +120,16 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final material = MaterialLocalizations.of(context);
+    final date =
+        DateTime.fromMillisecondsSinceEpoch(_lastScrobbleTime).toLocal();
     final lastDateStr = _lastScrobbleTime > 0
-        ? DateTime.fromMillisecondsSinceEpoch(_lastScrobbleTime)
-            .toLocal()
-            .toString()
-            .split('.')
-            .first
+        ? '${material.formatShortDate(date)} · ${material.formatTimeOfDay(TimeOfDay.fromDateTime(date), alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))}'
         : context.l10n.settingsNeverLabel;
+    final dayLabels = List.generate(
+        7,
+        (i) => DateFormat.E(Localizations.localeOf(context).toString())
+            .format(_chartDate.subtract(Duration(days: 6 - i))));
 
     return PulsrPagePopScope(
       child: Scaffold(
@@ -143,213 +143,223 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
         ),
-        body: _isLoading
-            ? SkeletonShimmer(
-                child: ListView(
-                  padding: const EdgeInsetsDirectional.fromSTEB(
-                      AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
-                  children: const [
-                    SkeletonBox(height: 132, radius: AppRadii.r20),
-                    SizedBox(height: AppSpacing.s20),
-                    SkeletonBox(height: 206, radius: AppRadii.r20),
-                    SizedBox(height: AppSpacing.s20),
-                    SkeletonBox(height: 188, radius: AppRadii.r20),
-                  ],
-                ),
-              )
-            : ListView(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
-                children: [
-                  // Overview Card
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s18),
-                    decoration: BoxDecoration(
-                      color: p.surfaceCard,
-                      borderRadius: AppRadii.r20All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.sync_alt_rounded, color: p.primary),
-                            const SizedBox(width: AppSpacing.s10),
-                            Text(
-                              context.l10n.universalScrobblingEngine,
-                              style: TextStyle(
-                                fontSize: AppFontSize.bodyLarge,
-                                fontWeight: FontWeight.w700,
-                                color: p.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          context.l10n.scrobblingServicesDesc,
-                          style: TextStyle(
-                              fontSize: AppFontSize.bodySmall,
-                              color: p.textSecondary),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Divider(color: p.hairline),
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(context.l10n.totalScrobbles,
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.bodySmall)),
-                            Text('$_totalScrobbles',
-                                style: TextStyle(
-                                    color: p.accent,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.body)),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(context.l10n.lastScrobbled,
-                                style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.bodySmall)),
-                            Text(lastDateStr,
-                                style: TextStyle(
-                                    color: p.primary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.bodySmall)),
-                          ],
-                        ),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: _isLoading
+                ? SkeletonShimmer(
+                    child: ListView(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                          AppSpacing.s20,
+                          AppSpacing.sm,
+                          AppSpacing.s20,
+                          PulsrLayoutMetrics.scrollBottom(context)),
+                      children: const [
+                        SkeletonBox(height: 132, radius: AppRadii.r20),
+                        SizedBox(height: AppSpacing.s20),
+                        SkeletonBox(height: 206, radius: AppRadii.r20),
+                        SizedBox(height: AppSpacing.s20),
+                        SkeletonBox(height: 188, radius: AppRadii.r20),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // 7-Day Activity Chart Card
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s18),
-                    decoration: BoxDecoration(
-                      color: p.surfaceCard,
-                      borderRadius: AppRadii.r20All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  )
+                : ListView(
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                        AppSpacing.s20,
+                        AppSpacing.sm,
+                        AppSpacing.s20,
+                        PulsrLayoutMetrics.scrollBottom(context)),
+                    children: [
+                      // Overview Card
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.s18),
+                        decoration: BoxDecoration(
+                          color: p.surfaceCard,
+                          borderRadius: AppRadii.r20All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.bar_chart_rounded,
-                                color: p.accent, size: 20),
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              context.l10n.last7DaysActivity,
-                              style: TextStyle(
-                                  fontSize: AppFontSize.callout,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.textPrimary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s20),
-                        SizedBox(
-                          height: 130,
-                          child: Semantics(
-                            label: '7-day scrobble history chart',
-                            child: CustomPaint(
-                              size: const Size(double.infinity, 130),
-                              painter: _ScrobbleBarChartPainter(
-                                data: _last7DaysScrobbles,
-                                labels: _dayLabels,
-                                barColor: p.primary,
-                                labelColor: p.textSecondary,
-                                textDirection: Directionality.of(context),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // Top Artists
-                  if (_topArtists.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.s18),
-                      decoration: BoxDecoration(
-                        color: p.surfaceCard,
-                        borderRadius: AppRadii.r20All,
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.leaderboard_rounded,
-                                  color: p.primary, size: 20),
-                              const SizedBox(width: AppSpacing.xs),
-                              Text(
-                                context.l10n.topScrobbledArtists,
-                                style: TextStyle(
-                                    fontSize: AppFontSize.callout,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.textPrimary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          for (int i = 0; i < _topArtists.length; i++) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: AppSpacing.s6),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    '#${i + 1}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color:
-                                          i == 0 ? p.accent : p.textSecondary,
-                                      fontSize: AppFontSize.bodySmall,
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.sm),
-                                  Expanded(
+                            Row(
+                              children: [
+                                Icon(Icons.sync_alt_rounded, color: p.primary),
+                                const SizedBox(width: AppSpacing.s10),
+                                Expanded(
                                     child: Text(
-                                      _topArtists[i].key,
-                                      style: TextStyle(
-                                          color: p.textPrimary,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: AppFontSize.bodySmall),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                  context.l10n.universalScrobblingEngine,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.bodyLarge,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.textPrimary,
                                   ),
-                                  Text(
-                                    context.l10n.settingsPlaysCount(
-                                        _topArtists[i].value),
+                                )),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              context.l10n.scrobblingServicesDesc,
+                              style: TextStyle(
+                                  fontSize: AppFontSize.bodySmall,
+                                  color: p.textSecondary),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Divider(color: p.hairline),
+                            const SizedBox(height: AppSpacing.sm),
+                            PulsrKeyValue(
+                                label: Text(context.l10n.totalScrobbles,
                                     style: TextStyle(
                                         color: p.textSecondary,
-                                        fontSize: AppFontSize.label),
+                                        fontSize: AppFontSize.bodySmall)),
+                                value: Text('$_totalScrobbles',
+                                    style: TextStyle(
+                                        color: p.accent,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppFontSize.body))),
+                            const SizedBox(height: AppSpacing.xs),
+                            PulsrKeyValue(
+                                label: Text(context.l10n.lastScrobbled,
+                                    style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.bodySmall)),
+                                value: Text(lastDateStr,
+                                    style: TextStyle(
+                                        color: p.primary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppFontSize.bodySmall))),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s20),
+
+                      // 7-Day Activity Chart Card
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.s18),
+                        decoration: BoxDecoration(
+                          color: p.surfaceCard,
+                          borderRadius: AppRadii.r20All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.bar_chart_rounded,
+                                    color: p.accent, size: 20),
+                                const SizedBox(width: AppSpacing.xs),
+                                Expanded(
+                                    child: Text(
+                                  context.l10n.last7DaysActivity,
+                                  style: TextStyle(
+                                      fontSize: AppFontSize.callout,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.textPrimary),
+                                )),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.s20),
+                            SizedBox(
+                              height: 130,
+                              child: Semantics(
+                                label:
+                                    '${context.l10n.last7DaysActivity}: ${List.generate(7, (i) => '${dayLabels[i]} ${_last7DaysScrobbles[i]}').join(', ')}',
+                                child: CustomPaint(
+                                  size: const Size(double.infinity, 130),
+                                  painter: _ScrobbleBarChartPainter(
+                                    data: _last7DaysScrobbles,
+                                    labels: dayLabels,
+                                    barColor: p.primary,
+                                    labelColor: p.textSecondary,
+                                    textDirection: Directionality.of(context),
+                                    textScaler:
+                                        MediaQuery.textScalerOf(context),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                            if (i < _topArtists.length - 1)
-                              Divider(color: p.hairline, height: 8),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: AppSpacing.s20),
+
+                      // Top Artists
+                      if (_topArtists.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.s18),
+                          decoration: BoxDecoration(
+                            color: p.surfaceCard,
+                            borderRadius: AppRadii.r20All,
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.leaderboard_rounded,
+                                      color: p.primary, size: 20),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                      child: Text(
+                                    context.l10n.topScrobbledArtists,
+                                    style: TextStyle(
+                                        fontSize: AppFontSize.callout,
+                                        fontWeight: FontWeight.w700,
+                                        color: p.textPrimary),
+                                  )),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              for (int i = 0; i < _topArtists.length; i++) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: AppSpacing.s6),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        '#${i + 1}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: i == 0
+                                              ? p.accent
+                                              : p.textSecondary,
+                                          fontSize: AppFontSize.bodySmall,
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      Expanded(
+                                        child: Text(
+                                          _topArtists[i].key,
+                                          style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: AppFontSize.bodySmall),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Text(
+                                        context.l10n.settingsPlaysCount(
+                                            _topArtists[i].value),
+                                        style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: AppFontSize.label),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (i < _topArtists.length - 1)
+                                  Divider(color: p.hairline, height: 8),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -362,6 +372,7 @@ class ScrobbleBarChartPainter extends CustomPainter {
   final Color barColor;
   final Color labelColor;
   final TextDirection textDirection;
+  final TextScaler textScaler;
 
   const ScrobbleBarChartPainter({
     required this.data,
@@ -369,6 +380,7 @@ class ScrobbleBarChartPainter extends CustomPainter {
     required this.barColor,
     required this.labelColor,
     this.textDirection = TextDirection.ltr,
+    this.textScaler = TextScaler.noScaling,
   });
 
   @override
@@ -392,15 +404,21 @@ class ScrobbleBarChartPainter extends CustomPainter {
       ..color = barColor
       ..style = PaintingStyle.fill;
 
-    final textPainter = TextPainter(textDirection: textDirection);
-    final usableHeight = math.max(10.0, size.height - 30);
+    final textPainter = TextPainter(
+        textDirection: textDirection,
+        textScaler: textScaler,
+        maxLines: 1,
+        ellipsis: '…');
+    final labelHeight = textScaler.scale(AppFontSize.caption) + 10;
+    final usableHeight = math.max(10.0, size.height - labelHeight - 6);
 
     for (int i = 0; i < data.length; i++) {
       final val = data[i];
       final heightRatio = (val / maxVal).clamp(0.0, 1.0);
       final barHeight = usableHeight * heightRatio;
-      final x = spacing + i * (barWidth + spacing);
-      final y = (size.height - 24) - barHeight;
+      final slot = textDirection == TextDirection.rtl ? data.length - 1 - i : i;
+      final x = spacing + slot * (barWidth + spacing);
+      final y = size.height - labelHeight - barHeight;
 
       final rRect = RRect.fromRectAndRadius(
         Rect.fromLTWH(x, y, barWidth, barHeight.clamp(4.0, size.height)),
@@ -416,10 +434,11 @@ class ScrobbleBarChartPainter extends CustomPainter {
               fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w600),
         );
-        textPainter.layout();
+        textPainter.layout(maxWidth: availableWidth / data.length);
         textPainter.paint(
           canvas,
-          Offset(x + (barWidth - textPainter.width) / 2, size.height - 18),
+          Offset(x + (barWidth - textPainter.width) / 2,
+              size.height - labelHeight + 4),
         );
       }
     }
@@ -430,6 +449,7 @@ class ScrobbleBarChartPainter extends CustomPainter {
     return oldDelegate.barColor != barColor ||
         oldDelegate.labelColor != labelColor ||
         oldDelegate.textDirection != textDirection ||
+        oldDelegate.textScaler != textScaler ||
         !listEquals(oldDelegate.data, data) ||
         !listEquals(oldDelegate.labels, labels);
   }

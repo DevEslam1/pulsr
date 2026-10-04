@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/library/presentation/library_stats_screen.dart
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -250,342 +251,353 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                 .take(5)
                 .toList();
 
-            return ListView(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                  AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
-              children: [
-                // BUG-15: surface a failed full-library load with a retry.
-                if (_loadError != null)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: AppRadii.r16All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.error_outline_rounded,
-                            color: p.error, size: 22),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            '${context.l10n.browseFailedToFetch}: $_loadError',
-                            style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.label),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _loadAllSongs,
-                          child: Text(context.l10n.retry),
-                        ),
-                      ],
-                    ),
-                  ),
-                // Top Metrics Grid
-                Row(
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 860),
+                child: ListView(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.s20,
+                      AppSpacing.sm,
+                      AppSpacing.s20,
+                      PulsrLayoutMetrics.scrollBottom(context)),
                   children: [
-                    Expanded(
-                      child: _buildMetricCard(
-                        context,
-                        icon: Icons.music_note_rounded,
-                        title: context.l10n.browseTotalTracks,
-                        value: songs.length.toString(),
-                        color: p.primary,
-                        p: p,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: _buildMetricCard(
-                        context,
-                        icon: Icons.play_circle_filled_rounded,
-                        title: context.l10n.browseTotalPlays,
-                        value: totalPlays.toString(),
-                        color: p.accent,
-                        p: p,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMetricCard(
-                        context,
-                        icon: Icons.access_time_filled_rounded,
-                        title: context.l10n.browseListeningTime,
-                        value: '$totalHours ${context.l10n.browseHoursShort}',
-                        color: p.warning,
-                        p: p,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: _buildMetricCard(
-                        context,
-                        icon: Icons.storage_rounded,
-                        title: context.l10n.browseDiskStorage,
-                        value: '$totalGb GB',
-                        color: p.success,
-                        p: p,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.s20),
-
-                // Audio Quality & Library Breakdown
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.s18),
-                  decoration: BoxDecoration(
-                    color: p.surfaceCard,
-                    borderRadius: AppRadii.r20All,
-                    border: Border.all(color: p.hairline),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.high_quality_rounded,
-                              color: p.primary, size: 22),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            context.l10n.audioQualityTiers,
-                            style: TextStyle(
-                              fontSize: AppFontSize.callout,
-                              fontWeight: FontWeight.w700,
-                              color: p.textPrimary,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
-                            style: TextStyle(
-                                fontSize: AppFontSize.label,
-                                color: p.textSecondary),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.s14),
-                      ClipRRect(
-                        borderRadius: AppRadii.r8All,
+                    // BUG-15: surface a failed full-library load with a retry.
+                    if (_loadError != null)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: AppRadii.r16All,
+                          border: Border.all(color: p.hairline),
+                        ),
                         child: Row(
                           children: [
-                            if (songs.isNotEmpty) ...[
-                              Expanded(
-                                flex: losslessCount > 0 ? losslessCount : 1,
-                                child: Container(
-                                  height: 12,
-                                  color: p.info,
-                                ),
-                              ),
-                              Expanded(
-                                flex: lossyCount > 0 ? lossyCount : 1,
-                                child: Container(
-                                  height: 12,
-                                  color: p.surfaceContainer,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              color: p.info,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
-                            style: TextStyle(
-                                fontSize: AppFontSize.label,
-                                color: p.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-
-                // Top Played Songs Section
-                _buildSectionHeader(
-                  title: context.l10n.browseMostPlayedTracks,
-                  subtitle: context.l10n.browseMostPlayedTracksSubtitle,
-                  icon: Icons.leaderboard_rounded,
-                  p: p,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                PulsrSegmentedControl(
-                  segments: [
-                    PulsrSegment(
-                      label: context.l10n.statsTimeRange7Days,
-                      icon: Icons.date_range_rounded,
-                    ),
-                    PulsrSegment(
-                      label: context.l10n.statsTimeRange30Days,
-                      icon: Icons.calendar_month_rounded,
-                    ),
-                    PulsrSegment(
-                      label: context.l10n.statsTimeRangeAllTime,
-                      icon: Icons.all_inclusive_rounded,
-                    ),
-                  ],
-                  selectedIndex: _timeRangeIndex,
-                  onChanged: _setTimeRange,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                if (topSongs.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s20),
-                    decoration: BoxDecoration(
-                      color: p.surfaceCard,
-                      borderRadius: AppRadii.r16All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Center(
-                      child: Text(
-                        context.l10n.noPlayHistory,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.bodySmall),
-                      ),
-                    ),
-                  )
-                else
-                  ...List.generate(topSongs.length, (index) {
-                    final song = topSongs[index];
-                    return _buildSongLeaderboardTile(
-                      context,
-                      rank: index + 1,
-                      song: song,
-                      queue: topSongs,
-                      p: p,
-                    );
-                  }),
-                const SizedBox(height: AppSpacing.lg),
-
-                // Top Artists Section
-                if (topArtists.isNotEmpty) ...[
-                  _buildSectionHeader(
-                    title: context.l10n.browseTopArtists,
-                    subtitle: context.l10n.browseTopArtistsSubtitle,
-                    icon: Icons.person_search_rounded,
-                    p: p,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: p.surfaceCard,
-                      borderRadius: AppRadii.r18All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      children: List.generate(topArtists.length, (idx) {
-                        final entry = topArtists[idx];
-                        final artistName = entry.key;
-                        final plays = entry.value;
-                        final trackCount = artistTrackCounts[artistName] ?? 0;
-                        final isLast = idx == topArtists.length - 1;
-
-                        return Column(
-                          children: [
-                            ListTile(
-                              leading: CircleAvatar(
-                                radius: 18,
-                                backgroundColor: _getRankColor(idx + 1, p)
-                                    .withValues(alpha: 0.15),
-                                child: Text(
-                                  '#${idx + 1}',
-                                  style: TextStyle(
-                                    color: _getRankColor(idx + 1, p),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.label,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                artistName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: AppFontSize.body,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '$trackCount ${context.l10n.browseTracksInLibrary}',
+                            Icon(Icons.error_outline_rounded,
+                                color: p.error, size: 22),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                '${context.l10n.browseFailedToFetch}: $_loadError',
                                 style: TextStyle(
                                     color: p.textSecondary,
                                     fontSize: AppFontSize.label),
                               ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s10,
-                                    vertical: AppSpacing.xxs),
-                                decoration: BoxDecoration(
-                                  color: p.accent.withValues(alpha: 0.15),
-                                  borderRadius: AppRadii.r12All,
-                                ),
-                                child: Text(
-                                  '$plays ${context.l10n.browsePlays}',
-                                  style: TextStyle(
-                                    color: p.accent,
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
                             ),
-                            if (!isLast)
-                              Divider(
-                                color: p.hairline.withValues(alpha: 0.5),
-                                height: 1,
-                                indent: 56,
-                              ),
+                            TextButton(
+                              onPressed: _loadAllSongs,
+                              child: Text(context.l10n.retry),
+                            ),
                           ],
+                        ),
+                      ),
+                    LayoutBuilder(builder: (context, constraints) {
+                      final scale =
+                          MediaQuery.textScalerOf(context).scale(14) / 14;
+                      final columns = scale > 1.5 || constraints.maxWidth < 340
+                          ? 1
+                          : constraints.maxWidth >= 700 && scale <= 1.2
+                              ? 4
+                              : 2;
+                      final width = (constraints.maxWidth -
+                              AppSpacing.sm * (columns - 1)) /
+                          columns;
+                      return Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
+                          children: [
+                            SizedBox(
+                                width: width,
+                                child: _buildMetricCard(
+                                  context,
+                                  icon: Icons.music_note_rounded,
+                                  title: context.l10n.browseTotalTracks,
+                                  value: songs.length.toString(),
+                                  color: p.primary,
+                                  p: p,
+                                )),
+                            SizedBox(
+                                width: width,
+                                child: _buildMetricCard(
+                                  context,
+                                  icon: Icons.play_circle_filled_rounded,
+                                  title: context.l10n.browseTotalPlays,
+                                  value: totalPlays.toString(),
+                                  color: p.accent,
+                                  p: p,
+                                )),
+                            SizedBox(
+                                width: width,
+                                child: _buildMetricCard(
+                                  context,
+                                  icon: Icons.access_time_filled_rounded,
+                                  title: context.l10n.browseListeningTime,
+                                  value:
+                                      '$totalHours ${context.l10n.browseHoursShort}',
+                                  color: p.warning,
+                                  p: p,
+                                )),
+                            SizedBox(
+                                width: width,
+                                child: _buildMetricCard(
+                                  context,
+                                  icon: Icons.storage_rounded,
+                                  title: context.l10n.browseDiskStorage,
+                                  value: '$totalGb GB',
+                                  color: p.success,
+                                  p: p,
+                                ))
+                          ]);
+                    }),
+                    const SizedBox(height: AppSpacing.lg),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.s18),
+                      decoration: BoxDecoration(
+                        color: p.surfaceCard,
+                        borderRadius: AppRadii.r20All,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.high_quality_rounded,
+                                  color: p.primary, size: 22),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(
+                                  child: Text(context.l10n.audioQualityTiers,
+                                      style: TextStyle(
+                                          fontSize: AppFontSize.callout,
+                                          fontWeight: FontWeight.w700,
+                                          color: p.textPrimary))),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                              '${albums.length} ${context.l10n.albums} · ${artists.length} ${context.l10n.artists}',
+                              style: TextStyle(
+                                  fontSize: AppFontSize.label,
+                                  color: p.textSecondary)),
+                          const SizedBox(height: AppSpacing.s14),
+                          ClipRRect(
+                            borderRadius: AppRadii.r8All,
+                            child: Row(
+                              children: [
+                                if (songs.isNotEmpty) ...[
+                                  Expanded(
+                                    flex: losslessCount > 0 ? losslessCount : 1,
+                                    child: Container(
+                                      height: 12,
+                                      color: p.info,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: lossyCount > 0 ? lossyCount : 1,
+                                    child: Container(
+                                      height: 12,
+                                      color: p.surfaceContainer,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            children: [
+                              Text(
+                                '${context.l10n.browseLosslessHiRes} $losslessCount ${context.l10n.browseTracks}',
+                                style: TextStyle(
+                                  fontSize: AppFontSize.label,
+                                  color: p.info,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${context.l10n.browseStandardLossy} $lossyCount ${context.l10n.browseTracks}',
+                                style: TextStyle(
+                                    fontSize: AppFontSize.label,
+                                    color: p.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+
+                    // Top Played Songs Section
+                    _buildSectionHeader(
+                      title: context.l10n.browseMostPlayedTracks,
+                      subtitle: context.l10n.browseMostPlayedTracksSubtitle,
+                      icon: Icons.leaderboard_rounded,
+                      p: p,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    PulsrSegmentedControl(
+                      segments: [
+                        PulsrSegment(
+                          label: context.l10n.statsTimeRange7Days,
+                          icon: Icons.date_range_rounded,
+                        ),
+                        PulsrSegment(
+                          label: context.l10n.statsTimeRange30Days,
+                          icon: Icons.calendar_month_rounded,
+                        ),
+                        PulsrSegment(
+                          label: context.l10n.statsTimeRangeAllTime,
+                          icon: Icons.all_inclusive_rounded,
+                        ),
+                      ],
+                      selectedIndex: _timeRangeIndex,
+                      onChanged: _setTimeRange,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (topSongs.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.s20),
+                        decoration: BoxDecoration(
+                          color: p.surfaceCard,
+                          borderRadius: AppRadii.r16All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Center(
+                          child: Text(
+                            context.l10n.noPlayHistory,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.bodySmall),
+                          ),
+                        ),
+                      )
+                    else
+                      ...List.generate(topSongs.length, (index) {
+                        final song = topSongs[index];
+                        return _buildSongLeaderboardTile(
+                          context,
+                          rank: index + 1,
+                          song: song,
+                          queue: topSongs,
+                          p: p,
                         );
                       }),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                ],
+                    const SizedBox(height: AppSpacing.lg),
 
-                // Recently Played Section
-                if (recentlyPlayed.isNotEmpty) ...[
-                  _buildSectionHeader(
-                    title: context.l10n.recentlyPlayed,
-                    subtitle: context.l10n.browseLatestTracksSubtitle,
-                    icon: Icons.history_rounded,
-                    p: p,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ...List.generate(recentlyPlayed.length, (index) {
-                    final song = recentlyPlayed[index];
-                    return _buildSongLeaderboardTile(
-                      context,
-                      rank: null,
-                      song: song,
-                      queue: recentlyPlayed,
-                      p: p,
-                    );
-                  }),
-                ],
-              ],
+                    // Top Artists Section
+                    if (topArtists.isNotEmpty) ...[
+                      _buildSectionHeader(
+                        title: context.l10n.browseTopArtists,
+                        subtitle: context.l10n.browseTopArtistsSubtitle,
+                        icon: Icons.person_search_rounded,
+                        p: p,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: p.surfaceCard,
+                          borderRadius: AppRadii.r18All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Column(
+                          children: List.generate(topArtists.length, (idx) {
+                            final entry = topArtists[idx];
+                            final artistName = entry.key;
+                            final plays = entry.value;
+                            final trackCount =
+                                artistTrackCounts[artistName] ?? 0;
+                            final isLast = idx == topArtists.length - 1;
+
+                            return Column(
+                              children: [
+                                ListTile(
+                                  leading: CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: _getRankColor(idx + 1, p)
+                                        .withValues(alpha: 0.15),
+                                    child: Text(
+                                      '#${idx + 1}',
+                                      style: TextStyle(
+                                        color: _getRankColor(idx + 1, p),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    artistName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: AppFontSize.body,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '$trackCount ${context.l10n.browseTracksInLibrary}',
+                                    style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label),
+                                  ),
+                                  trailing: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.s10,
+                                        vertical: AppSpacing.xxs),
+                                    decoration: BoxDecoration(
+                                      color: p.accent.withValues(alpha: 0.15),
+                                      borderRadius: AppRadii.r12All,
+                                    ),
+                                    child: Text(
+                                      '$plays ${context.l10n.browsePlays}',
+                                      style: TextStyle(
+                                        color: p.accent,
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (!isLast)
+                                  Divider(
+                                    color: p.hairline.withValues(alpha: 0.5),
+                                    height: 1,
+                                    indent: 56,
+                                  ),
+                              ],
+                            );
+                          }),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+
+                    // Recently Played Section
+                    if (recentlyPlayed.isNotEmpty) ...[
+                      _buildSectionHeader(
+                        title: context.l10n.recentlyPlayed,
+                        subtitle: context.l10n.browseLatestTracksSubtitle,
+                        icon: Icons.history_rounded,
+                        p: p,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      ...List.generate(recentlyPlayed.length, (index) {
+                        final song = recentlyPlayed[index];
+                        return _buildSongLeaderboardTile(
+                          context,
+                          rank: null,
+                          song: song,
+                          queue: recentlyPlayed,
+                          p: p,
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ),
             );
           },
         ),

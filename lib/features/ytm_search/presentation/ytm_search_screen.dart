@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
@@ -317,8 +318,9 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
               physics: const AlwaysScrollableScrollPhysics(),
               addAutomaticKeepAlives: false,
               addRepaintBoundaries: true,
-              padding: const EdgeInsets.only(
-                  bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+              padding: EdgeInsets.only(
+                  bottom: PulsrLayoutMetrics.scrollBottom(context),
+                  top: AppSpacing.xxs),
               itemCount: songs.length,
               itemBuilder: (context, index) {
                 final song = songs[index];

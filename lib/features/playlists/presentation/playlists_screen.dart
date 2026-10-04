@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -620,8 +621,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(
-            bottom: AppSpacing.scrollBottom, top: AppSpacing.sm),
+        padding: EdgeInsets.only(
+            bottom: PulsrLayoutMetrics.scrollBottom(context),
+            top: AppSpacing.sm),
         children: [
           // Liked songs hero card (Local favorites)
           Padding(

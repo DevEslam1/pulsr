@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/ytm_browse/presentation/ytm_browse_screen.dart
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -143,9 +144,10 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                           child: ConstrainedBox(
                             constraints: Adaptive.contentConstraints(context),
                             child: ListView.separated(
-                              padding: const EdgeInsets.only(
+                              padding: EdgeInsets.only(
                                   top: AppSpacing.md,
-                                  bottom: AppSpacing.scrollBottom),
+                                  bottom:
+                                      PulsrLayoutMetrics.scrollBottom(context)),
                               itemCount: _sections.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: AppSpacing.lg),

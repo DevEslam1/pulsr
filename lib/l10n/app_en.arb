@@ -5305,5 +5305,6 @@
   "proBadge": "PRO",
   "@proBadge": {"description":"Badge marking a professional-mode-only setting"},
   "nowPlayingPreview": "▶ Now Playing",
-  "@nowPlayingPreview": {"description":"Mock mini-player pill label inside the dock style preview"}
+  "@nowPlayingPreview": {"description":"Mock mini-player pill label inside the dock style preview"},
+  "compactView": "Compact view"
 }

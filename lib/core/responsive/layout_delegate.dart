@@ -72,6 +72,12 @@ class PulsrLayoutDelegate {
   }) {
     final isLandscape = orientation == Orientation.landscape;
 
+    // A wide phone still has phone-sized vertical space after rotation.
+    // Resolve this before width tiers so crossing 840dp never opens a sidebar.
+    if (isLandscape && height < PulsrBreakpoint.shortHeightThreshold) {
+      return ShellLayoutMode.bottomNavWide;
+    }
+
     if (breakpoint == PulsrBreakpoint.large) {
       return ShellLayoutMode.sideRailFull;
     }

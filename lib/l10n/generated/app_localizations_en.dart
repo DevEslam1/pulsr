@@ -8219,4 +8219,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nowPlayingPreview => '▶ Now Playing';
+
+  @override
+  String get compactView => 'Compact view';
 }

@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -703,7 +704,7 @@ class _StartPage extends StatelessWidget {
           Adaptive.pagePadding(context),
           AppSpacing.sm,
           Adaptive.pagePadding(context),
-          AppSpacing.scrollBottom),
+          PulsrLayoutMetrics.scrollBottom(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1019,8 +1020,9 @@ class _LocalResults extends StatelessWidget {
               childCount: state.results.length,
             ),
           ),
-          const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.scrollBottom)),
+          SliverToBoxAdapter(
+              child:
+                  SizedBox(height: PulsrLayoutMetrics.scrollBottom(context))),
         ],
       ),
     );
@@ -1199,8 +1201,9 @@ class _UnifiedSearchResultsState extends State<_UnifiedSearchResults> {
                     parent: BouncingScrollPhysics()),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.only(
-                    bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+                padding: EdgeInsets.only(
+                    bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    top: AppSpacing.xxs),
                 children: [
                   _buildSectionHeader(
                     context: context,
@@ -1660,8 +1663,9 @@ class _OnlineResults extends StatelessWidget {
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             addAutomaticKeepAlives: false,
             addRepaintBoundaries: true,
-            padding: const EdgeInsets.only(
-                bottom: AppSpacing.scrollBottom, top: AppSpacing.xxs),
+            padding: EdgeInsets.only(
+                bottom: PulsrLayoutMetrics.scrollBottom(context),
+                top: AppSpacing.xxs),
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];

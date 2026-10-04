@@ -6,6 +6,7 @@ import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../responsive/pulsr_layout_metrics.dart';
 import '../theme/aura_theme.dart';
+import '../utils/l10n_extensions.dart';
 
 /// {@category DesignSystem}
 /// Standard, responsive search input field used across Settings, Library,
@@ -189,7 +190,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
                     color: p.textSecondary,
                     size: 18,
                   ),
-                  tooltip: 'Clear',
+                  tooltip: context.l10n.clear,
                   onPressed: _handleClear,
                 )
               : null,

@@ -1,6 +1,41 @@
 // lib/core/widgets/pulsr_dock_tracker.dart
 import 'package:flutter/material.dart';
 
+/// Reserves space only in content that actually shares the shell's dock.
+/// Standalone routes have no scope and do not inherit an offstage dock's height.
+class PulsrDockScope extends InheritedWidget {
+  final double height;
+  const PulsrDockScope({super.key, required this.height, required super.child});
+
+  static double heightOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PulsrDockScope>()?.height ?? 0;
+
+  @override
+  bool updateShouldNotify(PulsrDockScope oldWidget) =>
+      height != oldWidget.height;
+}
+
+class PulsrDockAware extends StatelessWidget {
+  final Widget child;
+  final bool heightIncludesSafeArea;
+  const PulsrDockAware(
+      {super.key, required this.child, this.heightIncludesSafeArea = false});
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<double>(
+        valueListenable: PulsrDockTracker.dockHeight,
+        child: child,
+        builder: (context, height, child) => PulsrDockScope(
+          height: (height -
+                  (heightIncludesSafeArea
+                      ? MediaQuery.paddingOf(context).bottom
+                      : 0))
+              .clamp(0.0, double.infinity),
+          child: child!,
+        ),
+      );
+}
+
 /// {@category DesignSystem}
 /// Global tracker for bottom-docked surfaces (MiniPlayer dock in AppShell,
 /// tablet player bar, bottom nav bar).

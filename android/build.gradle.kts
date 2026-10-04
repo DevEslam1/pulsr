@@ -50,6 +50,11 @@ subprojects {
             }
             android.compileSdk = 37
         }
+        // Plugins can overwrite compileSdk in their own android block. Apply
+        // the same SDK floor after that DSL is complete, before variants exist.
+        extensions.findByType(
+            com.android.build.api.variant.LibraryAndroidComponentsExtension::class.java
+        )?.finalizeDsl { library -> library.compileSdk = 37 }
     }
 }
 // Force Java 17 for all Android library/app projects after they are evaluated.

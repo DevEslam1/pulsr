@@ -6,6 +6,7 @@ import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import 'pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 /// {@category DesignSystem}
@@ -61,10 +62,10 @@ class PulsrSegmentedControl extends StatelessWidget {
             return Stack(
               children: [
                 // Sliding indicator pill
-                AnimatedPositioned(
+                AnimatedPositionedDirectional(
                   duration: context.motionMs(240),
                   curve: context.motionCurve(Curves.easeOutCubic),
-                  left: clampedIndex * segmentWidth,
+                  start: clampedIndex * segmentWidth,
                   top: 0,
                   bottom: 0,
                   width: segmentWidth,
@@ -91,8 +92,10 @@ class PulsrSegmentedControl extends StatelessWidget {
                           selected: clampedIndex == i,
                           button: true,
                           label: segments[i].label,
+                          onTap: () => onChanged(i),
                           excludeSemantics: true,
-                          child: GestureDetector(
+                          child: PulsrPressable(
+                            enableHaptics: false,
                             behavior: HitTestBehavior.opaque,
                             onTap: () {
                               if (clampedIndex != i) {
@@ -105,36 +108,41 @@ class PulsrSegmentedControl extends StatelessWidget {
                                 horizontal: AppSpacing.xs,
                                 vertical: AppSpacing.s10,
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    segments[i].icon,
-                                    size: 16,
-                                    color: clampedIndex == i
-                                        ? p.onAccent
-                                        : p.textSecondary,
-                                  ),
-                                  const SizedBox(width: AppSpacing.s6),
-                                  Flexible(
-                                    child: Text(
-                                      segments[i].count != null
-                                          ? '${segments[i].label} (${segments[i].count})'
-                                          : segments[i].label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.bodySmall,
-                                        fontWeight: clampedIndex == i
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
-                                        color: clampedIndex == i
-                                            ? p.onAccent
-                                            : p.textSecondary,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  minHeight: AppSpacing.minTouchTarget - 20,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      segments[i].icon,
+                                      size: 16,
+                                      color: clampedIndex == i
+                                          ? p.onAccent
+                                          : p.textSecondary,
+                                    ),
+                                    const SizedBox(width: AppSpacing.s6),
+                                    Flexible(
+                                      child: Text(
+                                        segments[i].count != null
+                                            ? '${segments[i].label} (${segments[i].count})'
+                                            : segments[i].label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: AppFontSize.bodySmall,
+                                          fontWeight: clampedIndex == i
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: clampedIndex == i
+                                              ? p.onAccent
+                                              : p.textSecondary,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -195,6 +203,7 @@ class _SegmentButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final content = AnimatedContainer(
+      constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
       duration: context.motionMs(200),
       curve: context.motionCurve(Curves.easeOutCubic),
       padding: const EdgeInsets.symmetric(
@@ -239,8 +248,10 @@ class _SegmentButton extends StatelessWidget {
       selected: isSelected,
       button: true,
       label: segment.label,
+      onTap: onTap,
       excludeSemantics: true,
-      child: GestureDetector(
+      child: PulsrPressable(
+        enableHaptics: false,
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: content,

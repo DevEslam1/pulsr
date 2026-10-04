@@ -258,7 +258,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
+                                    Expanded(
+                                        child: Row(
                                       children: [
                                         Container(
                                           width: 38,
@@ -271,7 +272,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                               color: p.accent, size: 20),
                                         ),
                                         const SizedBox(width: AppSpacing.s14),
-                                        Column(
+                                        Expanded(
+                                            child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
@@ -290,9 +292,9 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                                   fontSize: AppFontSize.label),
                                             ),
                                           ],
-                                        ),
+                                        )),
                                       ],
-                                    ),
+                                    )),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: AppSpacing.xs,
@@ -324,7 +326,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(
-                                          minWidth: 28, minHeight: 28),
+                                          minWidth: AppSpacing.minTouchTarget,
+                                          minHeight: AppSpacing.minTouchTarget),
                                       onPressed: state.minDurationSec == 30
                                           ? null
                                           : () => cubit.setMinDuration(30),
@@ -363,7 +366,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
+                              Expanded(
+                                  child: Row(
                                 children: [
                                   Container(
                                     width: 38,
@@ -376,7 +380,8 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                         color: p.accent, size: 20),
                                   ),
                                   const SizedBox(width: AppSpacing.s14),
-                                  Column(
+                                  Expanded(
+                                      child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -395,9 +400,9 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                             fontSize: AppFontSize.label),
                                       ),
                                     ],
-                                  ),
+                                  )),
                                 ],
-                              ),
+                              )),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: AppSpacing.xs,

@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/library/presentation/widgets/folder_browser_tab.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -98,7 +99,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
                 padding: EdgeInsetsDirectional.only(
-                  bottom: AppSpacing.scrollBottom,
+                  bottom: PulsrLayoutMetrics.scrollBottom(context),
                   top: 8,
                   start: Adaptive.pagePadding(context),
                   end: Adaptive.pagePadding(context),

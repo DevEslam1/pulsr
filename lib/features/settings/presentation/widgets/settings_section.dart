@@ -39,54 +39,67 @@ class SettingsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsetsDirectional.fromSTEB(
                 AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
-            child: Row(
-              children: [
-                if (icon != null) ...[
-                  Container(
-                    width: 24,
-                    height: 24,
-                    margin:
-                        const EdgeInsetsDirectional.only(end: AppSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.14),
-                      borderRadius: AppRadii.r8All,
-                    ),
-                    child: Icon(icon, size: 13, color: p.accent),
-                  ),
-                ],
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title.toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isProminent ? p.accent : p.textSecondary,
-                          fontSize: AppFontSize.label,
-                          fontWeight:
-                              isProminent ? FontWeight.w900 : FontWeight.w800,
-                          letterSpacing: AppTracking.overline,
-                        ),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final heading = Row(
+                children: [
+                  if (icon != null) ...[
+                    Container(
+                      width: 24,
+                      height: 24,
+                      margin:
+                          const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.14),
+                        borderRadius: AppRadii.r8All,
                       ),
-                      if (subtitle != null && subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.s2),
+                      child: Icon(icon, size: 13, color: p.accent),
+                    ),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          subtitle!,
+                          title.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: p.textTertiary,
+                            color: isProminent ? p.accent : p.textSecondary,
                             fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w500,
+                            fontWeight:
+                                isProminent ? FontWeight.w900 : FontWeight.w800,
+                            letterSpacing: AppTracking.overline,
                           ),
                         ),
+                        if (subtitle != null && subtitle!.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.s2),
+                          Text(
+                            subtitle!,
+                            style: TextStyle(
+                              color: p.textTertiary,
+                              fontSize: AppFontSize.label,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                if (trailing != null) trailing!,
-              ],
-            ),
+                ],
+              );
+              if (trailing == null) return heading;
+              if (constraints.maxWidth < 500 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 18) {
+                return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [heading, const SizedBox(height: 8), trailing!]);
+              }
+              return Row(children: [
+                Expanded(child: heading),
+                const SizedBox(width: 12),
+                trailing!
+              ]);
+            }),
           ),
           Material(
             color: isProminent

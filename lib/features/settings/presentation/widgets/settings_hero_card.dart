@@ -92,211 +92,229 @@ class SettingsHeroCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (AppConfig.isCloudSyncAllowed) ...[
-                        Row(
-                          children: [
-                            // Avatar / Icon with online ring
-                            Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: user != null
-                                        ? p.accent.withValues(alpha: 0.15)
-                                        : p.surface,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
+                        LayoutBuilder(builder: (context, constraints) {
+                          final identity = Row(
+                            children: [
+                              // Avatar / Icon with online ring
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
                                       color: user != null
-                                          ? p.accent.withValues(alpha: 0.4)
-                                          : p.hairline,
-                                      width: 1.5,
+                                          ? p.accent.withValues(alpha: 0.15)
+                                          : p.surface,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: user != null
+                                            ? p.accent.withValues(alpha: 0.4)
+                                            : p.hairline,
+                                        width: 1.5,
+                                      ),
                                     ),
-                                  ),
-                                  child: user?.photoURL != null
-                                      ? ClipOval(
-                                          child: Image.network(
-                                            user!.photoURL!,
-                                            fit: BoxFit.cover,
-                                            cacheWidth: 104,
-                                            cacheHeight: 104,
-                                            loadingBuilder:
-                                                (context, child, progress) =>
-                                                    progress == null
-                                                        ? child
-                                                        : Center(
-                                                            child: SizedBox(
-                                                              width: 16,
-                                                              height: 16,
-                                                              child: CircularProgressIndicator(
-                                                                  strokeWidth:
-                                                                      2,
-                                                                  color:
-                                                                      p.accent),
+                                    child: user?.photoURL != null
+                                        ? ClipOval(
+                                            child: Image.network(
+                                              user!.photoURL!,
+                                              fit: BoxFit.cover,
+                                              cacheWidth: 104,
+                                              cacheHeight: 104,
+                                              loadingBuilder:
+                                                  (context, child, progress) =>
+                                                      progress == null
+                                                          ? child
+                                                          : Center(
+                                                              child: SizedBox(
+                                                                width: 16,
+                                                                height: 16,
+                                                                child: CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2,
+                                                                    color: p
+                                                                        .accent),
+                                                              ),
                                                             ),
-                                                          ),
-                                            errorBuilder: (_, __, ___) => Icon(
-                                              Icons.person_rounded,
-                                              color: p.accent,
-                                              size: 26,
-                                            ),
-                                          ),
-                                        )
-                                      : Icon(
-                                          user != null
-                                              ? Icons.person_rounded
-                                              : Icons.cloud_outlined,
-                                          color: p.accent,
-                                          size: 26,
-                                        ),
-                                ),
-                                if (user != null)
-                                  PositionedDirectional(
-                                    bottom: 0,
-                                    end: 0,
-                                    child: Container(
-                                      width: 14,
-                                      height: 14,
-                                      decoration: BoxDecoration(
-                                        color: isSyncing ? p.accent : p.success,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: p.surfaceContainer,
-                                          width: 2.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: AppSpacing.s14),
-                            // User details
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          user?.displayName ??
-                                              user?.email ??
-                                              context.l10n.cloudSync,
-                                          style: TextStyle(
-                                            color: p.textPrimary,
-                                            fontSize: AppFontSize.bodyLarge,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: AppTracking.title,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (user != null) ...[
-                                        const SizedBox(width: AppSpacing.s6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: AppSpacing.s6,
-                                              vertical: AppSpacing.s2),
-                                          decoration: BoxDecoration(
-                                            color: p.accent
-                                                .withValues(alpha: 0.15),
-                                            borderRadius: AppRadii.r6All,
-                                          ),
-                                          child: Text(
-                                            context.l10n.syncedLabel,
-                                            style: TextStyle(
-                                              color: p.accent,
-                                              fontSize: AppFontSize.tiny,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: AppTracking.medium,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: AppSpacing.xxs),
-                                  Text(
-                                    syncSubtitle,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            // Action buttons
-                            if (user == null)
-                              FilledButton.icon(
-                                onPressed: () => AuthSheet.show(context),
-                                icon: const Icon(Icons.login_rounded, size: 16),
-                                label: Text(context.l10n.signIn),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: p.accent,
-                                  foregroundColor: p.onAccent,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.s14,
-                                      vertical: AppSpacing.xs),
-                                  textStyle: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.bodySmall,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.buttonRadius,
-                                  ),
-                                ),
-                              )
-                            else
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton.filledTonal(
-                                    constraints: const BoxConstraints(
-                                        minWidth: AppSpacing.minTouchTarget,
-                                        minHeight: AppSpacing.minTouchTarget),
-                                    tooltip: context.l10n.syncNow,
-                                    style: IconButton.styleFrom(
-                                      backgroundColor:
-                                          p.accent.withValues(alpha: 0.15),
-                                      foregroundColor: p.accent,
-                                      padding:
-                                          const EdgeInsets.all(AppSpacing.xs),
-                                    ),
-                                    icon: isSyncing
-                                        ? SizedBox(
-                                            width: AppSpacing.s18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: p.accent,
+                                              errorBuilder: (_, __, ___) =>
+                                                  Icon(
+                                                Icons.person_rounded,
+                                                color: p.accent,
+                                                size: 26,
+                                              ),
                                             ),
                                           )
-                                        : const Icon(Icons.sync_rounded,
-                                            size: 20),
-                                    onPressed: isSyncing
-                                        ? null
-                                        : () => authCubit.syncNow(),
+                                        : Icon(
+                                            user != null
+                                                ? Icons.person_rounded
+                                                : Icons.cloud_outlined,
+                                            color: p.accent,
+                                            size: 26,
+                                          ),
                                   ),
-                                  const SizedBox(width: AppSpacing.xxs),
-                                  IconButton(
-                                    constraints: const BoxConstraints(
-                                        minWidth: AppSpacing.minTouchTarget,
-                                        minHeight: AppSpacing.minTouchTarget),
-                                    tooltip: context.l10n.signOut,
-                                    icon: Icon(
-                                      Icons.logout_rounded,
-                                      color: p.textTertiary,
-                                      size: 20,
+                                  if (user != null)
+                                    PositionedDirectional(
+                                      bottom: 0,
+                                      end: 0,
+                                      child: Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color:
+                                              isSyncing ? p.accent : p.success,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: p.surfaceContainer,
+                                            width: 2.5,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    onPressed: () => authCubit.signOut(),
-                                  ),
                                 ],
                               ),
-                          ],
-                        ),
+                              const SizedBox(width: AppSpacing.s14),
+                              // User details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            user?.displayName ??
+                                                user?.email ??
+                                                context.l10n.cloudSync,
+                                            style: TextStyle(
+                                              color: p.textPrimary,
+                                              fontSize: AppFontSize.bodyLarge,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: AppTracking.title,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (user != null) ...[
+                                          const SizedBox(width: AppSpacing.s6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: AppSpacing.s6,
+                                                vertical: AppSpacing.s2),
+                                            decoration: BoxDecoration(
+                                              color: p.accent
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius: AppRadii.r6All,
+                                            ),
+                                            child: Text(
+                                              context.l10n.syncedLabel,
+                                              style: TextStyle(
+                                                color: p.accent,
+                                                fontSize: AppFontSize.tiny,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing:
+                                                    AppTracking.medium,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: AppSpacing.xxs),
+                                    Text(
+                                      syncSubtitle,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                          final action = user == null
+                              ? FilledButton.icon(
+                                  onPressed: () => AuthSheet.show(context),
+                                  icon:
+                                      const Icon(Icons.login_rounded, size: 16),
+                                  label: Text(context.l10n.signIn),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: p.accent,
+                                    foregroundColor: p.onAccent,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.s14,
+                                        vertical: AppSpacing.xs),
+                                    textStyle: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: AppFontSize.bodySmall,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: AppRadii.buttonRadius,
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton.filledTonal(
+                                      constraints: const BoxConstraints(
+                                          minWidth: AppSpacing.minTouchTarget,
+                                          minHeight: AppSpacing.minTouchTarget),
+                                      tooltip: context.l10n.syncNow,
+                                      style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            p.accent.withValues(alpha: 0.15),
+                                        foregroundColor: p.accent,
+                                        padding:
+                                            const EdgeInsets.all(AppSpacing.xs),
+                                      ),
+                                      icon: isSyncing
+                                          ? SizedBox(
+                                              width: AppSpacing.s18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: p.accent,
+                                              ),
+                                            )
+                                          : const Icon(Icons.sync_rounded,
+                                              size: 20),
+                                      onPressed: isSyncing
+                                          ? null
+                                          : () => authCubit.syncNow(),
+                                    ),
+                                    const SizedBox(width: AppSpacing.xxs),
+                                    IconButton(
+                                      constraints: const BoxConstraints(
+                                          minWidth: AppSpacing.minTouchTarget,
+                                          minHeight: AppSpacing.minTouchTarget),
+                                      tooltip: context.l10n.signOut,
+                                      icon: Icon(
+                                        Icons.logout_rounded,
+                                        color: p.textTertiary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => authCubit.signOut(),
+                                    ),
+                                  ],
+                                );
+                          final stacked = constraints.maxWidth < 420 ||
+                              MediaQuery.textScalerOf(context).scale(14) > 18;
+                          return stacked
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                      identity,
+                                      const SizedBox(height: 12),
+                                      action
+                                    ])
+                              : Row(children: [
+                                  Expanded(child: identity),
+                                  const SizedBox(width: 8),
+                                  action
+                                ]);
+                        }),
                         if (state.syncError != null) ...[
                           const SizedBox(height: AppSpacing.s10),
                           Container(

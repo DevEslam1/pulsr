@@ -134,7 +134,7 @@ mixin SettingsSearchResults
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: true,
       padding: EdgeInsetsDirectional.only(
-        bottom: AppSpacing.scrollBottom,
+        bottom: PulsrLayoutMetrics.scrollBottom(context),
         top: 8,
         start: Adaptive.pagePadding(context),
         end: Adaptive.pagePadding(context),
@@ -172,8 +172,9 @@ mixin SettingsSearchResults
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xxs,
                     children: [
                       Container(
                         margin: const EdgeInsets.only(bottom: AppSpacing.xxs),

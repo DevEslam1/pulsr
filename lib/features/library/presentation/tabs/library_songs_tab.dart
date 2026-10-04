@@ -246,8 +246,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     controller: _songsScrollController,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
-                    padding: const EdgeInsetsDirectional.only(
-                        bottom: AppSpacing.scrollBottom,
+                    padding: EdgeInsetsDirectional.only(
+                        bottom: PulsrLayoutMetrics.scrollBottom(context),
                         top: AppSpacing.xs,
                         start: AppSpacing.s6,
                         end: AppSpacing.s6),
@@ -275,8 +275,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                         : null,
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
-                    padding: const EdgeInsetsDirectional.only(
-                        bottom: AppSpacing.scrollBottom,
+                    padding: EdgeInsetsDirectional.only(
+                        bottom: PulsrLayoutMetrics.scrollBottom(context),
                         top: AppSpacing.xs,
                         start: AppSpacing.xxs,
                         end: AppSpacing.xxs),
@@ -433,8 +433,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
-                    padding: const EdgeInsetsDirectional.only(
-                        bottom: AppSpacing.scrollBottom,
+                    padding: EdgeInsetsDirectional.only(
+                        bottom: PulsrLayoutMetrics.scrollBottom(context),
                         top: AppSpacing.xxs,
                         start: AppSpacing.s6,
                         end: AppSpacing.s6),
@@ -500,8 +500,8 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     addAutomaticKeepAlives: false,
                     addRepaintBoundaries: true,
-                    padding: const EdgeInsetsDirectional.only(
-                        bottom: AppSpacing.scrollBottom,
+                    padding: EdgeInsetsDirectional.only(
+                        bottom: PulsrLayoutMetrics.scrollBottom(context),
                         top: AppSpacing.xxs,
                         start: AppSpacing.xxs,
                         end: AppSpacing.xxs),

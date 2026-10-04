@@ -154,13 +154,12 @@ void main() {
           (w) =>
               w is Container &&
               w.decoration is BoxDecoration &&
-              (w.decoration as BoxDecoration).borderRadius ==
-                  BorderRadius.circular(AppRadii.r20),
+              (w.decoration as BoxDecoration).borderRadius == AppRadii.r16All,
         ),
       ),
     );
     final boxDecor = container.decoration as BoxDecoration;
-    expect(boxDecor.borderRadius, BorderRadius.circular(AppRadii.r20));
+    expect(boxDecor.borderRadius, AppRadii.r16All);
 
     // Verify dock tracker receives the updated dock height
     expect(PulsrDockTracker.hasMiniPlayer.value, isTrue);

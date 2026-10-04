@@ -17,6 +17,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../core/widgets/staggered_reveal.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 
 class RadioScreen extends StatefulWidget {
   const RadioScreen({super.key});
@@ -243,7 +244,10 @@ class _RadioScreenState extends State<RadioScreen> {
           ),
         ],
       ),
-      body: _stations.isEmpty
+      body: Center(
+        child: ConstrainedBox(
+          constraints: PulsrLayoutMetrics.contentConstraints(context),
+          child: _stations.isEmpty
           ? RefreshIndicator(
               onRefresh: () async => _refresh(),
               color: p.accent,
@@ -251,8 +255,9 @@ class _RadioScreenState extends State<RadioScreen> {
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: SizedBox(
-                  height:
-                      MediaQuery.of(context).size.height - kToolbarHeight - 100,
+                      height: MediaQuery.of(context).size.height -
+                          kToolbarHeight -
+                          100,
                   child: Center(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -263,7 +268,8 @@ class _RadioScreenState extends State<RadioScreen> {
                             width: 76,
                             height: 76,
                             decoration: BoxDecoration(
-                              color: p.accentContainer.withValues(alpha: 0.35),
+                                  color:
+                                      p.accentContainer.withValues(alpha: 0.35),
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: p.accent.withValues(alpha: 0.25),
@@ -299,8 +305,8 @@ class _RadioScreenState extends State<RadioScreen> {
                             icon: const Icon(Icons.add_rounded, size: 20),
                             label: Text(
                               context.l10n.radioAddStation,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
                             ),
                             style: FilledButton.styleFrom(
                               backgroundColor: p.accent,
@@ -315,7 +321,8 @@ class _RadioScreenState extends State<RadioScreen> {
                           const SizedBox(height: AppSpacing.s10),
                           OutlinedButton.icon(
                             onPressed: _importCurated,
-                            icon: const Icon(Icons.explore_rounded, size: 18),
+                                icon:
+                                    const Icon(Icons.explore_rounded, size: 18),
                             label: Text(context.l10n.radioCuratedBrowse),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: p.accent,
@@ -339,12 +346,16 @@ class _RadioScreenState extends State<RadioScreen> {
           : Column(
               children: [
                 Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
-                      AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                          AppSpacing.md,
+                          AppSpacing.xs),
                   child: TextField(
                     controller: _searchController,
                     style: TextStyle(
-                        color: p.textPrimary, fontSize: AppFontSize.bodySmall),
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall),
                     decoration: InputDecoration(
                       hintText: context.l10n.radioSearchHint,
                       hintStyle: TextStyle(
@@ -367,9 +378,11 @@ class _RadioScreenState extends State<RadioScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
+                          fillColor:
+                              p.surfaceContainerHigh.withValues(alpha: 0.5),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.xs),
                       border: OutlineInputBorder(
                         borderRadius: AppRadii.r12All,
                         borderSide: BorderSide(color: p.hairline),
@@ -390,8 +403,8 @@ class _RadioScreenState extends State<RadioScreen> {
                     height: 38,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md),
                       itemCount: availableGenres.length,
                       separatorBuilder: (_, __) =>
                           const SizedBox(width: AppSpacing.xs),
@@ -405,8 +418,9 @@ class _RadioScreenState extends State<RadioScreen> {
                           checkmarkColor: p.accent,
                           labelStyle: TextStyle(
                             color: isSelected ? p.accent : p.textSecondary,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                             fontSize: AppFontSize.caption,
                           ),
                           side: BorderSide(
@@ -439,7 +453,8 @@ class _RadioScreenState extends State<RadioScreen> {
                                 icon: Icons.search_off_rounded,
                                 title: context.l10n
                                     .radioNoStationsMatch(_searchQuery),
-                                subtitle: context.l10n.radioNoStationsMatchDesc,
+                                    subtitle:
+                                        context.l10n.radioNoStationsMatchDesc,
                               ),
                             ),
                           ),
@@ -449,9 +464,10 @@ class _RadioScreenState extends State<RadioScreen> {
                           color: p.accent,
                           backgroundColor: p.surfaceContainer,
                           child: ListView.separated(
-                            padding: const EdgeInsets.only(
+                                padding: EdgeInsets.only(
                                 top: AppSpacing.xs,
-                                bottom: AppSpacing.scrollBottom),
+                                    bottom: PulsrLayoutMetrics.scrollBottom(
+                                        context)),
                             itemCount: filtered.length,
                             separatorBuilder: (_, __) => Divider(
                               height: 1,
@@ -464,7 +480,8 @@ class _RadioScreenState extends State<RadioScreen> {
                               return StaggeredReveal(
                                 index: index,
                                 groupKey: filtered.length,
-                                child: BlocBuilder<PlayerCubit, PlayerState>(
+                                    child:
+                                        BlocBuilder<PlayerCubit, PlayerState>(
                                   buildWhen: (prev, curr) =>
                                       prev.currentSong?.path !=
                                           curr.currentSong?.path ||
@@ -486,13 +503,15 @@ class _RadioScreenState extends State<RadioScreen> {
                                         height: 44,
                                         decoration: BoxDecoration(
                                           color: isPlaying
-                                              ? p.accent.withValues(alpha: 0.2)
+                                                  ? p.accent
+                                                      .withValues(alpha: 0.2)
                                               : p.accentContainer
                                                   .withValues(alpha: 0.35),
                                           borderRadius: AppRadii.r12All,
                                           border: isPlaying
                                               ? Border.all(
-                                                  color: p.accent, width: 1.5)
+                                                      color: p.accent,
+                                                      width: 1.5)
                                               : null,
                                         ),
                                         alignment: Alignment.center,
@@ -519,26 +538,31 @@ class _RadioScreenState extends State<RadioScreen> {
                                       subtitle: Row(
                                         children: [
                                           if (station.genre != null &&
-                                              station.genre!.isNotEmpty) ...[
+                                                  station
+                                                      .genre!.isNotEmpty) ...[
                                             Container(
                                               margin:
                                                   const EdgeInsetsDirectional
                                                       .only(end: 6),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
                                                       horizontal: 6,
                                                       vertical: 1.5),
                                               decoration: BoxDecoration(
                                                 color: p.accentContainer
-                                                    .withValues(alpha: 0.35),
-                                                borderRadius: AppRadii.r6All,
+                                                        .withValues(
+                                                            alpha: 0.35),
+                                                    borderRadius:
+                                                        AppRadii.r6All,
                                               ),
                                               child: Text(
                                                 station.genre!,
                                                 style: TextStyle(
                                                   color: p.accent,
-                                                  fontSize: AppFontSize.tiny,
-                                                  fontWeight: FontWeight.w700,
+                                                      fontSize:
+                                                          AppFontSize.tiny,
+                                                      fontWeight:
+                                                          FontWeight.w700,
                                                 ),
                                               ),
                                             ),
@@ -547,10 +571,12 @@ class _RadioScreenState extends State<RadioScreen> {
                                             child: Text(
                                               station.url,
                                               maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                               style: TextStyle(
                                                   color: p.textSecondary,
-                                                  fontSize: AppFontSize.label),
+                                                      fontSize:
+                                                          AppFontSize.label),
                                             ),
                                           ),
                                         ],
@@ -559,11 +585,12 @@ class _RadioScreenState extends State<RadioScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            constraints: const BoxConstraints(
-                                                minWidth:
-                                                    AppSpacing.minTouchTarget,
-                                                minHeight:
-                                                    AppSpacing.minTouchTarget),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                        minWidth: AppSpacing
+                                                            .minTouchTarget,
+                                                        minHeight: AppSpacing
+                                                            .minTouchTarget),
                                             tooltip: context.l10n.radioEdit,
                                             icon: Icon(Icons.edit_rounded,
                                                 color: p.textSecondary,
@@ -572,11 +599,12 @@ class _RadioScreenState extends State<RadioScreen> {
                                                 initial: station),
                                           ),
                                           IconButton(
-                                            constraints: const BoxConstraints(
-                                                minWidth:
-                                                    AppSpacing.minTouchTarget,
-                                                minHeight:
-                                                    AppSpacing.minTouchTarget),
+                                                constraints:
+                                                    const BoxConstraints(
+                                                        minWidth: AppSpacing
+                                                            .minTouchTarget,
+                                                        minHeight: AppSpacing
+                                                            .minTouchTarget),
                                             tooltip: isPlaying
                                                 ? context.l10n.pause
                                                 : context.l10n.radioPlay,
@@ -591,10 +619,12 @@ class _RadioScreenState extends State<RadioScreen> {
                                             ),
                                             onPressed: () {
                                               if (isCurrent) {
-                                                playerCubit.togglePlayPause();
+                                                    playerCubit
+                                                        .togglePlayPause();
                                               } else {
                                                 playerCubit
-                                                    .playRadioStation(station);
+                                                        .playRadioStation(
+                                                            station);
                                               }
                                             },
                                           ),
@@ -604,7 +634,8 @@ class _RadioScreenState extends State<RadioScreen> {
                                         if (isCurrent) {
                                           playerCubit.togglePlayPause();
                                         } else {
-                                          playerCubit.playRadioStation(station);
+                                              playerCubit
+                                                  .playRadioStation(station);
                                         }
                                       },
                                       onLongPress: () =>
@@ -618,6 +649,8 @@ class _RadioScreenState extends State<RadioScreen> {
                         ),
                 ),
               ],
+                ),
+        ),
             ),
     ));
   }

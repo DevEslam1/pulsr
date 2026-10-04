@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -280,7 +281,7 @@ class QueueScreen extends StatelessWidget {
                   padding: EdgeInsets.symmetric(
                     horizontal: context.pagePadding,
                     vertical: AppSpacing.xs,
-                  ).copyWith(bottom: AppSpacing.scrollBottom),
+                  ).copyWith(bottom: PulsrLayoutMetrics.scrollBottom(context)),
                   itemCount: queue.length,
                   onReorderStart: (index) {
                     HapticFeedback.mediumImpact();

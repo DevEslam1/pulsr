@@ -46,13 +46,16 @@ class ThemeRegistry {
     double scale = 0.4,
   }) {
     return IgnorePointer(
-      child: Transform.scale(
-        scale: scale,
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: 360,
-          height: 640,
-          child: build(mode, props),
+      child: SizedBox(
+        width: 360 * scale,
+        height: 640 * scale,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: 360,
+            height: 640,
+            child: build(mode, props),
+          ),
         ),
       ),
     );

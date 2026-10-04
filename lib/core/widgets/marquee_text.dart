@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../motion/pulsr_motion.dart';
 
 /// {@category DesignSystem}
 /// A widget that displays text normally when it fits within the parent bounds,
@@ -35,6 +36,7 @@ class _MarqueeTextState extends State<MarqueeText> {
   Timer? _scrollTimer;
   bool _isScrolling = false;
   bool _isHovered = false;
+  int _scrollGeneration = 0;
 
   double get _effectiveVelocity => widget.scrollSpeed ?? widget.velocity;
 
@@ -82,6 +84,7 @@ class _MarqueeTextState extends State<MarqueeText> {
   }
 
   void _stopScrolling() {
+    _scrollGeneration++;
     _scrollTimer?.cancel();
     _scrollTimer = null;
     _isScrolling = false;
@@ -92,18 +95,26 @@ class _MarqueeTextState extends State<MarqueeText> {
   }
 
   void _startScrolling(double maxScroll) {
-    if (_isScrolling || !mounted || maxScroll <= 0) return;
+    if (_isScrolling || !mounted || maxScroll <= 0 || !context.motionEnabled) {
+      return;
+    }
     _isScrolling = true;
+    final generation = ++_scrollGeneration;
+    bool isActive() =>
+        mounted &&
+        _isScrolling &&
+        generation == _scrollGeneration &&
+        context.motionEnabled;
 
     void cycle() {
-      if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
+      if (!isActive() || !_scrollController.hasClients) return;
 
       _scrollTimer = Timer(widget.pauseDuration, () async {
-        if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
+        if (!isActive() || !_scrollController.hasClients) return;
 
         // If hovered on desktop/tablet, wait until unhovered event-driven
         await _waitUntilUnhovered();
-        if (!mounted || !_isScrolling || !_scrollController.hasClients) return;
+        if (!isActive() || !_scrollController.hasClients) return;
 
         final duration = Duration(
           milliseconds: ((maxScroll / _effectiveVelocity) * 1000).toInt(),
@@ -116,17 +127,17 @@ class _MarqueeTextState extends State<MarqueeText> {
             curve: Curves.linear,
           );
 
-          if (!mounted || !_isScrolling || !_scrollController.hasClients) {
+          if (!isActive() || !_scrollController.hasClients) {
             return;
           }
 
           _scrollTimer = Timer(widget.pauseDuration, () async {
-            if (!mounted || !_isScrolling || !_scrollController.hasClients) {
+            if (!isActive() || !_scrollController.hasClients) {
               return;
             }
 
             await _waitUntilUnhovered();
-            if (!mounted || !_isScrolling || !_scrollController.hasClients) {
+            if (!isActive() || !_scrollController.hasClients) {
               return;
             }
 
@@ -149,12 +160,14 @@ class _MarqueeTextState extends State<MarqueeText> {
   @override
   Widget build(BuildContext context) {
     final effectiveStyle = widget.style ?? DefaultTextStyle.of(context).style;
+    final motionEnabled = context.motionEnabled;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final textPainter = TextPainter(
           text: TextSpan(text: widget.text, style: effectiveStyle),
           textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
           maxLines: 1,
         )..layout();
 
@@ -162,21 +175,27 @@ class _MarqueeTextState extends State<MarqueeText> {
         final availableWidth = constraints.maxWidth;
 
         // If text fits, display static text
-        if (textWidth <= availableWidth || availableWidth <= 0) {
+        if (!motionEnabled ||
+            textWidth <= availableWidth ||
+            availableWidth <= 0 ||
+            !availableWidth.isFinite) {
           _stopScrolling();
-          return Text(
-            widget.text,
-            style: effectiveStyle,
-            textAlign: widget.textAlign,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          return Tooltip(
+            message: widget.text,
+            child: Text(
+              widget.text,
+              style: effectiveStyle,
+              textAlign: widget.textAlign,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           );
         }
 
         // Text overflows -> animate marquee
         final maxScroll = textWidth - availableWidth + widget.blankSpace;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!_isScrolling) {
+          if (mounted && context.motionEnabled && !_isScrolling) {
             _startScrolling(maxScroll);
           }
         });

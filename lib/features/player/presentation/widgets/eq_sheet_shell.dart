@@ -378,7 +378,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                   child: Container(
-                    height: 38,
+                    height: PulsrLayoutMetrics.fieldHeight(context),
                     decoration: BoxDecoration(
                       color: p.surfaceContainer,
                       borderRadius: AppRadii.r20All,
@@ -485,7 +485,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 horizontal: AppSpacing.sm,
                                 vertical: AppSpacing.xxs),
                             child: Container(
-                              height: 34,
+                              height: PulsrLayoutMetrics.fieldHeight(context),
                               decoration: BoxDecoration(
                                 color: p.surfaceContainer,
                                 borderRadius: AppRadii.r20All,
@@ -1162,7 +1162,7 @@ extension _EqSheetShell on _EqualizerSheetState {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Container(
-        height: 38,
+        height: PulsrLayoutMetrics.fieldHeight(context) + 6,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
@@ -3011,7 +3011,7 @@ extension _EqSheetShell on _EqualizerSheetState {
 
         // Category Filter Chips
         SizedBox(
-          height: 34,
+          height: PulsrLayoutMetrics.fieldHeight(context),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             addAutomaticKeepAlives: false,

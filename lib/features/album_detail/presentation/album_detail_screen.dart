@@ -245,9 +245,9 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           ),
                         ),
                         SliverPadding(
-                          padding: const EdgeInsets.only(
+                          padding: EdgeInsets.only(
                               top: AppSpacing.xs,
-                              bottom: AppSpacing.scrollBottom),
+                              bottom: PulsrLayoutMetrics.scrollBottom(context)),
                           sliver: SliverList.builder(
                             addAutomaticKeepAlives: false,
                             addRepaintBoundaries: true,

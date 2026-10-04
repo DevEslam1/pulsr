@@ -14,6 +14,45 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
   Widget _buildTopHeader(BuildContext context) {
     final p = context.palette;
     final horizontalPad = Adaptive.pagePadding(context);
+    if (MediaQuery.viewInsetsOf(context).bottom > 0) {
+      return Padding(
+        padding: EdgeInsets.symmetric(
+            horizontal: horizontalPad, vertical: AppSpacing.xs),
+        child: PulsrSearchField(
+            controller: _searchController,
+            hintText: context.l10n.settingsSearchPlaceholder,
+            onClear: () {
+              if (mounted) setState(() => _searchQuery = '');
+            }),
+      );
+    }
+    final compact =
+        MediaQuery.sizeOf(context).height < 500 && context.isLandscape;
+
+    if (compact) {
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+            horizontalPad, AppSpacing.xs, horizontalPad, AppSpacing.xs),
+        child: Row(
+          children: [
+            Text(context.l10n.settings,
+                style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.titleLarge,
+                    fontWeight: FontWeight.w800)),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+                child: PulsrSearchField(
+              controller: _searchController,
+              hintText: context.l10n.settingsSearchPlaceholder,
+              onClear: () {
+                if (mounted) setState(() => _searchQuery = '');
+              },
+            )),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(

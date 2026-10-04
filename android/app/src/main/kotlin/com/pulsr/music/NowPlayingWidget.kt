@@ -574,12 +574,14 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val progressOnly = isProgressOnly && cached != null && !cached.isRecycled
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val viewsTiny = createPopulatedRemoteViews(context, R.layout.widget_now_playing_tiny, data, 44, progressOnly)
                     val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing_compact, data, 44, progressOnly)
                     val viewsSmall = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, progressOnly)
                     val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, progressOnly)
                     val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, progressOnly)
                     val viewMapping = mapOf(
-                        SizeF(140f, 60f) to viewsCompact,
+                        SizeF(140f, 60f) to viewsTiny,
+                        SizeF(250f, 60f) to viewsCompact,
                         SizeF(250f, 110f) to viewsSmall,
                         SizeF(250f, 170f) to viewsMedium,
                         SizeF(250f, 250f) to viewsLarge
@@ -591,6 +593,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                     val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
                     val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
                     val (layoutId, artDp) = when {
+                        minWidth < 250 -> Pair(R.layout.widget_now_playing_tiny, 44)
                         minHeight >= 250 -> Pair(R.layout.widget_now_playing_large, 88)
                         minHeight >= 170 -> Pair(R.layout.widget_now_playing_medium, 68)
                         minHeight >= 110 && minWidth >= 250 -> Pair(R.layout.widget_now_playing, 56)
@@ -759,7 +762,7 @@ class NowPlayingWidget : AppWidgetProvider() {
             if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_shuffle, if (isShuffle) View.VISIBLE else View.GONE)
                 views.setImageViewResource(R.id.widget_shuffle, R.drawable.ic_widget_shuffle)
-            } else if (layoutId != R.layout.widget_now_playing_compact) {
+            } else if (layoutId != R.layout.widget_now_playing_compact && layoutId != R.layout.widget_now_playing_tiny) {
                 views.setViewVisibility(R.id.widget_shuffle, View.VISIBLE)
                 views.setImageViewResource(
                     R.id.widget_shuffle,
@@ -780,7 +783,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                     R.id.widget_repeat,
                     if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
                 )
-            } else if (layoutId != R.layout.widget_now_playing_compact) {
+            } else if (layoutId != R.layout.widget_now_playing_compact && layoutId != R.layout.widget_now_playing_tiny) {
                 views.setViewVisibility(R.id.widget_repeat, View.VISIBLE)
                 views.setImageViewResource(
                     R.id.widget_repeat,
@@ -860,7 +863,7 @@ class NowPlayingWidget : AppWidgetProvider() {
             )
 
             // ---- 10 Granular Slider Seek Tap Zones (10% steps) ----
-            if (layoutId != R.layout.widget_now_playing_compact) {
+            if (layoutId != R.layout.widget_now_playing_compact && layoutId != R.layout.widget_now_playing_tiny) {
                 val seekViews = intArrayOf(
                     R.id.btn_seek_01, R.id.btn_seek_02, R.id.btn_seek_03, R.id.btn_seek_04, R.id.btn_seek_05,
                     R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10

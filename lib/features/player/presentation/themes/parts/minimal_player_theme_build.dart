@@ -88,72 +88,80 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                   }
                 }
               },
-              child: Column(
-                key: const ValueKey('minimal_art_display'),
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight:
-                            isLandscape ? 280 : double.infinity,
-                        maxWidth:
-                            isLandscape ? 280 : double.infinity,
-                      ),
-                      child: AspectRatio(
-                        aspectRatio: 1.0,
-                        child: Hero(
-                          tag: 'now_playing_art_minimal',
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: AppRadii.circular(
-                                  resolveCustomRadius(context, 20)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: activeColor.withValues(
-                                      alpha: 0.25),
-                                  blurRadius: 28,
-                                  spreadRadius: 1,
-                                  offset: const Offset(0, 10),
+              child: LayoutBuilder(
+                builder: (context, artConstraints) {
+                  final visualizerSpace = showVisualizer
+                      ? math.min(
+                          artConstraints.maxHeight,
+                          visualizerStyle == VisualizerStyle.circular
+                              ? 70.0
+                              : 46.0)
+                      : 0.0;
+                  final artworkSize = PlayerThemeMetrics.safeArtworkSize(
+                    availableWidth: artConstraints.maxWidth,
+                    availableHeight: artConstraints.maxHeight - visualizerSpace,
+                    isTablet: isTablet,
+                    maxAllowedOverride: isLandscape ? 280.0 : null,
+                  );
+                  return Column(
+                    key: const ValueKey('minimal_art_display'),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Center(
+                        child: SizedBox(
+                          width: artworkSize,
+                          height: artworkSize,
+                          child: AspectRatio(
+                            aspectRatio: 1.0,
+                            child: Hero(
+                              tag: 'now_playing_art_minimal',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: AppRadii.circular(
+                                      resolveCustomRadius(context, 20)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          activeColor.withValues(alpha: 0.25),
+                                      blurRadius: 28,
+                                      spreadRadius: 1,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: song != null
-                                ? CachedArtwork(
-                                    id: song.id,
-                                    albumId: song.albumId,
-                                    remoteUrl:
-                                        song.remoteArtworkUrl ??
+                                child: song != null
+                                    ? CachedArtwork(
+                                        id: song.id,
+                                        albumId: song.albumId,
+                                        remoteUrl: song.remoteArtworkUrl ??
                                             song.artworkUri,
-                                    type: ArtworkType.AUDIO,
-                                    size: double.infinity,
-                                    borderRadius:
-                                        resolveCustomRadius(
-                                            context, 20),
-                                    highQuality: true,
-                                  )
-                                : const SizedBox.shrink(),
+                                        type: ArtworkType.AUDIO,
+                                        size: double.infinity,
+                                        borderRadius:
+                                            resolveCustomRadius(context, 20),
+                                        highQuality: true,
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  if (showVisualizer) ...[
-                    const SizedBox(height: AppSpacing.s10),
-                    AudioVisualizer(
-                      style: visualizerStyle,
-                      color: activeColor,
-                      height: visualizerStyle ==
-                              VisualizerStyle.circular
-                          ? 60
-                          : 36,
-                      isPlaying: state.isPlaying,
-                      audioSessionId: state.audioSessionId,
-                      trackSeed: song?.id,
-                    ),
-                  ],
-                ],
+                      if (showVisualizer) ...[
+                        SizedBox(height: math.min(10.0, visualizerSpace)),
+                        AudioVisualizer(
+                          style: visualizerStyle,
+                          color: activeColor,
+                          height: math.max(0.0, visualizerSpace - 10),
+                          isPlaying: state.isPlaying,
+                          audioSessionId: state.audioSessionId,
+                          trackSeed: song?.id,
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             );
 
@@ -163,7 +171,8 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                     duration: context.motionMs(300),
                     child: state.isLyricsVisible
                         ? LyricsView(
-                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            key: ValueKey(
+                                'lyrics_${song?.id}_${song?.remoteId}'),
                             lyrics: state.lyrics,
                             isLoading: state.isLoadingLyrics,
                             activeColor: activeColor,

@@ -82,6 +82,10 @@ class _PulsrPressableState extends State<PulsrPressable>
   }
 
   void _handleTapUp(TapUpDetails _) {
+    _activate();
+  }
+
+  void _activate() {
     if (widget.onTap == null) return;
     if (widget.enableHaptics) {
       switch (widget.hapticStyle) {
@@ -121,56 +125,74 @@ class _PulsrPressableState extends State<PulsrPressable>
     }
 
     return FocusableActionDetector(
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            _activate();
+            return null;
+          },
+        ),
+      },
       onShowFocusHighlight: (value) {
         if (mounted && value != _focused) setState(() => _focused = value);
       },
-      child: GestureDetector(
-        behavior: widget.behavior,
-        onTapDown: _handleTapDown,
-        onTapUp: _handleTapUp,
-        onTapCancel: _handleTapCancel,
-        onLongPress: widget.onLongPress != null
-            ? () {
-                if (widget.enableHaptics) {
-                  switch (widget.hapticStyle) {
-                    case PulsrHapticStyle.heavy:
-                      HapticFeedback.heavyImpact();
-                      break;
-                    default:
-                      HapticFeedback.mediumImpact();
-                      break;
+      child: Semantics(
+        button: widget.onTap != null,
+        onTap: widget.onTap == null ? null : _activate,
+        onLongPress: widget.onLongPress,
+        child: GestureDetector(
+          excludeFromSemantics: true,
+          behavior: widget.behavior,
+          onTapDown: _handleTapDown,
+          onTapUp: _handleTapUp,
+          onTapCancel: _handleTapCancel,
+          onLongPress: widget.onLongPress != null
+              ? () {
+                  if (widget.enableHaptics) {
+                    switch (widget.hapticStyle) {
+                      case PulsrHapticStyle.heavy:
+                        HapticFeedback.heavyImpact();
+                        break;
+                      default:
+                        HapticFeedback.mediumImpact();
+                        break;
+                    }
                   }
+                  widget.onLongPress?.call();
                 }
-                widget.onLongPress?.call();
-              }
-            : null,
-        child: Stack(
-          children: [
-            AnimatedBuilder(
-              animation: _scaleAnimation,
-              builder: (context, child) {
-                if (!context.motionEnabled) return child!;
-                return Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: child,
-                );
-              },
-              child: widget.child,
-            ),
-            // Keyboard / switch-navigation focus ring.
-            if (_focused)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border:
-                          Border.all(color: context.palette.accent, width: 2),
-                      borderRadius: AppRadii.r12All,
+              : null,
+          child: Stack(
+            children: [
+              AnimatedBuilder(
+                animation: _scaleAnimation,
+                builder: (context, child) {
+                  if (!context.motionEnabled) return child!;
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: child,
+                  );
+                },
+                child: widget.child,
+              ),
+              // Keyboard / switch-navigation focus ring.
+              if (_focused)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border:
+                            Border.all(color: context.palette.accent, width: 2),
+                        borderRadius: AppRadii.r12All,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

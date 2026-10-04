@@ -8,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';

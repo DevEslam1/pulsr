@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/player/presentation/themes/custom_theme_builder_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -224,255 +225,270 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             ),
           ],
         ),
-        body: ListView(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
-          children: [
-            // Live Theme Preview Controls & Card
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: ListView(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s20,
+                  AppSpacing.sm,
+                  AppSpacing.s20,
+                  PulsrLayoutMetrics.scrollBottom(context)),
               children: [
-                Text(
-                  context.l10n.livePreview,
-                  style: TextStyle(
-                    fontSize: AppFontSize.callout,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                  ),
+                // Live Theme Preview Controls & Card
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  children: [
+                    Text(
+                      context.l10n.livePreview,
+                      style: TextStyle(
+                        fontSize: AppFontSize.callout,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => setState(
+                          () => _showPlayerPreview = !_showPlayerPreview),
+                      icon: Icon(
+                        _showPlayerPreview
+                            ? Icons.view_compact_rounded
+                            : Icons.play_circle_outline_rounded,
+                        size: 18,
+                        color: Color(_accentColor),
+                      ),
+                      label: Text(
+                        _showPlayerPreview
+                            ? context.l10n.compactView
+                            : context.l10n.nowPlaying,
+                        style: TextStyle(
+                          color: Color(_accentColor),
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.bodySmall,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                TextButton.icon(
-                  onPressed: () =>
-                      setState(() => _showPlayerPreview = !_showPlayerPreview),
-                  icon: Icon(
-                    _showPlayerPreview
-                        ? Icons.view_compact_rounded
-                        : Icons.play_circle_outline_rounded,
-                    size: 18,
-                    color: Color(_accentColor),
-                  ),
-                  label: Text(
-                    _showPlayerPreview ? 'Compact View' : 'Now Playing View',
-                    style: TextStyle(
-                      color: Color(_accentColor),
-                      fontWeight: FontWeight.w700,
-                      fontSize: AppFontSize.bodySmall,
+                const SizedBox(height: AppSpacing.xs),
+                if (_showPlayerPreview)
+                  Container(
+                    height: 340,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: p.bg,
+                      borderRadius: AppRadii.circular(_cornerRadius),
+                      border: Border.all(
+                        color: Color(_accentColor).withValues(alpha: 0.4),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        if (_glowEnabled)
+                          BoxShadow(
+                            color: Color(_accentColor).withValues(alpha: 0.25),
+                            blurRadius: 30,
+                            spreadRadius: 2,
+                          ),
+                      ],
+                    ),
+                    child: Builder(
+                      builder: (ctx) {
+                        try {
+                          final playerCubit = ctx.watch<PlayerCubit>();
+                          final props = PlayerThemeProps(
+                            state: playerCubit.state,
+                            cubit: playerCubit,
+                            activeColor: Color(_accentColor),
+                            bgColor: p.bg,
+                          );
+                          return ThemeRegistry.preview(
+                            PlayerThemeMode.classic,
+                            props,
+                            scale: 0.52,
+                          );
+                        } catch (_) {
+                          return Center(
+                            child: Text(
+                              context.l10n.livePreview,
+                              style: TextStyle(color: p.textSecondary),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  )
+                else
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 220),
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.darkSurface,
+                      borderRadius: AppRadii.circular(_cornerRadius),
+                      border: Border.all(
+                          color: Color(_accentColor).withValues(alpha: 0.4),
+                          width: 1.5),
+                      boxShadow: [
+                        if (_glowEnabled)
+                          BoxShadow(
+                            color: Color(_accentColor).withValues(alpha: 0.25),
+                            blurRadius: 30,
+                            spreadRadius: 2,
+                          ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color:
+                                    Color(_accentColor).withValues(alpha: 0.2),
+                                borderRadius:
+                                    AppRadii.circular(_cornerRadius / 2),
+                              ),
+                              child: Icon(Icons.music_note_rounded,
+                                  color: Color(_accentColor), size: 32),
+                            ),
+                            const SizedBox(width: AppSpacing.s14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    context.l10n.livePreview,
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: AppFontSize.bodyLarge,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: AppSpacing.s2),
+                                  Text(
+                                    context.l10n.dspPulsrAudiophileEdition,
+                                    style: TextStyle(
+                                        color: AppColors.specularAt(0.7),
+                                        fontSize: AppFontSize.label),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        LinearProgressIndicator(
+                          value: 0.65,
+                          backgroundColor: Colors.white12,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              Color(_accentColor)),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.skip_previous_rounded,
+                                color: Colors.white, size: 28),
+                            const SizedBox(width: AppSpacing.lg),
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.s10),
+                              decoration: BoxDecoration(
+                                color: Color(_accentColor),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.play_arrow_rounded,
+                                  color: Colors.black, size: 28),
+                            ),
+                            const SizedBox(width: AppSpacing.lg),
+                            const Icon(Icons.skip_next_rounded,
+                                color: Colors.white, size: 28),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
+                const SizedBox(height: AppSpacing.lg),
+
+                Text(
+                  context.l10n.accentPalette,
+                  style: TextStyle(
+                      fontSize: AppFontSize.callout,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: _paletteOptions.map((colorVal) {
+                    final isSelected = _accentColor == colorVal;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() => _accentColor = colorVal);
+                        context
+                            .read<SettingsCubit>()
+                            .setCustomAccentColor(Color(colorVal));
+                      },
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Color(colorVal),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color:
+                                isSelected ? Colors.white : Colors.transparent,
+                            width: 3,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check_rounded,
+                                color: Colors.black, size: 22)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                Text(
+                  context.l10n.cornerRadiusLabel(_cornerRadius.round()),
+                  style: TextStyle(
+                      fontSize: AppFontSize.callout,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary),
+                ),
+                Slider(
+                  value: _cornerRadius,
+                  min: 0.0,
+                  max: 48.0,
+                  activeColor: Color(_accentColor),
+                  onChanged: (val) => setState(() => _cornerRadius = val),
+                  onChangeEnd: (val) =>
+                      context.read<SettingsCubit>().setCustomThemeRadius(val),
+                ),
+                const SizedBox(height: AppSpacing.md),
+
+                SwitchListTile(
+                  title: Text(context.l10n.ambientGlow,
+                      style: TextStyle(
+                          color: p.textPrimary, fontWeight: FontWeight.w600)),
+                  subtitle: Text(context.l10n.glowDesc,
+                      style: TextStyle(
+                          color: p.textSecondary, fontSize: AppFontSize.label)),
+                  value: _glowEnabled,
+                  activeThumbColor: Color(_accentColor),
+                  onChanged: (val) {
+                    setState(() => _glowEnabled = val);
+                    context.read<SettingsCubit>().setCustomThemeGlow(val);
+                  },
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xs),
-            if (_showPlayerPreview)
-              Container(
-                height: 340,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: p.bg,
-                  borderRadius: AppRadii.circular(_cornerRadius),
-                  border: Border.all(
-                    color: Color(_accentColor).withValues(alpha: 0.4),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    if (_glowEnabled)
-                      BoxShadow(
-                        color: Color(_accentColor).withValues(alpha: 0.25),
-                        blurRadius: 30,
-                        spreadRadius: 2,
-                      ),
-                  ],
-                ),
-                child: Builder(
-                  builder: (ctx) {
-                    try {
-                      final playerCubit = ctx.watch<PlayerCubit>();
-                      final props = PlayerThemeProps(
-                        state: playerCubit.state,
-                        cubit: playerCubit,
-                        activeColor: Color(_accentColor),
-                        bgColor: p.bg,
-                      );
-                      return ThemeRegistry.preview(
-                        PlayerThemeMode.classic,
-                        props,
-                        scale: 0.52,
-                      );
-                    } catch (_) {
-                      return Center(
-                        child: Text(
-                          context.l10n.livePreview,
-                          style: TextStyle(color: p.textSecondary),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              )
-            else
-              Container(
-                height: 220,
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.darkSurface,
-                  borderRadius: AppRadii.circular(_cornerRadius),
-                  border: Border.all(
-                      color: Color(_accentColor).withValues(alpha: 0.4),
-                      width: 1.5),
-                  boxShadow: [
-                    if (_glowEnabled)
-                      BoxShadow(
-                        color: Color(_accentColor).withValues(alpha: 0.25),
-                        blurRadius: 30,
-                        spreadRadius: 2,
-                      ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: Color(_accentColor).withValues(alpha: 0.2),
-                            borderRadius: AppRadii.circular(_cornerRadius / 2),
-                          ),
-                          child: Icon(Icons.music_note_rounded,
-                              color: Color(_accentColor), size: 32),
-                        ),
-                        const SizedBox(width: AppSpacing.s14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                context.l10n.livePreview,
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: AppFontSize.bodyLarge,
-                                    fontWeight: FontWeight.w700),
-                              ),
-                              const SizedBox(height: AppSpacing.s2),
-                              Text(
-                                context.l10n.dspPulsrAudiophileEdition,
-                                style: TextStyle(
-                                    color: AppColors.specularAt(0.7),
-                                    fontSize: AppFontSize.label),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    LinearProgressIndicator(
-                      value: 0.65,
-                      backgroundColor: Colors.white12,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(_accentColor)),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.skip_previous_rounded,
-                            color: Colors.white, size: 28),
-                        const SizedBox(width: AppSpacing.lg),
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.s10),
-                          decoration: BoxDecoration(
-                            color: Color(_accentColor),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.play_arrow_rounded,
-                              color: Colors.black, size: 28),
-                        ),
-                        const SizedBox(width: AppSpacing.lg),
-                        const Icon(Icons.skip_next_rounded,
-                            color: Colors.white, size: 28),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: AppSpacing.lg),
-
-            Text(
-              context.l10n.accentPalette,
-              style: TextStyle(
-                  fontSize: AppFontSize.callout,
-                  fontWeight: FontWeight.w700,
-                  color: p.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: _paletteOptions.map((colorVal) {
-                final isSelected = _accentColor == colorVal;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => _accentColor = colorVal);
-                    context
-                        .read<SettingsCubit>()
-                        .setCustomAccentColor(Color(colorVal));
-                  },
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Color(colorVal),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected ? Colors.white : Colors.transparent,
-                        width: 3,
-                      ),
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check_rounded,
-                            color: Colors.black, size: 22)
-                        : null,
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            Text(
-              context.l10n.cornerRadiusLabel(_cornerRadius.round()),
-              style: TextStyle(
-                  fontSize: AppFontSize.callout,
-                  fontWeight: FontWeight.w700,
-                  color: p.textPrimary),
-            ),
-            Slider(
-              value: _cornerRadius,
-              min: 0.0,
-              max: 48.0,
-              activeColor: Color(_accentColor),
-              onChanged: (val) => setState(() => _cornerRadius = val),
-              onChangeEnd: (val) =>
-                  context.read<SettingsCubit>().setCustomThemeRadius(val),
-            ),
-            const SizedBox(height: AppSpacing.md),
-
-            SwitchListTile(
-              title: Text(context.l10n.ambientGlow,
-                  style: TextStyle(
-                      color: p.textPrimary, fontWeight: FontWeight.w600)),
-              subtitle: Text(context.l10n.glowDesc,
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.label)),
-              value: _glowEnabled,
-              activeThumbColor: Color(_accentColor),
-              onChanged: (val) {
-                setState(() => _glowEnabled = val);
-                context.read<SettingsCubit>().setCustomThemeGlow(val);
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );

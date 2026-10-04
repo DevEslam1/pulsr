@@ -8164,4 +8164,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get nowPlayingPreview => '▶ قيد التشغيل الآن';
+
+  @override
+  String get compactView => 'العرض المصغر';
 }

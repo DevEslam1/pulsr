@@ -883,8 +883,8 @@ class PlayerTopBar extends StatelessWidget {
       required VoidCallback onTap,
     }) {
       return SizedBox(
-        width: isTablet ? 48 : 44,
-        height: isTablet ? 48 : 44,
+        width: 48,
+        height: 48,
         child: Material(
           color: AppColors.specular,
           shape: const CircleBorder(),
@@ -947,8 +947,11 @@ class PlayerTopBar extends StatelessWidget {
                               animate: state.isPlaying,
                             ),
                             const SizedBox(width: AppSpacing.s6),
-                            Text(
+                            Flexible(
+                                child: Text(
                               context.l10n.playingFrom.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -959,7 +962,7 @@ class PlayerTopBar extends StatelessWidget {
                                     color:
                                         resolvedSubtitle.withValues(alpha: 0.8),
                                   ),
-                            ),
+                            )),
                           ],
                         ),
                         const SizedBox(height: AppSpacing.s2),

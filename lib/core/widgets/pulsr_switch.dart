@@ -72,6 +72,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
   late final AnimationController _controller;
   late final Animation<double> _slideAnimation;
   bool _isPressed = false;
+  bool _focused = false;
 
   bool get isEnabled => widget.onChanged != null;
 
@@ -130,77 +131,114 @@ class _PulsrSwitchState extends State<PulsrSwitch>
 
     final thumbRadius = (widget.height - 6.0) / 2.0;
     final maxSlide = widget.width - widget.height;
+    final direction =
+        Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0;
 
-    return Semantics(
-      toggled: widget.value,
+    return FocusableActionDetector(
       enabled: isEnabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: isEnabled ? (_) => setState(() => _isPressed = true) : null,
-        onTapUp: isEnabled
-            ? (_) {
-                setState(() => _isPressed = false);
-                _toggle();
-              }
-            : null,
-        onTapCancel:
-            isEnabled ? () => setState(() => _isPressed = false) : null,
-        child: Opacity(
-          opacity: isEnabled ? 1.0 : 0.45,
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              final t = _controller.value;
-              final currentColor = Color.lerp(inactiveFill, activeFill, t)!;
+      shortcuts: const {
+        SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+        SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            _toggle();
+            return null;
+          },
+        ),
+      },
+      onShowFocusHighlight: (focused) => setState(() => _focused = focused),
+      child: Semantics(
+        toggled: widget.value,
+        enabled: isEnabled,
+        onTap: isEnabled ? _toggle : null,
+        child: GestureDetector(
+          excludeFromSemantics: true,
+          behavior: HitTestBehavior.opaque,
+          onTapDown:
+              isEnabled ? (_) => setState(() => _isPressed = true) : null,
+          onTapUp: isEnabled
+              ? (_) {
+                  setState(() => _isPressed = false);
+                  _toggle();
+                }
+              : null,
+          onTapCancel:
+              isEnabled ? () => setState(() => _isPressed = false) : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Opacity(
+                opacity: isEnabled ? 1.0 : 0.45,
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    final t = _controller.value;
+                    final currentColor =
+                        Color.lerp(inactiveFill, activeFill, t)!;
 
-              return Container(
-                width: widget.width,
-                height: widget.height,
-                padding: const EdgeInsets.all(3.0),
-                decoration: BoxDecoration(
-                  borderRadius: AppRadii.circular(widget.height / 2.0),
-                  color: currentColor,
-                  border: Border.all(
-                    color: t > 0.5
-                        ? activeFill.withValues(alpha: 0.20)
-                        : p.hairline,
-                    width: 1.0,
-                  ),
-                  boxShadow: t > 0.01
-                      ? [
-                          BoxShadow(
-                            color: activeFill.withValues(alpha: 0.30 * t),
-                            blurRadius: 10 * t,
-                            spreadRadius: -1 * t,
-                            offset: Offset(0, 2 * t),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Transform.translate(
-                    offset: Offset(_slideAnimation.value * maxSlide, 0),
-                    child: AnimatedContainer(
-                      duration: context.motionMs(140),
-                      width: _isPressed ? thumbRadius * 2.3 : thumbRadius * 2.0,
-                      height: thumbRadius * 2.0,
+                    return Container(
+                      width: widget.width,
+                      height: widget.height,
+                      padding: const EdgeInsets.all(3.0),
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: thumbFill,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.scrimAt(0.22),
-                            blurRadius: 4.0,
-                            offset: const Offset(0, 1.5),
-                          ),
-                        ],
+                        borderRadius: AppRadii.circular(widget.height / 2.0),
+                        color: currentColor,
+                        border: Border.all(
+                          color: _focused
+                              ? p.accent
+                              : t > 0.5
+                                  ? activeFill.withValues(alpha: 0.20)
+                                  : p.hairline,
+                          width: _focused ? 2.0 : 1.0,
+                        ),
+                        boxShadow: t > 0.01
+                            ? [
+                                BoxShadow(
+                                  color: activeFill.withValues(alpha: 0.30 * t),
+                                  blurRadius: 10 * t,
+                                  spreadRadius: -1 * t,
+                                  offset: Offset(0, 2 * t),
+                                ),
+                              ]
+                            : null,
                       ),
-                    ),
-                  ),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Transform.translate(
+                          offset: Offset(
+                              direction * _slideAnimation.value * maxSlide, 0),
+                          child: AnimatedContainer(
+                            duration: context.motionMs(140),
+                            width: _isPressed
+                                ? thumbRadius * 2.3
+                                : thumbRadius * 2.0,
+                            height: thumbRadius * 2.0,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: thumbFill,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.scrimAt(0.22),
+                                  blurRadius: 4.0,
+                                  offset: const Offset(0, 1.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),

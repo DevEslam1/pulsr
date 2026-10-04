@@ -17,9 +17,10 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- Album artwork -->
+        <!-- Hidden artwork for RemoteViews ID compatibility -->
         <ImageView
             android:id="@+id/widget_artwork"
+            android:visibility="gone"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:scaleType="centerCrop"
@@ -42,7 +43,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
                 android:textColor="#FFFFFF"
-                android:textSize="13.5sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
@@ -61,7 +62,7 @@
                 android:ellipsize="end" />
         </LinearLayout>
 
-        <!-- Compact playback controls -->
+        <!-- Keep one full-size playback button at the smallest widget width -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -73,7 +74,7 @@
                 android:visibility="gone"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:padding="8dp"
+                android:padding="6dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_skip_prev"
                 android:contentDescription="@string/widget_previous" />
@@ -91,9 +92,10 @@
 
             <ImageButton
                 android:id="@+id/btn_next"
+                android:visibility="gone"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:padding="8dp"
+                android:padding="6dp"
                 android:background="@drawable/widget_secondary_button_background"
                 android:src="@drawable/ic_widget_skip_next"
                 android:contentDescription="@string/widget_next" />

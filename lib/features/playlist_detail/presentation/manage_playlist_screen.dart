@@ -214,24 +214,29 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                           Expanded(
                             child: visibleSongs.isEmpty
                                 ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.search_off_rounded,
-                                            size: 48, color: p.textTertiary),
-                                        const SizedBox(height: AppSpacing.sm),
-                                        Text(
-                                          _searchQuery.isEmpty
-                                              ? context
-                                                  .l10n.browseNoSongsInLibrary
-                                              : '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
-                                          style: TextStyle(
-                                            color: p.textSecondary,
-                                            fontSize: AppFontSize.body,
+                                    child: SingleChildScrollView(
+                                      padding:
+                                          const EdgeInsets.all(AppSpacing.lg),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.search_off_rounded,
+                                              size: 48, color: p.textTertiary),
+                                          const SizedBox(height: AppSpacing.sm),
+                                          Text(
+                                            _searchQuery.isEmpty
+                                                ? context
+                                                    .l10n.browseNoSongsInLibrary
+                                                : '${context.l10n.browseNoSongsMatch} "$_searchQuery"',
+                                            style: TextStyle(
+                                              color: p.textSecondary,
+                                              fontSize: AppFontSize.body,
+                                            ),
+                                            textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   )
                                 : ListView.builder(

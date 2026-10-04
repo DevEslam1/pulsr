@@ -36,20 +36,16 @@ class _SplashScreenState extends State<SplashScreen> {
     if (_isChecking) return;
     _isChecking = true;
     try {
-      // Hold the intro for its full choreography, but never route before the DI
-      // graph is actually ready. The timeout is a safety net so a stuck
-      // initializer can never trap the user on the splash (I25).
+      // Route as soon as initialization is ready; the timeout keeps a stuck
+      // initializer recoverable without imposing a delay on every launch.
       bool timedOut = false;
       try {
-        await Future.wait<void>([
-          Future<void>.delayed(const Duration(milliseconds: 800)),
-          initializationReady.timeout(
-            const Duration(seconds: 8),
-            onTimeout: () {
-              timedOut = true;
-            },
-          ),
-        ]);
+        await initializationReady.timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            timedOut = true;
+          },
+        );
       } catch (e, st) {
         ErrorLogger.log('Splash initialization wait failed',
             error: e, stackTrace: st, category: 'Splash');

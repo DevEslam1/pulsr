@@ -6,6 +6,7 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -295,7 +296,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                         child: Align(
                           alignment: AlignmentDirectional.center,
                           child: Container(
-                            height: 38,
+                            height: PulsrLayoutMetrics.fieldHeight(context) + 6,
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
                               color: AppColors.specularAt(0.08),
@@ -321,8 +322,8 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                                   width: 1,
                                 ),
                               ),
-                              labelColor: Colors.white,
-                              unselectedLabelColor: AppColors.specularAt(0.60),
+                              labelColor: p.textPrimary,
+                              unselectedLabelColor: p.textSecondary,
                               labelStyle: const TextStyle(
                                 fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,

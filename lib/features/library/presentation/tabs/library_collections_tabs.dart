@@ -104,8 +104,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
-                padding: const EdgeInsets.only(
-                    bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
+                padding: EdgeInsets.only(
+                    bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    top: AppSpacing.xs),
                 itemCount: albums.length,
                 itemBuilder: (context, index) {
                   final album = albums[index];
@@ -247,8 +248,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 addAutomaticKeepAlives: false,
                 addRepaintBoundaries: true,
-                padding: const EdgeInsets.only(
-                    bottom: AppSpacing.scrollBottom, top: AppSpacing.xs),
+                padding: EdgeInsets.only(
+                    bottom: PulsrLayoutMetrics.scrollBottom(context),
+                    top: AppSpacing.xs),
                 itemCount: artists.length,
                 itemBuilder: (context, index) {
                   final artist = artists[index];

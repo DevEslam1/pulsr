@@ -14651,6 +14651,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'▶ Now Playing'**
   String get nowPlayingPreview;
+
+  /// No description provided for @compactView.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact view'**
+  String get compactView;
 }
 
 class _AppLocalizationsDelegate

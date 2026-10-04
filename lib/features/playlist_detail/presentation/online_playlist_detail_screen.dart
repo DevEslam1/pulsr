@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -304,7 +305,8 @@ class _OnlinePlaylistDetailScreenState
       color: p.accent,
       backgroundColor: p.surfaceContainer,
       child: ListView(
-        padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
+        padding:
+            EdgeInsets.only(bottom: PulsrLayoutMetrics.scrollBottom(context)),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           // ── HERO BANNER ─────────────────────────────────────────────

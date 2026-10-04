@@ -46,7 +46,7 @@ class PulsrSectionHeader extends StatelessWidget {
               onPressed: onAction,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
-                minimumSize: const Size(0, 36),
+                minimumSize: const Size(48, 48),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(

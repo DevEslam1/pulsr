@@ -1,3 +1,5 @@
+import 'package:pulsr/core/widgets/pulsr_key_value.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/error_logger.dart';
@@ -126,7 +128,7 @@ class CloudBackupDashboardScreenState
     final p = context.palette;
     final lastSync = _service?.lastSyncTime;
     final lastSyncStr = lastSync != null
-        ? '${lastSync.toLocal()}'.split('.').first
+        ? '${MaterialLocalizations.of(context).formatShortDate(lastSync.toLocal())} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(lastSync.toLocal()), alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))}'
         : context.l10n.settingsNeverLabel;
 
     return PulsrPagePopScope(
@@ -141,131 +143,129 @@ class CloudBackupDashboardScreenState
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700),
           ),
         ),
-        body: ListView(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, 120),
-          children: [
-            // Cloud Status Card
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.s18),
-              decoration: BoxDecoration(
-                color: p.surfaceCard,
-                borderRadius: AppRadii.r20All,
-                border: Border.all(color: p.hairline),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: ListView(
+              padding: EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s20,
+                  AppSpacing.sm,
+                  AppSpacing.s20,
+                  PulsrLayoutMetrics.scrollBottom(context)),
+              children: [
+                // Cloud Status Card
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s18),
+                  decoration: BoxDecoration(
+                    color: p.surfaceCard,
+                    borderRadius: AppRadii.r20All,
+                    border: Border.all(color: p.hairline),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.cloud_done_rounded,
-                              color: p.primary, size: 24),
-                          const SizedBox(width: AppSpacing.s10),
-                          Text(
-                            context.l10n.cloudStorageStatus,
-                            style: TextStyle(
-                                fontSize: AppFontSize.bodyLarge,
-                                fontWeight: FontWeight.w700,
-                                color: p.textPrimary),
-                          ),
-                        ],
+                      Row(children: [
+                        Icon(Icons.cloud_done_rounded,
+                            color: p.primary, size: 24),
+                        const SizedBox(width: AppSpacing.s10),
+                        Expanded(
+                            child: Text(context.l10n.cloudStorageStatus,
+                                style: TextStyle(
+                                    fontSize: AppFontSize.bodyLarge,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.textPrimary))),
+                        if (_isSyncing)
+                          SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: p.primary)),
+                      ]),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        context.l10n.cloudBackupDesc,
+                        style: TextStyle(
+                            fontSize: AppFontSize.bodySmall,
+                            color: p.textSecondary),
                       ),
-                      if (_isSyncing)
-                        SizedBox(
-                          width: AppSpacing.s20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: p.primary),
-                        ),
+                      const SizedBox(height: AppSpacing.s14),
+                      Divider(color: p.hairline),
+                      const SizedBox(height: AppSpacing.s10),
+                      PulsrKeyValue(
+                          label: Text(context.l10n.lastSynced,
+                              style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: AppFontSize.bodySmall)),
+                          value: Text(lastSyncStr,
+                              style: TextStyle(
+                                  color: p.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.bodySmall))),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    context.l10n.cloudBackupDesc,
-                    style: TextStyle(
-                        fontSize: AppFontSize.bodySmall,
-                        color: p.textSecondary),
-                  ),
-                  const SizedBox(height: AppSpacing.s14),
-                  Divider(color: p.hairline),
-                  const SizedBox(height: AppSpacing.s10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(context.l10n.lastSynced,
-                          style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.bodySmall)),
-                      Text(lastSyncStr,
-                          style: TextStyle(
-                              color: p.primary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppFontSize.bodySmall)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            Text(
-              context.l10n.whatGetsSynced,
-              style: TextStyle(
-                  fontSize: AppFontSize.callout,
-                  fontWeight: FontWeight.w700,
-                  color: p.textPrimary),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              context.l10n.cloudSyncItemsDesc,
-              style: TextStyle(
-                  fontSize: AppFontSize.bodySmall, color: p.textSecondary),
-            ),
-            const SizedBox(height: AppSpacing.md),
-
-            // Per-scope sync toggles (previously the service exposed them but
-            // no UI ever set or read them, so syncAll always synced everything).
-            _SyncScopeTile(
-              icon: Icons.favorite_rounded,
-              title: context.l10n.cloudSyncFavoritesLabel,
-              subtitle: context.l10n.cloudSyncFavoritesDesc,
-              value: _syncFavorites,
-              onChanged: _hasService ? _onFavoritesSyncChanged : null,
-            ),
-            _SyncScopeTile(
-              icon: Icons.queue_music_rounded,
-              title: context.l10n.cloudSyncPlaylistsLabel,
-              subtitle: context.l10n.cloudSyncPlaylistsDesc,
-              value: _syncPlaylists,
-              onChanged: _hasService ? _onPlaylistsSyncChanged : null,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: p.primary,
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadii.r16All),
                 ),
-                icon: Icon(Icons.sync_rounded, color: Colors.black),
-                label: Text(
-                  _isSyncing
-                      ? context.l10n.settingsSyncing
-                      : context.l10n.syncNow,
+                const SizedBox(height: AppSpacing.lg),
+
+                Text(
+                  context.l10n.whatGetsSynced,
                   style: TextStyle(
-                      color: Colors.black,
+                      fontSize: AppFontSize.callout,
                       fontWeight: FontWeight.w700,
-                      fontSize: AppFontSize.callout),
+                      color: p.textPrimary),
                 ),
-                onPressed: (_isSyncing || !_hasService) ? null : _performSync,
-              ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  context.l10n.cloudSyncItemsDesc,
+                  style: TextStyle(
+                      fontSize: AppFontSize.bodySmall, color: p.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.md),
+
+                // Per-scope sync toggles (previously the service exposed them but
+                // no UI ever set or read them, so syncAll always synced everything).
+                _SyncScopeTile(
+                  icon: Icons.favorite_rounded,
+                  title: context.l10n.cloudSyncFavoritesLabel,
+                  subtitle: context.l10n.cloudSyncFavoritesDesc,
+                  value: _syncFavorites,
+                  onChanged: _hasService ? _onFavoritesSyncChanged : null,
+                ),
+                _SyncScopeTile(
+                  icon: Icons.queue_music_rounded,
+                  title: context.l10n.cloudSyncPlaylistsLabel,
+                  subtitle: context.l10n.cloudSyncPlaylistsDesc,
+                  value: _syncPlaylists,
+                  onChanged: _hasService ? _onPlaylistsSyncChanged : null,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: p.primary,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.s14),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r16All),
+                    ),
+                    icon: Icon(Icons.sync_rounded, color: Colors.black),
+                    label: Text(
+                      _isSyncing
+                          ? context.l10n.settingsSyncing
+                          : context.l10n.syncNow,
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.callout),
+                    ),
+                    onPressed:
+                        (_isSyncing || !_hasService) ? null : _performSync,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

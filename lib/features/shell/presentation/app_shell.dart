@@ -14,6 +14,7 @@ import '../../../core/responsive/pulsr_hinge_gap.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_modal_tracker.dart';
+import '../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -340,7 +341,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
-            Positioned.fill(child: widget.navigationShell),
+            Positioned.fill(
+                child: PulsrDockAware(child: widget.navigationShell)),
             PositionedDirectional(
               start: 0,
               end: 0,
@@ -418,7 +420,10 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                   Positioned.fill(
                     child: Row(
                       children: [
-                        Expanded(child: widget.navigationShell),
+                        Expanded(
+                            child: PulsrDockAware(
+                                heightIncludesSafeArea: true,
+                                child: widget.navigationShell)),
                         if (inspectorOpen) ...[
                           TabletSideInspector(
                             onClose: () =>

@@ -40,8 +40,8 @@ class PulsrLayoutMetrics {
 
   // ── Standard Input / Field Heights (Fixes G3, G6) ──────────────────────────
   static double fieldHeight(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.25);
-    return 44.0 * scale;
+    final textHeight = MediaQuery.textScalerOf(context).scale(16) * 1.5;
+    return (textHeight + 24).clamp(48.0, double.infinity);
   }
 
   // ── Dock Metrics & Math (Fixes G9) ─────────────────────────────────────────
@@ -60,11 +60,9 @@ class PulsrLayoutMetrics {
 
   /// Safe bottom padding for scrollables (Fixes Phase 1.2)
   static double scrollBottom(BuildContext context, {double extra = 24.0}) {
-    final dockH = PulsrDockTracker.dockHeight.value;
+    final dockH = PulsrDockScope.heightOf(context);
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final effectiveDock =
-        dockH > 0 ? dockH : (navBarTotalHeight(context) + miniPlayerHeight);
-    return effectiveDock + safeBottom + extra;
+    return dockH + safeBottom + extra;
   }
 
   // ── Player Responsive Split Threshold (Fixes G7, Phase 2.3) ───────────────

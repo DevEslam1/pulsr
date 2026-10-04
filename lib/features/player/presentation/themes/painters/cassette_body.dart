@@ -18,7 +18,10 @@ class _CassetteBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    // The tape is an illustration with printed labels. The song information
+    // outside the illustration follows the system text size.
+    return MediaQuery.withNoTextScaling(
+        child: Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: isLandscape ? 260 : (isTablet ? 360 : 300),
@@ -26,114 +29,121 @@ class _CassetteBody extends StatelessWidget {
         ),
         child: AspectRatio(
           aspectRatio: 1.5,
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.s14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E2028),
-              borderRadius: AppRadii.r20All,
-              border: Border.all(color: const Color(0xFF323646), width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.scrimAt(0.5),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Cassette Label Header
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm, vertical: AppSpacing.s6),
-                  decoration: BoxDecoration(
-                    color: activeColor.withValues(alpha: 0.2),
-                    borderRadius: AppRadii.r8All,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        context.l10n.cassetteSideA,
-                        style: const TextStyle(
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white70,
-                          letterSpacing: AppTracking.wide,
-                        ),
-                      ),
-                      Text(
-                        context.l10n.cassettePulsrTape,
-                        style: TextStyle(
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.w900,
-                          color: activeColor,
-                          letterSpacing: AppTracking.wide,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-
-                // Cassette Center Window with Spinning Spools
-                Expanded(
+          child: FittedBox(
+              fit: BoxFit.contain,
+              child: SizedBox(
+                  width: 440,
+                  height: 440 / 1.5,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                    padding: const EdgeInsets.all(AppSpacing.s14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F1116),
-                      borderRadius: AppRadii.r12All,
-                      border: Border.all(color: Colors.white12),
+                      color: const Color(0xFF1E2028),
+                      borderRadius: AppRadii.r20All,
+                      border:
+                          Border.all(color: const Color(0xFF323646), width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.scrimAt(0.5),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
                       children: [
-                        // Left Spool
-                        _buildSpool(),
-                        // Center Tape Window
+                        // Cassette Label Header
                         Container(
-                          width: 70,
-                          height: 36,
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.s6),
                           decoration: BoxDecoration(
-                            color: AppColors.specularAt(0.05),
-                            borderRadius: AppRadii.r6All,
-                            border: Border.all(color: Colors.white10),
+                            color: activeColor.withValues(alpha: 0.2),
+                            borderRadius: AppRadii.r8All,
                           ),
-                          child: Center(
-                            child: Container(
-                              height: 12,
-                              width: 50,
-                              color: const Color(0xFF5A3825),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                context.l10n.cassetteSideA,
+                                style: const TextStyle(
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white70,
+                                  letterSpacing: AppTracking.wide,
+                                ),
+                              ),
+                              Text(
+                                context.l10n.cassettePulsrTape,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.tiny,
+                                  fontWeight: FontWeight.w900,
+                                  color: activeColor,
+                                  letterSpacing: AppTracking.wide,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+
+                        // Cassette Center Window with Spinning Spools
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.s20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F1116),
+                              borderRadius: AppRadii.r12All,
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Left Spool
+                                _buildSpool(),
+                                // Center Tape Window
+                                Container(
+                                  width: 70,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.specularAt(0.05),
+                                    borderRadius: AppRadii.r6All,
+                                    border: Border.all(color: Colors.white10),
+                                  ),
+                                  child: Center(
+                                    child: Container(
+                                      height: 12,
+                                      width: 50,
+                                      color: const Color(0xFF5A3825),
+                                    ),
+                                  ),
+                                ),
+                                // Right Spool
+                                _buildSpool(),
+                              ],
                             ),
                           ),
                         ),
-                        // Right Spool
-                        _buildSpool(),
+                        const SizedBox(height: AppSpacing.xs),
+
+                        // Track Title on Cassette Body
+                        Text(
+                          song?.title ?? context.l10n.dspTapeLoaded,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-
-                // Track Title on Cassette Body
-                Text(
-                  song?.title ?? context.l10n.dspTapeLoaded,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
+                  ))),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildSpool() {

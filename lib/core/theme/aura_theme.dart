@@ -199,9 +199,8 @@ class AuraTheme {
         hairline: const Color(0xFF0F1724).withValues(alpha: 0.09),
         textPrimary: const Color(0xFF101425),
         textSecondary: const Color(0xFF5D6880),
-        // AA-compliant tertiary (>=4.5:1 on white/cards, ~4.2:1 on bg).
-        // Was #9AA3B8 (2.34:1) which failed WCAG for small metadata text.
-        textTertiary: const Color(0xFF6C7690),
+        // Small metadata remains readable on every surface, including elevated cards.
+        textTertiary: const Color(0xFF59657E),
         favorite: AppColors.favorite,
         success: AppColors.success,
         error: AppColors.error,
@@ -226,8 +225,7 @@ class AuraTheme {
         textPrimary:
             dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFF5F6FA),
         textSecondary: const Color(0xFF9BA1AE),
-        // AA-compliant tertiary on black (4.80:1); was #5F6470 (3.54:1).
-        textTertiary: const Color(0xFF737985),
+        textTertiary: const Color(0xFF8D94A3),
         favorite: AppColors.favorite,
         success: AppColors.success,
         error: AppColors.error,
@@ -252,9 +250,7 @@ class AuraTheme {
       textPrimary:
           dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFEDEFF7),
       textSecondary: const Color(0xFF98A0B3),
-      // AA-compliant tertiary (5.18:1 on bg, 4.52:1 on cards).
-      // Was #5C6478 (3.30:1 / 2.90:1) which failed WCAG for small text.
-      textTertiary: const Color(0xFF7A8399),
+      textTertiary: const Color(0xFF909AB0),
       favorite: AppColors.favorite,
       success: AppColors.success,
       error: AppColors.error,

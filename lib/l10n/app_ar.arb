@@ -4431,5 +4431,6 @@
   "audioQualityFormatFollowsEngine": "يتبع التنسيق محرك التشغيل. التحويل اليدوي غير متاح.",
   "upNext": "التالي",
   "proBadge": "PRO",
-  "nowPlayingPreview": "▶ قيد التشغيل الآن"
+  "nowPlayingPreview": "▶ قيد التشغيل الآن",
+  "compactView": "العرض المصغر"
 }

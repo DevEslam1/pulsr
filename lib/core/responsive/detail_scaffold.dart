@@ -82,7 +82,7 @@ class DetailScaffold extends StatelessWidget {
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsetsDirectional.all(AppSpacing.md),
+                    padding: EdgeInsetsDirectional.all(AppSpacing.md),
                     child: Center(child: hero),
                   ),
                 ),
@@ -101,7 +101,8 @@ class DetailScaffold extends StatelessWidget {
             flex: (rightPaneFlex * 10).round(),
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
+              padding: EdgeInsets.only(
+                  bottom: PulsrLayoutMetrics.scrollBottom(context)),
               child: body,
             ),
           ),
@@ -124,8 +125,8 @@ class DetailScaffold extends StatelessWidget {
               ),
               Expanded(
                 child: ListView(
-                  padding:
-                      const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
+                  padding: EdgeInsets.only(
+                      bottom: PulsrLayoutMetrics.scrollBottom(context)),
                   physics: const BouncingScrollPhysics(),
                   children: [
                     hero,

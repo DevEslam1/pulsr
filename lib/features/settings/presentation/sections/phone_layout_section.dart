@@ -34,7 +34,8 @@ mixin PhoneLayoutSection
           children: [
             _buildTopHeader(context),
             if (_searchQuery.isEmpty) _buildCategoryFilterBar(context, state),
-            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+                height: context.isLandscape ? AppSpacing.xxs : AppSpacing.md),
             Expanded(
               child: _searchQuery.isNotEmpty
                   ? _buildSearchResultsList(context, state, cubit)
@@ -60,12 +61,13 @@ mixin PhoneLayoutSection
         physics: const BouncingScrollPhysics(),
         padding: EdgeInsetsDirectional.only(
           bottom: bottomInset,
-          top: AppSpacing.md,
+          top: context.isLandscape ? AppSpacing.xxs : AppSpacing.md,
           start: horizontalPad,
           end: horizontalPad,
         ),
         children: [
-          if (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled) ...[
+          if (!context.isLandscape &&
+              (AppConfig.isCloudSyncAllowed || AppConfig.ytmEnabled)) ...[
             const SettingsHeroCard(),
             const SizedBox(height: AppSpacing.md),
           ],

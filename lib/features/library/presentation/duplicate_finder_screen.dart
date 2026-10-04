@@ -296,7 +296,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           color: p.accent,
           backgroundColor: p.surfaceContainer,
           onRefresh: _scan,
-          child: _buildBody(p),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: _buildBody(p),
+            ),
+          ),
         ),
       ),
     );

@@ -45,12 +45,13 @@ void main() {
 
       expect(previewWidget, isA<IgnorePointer>());
       final ignorePointer = previewWidget as IgnorePointer;
-      expect(ignorePointer.child, isA<Transform>());
+      expect(ignorePointer.child, isA<SizedBox>());
 
-      final transform = ignorePointer.child! as Transform;
-      expect(transform.child, isA<SizedBox>());
-
-      final sizedBox = transform.child! as SizedBox;
+      final bounds = ignorePointer.child! as SizedBox;
+      expect(bounds.width, 180);
+      expect(bounds.height, 320);
+      final fitted = bounds.child! as FittedBox;
+      final sizedBox = fitted.child! as SizedBox;
       expect(sizedBox.width, 360);
       expect(sizedBox.height, 640);
       expect(sizedBox.child, isA<ClassicPlayerTheme>());
@@ -71,8 +72,9 @@ void main() {
       for (final entry in modes.entries) {
         final preview = ThemeRegistry.preview(entry.key, dummyProps);
         final ignorePointer = preview as IgnorePointer;
-        final transform = ignorePointer.child! as Transform;
-        final sizedBox = transform.child! as SizedBox;
+        final bounds = ignorePointer.child! as SizedBox;
+        final fitted = bounds.child! as FittedBox;
+        final sizedBox = fitted.child! as SizedBox;
         expect(
           sizedBox.child.runtimeType,
           entry.value,
@@ -81,20 +83,14 @@ void main() {
       }
     });
 
-    test('preview() scale parameter configures Transform scale accurately', () {
+    test('preview() scale sets layout dimensions as well as visual size', () {
       const targetScale = 0.35;
-      final preview = ThemeRegistry.preview(
-        PlayerThemeMode.minimal,
-        dummyProps,
-        scale: targetScale,
-      );
-
-      final ignorePointer = preview as IgnorePointer;
-      final transform = ignorePointer.child! as Transform;
-      final matrix = transform.transform;
-      // Transform.scale scales X and Y axes
-      expect(matrix.entry(0, 0), closeTo(targetScale, 0.001));
-      expect(matrix.entry(1, 1), closeTo(targetScale, 0.001));
+      final preview = ThemeRegistry.preview(PlayerThemeMode.minimal, dummyProps,
+          scale: targetScale) as IgnorePointer;
+      final bounds = preview.child! as SizedBox;
+      expect(bounds.width, closeTo(360 * targetScale, 0.001));
+      expect(bounds.height, closeTo(640 * targetScale, 0.001));
+      expect((bounds.child! as FittedBox).fit, BoxFit.contain);
     });
   });
 }

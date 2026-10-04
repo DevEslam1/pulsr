@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 // lib/features/library/presentation/favorites_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -484,8 +485,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             );
                           },
                         ),
-                      const SliverToBoxAdapter(
-                        child: SizedBox(height: AppSpacing.scrollBottom),
+                      SliverToBoxAdapter(
+                        child: SizedBox(
+                            height: PulsrLayoutMetrics.scrollBottom(context)),
                       ),
                     ],
                   ),

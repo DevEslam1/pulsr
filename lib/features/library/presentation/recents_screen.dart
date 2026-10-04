@@ -1,3 +1,4 @@
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -47,6 +48,22 @@ class _RecentsScreenState extends State<RecentsScreen> {
   void _updateStream() {
     _recentStream = _getSongsUseCase.watchRecentlyPlayed(limit: _historyLimit);
   }
+
+  void _retryHistory() {
+    setState(() {
+      _updateStream();
+    });
+  }
+
+  Widget _buildLoadError(BuildContext context) => PulsrEmptyState(
+        icon: Icons.error_outline_rounded,
+        iconColor: context.palette.error,
+        title: context.l10n.somethingWentWrong,
+        subtitle: context.l10n.libraryReadError,
+        primaryActionLabel: context.l10n.retry,
+        primaryActionIcon: Icons.refresh_rounded,
+        onPrimaryAction: _retryHistory,
+      );
 
   @override
   void initState() {
@@ -131,7 +148,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
               color: p.accent,
               backgroundColor: p.surfaceContainer,
               onRefresh: () async {
-                if (mounted) setState(() {});
+                if (mounted) _retryHistory();
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
@@ -151,10 +168,11 @@ class _RecentsScreenState extends State<RecentsScreen> {
               snapshot: snapshot,
               loadingWidget: const SkeletonList(),
               emptyWidget: emptyBody,
-              onError: (_) => emptyBody,
+              onError: (_) => _buildLoadError(context),
               isEmpty: (data) =>
-                  data?.fold((l) => true, (r) => r.isEmpty) ?? true,
+                  data?.fold((l) => false, (r) => r.isEmpty) ?? true,
               onData: (data) {
+                if (data.isLeft()) return _buildLoadError(context);
                 final allRecents =
                     data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
                 final filtered = _filterSongs(allRecents);
@@ -163,7 +181,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                   color: p.accent,
                   backgroundColor: p.surfaceContainer,
                   onRefresh: () async {
-                    if (mounted) setState(() {});
+                    if (mounted) _retryHistory();
                   },
                   child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(
@@ -287,9 +305,9 @@ class _RecentsScreenState extends State<RecentsScreen> {
                         )
                       else
                         SliverPadding(
-                          padding: const EdgeInsetsDirectional.only(
+                          padding: EdgeInsetsDirectional.only(
                               top: AppSpacing.xs,
-                              bottom: 100,
+                              bottom: PulsrLayoutMetrics.scrollBottom(context),
                               start: AppSpacing.md,
                               end: AppSpacing.md),
                           sliver: SliverList(
