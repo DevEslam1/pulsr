@@ -102,8 +102,10 @@ void main() {
   group('I-06 CacheManager', () {
     test('evicts least recently used on max capacity and respects TTL',
         () async {
+      // Capacity/LRU phase uses a long TTL so entries cannot expire while the
+      // eviction assertions run under load.
       final cache = CacheManager<String, int>(
-          maxSize: 3, defaultTtl: const Duration(milliseconds: 100));
+          maxSize: 3, defaultTtl: const Duration(seconds: 10));
 
       cache.put('a', 1);
       cache.put('b', 2);
@@ -120,10 +122,15 @@ void main() {
       expect(cache.containsKey('c'), isTrue);
       expect(cache.containsKey('d'), isTrue);
 
-      // Wait for TTL expiration
-      await Future.delayed(const Duration(milliseconds: 120));
-      expect(cache.get('a'), isNull);
-      expect(cache.length, 0);
+      // TTL phase uses its own short-TTL instance and a wide wait margin.
+      final ttlCache = CacheManager<String, int>(
+          maxSize: 3, defaultTtl: const Duration(milliseconds: 100));
+      ttlCache.put('x', 42);
+      expect(ttlCache.get('x'), 42);
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      expect(ttlCache.get('x'), isNull);
+      expect(ttlCache.length, 0);
     });
   });
 

@@ -12,10 +12,23 @@ import '../../domain/models/dsp_telemetry.dart';
 class AudioEffectsChannel {
   Future<bool> awaitControlUpdates() async {
     if (!PlatformCapabilities.isAndroid) return true;
-    return await _channel
-            .invokeMethod<bool>('awaitDspControlUpdates')
-            .timeout(const Duration(seconds: 5)) ??
-        false;
+    // Documented as a bool result: a timeout or platform error must report
+    // `false` rather than throw a raw TimeoutException/PlatformException at
+    // callers that only check the return value.
+    try {
+      return await _channel
+              .invokeMethod<bool>('awaitDspControlUpdates')
+              .timeout(const Duration(seconds: 5)) ??
+          false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'awaitDspControlUpdates failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
   }
 
   /// Test-only observation of the last value pushed to the native
@@ -55,7 +68,12 @@ class AudioEffectsChannel {
 
   Future<dynamic> _invokeNativeSetter(String method,
       [Map<String, dynamic>? arguments]) async {
-    final result = await _channel.invokeMethod<dynamic>(method, arguments);
+    // Built-in ceiling so a caller that forgets its own .timeout() can never
+    // hang forever (setSincResamplerQuality did, and the audio handler awaits
+    // it during cold-start init). Callers may still apply a tighter timeout.
+    final result = await _channel
+        .invokeMethod<dynamic>(method, arguments)
+        .timeout(const Duration(seconds: 5));
     if (result == false) {
       throw PlatformException(
         code: 'DSP_NOT_APPLIED',
@@ -87,7 +105,13 @@ class AudioEffectsChannel {
     _isHeadTrackerAvailable = false;
     _isVolumeBoostSupported = false;
     _isBassBoostSupported = false;
+    _isFloatOutputSupported = true;
+    _isHardwareOffloadSupported = true;
     _isPcmDspAttached = false;
+    _hasPcmDspPath = false;
+    _hasOemAudio = false;
+    _detectedOemEngines = [];
+    _lastKnownDegradedStages = 0;
     if (identical(_instance, this)) {
       _instance = null;
     }
@@ -202,9 +226,12 @@ class AudioEffectsChannel {
         try {
           final oemMap = await detectOemAudio();
           _hasOemAudio = (oemMap['hasOemAudio'] == true);
-          _detectedOemEngines =
-              (oemMap['detectedEngines'] as List<dynamic>?)?.cast<String>() ??
-                  [];
+          // Eager copy: .cast<String>() is a lazy view that throws later, at
+          // read time, if the native list contains a non-String.
+          _detectedOemEngines = (oemMap['detectedEngines'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              <String>[];
         } catch (e, st) {
           ErrorLogger.log(
             'Failed to detectOemAudio',
@@ -418,6 +445,14 @@ class AudioEffectsChannel {
   /// native direct-volume stage. Only meaningful while DVC is enabled.
   Future<bool> setDvcGain(double gainLinear) async {
     if (!_isAndroid) return false;
+    // A NaN/inf gain would poison the native smoothed gain for the session.
+    if (!gainLinear.isFinite) {
+      ErrorLogger.log(
+        'Ignoring non-finite DVC gain ($gainLinear)',
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
     try {
       final bool? applied = await _channel.invokeMethod<bool>('setDvcGain',
           {'gain': gainLinear}).timeout(const Duration(seconds: 3));
@@ -437,8 +472,11 @@ class AudioEffectsChannel {
   Future<bool> setBassBoost(int strength) async {
     if (!_isAndroid) return false;
     try {
-      final bool? applied = await _channel.invokeMethod<bool>('setBassBoost',
-          {'strength': strength}).timeout(const Duration(seconds: 3));
+      // android.media.audiofx.BassBoost only accepts 0..1000; out-of-range
+      // values make the native call throw and the boost silently not apply.
+      final bool? applied = await _channel.invokeMethod<bool>('setBassBoost', {
+        'strength': strength.clamp(0, 1000)
+      }).timeout(const Duration(seconds: 3));
       return applied ?? true;
     } catch (e, st) {
       ErrorLogger.log(
@@ -775,7 +813,9 @@ class AudioEffectsChannel {
       };
     }
     try {
-      final res = await _channel.invokeMethod<Map>('getRtfGovernorStatus');
+      final res = await _channel
+          .invokeMethod<Map>('getRtfGovernorStatus')
+          .timeout(const Duration(seconds: 3));
       return Map<String, dynamic>.from(res ?? {});
     } catch (e, st) {
       ErrorLogger.log(
@@ -1853,7 +1893,11 @@ class AudioEffectsChannel {
       _autoDegradeStreamController.stream;
 
   void _handleAutoDegradeTransition(int currentStages) {
-    if (_lastKnownDegradedStages == 0 && currentStages != 0) {
+    if (_lastKnownDegradedStages == 0 &&
+        currentStages != 0 &&
+        !_autoDegradeStreamController.isClosed) {
+      // After dispose() the controller is closed and add() would throw a
+      // StateError out of getTelemetry()/getAutoDegradedStages() polling.
       _autoDegradeStreamController.add(currentStages);
     }
     _lastKnownDegradedStages = currentStages;
@@ -1863,10 +1907,13 @@ class AudioEffectsChannel {
   Future<double> getWeeklyDose() async {
     if (!_isAndroid) return 0.0;
     try {
-      final res = await _channel
-          .invokeMethod<double>('getWeeklyDose')
+      // The standard codec delivers a whole-number reply (0, 1) as an int, and
+      // invokeMethod<double> then throws a cast error that the catch below
+      // swallowed, so the dose silently read 0.0. Accept any num.
+      final dynamic res = await _channel
+          .invokeMethod<dynamic>('getWeeklyDose')
           .timeout(const Duration(milliseconds: 250));
-      return res ?? 0.0;
+      return res is num && res.isFinite ? res.toDouble() : 0.0;
     } catch (_) {
       return 0.0;
     }

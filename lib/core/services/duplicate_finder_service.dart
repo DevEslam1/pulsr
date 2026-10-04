@@ -25,7 +25,8 @@ Future<List<DuplicateGroup>> _findDuplicatesWorker(
 @singleton
 class DuplicateFinderService {
   /// Scans songs and finds verified duplicate sets.
-  /// Pass 1: Identical normalized title + artist metadata.
+  /// Pass 1: Identical normalized title + artist, confirmed by album equality
+  /// (when known) and a duration tolerance so only the same recording clusters.
   /// Pass 2: Duration + size pre-filtering verified via fast audio content checksums.
   /// Offloads execution to a background isolate via [compute] for larger collections.
   Future<List<DuplicateGroup>> findDuplicates(
@@ -59,16 +60,30 @@ class DuplicateFinderService {
     final List<DuplicateGroup> result = [];
     final Set<int> capturedSongIds = {};
 
-    // Pass 1: Title + Artist matches
+    // Pass 1: Title + Artist matches, refined by same-recording heuristics so
+    // unrelated tracks that merely share a name (e.g. "Intro" on two albums)
+    // are not reported as duplicates. Codec variants of one recording (FLAC vs
+    // MP3) still cluster: album must match when both are known and durations
+    // must be within [_pass1DurationToleranceMs].
     for (final entry in byTitleArtist.entries) {
-      if (entry.value.length > 1) {
-        result.add(DuplicateGroup(
-          key: entry.key,
-          songs: entry.value,
-          reason: 'Identical Title & Artist (${entry.value.length} copies)',
-        ));
-        for (final song in entry.value) {
-          capturedSongIds.add(song.id);
+      final remaining = List<SongsTableData>.from(entry.value);
+      while (remaining.length > 1) {
+        final anchor = remaining.removeAt(0);
+        final cluster = <SongsTableData>[anchor];
+        for (var i = remaining.length - 1; i >= 0; i--) {
+          if (_isSameRecording(anchor, remaining[i])) {
+            cluster.add(remaining.removeAt(i));
+          }
+        }
+        if (cluster.length > 1) {
+          result.add(DuplicateGroup(
+            key: '${entry.key}-${anchor.id}',
+            songs: cluster,
+            reason: 'Identical Title & Artist (${cluster.length} copies)',
+          ));
+          for (final song in cluster) {
+            capturedSongIds.add(song.id);
+          }
         }
       }
     }
@@ -96,6 +111,22 @@ class DuplicateFinderService {
 
     return result;
   }
+
+  /// Two files inside a title+artist group are the same recording when their
+  /// albums agree (an unknown/empty album is treated as compatible) and their
+  /// durations are within [_pass1DurationToleranceMs]. File sizes are
+  /// deliberately ignored so lossless and lossy encodes of one track cluster.
+  static bool _isSameRecording(SongsTableData a, SongsTableData b) {
+    final albumA = _normalizeString(a.album);
+    final albumB = _normalizeString(b.album);
+    if (albumA.isNotEmpty && albumB.isNotEmpty && albumA != albumB) {
+      return false;
+    }
+    if (a.durationMs <= 0 || b.durationMs <= 0) return true;
+    return (a.durationMs - b.durationMs).abs() <= _pass1DurationToleranceMs;
+  }
+
+  static const int _pass1DurationToleranceMs = 5000;
 
   static Future<List<List<SongsTableData>>> _verifyWithChecksum(
       List<SongsTableData> candidates) async {

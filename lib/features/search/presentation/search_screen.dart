@@ -216,8 +216,7 @@ class _SearchViewState extends State<_SearchView> {
     }
     _suggestTimer = Timer(const Duration(milliseconds: 200), () async {
       if (!mounted) return;
-      final results =
-          await context.read<SearchCubit>().suggestionsFor(trimmed);
+      final results = await context.read<SearchCubit>().suggestionsFor(trimmed);
       if (!mounted || _controller.text.trim() != trimmed) return;
       setState(() {
         _suggestions = results;
@@ -486,13 +485,12 @@ class _SearchViewState extends State<_SearchView> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.symmetric(
-                horizontal: pad, vertical: AppSpacing.xs),
+            padding:
+                EdgeInsets.symmetric(horizontal: pad, vertical: AppSpacing.xs),
             children: [
               for (final filter in SearchCubit.filterOptions)
                 Padding(
-                  padding:
-                      const EdgeInsetsDirectional.only(end: AppSpacing.xs),
+                  padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
                   child: _buildChip(context, state, filter, p),
                 ),
               if (state.query.trim().isNotEmpty)
@@ -610,10 +608,10 @@ class _SearchViewState extends State<_SearchView> {
       children: [
         Positioned.fill(child: content),
         if (showCard)
-          Positioned(
+          PositionedDirectional(
             top: 0,
-            left: Adaptive.pagePadding(context),
-            right: Adaptive.pagePadding(context),
+            start: Adaptive.pagePadding(context),
+            end: Adaptive.pagePadding(context),
             child: _SuggestionsCard(
               suggestions: _suggestions,
               onSelect: (s) => _applySearch(s),
@@ -701,8 +699,11 @@ class _StartPage extends StatelessWidget {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
-          AppSpacing.sm, Adaptive.pagePadding(context), AppSpacing.scrollBottom),
+      padding: EdgeInsetsDirectional.fromSTEB(
+          Adaptive.pagePadding(context),
+          AppSpacing.sm,
+          Adaptive.pagePadding(context),
+          AppSpacing.scrollBottom),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1064,7 +1065,8 @@ class _EntityRail extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.symmetric(
-            horizontal: Adaptive.pagePadding(context), vertical: AppSpacing.xxs),
+            horizontal: Adaptive.pagePadding(context),
+            vertical: AppSpacing.xxs),
         itemCount: names.length,
         separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, i) {
@@ -1470,8 +1472,8 @@ Widget _buildErrorSectionCard({
             errorMessage,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style:
-                TextStyle(fontSize: AppFontSize.caption, color: p.textSecondary),
+            style: TextStyle(
+                fontSize: AppFontSize.caption, color: p.textSecondary),
           ),
         ),
         const SizedBox(width: AppSpacing.xs),

@@ -70,9 +70,8 @@ class YtmDownloadButton extends StatelessWidget {
         switch (item.status) {
           case YtDownloadStatus.queued:
           case YtDownloadStatus.running:
-            final progressValue = item.status == YtDownloadStatus.queued
-                ? null
-                : item.progress;
+            final progressValue =
+                item.status == YtDownloadStatus.queued ? null : item.progress;
             return SizedBox(
               width: AppSpacing.s40,
               height: 40,

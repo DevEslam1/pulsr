@@ -186,7 +186,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     themeWidget: AnimatedSwitcher(
                       duration: context.motionMs(350),
                       switchInCurve: context.motionCurve(Curves.easeInOutCubic),
-                      switchOutCurve: context.motionCurve(Curves.easeInOutCubic),
+                      switchOutCurve:
+                          context.motionCurve(Curves.easeInOutCubic),
                       transitionBuilder: (child, animation) =>
                           FadeTransition(opacity: animation, child: child),
                       child: KeyedSubtree(

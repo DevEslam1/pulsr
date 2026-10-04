@@ -1155,13 +1155,17 @@ class PlayerTrackHeader extends StatelessWidget {
             Center(
               child: extraBadge == null
                   ? qualityBadge
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        qualityBadge,
-                        const SizedBox(width: AppSpacing.xs),
-                        extraBadge!,
-                      ],
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          qualityBadge,
+                          const SizedBox(width: AppSpacing.xs),
+                          extraBadge!,
+                        ],
+                      ),
                     ),
             ),
           ],

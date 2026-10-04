@@ -34,7 +34,8 @@ void main() {
           ),
         ]),
         'directFormats': base.copyWith(directFormats: const [
-          AudioDirectFormat(encoding: 'float', sampleRate: 96000, supported: true),
+          AudioDirectFormat(
+              encoding: 'float', sampleRate: 96000, supported: true),
         ]),
         'btCodecName': base.copyWith(btCodecName: 'LDAC'),
         'btSampleRateHz': base.copyWith(btSampleRateHz: 96000),
@@ -43,9 +44,11 @@ void main() {
         'usbAudioClass': base.copyWith(usbAudioClass: 2),
         'isLeAudio': base.copyWith(isLeAudio: true),
         'bleAudioPresent': base.copyWith(bleAudioPresent: true),
-        'btSelectableCodecs': base.copyWith(btSelectableCodecs: ['SBC', 'LDAC']),
+        'btSelectableCodecs':
+            base.copyWith(btSelectableCodecs: ['SBC', 'LDAC']),
         'btSupportedCodecs': base.copyWith(btSupportedCodecs: ['LDAC']),
-        'btSelectableSampleRates': base.copyWith(btSelectableSampleRates: [96000]),
+        'btSelectableSampleRates':
+            base.copyWith(btSelectableSampleRates: [96000]),
         'btSelectableBitDepths': base.copyWith(btSelectableBitDepths: [24]),
       };
 

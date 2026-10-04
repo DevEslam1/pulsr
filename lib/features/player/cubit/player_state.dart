@@ -293,7 +293,8 @@ abstract class PlayerState with _$PlayerState {
   int get silenceSkipSensitivity => playback.silenceSkipSensitivity;
   int get currentSongRating => playback.currentSongRating;
   String? get currentSongEqOverride => playback.currentSongEqOverride;
-  double get currentSongVolumeOverrideDb => playback.currentSongVolumeOverrideDb;
+  double get currentSongVolumeOverrideDb =>
+      playback.currentSongVolumeOverrideDb;
 
   // ──────────────────────────────────────────────
   // Forwarded Queue Getters
@@ -324,7 +325,8 @@ abstract class PlayerState with _$PlayerState {
   bool get isDynamicsEnabled => dsp.isDynamicsEnabled;
   bool get isDynamicsSupported => dsp.isDynamicsSupported;
   DynamicsPreset get dynamicsPreset => dsp.dynamicsPreset;
-  HeadphoneProfile? get selectedHeadphoneProfile => dsp.selectedHeadphoneProfile;
+  HeadphoneProfile? get selectedHeadphoneProfile =>
+      dsp.selectedHeadphoneProfile;
   bool get isSpatializerSupported => dsp.isSpatializerSupported;
   bool get isSpatializerEnabled => dsp.isSpatializerEnabled;
   double get volumeBoost => dsp.volumeBoost;

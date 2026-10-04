@@ -10,8 +10,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (albums.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(
-              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+              16, Adaptive.pagePadding(context), 160),
         );
       }
       return _buildEmpty(
@@ -160,8 +160,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (artists.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(
-              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+              16, Adaptive.pagePadding(context), 160),
         );
       }
       return _buildEmpty(
@@ -324,8 +324,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (genres.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(
-              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+              16, Adaptive.pagePadding(context), 160),
         );
       }
       return _buildEmpty(
@@ -411,8 +411,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     if (years.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
-          padding: EdgeInsetsDirectional.fromSTEB(
-              Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+          padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
+              16, Adaptive.pagePadding(context), 160),
         );
       }
       return _buildEmpty(

@@ -56,8 +56,10 @@ class PlayerScrobbleCoordinator {
     final posMs = position.inMilliseconds;
     // Differentiate true track restart (returning near zero from >10s into playback)
     // from a standard backward scrub within the track.
-    final isTrueRestart =
-        _lastSongId == song.id && _lastPosMs != null && posMs < 3000 && _lastPosMs! > 10000;
+    final isTrueRestart = _lastSongId == song.id &&
+        _lastPosMs != null &&
+        posMs < 3000 &&
+        _lastPosMs! > 10000;
     final isSongRestart = isTrueRestart;
     final isSongChange = _lastSongId != song.id || isSongRestart;
     final isPlayStateChange = _lastIsPlaying != isPlaying;

@@ -4,7 +4,9 @@ import 'package:pulsr/core/widgets/pulsr_static_grid.dart';
 
 void main() {
   group('PulsrStaticGrid Tests', () {
-    testWidgets('renders inside an unbounded vertical scrollable without throwing', (tester) async {
+    testWidgets(
+        'renders inside an unbounded vertical scrollable without throwing',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

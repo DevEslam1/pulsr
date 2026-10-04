@@ -101,13 +101,14 @@ class DsdPcmStreamAudioSource extends StreamAudioSource {
     // Range header cannot trigger an out-of-bounds sublist RangeError.
     final from = (start ?? 0).clamp(0, wavBytes.length);
     final to = (end ?? wavBytes.length).clamp(from, wavBytes.length);
+    // sublistView, not sublist: every seek used to copy up to hundreds of MB.
     return StreamAudioResponse(
       rangeRequestsSupported: true,
       sourceLength: wavBytes.length,
       contentLength: to - from,
       offset: from,
       contentType: 'audio/wav',
-      stream: Stream.value(wavBytes.sublist(from, to)),
+      stream: Stream.value(Uint8List.sublistView(wavBytes, from, to)),
     );
   }
 }
@@ -192,7 +193,8 @@ class DsdDecoderHelper {
       dsdL = parsed.dsdL;
       dsdR = parsed.dsdR;
       dsdRate = parsed.dsdRate;
-      bitOrder = 0; // LSB first (Sony DSF)
+      // DSF declares its bit order in the fmt chunk (1 = LSB first, 8 = MSB).
+      bitOrder = parsed.msbFirst ? 1 : 0;
     } else {
       final parsed = parseDffBytes(bytes);
       dsdL = parsed.dsdL;
@@ -205,7 +207,9 @@ class DsdDecoderHelper {
     final bool useDop = forceDop &&
         dopSampleRate > 0 &&
         (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
-    AudioQualityInfo.dsdDopActive = useDop;
+    // Only claim DoP once the framing has actually been built (set below);
+    // a decode failure must not leave the global flag stuck on true.
+    AudioQualityInfo.dsdDopActive = false;
     if (useDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
       var left = dsdL;
@@ -216,8 +220,16 @@ class DsdDecoderHelper {
         right = Uint8List.sublistView(right, 0, minLen);
       }
       if (left.length.isOdd) {
-        left = Uint8List.fromList([...left, 0]);
-        right = Uint8List.fromList([...right, 0]);
+        // 0x69 is DSD digital silence; a 0x00 pad is a DC/noise byte.
+        left = Uint8List.fromList([...left, 0x69]);
+        right = Uint8List.fromList([...right, 0x69]);
+      }
+      // DoP wants the oldest DSD bit in the MSB. DSF is LSB-first, so reverse
+      // the bits of every byte first (the decoder-bound PCM path is unaffected,
+      // it takes bitOrder explicitly).
+      if (bitOrder == 0) {
+        left = _reverseBits(left);
+        right = _reverseBits(right);
       }
 
       final use32Bit = dopContainerBits == 32;
@@ -232,12 +244,13 @@ class DsdDecoderHelper {
         bitsPerSample: use32Bit ? 32 : 24,
       );
 
+      AudioQualityInfo.dsdDopActive = true;
       return DsdPcmStreamAudioSource(wavBytes, tag: tag);
     }
 
     final targetSampleRate = switch (dsdRate) {
-      >= 256 || >= 11289600 => 705600, // DSD256
-      >= 128 || >= 5644800 => 352800, // DSD128
+      >= 256 => 705600, // DSD256 and above
+      >= 128 => 352800, // DSD128
       _ => 176400, // DSD64
     };
 
@@ -270,9 +283,31 @@ class DsdDecoderHelper {
     return DsdPcmStreamAudioSource(wavBytes, tag: tag);
   }
 
+  static final Uint8List _bitReverseTable = () {
+    final table = Uint8List(256);
+    for (var i = 0; i < 256; i++) {
+      var v = i, r = 0;
+      for (var b = 0; b < 8; b++) {
+        r = (r << 1) | (v & 1);
+        v >>= 1;
+      }
+      table[i] = r;
+    }
+    return table;
+  }();
+
+  /// Returns a copy of [src] with the bits of every byte reversed.
+  static Uint8List _reverseBits(Uint8List src) {
+    final out = Uint8List(src.length);
+    for (var i = 0; i < src.length; i++) {
+      out[i] = _bitReverseTable[src[i]];
+    }
+    return out;
+  }
+
   /// Parses DSF header and demuxes planar channel data blocks.
-  static ({Uint8List dsdL, Uint8List dsdR, int dsdRate}) parseDsfBytes(
-      Uint8List bytes) {
+  static ({Uint8List dsdL, Uint8List dsdR, int dsdRate, bool msbFirst})
+      parseDsfBytes(Uint8List bytes) {
     if (bytes.length < 52) {
       throw const FormatException(
           'DSF file too small to contain valid headers');
@@ -289,16 +324,22 @@ class DsdDecoderHelper {
     int channels = 2;
     int blockSize = 4096;
     int samplingFrequency = 2822400;
+    int bitsPerSample = 1;
+    int sampleCount = 0;
     int dataOffset = -1;
     int dataSize = -1;
 
     while (pos + 12 <= bytes.length) {
       final chunkId = String.fromCharCodes(bytes.sublist(pos, pos + 4));
       final chunkSize = byteData.getUint64(pos + 4, Endian.little);
+      // A uint64 >= 2^63 reads back negative; treat as corrupt.
+      if (chunkSize < 0) break;
 
-      if (chunkId == 'fmt ') {
+      if (chunkId == 'fmt ' && pos + 52 <= bytes.length) {
         channels = byteData.getUint32(pos + 24, Endian.little);
         samplingFrequency = byteData.getUint32(pos + 28, Endian.little);
+        bitsPerSample = byteData.getUint32(pos + 32, Endian.little);
+        sampleCount = byteData.getUint64(pos + 36, Endian.little);
         blockSize = byteData.getUint32(pos + 44, Endian.little);
         dsdRate = samplingFrequency ~/ 44100;
       } else if (chunkId == 'data') {
@@ -307,8 +348,8 @@ class DsdDecoderHelper {
         break;
       }
 
-      pos += chunkSize;
       if (chunkSize <= 0) break;
+      pos += chunkSize;
     }
 
     if (dataOffset == -1 || dataOffset + dataSize > bytes.length) {
@@ -319,35 +360,53 @@ class DsdDecoderHelper {
     if (dataSize <= 0 || dataOffset >= bytes.length) {
       throw const FormatException('DSF file contains no audio data');
     }
+    if (channels != 1 && channels != 2) {
+      throw DsdUnsupportedException(
+          'DSF with $channels channels is not supported (mono/stereo only)');
+    }
 
-    final payload = bytes.sublist(
-        dataOffset, (dataOffset + dataSize).clamp(0, bytes.length));
-    final List<int> leftBytes = [];
-    final List<int> rightBytes = [];
+    final payload = Uint8List.sublistView(
+        bytes, dataOffset, (dataOffset + dataSize).clamp(0, bytes.length));
 
     if (blockSize <= 0) {
       blockSize = 4096;
     }
-    final stride = blockSize * (channels > 0 ? channels : 2);
-    if (stride <= 0) {
-      throw const FormatException('Invalid DSF stride/block size');
-    }
+    final stride = blockSize * channels;
+    // BytesBuilder(copy: false) keeps views and concatenates once at the end;
+    // the previous List<int>.addAll() boxed every byte (8 B/byte), which blew
+    // up memory on large DSD files.
+    final left = BytesBuilder(copy: false);
+    final right = BytesBuilder(copy: false);
     for (int offset = 0; offset < payload.length; offset += stride) {
       final leftEnd = (offset + blockSize).clamp(0, payload.length);
       if (offset < leftEnd) {
-        leftBytes.addAll(payload.sublist(offset, leftEnd));
+        left.add(Uint8List.sublistView(payload, offset, leftEnd));
       }
-      final rightStart = offset + blockSize;
-      final rightEnd = (rightStart + blockSize).clamp(0, payload.length);
-      if (rightStart < rightEnd) {
-        rightBytes.addAll(payload.sublist(rightStart, rightEnd));
+      if (channels == 2) {
+        final rightStart = offset + blockSize;
+        final rightEnd = (rightStart + blockSize).clamp(0, payload.length);
+        if (rightStart < rightEnd) {
+          right.add(Uint8List.sublistView(payload, rightStart, rightEnd));
+        }
       }
     }
 
+    var dsdL = left.takeBytes();
+    var dsdR = channels == 2 ? right.takeBytes() : Uint8List.fromList(dsdL);
+
+    // The last block of every channel is zero-padded; sampleCount (bits per
+    // channel) tells us where real audio ends. Trim so padding is not played,
+    // and so L/R lengths agree on truncated files.
+    var valid = math.min(dsdL.length, dsdR.length);
+    if (sampleCount > 0) valid = math.min(valid, (sampleCount + 7) ~/ 8);
+    if (valid != dsdL.length) dsdL = Uint8List.sublistView(dsdL, 0, valid);
+    if (valid != dsdR.length) dsdR = Uint8List.sublistView(dsdR, 0, valid);
+
     return (
-      dsdL: Uint8List.fromList(leftBytes),
-      dsdR: Uint8List.fromList(rightBytes),
+      dsdL: dsdL,
+      dsdR: dsdR,
       dsdRate: dsdRate > 0 ? dsdRate : 64,
+      msbFirst: bitsPerSample == 8,
     );
   }
 
@@ -369,17 +428,42 @@ class DsdDecoderHelper {
     // the first real sub-chunk begins at offset 16.
     int pos = 16;
     int dsdRate = 64;
+    int channels = 2;
     int dataOffset = -1;
     int dataSize = -1;
 
     while (pos + 12 <= bytes.length) {
       final chunkId = String.fromCharCodes(bytes.sublist(pos, pos + 4));
       final chunkSize = byteData.getUint64(pos + 4, Endian.big);
+      if (chunkSize < 0) break;
 
-      if (chunkId == 'FS  ') {
+      if (chunkId == 'PROP') {
+        // FS / CHNL / CMPR live INSIDE the PROP chunk (after its 4-byte 'SND '
+        // property type). The old loop only looked at top-level chunks, so it
+        // never saw 'FS  ' and every DFF was treated as DSD64.
+        final end = math.min(pos + 12 + chunkSize, bytes.length);
+        var sub = pos + 16;
+        while (sub + 12 <= end) {
+          final subId = String.fromCharCodes(bytes.sublist(sub, sub + 4));
+          final subSize = byteData.getUint64(sub + 4, Endian.big);
+          if (subSize < 0) break;
+          if (subId == 'FS  ' && subSize >= 4 && sub + 16 <= end) {
+            dsdRate = byteData.getUint32(sub + 12, Endian.big) ~/ 44100;
+          } else if (subId == 'CHNL' && subSize >= 2 && sub + 14 <= end) {
+            channels = byteData.getUint16(sub + 12, Endian.big);
+          } else if (subId == 'CMPR' && subSize >= 4 && sub + 16 <= end) {
+            final type =
+                String.fromCharCodes(bytes.sublist(sub + 12, sub + 16));
+            if (type != 'DSD ') {
+              throw DsdUnsupportedException(
+                  'Compressed DFF ($type) is not supported');
+            }
+          }
+          sub += 12 + subSize + (subSize & 1);
+        }
+      } else if (chunkId == 'FS  ') {
         if (chunkSize >= 4 && pos + 16 <= bytes.length) {
-          final sampleRate = byteData.getUint32(pos + 12, Endian.big);
-          dsdRate = sampleRate ~/ 44100;
+          dsdRate = byteData.getUint32(pos + 12, Endian.big) ~/ 44100;
         }
       } else if (chunkId == 'DSD ') {
         dataOffset = pos + 12;
@@ -387,28 +471,41 @@ class DsdDecoderHelper {
         break;
       }
 
-      pos += (12 + chunkSize);
-      if (chunkSize <= 0) break;
+      // IFF chunks are padded to an even size.
+      pos += 12 + chunkSize + (chunkSize & 1);
     }
 
     if (dataOffset == -1 || dataOffset >= bytes.length) {
       throw const FormatException('DFF file contains no DSD audio chunk');
     }
+    if (channels != 1 && channels != 2) {
+      throw DsdUnsupportedException(
+          'DFF with $channels channels is not supported (mono/stereo only)');
+    }
 
-    final payload = bytes.sublist(
-        dataOffset, (dataOffset + dataSize).clamp(0, bytes.length));
-    final List<int> leftBytes = [];
-    final List<int> rightBytes = [];
+    final payload = Uint8List.sublistView(
+        bytes, dataOffset, (dataOffset + dataSize).clamp(0, bytes.length));
 
-    // Interleaved 1 byte L, 1 byte R
-    for (int i = 0; i + 1 < payload.length; i += 2) {
-      leftBytes.add(payload[i]);
-      rightBytes.add(payload[i + 1]);
+    // Byte-interleaved across channels. Preallocated typed buffers instead of
+    // a boxed List<int>.add() per byte.
+    final Uint8List dsdL;
+    final Uint8List dsdR;
+    if (channels == 1) {
+      dsdL = Uint8List.fromList(payload);
+      dsdR = Uint8List.fromList(payload);
+    } else {
+      final frames = payload.length ~/ 2;
+      dsdL = Uint8List(frames);
+      dsdR = Uint8List(frames);
+      for (int i = 0; i < frames; i++) {
+        dsdL[i] = payload[i * 2];
+        dsdR[i] = payload[i * 2 + 1];
+      }
     }
 
     return (
-      dsdL: Uint8List.fromList(leftBytes),
-      dsdR: Uint8List.fromList(rightBytes),
+      dsdL: dsdL,
+      dsdR: dsdR,
       dsdRate: dsdRate > 0 ? dsdRate : 64,
     );
   }
@@ -462,7 +559,11 @@ class DsdDecoderHelper {
 
     int offset = 44;
     for (int i = 0; i < pcmFloatSamples.length; i++) {
-      final double sample = pcmFloatSamples[i].clamp(-1.0, 1.0);
+      // NaN/Inf from the native decoder would make .round() throw
+      // UnsupportedError and kill the whole load; write silence instead.
+      final double raw = pcmFloatSamples[i];
+      final double sample =
+          raw.isFinite ? raw.clamp(-1.0, 1.0).toDouble() : 0.0;
       if (bytesPerSample == 2) {
         final int pcm16 = (sample * 32767.0).round().clamp(-32768, 32767);
         byteData.setInt16(offset, pcm16, Endian.little);

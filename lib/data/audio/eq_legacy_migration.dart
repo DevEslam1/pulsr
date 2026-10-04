@@ -88,6 +88,9 @@ abstract class EqLegacyMigration {
         final item = decoded[i];
         if (item is! Map) continue;
         final profile = Map<String, dynamic>.from(item);
+        // A profile that carries its own frequency table is a genuine
+        // 5-band custom profile, not pre-10-band legacy data: leave it alone.
+        if (profile['customFrequencies'] != null) continue;
         final gains = _decodeLegacyGains(profile['gains']);
         if (gains == null) continue;
         profile['gains'] = to10Band(gains);

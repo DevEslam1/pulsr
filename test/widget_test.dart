@@ -312,16 +312,14 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   double get preampDb => 0.0;
   @override
-  ValueNotifier<bool> get platformBridgeDegraded =>
-      ValueNotifier<bool>(false);
+  ValueNotifier<bool> get platformBridgeDegraded => ValueNotifier<bool>(false);
 }
 
 void main() {
   // The splash gates its routing on the DI initialization future; unblock it
   // so the first frame can render instead of waiting for its 8s safety net.
   setUpAll(() {
-    initializationReady
-        .timeout(const Duration(seconds: 1), onTimeout: () {});
+    initializationReady.timeout(const Duration(seconds: 1), onTimeout: () {});
   });
 
   setUp(() async {

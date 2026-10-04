@@ -16,7 +16,11 @@ void main() {
     // 439 -> 438 after scrobbler/headset logging pass (14 sites fixed).
     // 438 -> 435 after service-layer logging pass (waveform/ytm-cache/
     // artist-bio/lrclib/artwork/metadata/cloud-sync).
-    const int emptyCatchBaseline = 435;
+    // 435 -> 397 reconciled with empty_catch_ratchet_test.dart's measured count
+    // so both guards enforce the same ceiling.
+    // 397 -> 367 after the audio-layer refactor and generated-payload scope
+    // alignment (embedded browser JS excluded, matching the sibling ratchet).
+    const int emptyCatchBaseline = 367;
 
     List<File> dartFilesUnderLib() {
       final dir = Directory('lib');
@@ -28,7 +32,18 @@ void main() {
           .listSync(recursive: true)
           .whereType<File>()
           .where((f) => f.path.endsWith('.dart'))
-          .toList();
+          // Keep scope identical to empty_catch_ratchet_test.dart: generated
+          // sources are not hand-maintained error handling.
+          .where((f) {
+        final path = f.path.replaceAll('\\', '/');
+        if (path.contains('l10n/generated/')) return false;
+        if (path.endsWith('.freezed.dart') || path.endsWith('.g.dart')) {
+          return false;
+        }
+        // The embedded browser ships a JS payload full of `catch(e){}`.
+        if (path.endsWith('embedded_browser_ua.dart')) return false;
+        return true;
+      }).toList();
     }
 
     test('lib/ contains no raw print() calls (defect 08-04)', () {

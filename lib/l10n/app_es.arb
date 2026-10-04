@@ -907,6 +907,7 @@
   "followTrackSampleRateTitle": "Seguir la frecuencia de muestreo de la pista",
   "followTrackSampleRateSubtitle": "Reconfigura la salida a la frecuencia nativa de cada pista; se omite en Bluetooth y no repite cambios",
   "followTrackSampleRateBluetooth": "Se omite en Bluetooth: el enlace del códec/AVRCP controla la frecuencia",
+  "followTrackRequiresBitPerfect": "Requiere salida Bit-Perfect: la frecuencia de la pista solo se aplica en la ruta USB exclusiva",
   "strictBitPerfectTitle": "Bit-perfect estricto (sin remuestreo)",
   "strictBitPerfectSubtitle": "Fuerza Bit-Perfect + omisión del DSP y sigue la frecuencia de cada pista para que el DAC reciba las muestras exactas",
   "strictBitPerfectBluetooth": "No disponible: Bluetooth transcodifica — el bit-perfect estricto necesita un DAC USB",
@@ -4342,6 +4343,8 @@
   "conflictCrossfadeNeedsGaplessOff": "Desactivado: Sin cortes está activado — el crossfade necesita que esté desactivado. Desactiva Sin cortes para habilitar el crossfade.",
   "conflictStrictBitPerfectActive": "Bit-perfect estricto está activado: EQ, ReplayGain, Virtualizer/Dynamics y Crossfade están silenciados para que las muestras exactas de origen lleguen al DAC. Desactiva Bit-perfect estricto para reactivarlos.",
   "conflictCrossfadeBitPerfectBypass": "Desactivado: la omisión bit-perfect está activada — el crossfade solapa dos pistas y alteraría el flujo de bits. Desactiva Bit-Perfect (o su omisión de DSP) para usar el crossfade.",
+  "conflictSpeedBitPerfectBypass": "Desactivado: la omisión bit-perfect está activada — cambiar la velocidad o el tono remuestrea el audio y alteraría el flujo de bits exclusivo. Vuelve a 1.0× o desactiva Bit-Perfect.",
+  "conflictSilenceSkipBitPerfectBypass": "Desactivado: la omisión bit-perfect está activada — el salto de silencio edita el flujo de muestras. Desactiva Bit-Perfect (o su omisión de DSP) para usarlo.",
   "conflictNoDeviceDetected": "No se puede activar: aún no se ha detectado ningún dispositivo de salida. Conecta un DAC USB e inténtalo de nuevo.",
   "conflictNoExclusiveMixer": "No se puede activar: esta ruta de salida no expone atributos de mezclador bit-perfect exclusivos.",
   "conflictAaudioDirectCrossfade": "Desactivado: AAudio Direct está activado — el crossfade se aplica en la cadena DSP de ExoPlayer que omite. Desactiva AAudio Direct para usar el crossfade.",
@@ -4422,5 +4425,11 @@
   "unifiedFavoritesHeader": "Colección de favoritos",
   "unifiedFavoritesHeaderSubtitle": "Todas tus pistas favoritas y destacadas en un solo lugar",
   "unifiedFavoritesViewAll": "Abrir favoritos completos",
-  "folderPersistentExcludedBadge": "Excluido del escaneo"
+  "folderPersistentExcludedBadge": "Excluido del escaneo",
+  "audioQualityCapabilityProbe": "Solo sondeo de capacidades; no se mide el formato de salida del hardware.",
+  "audioQualityOutputSwitchUnavailable": "El cambio de salida no está disponible para este motor de reproducción.",
+  "audioQualityFormatFollowsEngine": "El formato sigue al motor de reproducción. La conversión manual no está disponible.",
+  "upNext": "A CONTINUACIÓN",
+  "proBadge": "PRO",
+  "nowPlayingPreview": "▶ Reproduciendo ahora"
 }

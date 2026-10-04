@@ -26,7 +26,8 @@ class QuickDiscoveryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final items = <({IconData icon, String label, Color color, VoidCallback onTap})>[
+    final items =
+        <({IconData icon, String label, Color color, VoidCallback onTap})>[
       if (online) ...[
         (
           icon: Icons.explore_rounded,

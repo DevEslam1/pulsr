@@ -234,7 +234,8 @@ void main() {
       expect(identical(state.memoizedSearchResults, initialResults), isTrue);
     });
 
-    testWidgets('SettingsScreen phone landscape scroll and toggle super sections',
+    testWidgets(
+        'SettingsScreen phone landscape scroll and toggle super sections',
         (tester) async {
       tester.view.physicalSize = const Size(800, 390);
       tester.view.devicePixelRatio = 1.0;
@@ -281,8 +282,7 @@ void main() {
       }
     });
 
-    testWidgets(
-        'maps legacy category to consolidated category on load',
+    testWidgets('maps legacy category to consolidated category on load',
         (tester) async {
       SharedPreferences.setMockInitialValues({
         'settings_last_selected_category': 'playback',
@@ -296,4 +296,3 @@ void main() {
     });
   });
 }
-

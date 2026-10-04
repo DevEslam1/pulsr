@@ -23,6 +23,13 @@ void main() {
       'lib/features/library/presentation/library_screen.dart': 88000,
       'lib/data/audio/equalizer_manager.dart': 106950,
       'lib/features/settings/cubit/settings_cubit.dart': 82500,
+      // Remaining god-files from the 2026-10 gap register. Caps are pinned to
+      // the current size so they can only shrink; extract a collaborator and
+      // lower the cap, never raise it.
+      'lib/core/services/ytm_account_service.dart': 138705,
+      'lib/core/services/yt_download_service.dart': 77149,
+      'lib/core/services/ytm_service.dart': 70631,
+      'lib/features/playlists/presentation/playlists_screen.dart': 91411,
     };
     final offenders = <String>[];
     caps.forEach((path, cap) {

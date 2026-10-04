@@ -53,7 +53,8 @@ mixin SettingsScreenController on State<SettingsScreen> {
     // Normalise session category if stale
     _sessionCategoryId = normalizeCategoryId(_sessionCategoryId);
     if (_selectedCategoryId != _sessionCategoryId &&
-        (_categoryIds.contains(_sessionCategoryId) || _sessionCategoryId == 'all')) {
+        (_categoryIds.contains(_sessionCategoryId) ||
+            _sessionCategoryId == 'all')) {
       setState(() => _selectedCategoryId = _sessionCategoryId);
     }
     // Read and map any legacy disk-persisted category from prior versions

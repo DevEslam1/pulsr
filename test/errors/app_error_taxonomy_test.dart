@@ -119,8 +119,8 @@ void main() {
     });
 
     test('Drift wrapped database errors resolve to StorageError', () {
-      final error = resolveAppError(
-          DriftWrappedException(message: 'invalid statement'));
+      final error =
+          resolveAppError(DriftWrappedException(message: 'invalid statement'));
 
       expect(error, isA<StorageError>());
       expect(error.code, equals('DB_ERROR'));

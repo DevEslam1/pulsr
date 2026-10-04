@@ -38,12 +38,28 @@ extension EqualizerEffectOps on EqualizerManager {
     if (!_effectsChannel.isVirtualizerSupported) return;
 
     // Finite-guard before clamp so a NaN strength can't survive clamp().
+    final previous = virtualizerStrength;
     virtualizerStrength = DspParamRanges.virtualizerStrength.clamp(strength);
-    final applied = await _effectsChannel.setVirtualizerStrength(
-      virtualizerStrength,
-    );
-    _recordEffectOutcome('virtualizer', applied || virtualizerStrength <= 0.0);
-    await _savePreferences();
+    try {
+      final applied = await _effectsChannel.setVirtualizerStrength(
+        virtualizerStrength,
+      );
+      _recordEffectOutcome(
+          'virtualizer', applied || virtualizerStrength <= 0.0);
+      await _savePreferences();
+    } catch (e, st) {
+      // Mirror setVirtualizerEnabled: a throwing channel call must not leave
+      // the UI value out of step with the engine, nor escape as an unhandled
+      // error from a slider drag.
+      virtualizerStrength = previous;
+      _recordEffectOutcome('virtualizer', false);
+      ErrorLogger.log(
+        'Failed to set virtualizer strength',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+    }
   }
 
   Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {
@@ -69,16 +85,27 @@ extension EqualizerEffectOps on EqualizerManager {
   }
 
   Future<void> toggleDynamicsBypass() async {
-    _isDynamicsBypassed = !_isDynamicsBypassed;
-    if (_isDynamicsBypassed) {
-      await _effectsChannel.setDynamicsPreset(DynamicsPreset.off, false);
-    } else {
-      await _effectsChannel.setDynamicsPreset(
-        dynamicsPreset,
-        isDynamicsEnabled,
+    final previous = _isDynamicsBypassed;
+    _isDynamicsBypassed = !previous;
+    try {
+      if (_isDynamicsBypassed) {
+        await _effectsChannel.setDynamicsPreset(DynamicsPreset.off, false);
+      } else {
+        await _effectsChannel.setDynamicsPreset(
+          dynamicsPreset,
+          isDynamicsEnabled,
+        );
+      }
+      await _savePreferences();
+    } catch (e, st) {
+      _isDynamicsBypassed = previous;
+      ErrorLogger.log(
+        'Failed to toggle dynamics bypass',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
       );
     }
-    await _savePreferences();
   }
 
   bool get isSpatializerSupported => _effectsChannel.isSpatializerSupported;
@@ -281,7 +308,9 @@ extension EqualizerEffectOps on EqualizerManager {
       // ordinal never reaches native and produce the wrong room (see clamp above).
       if (preset != null) await _effectsChannel.setReverbPreset(reverbPreset);
       // FIX M-7: always sync wet/dry after preset change so DSP is not stale
-      await _effectsChannel.setReverbWetDry(wetDry ?? reverbWetDry);
+      // Always the clamped field: forwarding the raw `wetDry` argument let
+      // NaN / out-of-range values reach native.
+      await _effectsChannel.setReverbWetDry(reverbWetDry);
       // Predelay, damping and cross-channel share one native call; push the
       // current values so a preset change never leaves them stale.
       await _effectsChannel.setReverbParams(
@@ -303,6 +332,13 @@ extension EqualizerEffectOps on EqualizerManager {
     if (irSamples.isEmpty) {
       ErrorLogger.log(
         'Cannot load an empty impulse response',
+        category: 'EqualizerManager',
+      );
+      return false;
+    }
+    if (irSamples.any((s) => !s.isFinite)) {
+      ErrorLogger.log(
+        'Impulse response contains NaN/Infinity samples; rejecting',
         category: 'EqualizerManager',
       );
       return false;

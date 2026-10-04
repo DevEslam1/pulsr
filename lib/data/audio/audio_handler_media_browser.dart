@@ -299,62 +299,71 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
         }
 
         if (parentMediaId.startsWith('mood_')) {
-          final mood = parentMediaId.substring(5).toLowerCase();
           final allSongsRes = await _repository.getAllSongs();
           final allSongs =
               allSongsRes.fold((l) => <SongsTableData>[], (r) => r);
-          final keywords = switch (mood) {
-            'chill' => [
-                'chill',
-                'relax',
-                'acoustic',
-                'ambient',
-                'lofi',
-                'calm',
-                'peaceful'
-              ],
-            'workout' => [
-                'workout',
-                'energy',
-                'power',
-                'gym',
-                'fast',
-                'rock',
-                'electronic',
-                'dance'
-              ],
-            'focus' => [
-                'focus',
-                'study',
-                'instrumental',
-                'piano',
-                'classical',
-                'jazz',
-                'ambient'
-              ],
-            'party' => [
-                'party',
-                'dance',
-                'club',
-                'pop',
-                'disco',
-                'house',
-                'hip hop',
-                'upbeat'
-              ],
-            _ => [mood],
-          };
-          final filtered = allSongs.where((s) {
-            final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'
-                .toLowerCase();
-            return keywords.any((k) => text.contains(k));
-          }).toList();
+          final filtered = _filterByMood(allSongs, parentMediaId.substring(5));
           _warmArtworkAsync(filtered);
           return filtered.map(_fastSongToMediaItem).toList();
         }
 
         return [];
     }
+  }
+
+  static List<String> _moodKeywords(String mood) => switch (mood) {
+        'chill' => [
+            'chill',
+            'relax',
+            'acoustic',
+            'ambient',
+            'lofi',
+            'calm',
+            'peaceful'
+          ],
+        'workout' => [
+            'workout',
+            'energy',
+            'power',
+            'gym',
+            'fast',
+            'rock',
+            'electronic',
+            'dance'
+          ],
+        'focus' => [
+            'focus',
+            'study',
+            'instrumental',
+            'piano',
+            'classical',
+            'jazz',
+            'ambient'
+          ],
+        'party' => [
+            'party',
+            'dance',
+            'club',
+            'pop',
+            'disco',
+            'house',
+            'hip hop',
+            'upbeat'
+          ],
+        _ => [mood],
+      };
+
+  List<SongsTableData> _filterByMood(List<SongsTableData> songs, String mood) {
+    final keywords = _moodKeywords(mood.toLowerCase());
+    return songs.where((s) {
+      final text =
+          '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'.toLowerCase();
+      return keywords.any(text.contains);
+    }).toList();
+  }
+
+  Future<void> _loadSongsIfAny(List<SongsTableData> songs) async {
+    if (songs.isNotEmpty) await loadQueue(songs);
   }
 
   @override
@@ -394,15 +403,12 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     final songId = int.tryParse(mediaId);
     if (songId != null) {
       final songsRes = await _repository.getAllSongs();
-      final loaded = songsRes.fold((l) => false, (songs) {
-        final index = songs.indexWhere((s) => s.id == songId);
-        if (index != -1) {
-          loadQueue(songs, initialIndex: index);
-          return true;
-        }
-        return false;
-      });
-      if (loaded) return;
+      final all = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+      final index = all.indexWhere((s) => s.id == songId);
+      if (index != -1) {
+        await loadQueue(all, initialIndex: index);
+        return;
+      }
     }
 
     if (extras != null &&
@@ -412,11 +418,13 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       final remoteId = (extras['remoteId'] as String?) ?? mediaId;
       final uniqueNegativeId = -(remoteId.hashCode.abs() % 1000000000 + 1);
       final onlineSong = SongsTableData(
-        id: songId ?? uniqueNegativeId,
+        // Never reuse a positive library id for an online-only row: it could
+        // collide with a real song and misattribute play history.
+        id: uniqueNegativeId,
         title: extras['title'] as String? ?? 'Unknown',
         artist: extras['artist'] as String? ?? 'Unknown Artist',
         album: extras['album'] as String? ?? '',
-        durationMs: (extras['durationMs'] as int?) ?? 0,
+        durationMs: (extras['durationMs'] as num?)?.toInt() ?? 0,
         path: extras['path'] as String? ?? '',
         source: extras['source'] as String? ?? SongSource.youtube,
         remoteId: remoteId,
@@ -431,146 +439,66 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
       return;
     }
 
+    List<SongsTableData> unwrap(dynamic res) =>
+        res.fold((l) => <SongsTableData>[], (r) => r) as List<SongsTableData>;
+
     if (mediaId.startsWith('album_')) {
-      final albumId = int.tryParse(mediaId.substring(6));
-      if (albumId != null) {
-        final songsRes = await _repository.getAlbumSongs(albumId);
-        songsRes.fold((l) => null, (songs) {
-          if (songs.isNotEmpty) loadQueue(songs);
-        });
+      final id = int.tryParse(mediaId.substring(6));
+      if (id != null) {
+        await _loadSongsIfAny(unwrap(await _repository.getAlbumSongs(id)));
       }
       return;
     }
-
     if (mediaId.startsWith('artist_')) {
-      final artistId = int.tryParse(mediaId.substring(7));
-      if (artistId != null) {
-        final songsRes = await _repository.getArtistSongs(artistId);
-        songsRes.fold((l) => null, (songs) {
-          if (songs.isNotEmpty) loadQueue(songs);
-        });
+      final id = int.tryParse(mediaId.substring(7));
+      if (id != null) {
+        await _loadSongsIfAny(unwrap(await _repository.getArtistSongs(id)));
       }
       return;
     }
-
     if (mediaId.startsWith('playlist_')) {
-      final playlistId = int.tryParse(mediaId.substring(9));
-      if (playlistId != null) {
-        final songsRes = await _repository.getPlaylistSongs(playlistId);
-        songsRes.fold((l) => null, (songs) {
-          if (songs.isNotEmpty) loadQueue(songs);
-        });
+      final id = int.tryParse(mediaId.substring(9));
+      if (id != null) {
+        await _loadSongsIfAny(unwrap(await _repository.getPlaylistSongs(id)));
       }
       return;
     }
-
     if (mediaId.startsWith('genre_')) {
-      final genreName = mediaId.substring(6);
-      if (genreName.isNotEmpty) {
-        final songsRes = await _repository.getGenreSongs(genreName);
-        songsRes.fold((l) => null, (songs) {
-          if (songs.isNotEmpty) loadQueue(songs);
-        });
+      final name = mediaId.substring(6);
+      if (name.isNotEmpty) {
+        await _loadSongsIfAny(unwrap(await _repository.getGenreSongs(name)));
       }
       return;
     }
-
     if (mediaId == 'songs' || mediaId == 'root_songs') {
-      final songsRes = await _repository.getAllSongs();
-      songsRes.fold((l) => null, (songs) {
-        if (songs.isNotEmpty) loadQueue(songs);
-      });
+      await _loadSongsIfAny(unwrap(await _repository.getAllSongs()));
       return;
     }
-
     if (mediaId == 'favorites' || mediaId == 'root_favorites') {
-      final songsRes = await _repository.getFavorites();
-      songsRes.fold((l) => null, (songs) {
-        if (songs.isNotEmpty) loadQueue(songs);
-      });
+      await _loadSongsIfAny(unwrap(await _repository.getFavorites()));
       return;
     }
-
     if (mediaId == 'downloaded' || mediaId == 'root_downloaded') {
-      final songsRes = await _repository.getAllSongs();
-      songsRes.fold((l) => null, (songs) {
-        final downloaded = songs
-            .where((s) => s.isDownloaded || s.source == SongSource.local)
-            .toList();
-        if (downloaded.isNotEmpty) loadQueue(downloaded);
-      });
+      final all = unwrap(await _repository.getAllSongs());
+      await _loadSongsIfAny(all
+          .where((s) => s.isDownloaded || s.source == SongSource.local)
+          .toList());
       return;
     }
-
     if (mediaId.startsWith('mood_')) {
-      final mood = mediaId.substring(5).toLowerCase();
-      final songsRes = await _repository.getAllSongs();
-      songsRes.fold((l) => null, (songs) {
-        final keywords = switch (mood) {
-          'chill' => [
-              'chill',
-              'relax',
-              'acoustic',
-              'ambient',
-              'lofi',
-              'calm',
-              'peaceful'
-            ],
-          'workout' => [
-              'workout',
-              'energy',
-              'power',
-              'gym',
-              'fast',
-              'rock',
-              'electronic',
-              'dance'
-            ],
-          'focus' => [
-              'focus',
-              'study',
-              'instrumental',
-              'piano',
-              'classical',
-              'jazz',
-              'ambient'
-            ],
-          'party' => [
-              'party',
-              'dance',
-              'club',
-              'pop',
-              'disco',
-              'house',
-              'hip hop',
-              'upbeat'
-            ],
-          _ => [mood],
-        };
-        final filtered = songs.where((s) {
-          final text = '${s.title} ${s.artist} ${s.album} ${s.genre ?? ''}'
-              .toLowerCase();
-          return keywords.any((k) => text.contains(k));
-        }).toList();
-        if (filtered.isNotEmpty) loadQueue(filtered);
-      });
+      final all = unwrap(await _repository.getAllSongs());
+      await _loadSongsIfAny(_filterByMood(all, mediaId.substring(5)));
       return;
     }
-
     if (mediaId == 'recent' ||
         mediaId == 'root_recent' ||
         mediaId == AudioService.recentRootId) {
       // External controllers (media resumption chip, Assistant, Wear/Auto
       // reconnect) address the "recent" root to auto-play recently played
       // music. Honoring it while a user queue is actively playing silently
-      // replaced the running queue — and the player-screen queue view — with
-      // the 20 most recently played tracks. Only honor it when nothing is
-      // playing.
+      // replaced the running queue, so only honor it when nothing is playing.
       if (_songs.isNotEmpty && _activePlayer.playing) return;
-      final songsRes = await _repository.getRecentlyPlayed();
-      songsRes.fold((l) => null, (songs) {
-        if (songs.isNotEmpty) loadQueue(songs);
-      });
+      await _loadSongsIfAny(unwrap(await _repository.getRecentlyPlayed()));
       return;
     }
   }
@@ -581,10 +509,16 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     if (query.trim().isEmpty) return [];
     // Use the indexed FTS search instead of materializing and linear-scanning
     // the entire library on every Android Auto query.
-    final songsRes = await _repository
-        .watchAllSongs(searchQuery: query.trim(), limit: 50)
-        .first;
-    final matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+    List<SongsTableData> matches;
+    try {
+      final songsRes = await _repository
+          .watchAllSongs(searchQuery: query.trim(), limit: 50)
+          .first
+          .timeout(const Duration(seconds: 5));
+      matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+    } catch (_) {
+      matches = const <SongsTableData>[];
+    }
     final results = <MediaItem>[
       for (final song in matches) _fastSongToMediaItem(song),
     ];
@@ -653,12 +587,21 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
     }
 
     // Indexed FTS search (title/artist/album) instead of a full-library scan.
-    final songsRes =
-        await _repository.watchAllSongs(searchQuery: cleanQ, limit: 50).first;
-    final matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+    List<SongsTableData> matches;
+    try {
+      final songsRes = await _repository
+          .watchAllSongs(searchQuery: cleanQ, limit: 50)
+          .first
+          .timeout(const Duration(seconds: 5));
+      matches = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+    } catch (_) {
+      matches = const <SongsTableData>[];
+    }
     if (matches.isNotEmpty) {
-      if (autoShuffle) matches.shuffle();
-      await loadQueue(matches);
+      // Copy first: the repository list may be unmodifiable.
+      final queueSongs = List<SongsTableData>.of(matches);
+      if (autoShuffle) queueSongs.shuffle();
+      await loadQueue(queueSongs);
       return;
     }
 
@@ -722,12 +665,18 @@ mixin PulsrAudioMediaBrowser on BaseAudioHandler {
 
   Future<void> _toggleSleepTimer30m() async {
     if (_sleepTimerManager.isActive) {
-      _sleepTimerManager.cancelSleepTimer();
+      cancelSleepTimer();
     } else {
-      _sleepTimerManager.startDurationTimer(const Duration(minutes: 30));
+      // Go through the bridge: it wires onTimerExpired -> pause() and the
+      // active-player fade-out, which the bare manager call did not.
+      startSleepTimer(const Duration(minutes: 30));
     }
   }
 
   Future<void> loadQueue(List<SongsTableData> songs,
       {int initialIndex = 0, Duration? initialPosition, bool autoPlay = true});
+
+  /// Supplied by [PulsrAudioSleepBridge].
+  void startSleepTimer(Duration duration, {bool fadeOut = true});
+  void cancelSleepTimer();
 }

@@ -304,9 +304,12 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
   Widget _buildBody(PulsrPalette p) {
     if (_isScanning) {
-      return const SkeletonList(
-        padding: EdgeInsetsDirectional.fromSTEB(
-            AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+      return const SingleChildScrollView(
+        physics: AlwaysScrollableScrollPhysics(),
+        child: SkeletonList(
+          padding: EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.xs, AppSpacing.md, 120),
+        ),
       );
     }
 

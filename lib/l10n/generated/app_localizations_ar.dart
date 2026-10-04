@@ -2518,6 +2518,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات';
 
   @override
+  String get followTrackRequiresBitPerfect =>
+      'يتطلب إخراج Bit-Perfect — لا يُطبَّق معدل المسار إلا على مسار USB الحصري';
+
+  @override
   String get strictBitPerfectTitle => 'بت-بيرفكت صارم (بدون إعادة عينات)';
 
   @override
@@ -7855,6 +7859,14 @@ class AppLocalizationsAr extends AppLocalizations {
       'معطَّل: تجاوز Bit-Perfect مفعّل — يتداخل Crossfade بين مقطعين وسيغيّر تيار البتات. أوقف Bit-Perfect (أو تجاوز DSP الخاص به) لاستخدام Crossfade.';
 
   @override
+  String get conflictSpeedBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — تغيير السرعة أو النغمة يعيد أخذ العينات ويُغيّر تدفق البتات الحصري. أعد السرعة إلى 1.0× أو أوقف Bit-Perfect.';
+
+  @override
+  String get conflictSilenceSkipBitPerfectBypass =>
+      'معطَّل: تجاوز Bit-Perfect مفعّل — تخطي الصمت يعدّل تدفق العينات. أوقف Bit-Perfect (أو تجاوز DSP) لاستخدامه.';
+
+  @override
   String get conflictNoDeviceDetected =>
       'لا يمكن التفعيل: لم يُكتشف أي جهاز إخراج بعد. وصّل DAC USB وأعد المحاولة.';
 
@@ -8131,4 +8143,25 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get folderPersistentExcludedBadge => 'مستبعد من الفحص';
+
+  @override
+  String get audioQualityCapabilityProbe =>
+      'فحص القدرات فقط؛ لا يُقاس تنسيق مخرج العتاد.';
+
+  @override
+  String get audioQualityOutputSwitchUnavailable =>
+      'تبديل المخرج غير متاح لمحرك التشغيل هذا.';
+
+  @override
+  String get audioQualityFormatFollowsEngine =>
+      'يتبع التنسيق محرك التشغيل. التحويل اليدوي غير متاح.';
+
+  @override
+  String get upNext => 'التالي';
+
+  @override
+  String get proBadge => 'PRO';
+
+  @override
+  String get nowPlayingPreview => '▶ قيد التشغيل الآن';
 }

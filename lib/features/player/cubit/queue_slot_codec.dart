@@ -36,7 +36,8 @@ class DecodedSlot {
 class QueueSlotCodec {
   static const int currentSchemaVersion = 1;
   static const int maxSlotIndex = 2;
-  static const int maxDocumentKeys = (maxSlotIndex + 1) + 2; // slots + activeSlot + schemaVersion
+  static const int maxDocumentKeys =
+      (maxSlotIndex + 1) + 2; // slots + activeSlot + schemaVersion
   // FIX-L06: 7 days to support audiobooks and long podcasts
   static const int maxPositionMs = 7 * 24 * 3600 * 1000;
   static const double minSpeed = 0.1;
@@ -160,11 +161,8 @@ class QueueSlotCodec {
 
     // songIds only holds ints, so a non-int anchor (corrupt id) can never match
     // and must not be passed to List<int>.indexOf, whose parameter is covariant.
-    final remappedIndex =
-        anchorId is int ? songIds.indexOf(anchorId) : -1;
-    final currentIndex = (remappedIndex != -1
-            ? remappedIndex
-            : rawIndexInt)
+    final remappedIndex = anchorId is int ? songIds.indexOf(anchorId) : -1;
+    final currentIndex = (remappedIndex != -1 ? remappedIndex : rawIndexInt)
         .clamp(0, songIds.length - 1);
 
     // isFinite guards Infinity/NaN (jsonDecode of 1e999 yields Infinity) whose
@@ -235,8 +233,7 @@ class QueueSlotCodec {
     ];
   }
 
-  static int clampCurrentIndex(int raw, int length) =>
-      raw.clamp(0, length - 1);
+  static int clampCurrentIndex(int raw, int length) => raw.clamp(0, length - 1);
   static Duration clampPosition(int ms) =>
       Duration(milliseconds: ms.clamp(0, maxPositionMs));
   static double clampSpeed(double v) =>

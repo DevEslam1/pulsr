@@ -44,7 +44,6 @@ class TransitionDecision {
 class CrossfadeManager {
   final Mutex _fadeMutex = Mutex();
   final List<Timer> _activeTimers = [];
-  Timer? _fadeTimer;
 
   Duration duration = Duration.zero;
   CrossfadeCurve curve = CrossfadeCurve.equalPower;
@@ -83,7 +82,7 @@ class CrossfadeManager {
   static Duration calculateBpmAlignedDuration(
       Duration baseDuration, double? bpm) {
     if (bpm == null || !bpm.isFinite) return baseDuration;
-    if (bpm <= 40.0 || bpm >= 240.0) {
+    if (bpm < 40.0 || bpm > 240.0) {
       ErrorLogger.log(
         'BPM $bpm out of range (40-240) — using base duration',
         category: 'CrossfadeManager',
@@ -109,8 +108,10 @@ class CrossfadeManager {
     }
 
     final alignedSeconds = bestBeats * secondsPerBeat;
+    final baseMs = (baseSec * 1000).round();
+    final minMs = math.min(1000, baseMs);
     return Duration(
-        milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000));
+        milliseconds: (alignedSeconds * 1000).round().clamp(minMs, 20000));
   }
 
   /// Returns the effective crossfade duration, optionally aligned to song [bpm].
@@ -145,7 +146,7 @@ class CrossfadeManager {
         return f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
 
       case CrossfadeCurve.djCutDrop:
-        // Sharp attack after midpoint
+        // Slow start, then a sharp rise
         return f < 0.2
             ? f * 1.5
             : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
@@ -171,11 +172,14 @@ class CrossfadeManager {
         final s = f * f * (3.0 - 2.0 * f);
         return (1.0 - s, s);
       case CrossfadeCurve.exponential:
-        final inGain =
-            f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
-        final outGain = (1.0 - f) == 0.0
-            ? 0.0
-            : math.pow(2.0, 10.0 * ((1.0 - f) - 1.0)).toDouble();
+        // Incoming follows a normalised exponential rise (exact 0 -> 1). The
+        // outgoing gain is its power complement, so the pair never collapses
+        // into a near-silent hole mid-fade (two independent exponentials
+        // were ~-30 dB each at the midpoint).
+        const floor = 0.0009765625; // 2^-10
+        final raw = math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
+        final inGain = ((raw - floor) / (1.0 - floor)).clamp(0.0, 1.0);
+        final outGain = math.sqrt((1.0 - inGain * inGain).clamp(0.0, 1.0));
         return (outGain, inGain);
       case CrossfadeCurve.djCutDrop:
         final inGain = f < 0.2
@@ -234,10 +238,11 @@ class CrossfadeManager {
     Duration duration = const Duration(seconds: 3),
     int steps = 30,
   }) async* {
-    final stepDuration = duration ~/ steps;
-    for (var i = 0; i <= steps; i++) {
-      yield evaluateSumSafeGainPair(i / steps);
-      if (i < steps) {
+    final n = steps < 1 ? 1 : steps;
+    final stepDuration = duration ~/ n;
+    for (var i = 0; i <= n; i++) {
+      yield evaluateSumSafeGainPair(i / n);
+      if (i < n) {
         await Future.delayed(stepDuration);
       }
     }
@@ -388,8 +393,17 @@ class CrossfadeManager {
           await player.setVolume(to.clamp(0.0, 1.0));
         } catch (_) {
           nativeArmed = false;
+          _clearNativeCurve(
+              player); // else the stepped fallback double-attenuates
         }
       }
+    }
+    // cancel()/dispose() may have run while the arm call above was awaiting.
+    // Bail out and drop any curve we just armed, or the player stays muted.
+    if (_fadeId != fadeId) {
+      if (nativeArmed) _clearNativeCurve(player);
+      if (!completer.isCompleted) completer.complete();
+      return;
     }
     if (nativeArmed) {
       Timer? singleTimer;
@@ -423,27 +437,22 @@ class CrossfadeManager {
       final elapsed = stopwatch.elapsedMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
 
-      if (nativeArmed) {
-        // The sink applies the ramp per-sample; this timer only watches for
-        // cancellation and fade end.
-      } else {
-        final (outGain, inGain) = evaluateGainPair(fraction);
-        final currentVol = from * outGain + to * inGain;
+      final (outGain, inGain) = evaluateGainPair(fraction);
+      final currentVol = from * outGain + to * inGain;
 
-        try {
-          player.setVolume(currentVol.clamp(0.0, 1.0));
-        } catch (e, st) {
-          ErrorLogger.log(
-            'Error adjusting volume during fade',
-            error: e,
-            stackTrace: st,
-            category: 'CrossfadeManager',
-          );
-          t.cancel();
-          _activeTimers.remove(t);
-          if (!completer.isCompleted) completer.complete();
-          return;
-        }
+      try {
+        player.setVolume(currentVol.clamp(0.0, 1.0));
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Error adjusting volume during fade',
+          error: e,
+          stackTrace: st,
+          category: 'CrossfadeManager',
+        );
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+        return;
       }
 
       if (fraction >= 1.0) {
@@ -532,6 +541,12 @@ class CrossfadeManager {
       return o;
     });
     final oldArmed = await _armNativeCurve(active, oldCurve, segmentMs);
+    if (_fadeId != fadeId) {
+      // Cancelled while arming: do not record/leave the curve armed.
+      if (oldArmed) _clearNativeCurve(active);
+      if (!completer.isCompleted) completer.complete();
+      return;
+    }
     if (oldArmed) {
       _outgoingWithArmedCurve = active;
       _nativeCurveArmedOnOutgoing = true;
@@ -546,6 +561,9 @@ class CrossfadeManager {
     // ABSOLUTE volume never lets the base jump past the current fade gain, so
     // no full-gain buffer can leak.
     double lastFraction = 0.0;
+    // A normal 10 ms tick advances 10/totalMs; flag only a jump of 5x that
+    // (and never below 5%), so short fades don't count as glitches.
+    final glitchThreshold = math.max(0.05, 5 * 10.0 / totalMs);
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 10), (t) {
       if (_fadeId != fadeId) {
@@ -558,7 +576,7 @@ class CrossfadeManager {
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
 
       // Track timer jitter: if fraction jumps > 0.05 (5%) between ticks, increment glitch counter
-      if ((fraction - lastFraction) > 0.05) {
+      if ((fraction - lastFraction) > glitchThreshold) {
         crossfadeGlitchCount++;
       }
       lastFraction = fraction;
@@ -582,6 +600,11 @@ class CrossfadeManager {
         );
         t.cancel();
         _activeTimers.remove(t);
+        if (oldArmed) {
+          _clearNativeCurve(active);
+          _outgoingWithArmedCurve = null;
+          _nativeCurveArmedOnOutgoing = false;
+        }
         if (!completer.isCompleted) completer.complete();
         return;
       }
@@ -645,9 +668,13 @@ class CrossfadeManager {
 
     final hadActiveFade = isCrossfading ||
         _activeTimers.isNotEmpty ||
-        _fadeTimer != null ||
         _activeFadeCompleters.isNotEmpty;
     if (!hadActiveFade) return;
+
+    // Detach the completer NOW: beginCrossfade() may install a new one while
+    // the awaits below are in flight, and that one must not be completed here.
+    final completer = _crossfadeCompleter;
+    _crossfadeCompleter = null;
 
     _fadeId++; // Invalidate any in-progress fade timers
     for (final t in _activeTimers) {
@@ -658,8 +685,6 @@ class CrossfadeManager {
     // them here so an awaited fadeVolume/crossfadeVolumes (and the mutex held
     // across it) does not hang forever. Local reference & clear before iterating (C-02).
     _completeActiveFades();
-    _fadeTimer?.cancel();
-    _fadeTimer = null;
     isCrossfading = false; // Set BEFORE stopping players
     pendingIndex = null;
 
@@ -676,9 +701,7 @@ class CrossfadeManager {
       );
     }
 
-    // Complete the completer exactly once
-    final completer = _crossfadeCompleter;
-    _crossfadeCompleter = null;
+    // Complete the detached completer exactly once
     // FIX-B04: Guard against completing an already completed crossfade completer
     if (completer != null && !completer.isCompleted) {
       completer.complete();
@@ -742,8 +765,6 @@ class CrossfadeManager {
     }
     _activeTimers.clear();
     _completeActiveFades();
-    _fadeTimer?.cancel();
-    _fadeTimer = null;
     isCrossfading = false;
     pendingIndex = null;
     // FIX-B04: Guard against completing an already completed crossfade completer

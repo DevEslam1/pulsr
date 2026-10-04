@@ -47,10 +47,9 @@ void main() {
       final cubit = PlaylistCubit(playlistUseCases: playlistUseCases);
 
       // Mirror the screen: capture membership *before* removing the playlist.
-      final captured = (await playlistUseCases
-              .watchPlaylistSongs(playlistId)
-              .first)
-          .fold((_) => <int>[], (songs) => [for (final s in songs) s.id]);
+      final captured =
+          (await playlistUseCases.watchPlaylistSongs(playlistId).first)
+              .fold((_) => <int>[], (songs) => [for (final s in songs) s.id]);
       expect(captured.toSet(), {201, 202});
 
       await cubit.deletePlaylist(playlistId);
@@ -64,10 +63,9 @@ void main() {
       expect(restoredId == null, isFalse);
       expect(restoredId, greaterThan(0));
 
-      final restoredSongs = (await playlistUseCases
-              .watchPlaylistSongs(restoredId!)
-              .first)
-          .fold((_) => <int>[], (songs) => [for (final s in songs) s.id]);
+      final restoredSongs =
+          (await playlistUseCases.watchPlaylistSongs(restoredId!).first)
+              .fold((_) => <int>[], (songs) => [for (final s in songs) s.id]);
       expect(restoredSongs.toSet(), {201, 202});
 
       await Future.delayed(const Duration(milliseconds: 50));

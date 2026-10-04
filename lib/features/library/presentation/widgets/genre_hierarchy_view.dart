@@ -258,7 +258,8 @@ class _GenreHierarchyViewState extends State<GenreHierarchyView> {
         border: Border.all(color: p.hairline),
       ),
       child: ExpansionTile(
-        key: PageStorageKey<String>('genre_cat_${cat.name}_${_searchQuery.isNotEmpty}'),
+        key: PageStorageKey<String>(
+            'genre_cat_${cat.name}_${_searchQuery.isNotEmpty}'),
         initiallyExpanded: _searchQuery.isNotEmpty && matching.isNotEmpty,
         shape: const Border(),
         leading: Container(

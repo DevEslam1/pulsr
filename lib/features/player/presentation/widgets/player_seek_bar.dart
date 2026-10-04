@@ -227,7 +227,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   size: 14, color: widget.activeColor.withValues(alpha: 0.90)),
               const SizedBox(width: AppSpacing.s6),
               Text(
-                'UP NEXT',
+                context.l10n.upNext,
                 style: TextStyle(
                   color: widget.activeColor.withValues(alpha: 0.90),
                   fontSize: AppFontSize.tiny,

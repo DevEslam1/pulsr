@@ -132,7 +132,9 @@ class AdaptiveQualityManager {
   }
 
   void setQuality(String q) {
-    currentQuality = q;
+    // Normalize: prefs may hold 'High'/'HIGH', and callers use currentQuality
+    // verbatim in cache keys and equality checks.
+    currentQuality = q.trim().toLowerCase();
     policy.reset();
   }
 

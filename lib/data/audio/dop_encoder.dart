@@ -51,21 +51,25 @@ class DopEncoder {
       final int marker = (i % 2 == 0) ? dopMarkerA : dopMarkerB;
       final int inOffset = i * 2;
 
-      // Left channel sample (3 bytes, Little-Endian: DSD0, DSD1, Marker)
-      dopBuffer[outOffset++] = dsdLeft[inOffset];
+      // DoP 1.1: the 24-bit word is [marker | older DSD byte | newer DSD
+      // byte] (marker = bits 23..16, oldest DSD bit = MSB). Stored
+      // little-endian that is: newer byte, older byte, marker. The previous
+      // order (older, newer) swapped the two DSD bytes in every word, which a
+      // DoP-capable DAC decodes as noise.
       dopBuffer[outOffset++] = dsdLeft[inOffset + 1];
+      dopBuffer[outOffset++] = dsdLeft[inOffset];
       dopBuffer[outOffset++] = marker;
 
-      // Right channel sample (3 bytes, Little-Endian: DSD0, DSD1, Marker)
-      dopBuffer[outOffset++] = dsdRight[inOffset];
       dopBuffer[outOffset++] = dsdRight[inOffset + 1];
+      dopBuffer[outOffset++] = dsdRight[inOffset];
       dopBuffer[outOffset++] = marker;
     }
 
     return dopBuffer;
   }
 
-  /// Encodes into 32-bit PCM containers (LSB 0 padded, [0x00, DSD0, DSD1, Marker])
+  /// Encodes into 32-bit PCM containers (LSB 0 padded). Input DSD bytes must be
+  /// MSB-first (oldest bit in bit 7); reverse DSF (LSB-first) data beforehand.
   static Uint8List encodeToDopPcm32({
     required Uint8List dsdLeft,
     required Uint8List dsdRight,
@@ -88,16 +92,16 @@ class DopEncoder {
       final int marker = (i % 2 == 0) ? dopMarkerA : dopMarkerB;
       final int inOffset = i * 2;
 
-      // Left channel 32-bit (Pad, DSD0, DSD1, Marker)
+      // 32-bit container, little-endian: pad, newer, older, marker (same
+      // byte significance as the 24-bit form, see encodeToDopPcm24).
       dopBuffer[outOffset++] = 0x00;
-      dopBuffer[outOffset++] = dsdLeft[inOffset];
       dopBuffer[outOffset++] = dsdLeft[inOffset + 1];
+      dopBuffer[outOffset++] = dsdLeft[inOffset];
       dopBuffer[outOffset++] = marker;
 
-      // Right channel 32-bit (Pad, DSD0, DSD1, Marker)
       dopBuffer[outOffset++] = 0x00;
-      dopBuffer[outOffset++] = dsdRight[inOffset];
       dopBuffer[outOffset++] = dsdRight[inOffset + 1];
+      dopBuffer[outOffset++] = dsdRight[inOffset];
       dopBuffer[outOffset++] = marker;
     }
 

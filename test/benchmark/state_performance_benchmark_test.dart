@@ -69,20 +69,32 @@ void main() {
         playback: state1.playback.copyWith(currentSong: songB),
       );
 
+      // Warm up the diff paths before measuring so JIT/first-call overhead
+      // does not land inside the timed region.
+      for (int i = 0; i < 1000; i++) {
+        state1.differsFromBeyondPosition(state2);
+        state3.differsFromBeyondPosition(state4);
+      }
+
       final stopwatch = Stopwatch()..start();
       const iterations = 10000;
+      var diffsMatchExpectations = true;
 
       for (int i = 0; i < iterations; i++) {
         // Fast path: identical beyond position
         final diff1 = state1.differsFromBeyondPosition(state2);
-        expect(diff1, isFalse);
 
         // Different track
         final diff2 = state3.differsFromBeyondPosition(state4);
-        expect(diff2, isTrue);
+
+        if (diff1 || !diff2) {
+          diffsMatchExpectations = false;
+        }
       }
 
       stopwatch.stop();
+      expect(diffsMatchExpectations, isTrue,
+          reason: 'diff results diverged during the benchmark');
       expect(stopwatch.elapsedMilliseconds, lessThan(500),
           reason: '10,000 state diffs took ${stopwatch.elapsedMilliseconds}ms');
     });

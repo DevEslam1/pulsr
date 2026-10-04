@@ -114,7 +114,10 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
         // Hot-swap mid-track: re-resolve at new quality, keep position.
         final pos = _activePlayer.position;
         final wasPlaying = _activePlayer.playing;
-        final generation = ++_playGeneration;
+        // Capture, don't bump: incrementing the shared generation here used to
+        // cancel any playSongAt/gapless load the user started in the meantime
+        // (their post-await generation check failed, so nothing played).
+        final generation = _playGeneration;
         try {
           final resolved = await _resolveStreamUrl(song, forceRefresh: true);
           // Bail if the track/queue changed while we re-resolved or if in gapless mode.
@@ -130,6 +133,9 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
           if (wasPlaying) unawaited(_activePlayer.play());
         } catch (_) {
           await prefs.setString('adaptive_runtime_quality', previousQuality);
+          // Keep the manager's idea of the current tier in sync with what is
+          // actually playing, or later step-up/step-down math is off by a tier.
+          adaptiveQualityManager.setQuality(previousQuality);
         }
       }
     } catch (e, st) {
@@ -137,6 +143,7 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
           error: e, stackTrace: st, category: 'AudioHandler');
       try {
         await prefs.setString('adaptive_runtime_quality', previousQuality);
+        adaptiveQualityManager.setQuality(previousQuality);
       } catch (e2, st2) {
         ErrorLogger.log('Failed to roll back runtime quality pref',
             error: e2, stackTrace: st2, category: 'AudioHandler');
@@ -167,6 +174,11 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<void> saveDspSnapshotForCurrent() async {
     final s = currentSong;
     if (s == null) return;
+    // 'Unknown Album' / empty tags would share one key across unrelated tracks.
+    if (!DspSnapshotStore.isUsableScope(s.album) ||
+        !DspSnapshotStore.isUsableScope(s.artist)) {
+      return;
+    }
     dspSnapshotStore.save(
       DspSnapshotStore.albumKey(s.album, s.artist),
       DspSnapshot(
@@ -198,7 +210,9 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
             .applyPreset(EqPreset(name: snap.presetName, gains: snap.gains));
       }
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to recall DSP snapshot',
+          error: e, stackTrace: st, category: 'AudioHandler');
       return false;
     }
   }
@@ -214,9 +228,11 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   // the native boolean stage.
   Future<void> setSilenceSkipSensitivity(int v) async {
     silenceSkipController.setSensitivity(v);
+    final enabled = silenceSkipController.enabled &&
+        !await _isBitPerfectBypassActivePrefs(_cachedPrefs);
     try {
-      await _playerA.setSkipSilenceEnabled(silenceSkipController.enabled);
-      await _playerB.setSkipSilenceEnabled(silenceSkipController.enabled);
+      await _playerA.setSkipSilenceEnabled(enabled);
+      await _playerB.setSkipSilenceEnabled(enabled);
     } catch (_) {}
     await silenceSkipController.persist();
   }
@@ -236,6 +252,7 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   }
 
   Future<void> persistBookmarks() => bookmarkStore.persist();
+
   // Abstract contract supplied by the composing PulsrAudioHandler (same
   // library). Declaring these here keeps the mixin stateless and lets the
   // analyser type-check each mixin against the host's private members.
@@ -248,7 +265,6 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   EqualizerManager get _equalizerManager;
 
   int get _playGeneration;
-  set _playGeneration(int value);
 
   AudioPlayer get _playerA;
 

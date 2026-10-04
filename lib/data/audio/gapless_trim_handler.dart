@@ -329,8 +329,7 @@ class GaplessTrimHandler {
     }
     final headerTrim = readHeaderGaplessTrimSync(
       path,
-      sampleRate:
-          (sampleRate != null && sampleRate > 0) ? sampleRate : 44100,
+      sampleRate: (sampleRate != null && sampleRate > 0) ? sampleRate : 44100,
     );
     if (headerTrim != null) {
       return headerTrim;

@@ -2497,6 +2497,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Skipped on Bluetooth — the codec/AVRCP link owns the sample rate';
 
   @override
+  String get followTrackRequiresBitPerfect =>
+      'Requires Bit-Perfect output — the track rate is only pushed on the exclusive USB path';
+
+  @override
   String get strictBitPerfectTitle => 'Strict bit-perfect (no resample)';
 
   @override
@@ -7910,6 +7914,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
 
   @override
+  String get conflictSpeedBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — changing speed or pitch resamples the audio and would alter the exclusive bitstream. Reset to 1.0× or turn off Bit-Perfect.';
+
+  @override
+  String get conflictSilenceSkipBitPerfectBypass =>
+      'Disabled: Bit-Perfect bypass is ON — silence skipping edits the sample stream. Turn off Bit-Perfect (or its DSP bypass) to use it.';
+
+  @override
   String get conflictNoDeviceDetected =>
       'Cannot enable: no output device detected yet. Connect a USB DAC and retry.';
 
@@ -8186,4 +8198,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get folderPersistentExcludedBadge => 'Excluded from scan';
+
+  @override
+  String get audioQualityCapabilityProbe =>
+      'Capability probe only; hardware output format is not measured.';
+
+  @override
+  String get audioQualityOutputSwitchUnavailable =>
+      'Output switch unavailable for this playback engine.';
+
+  @override
+  String get audioQualityFormatFollowsEngine =>
+      'Format follows the playback engine. Manual conversion is unavailable.';
+
+  @override
+  String get upNext => 'UP NEXT';
+
+  @override
+  String get proBadge => 'PRO';
+
+  @override
+  String get nowPlayingPreview => '▶ Now Playing';
 }

@@ -213,8 +213,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
   }
 
   // ── Saved searches ──────────────────────────────────────────────────
-  bool isSaved(String query, String filter) => savedSearches.value
-      .contains(encodeSavedSearch(query.trim(), filter));
+  bool isSaved(String query, String filter) =>
+      savedSearches.value.contains(encodeSavedSearch(query.trim(), filter));
 
   /// Saves the current query + filter (deduped, capped at [savedSearchMax]).
   Future<void> saveCurrentSearch() async {

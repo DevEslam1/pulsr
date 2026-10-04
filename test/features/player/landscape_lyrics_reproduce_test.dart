@@ -19,7 +19,9 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
+
 class MockDynamicThemeCubit extends Mock implements DynamicThemeCubit {}
 
 void main() {
@@ -49,9 +51,12 @@ void main() {
     mockDynamicThemeCubit = MockDynamicThemeCubit();
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
-    when(() => mockDynamicThemeCubit.state).thenReturn(const DynamicThemeState());
-    when(() => mockDynamicThemeCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
+    when(() => mockDynamicThemeCubit.state)
+        .thenReturn(const DynamicThemeState());
+    when(() => mockDynamicThemeCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
   });
 
   Widget createSubject({
@@ -72,7 +77,8 @@ void main() {
             providers: [
               BlocProvider<PlayerCubit>.value(value: mockPlayerCubit),
               BlocProvider<SettingsCubit>.value(value: mockSettingsCubit),
-              BlocProvider<DynamicThemeCubit>.value(value: mockDynamicThemeCubit),
+              BlocProvider<DynamicThemeCubit>.value(
+                  value: mockDynamicThemeCubit),
             ],
             child: SizedBox(
               width: size.width,
@@ -85,7 +91,8 @@ void main() {
     );
   }
 
-  testWidgets('ClassicPlayerTheme in landscape phone with lyrics visible', (tester) async {
+  testWidgets('ClassicPlayerTheme in landscape phone with lyrics visible',
+      (tester) async {
     const size = Size(844, 390);
     final state = PlayerState(
       playback: const PlaybackSlice(
@@ -126,7 +133,9 @@ void main() {
     expect(seekRect.top, greaterThanOrEqualTo(0));
   });
 
-  testWidgets('LyricsPlayerTheme in landscape phone 800x360 with lyrics visible', (tester) async {
+  testWidgets(
+      'LyricsPlayerTheme in landscape phone 800x360 with lyrics visible',
+      (tester) async {
     const size = Size(800, 360);
     final state = PlayerState(
       playback: const PlaybackSlice(
@@ -157,8 +166,11 @@ void main() {
   });
 
   for (final themeMode in PlayerThemeMode.values) {
-    testWidgets('NowPlayingScreen with $themeMode rotate from landscape to portrait with lyrics visible', (tester) async {
-      when(() => mockSettingsCubit.state).thenReturn(SettingsState(playerThemeMode: themeMode));
+    testWidgets(
+        'NowPlayingScreen with $themeMode rotate from landscape to portrait with lyrics visible',
+        (tester) async {
+      when(() => mockSettingsCubit.state)
+          .thenReturn(SettingsState(playerThemeMode: themeMode));
 
       final state = PlayerState(
         playback: const PlaybackSlice(
@@ -187,9 +199,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(tester.takeException(), isNull, reason: '$themeMode threw exception in landscape');
-      expect(find.byType(PlayerControls), findsOneWidget, reason: '$themeMode missing controls in landscape');
-      expect(find.byType(PlayerSeekBar), findsOneWidget, reason: '$themeMode missing seekbar in landscape');
+      expect(tester.takeException(), isNull,
+          reason: '$themeMode threw exception in landscape');
+      expect(find.byType(PlayerControls), findsOneWidget,
+          reason: '$themeMode missing controls in landscape');
+      expect(find.byType(PlayerSeekBar), findsOneWidget,
+          reason: '$themeMode missing seekbar in landscape');
 
       // Rotate to portrait phone (390x844)
       tester.view.physicalSize = const Size(390, 844);
@@ -201,17 +216,24 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(tester.takeException(), isNull, reason: '$themeMode threw exception in portrait');
-      expect(find.byType(PlayerControls), findsOneWidget, reason: '$themeMode missing controls in portrait');
-      expect(find.byType(PlayerSeekBar), findsOneWidget, reason: '$themeMode missing seekbar in portrait');
+      expect(tester.takeException(), isNull,
+          reason: '$themeMode threw exception in portrait');
+      expect(find.byType(PlayerControls), findsOneWidget,
+          reason: '$themeMode missing controls in portrait');
+      expect(find.byType(PlayerSeekBar), findsOneWidget,
+          reason: '$themeMode missing seekbar in portrait');
 
       final portraitControlsRect = tester.getRect(find.byType(PlayerControls));
-      expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0), reason: '$themeMode controls pushed below screen bottom in portrait');
-      expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0), reason: '$themeMode controls pushed above screen top in portrait');
+      expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0),
+          reason: '$themeMode controls pushed below screen bottom in portrait');
+      expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0),
+          reason: '$themeMode controls pushed above screen top in portrait');
     });
   }
 
-  testWidgets('KaraokeModeScreen has controls in landscape and retains them in portrait', (tester) async {
+  testWidgets(
+      'KaraokeModeScreen has controls in landscape and retains them in portrait',
+      (tester) async {
     final state = PlayerState(
       playback: const PlaybackSlice(
         currentSong: testSong,
@@ -223,7 +245,8 @@ void main() {
         isLyricsVisible: true,
         lyrics: [
           LyricsLine(timestamp: Duration(seconds: 10), text: 'First line'),
-          LyricsLine(timestamp: Duration(seconds: 40), text: 'Second active line'),
+          LyricsLine(
+              timestamp: Duration(seconds: 40), text: 'Second active line'),
           LyricsLine(timestamp: Duration(seconds: 70), text: 'Third line'),
         ],
       ),
@@ -243,9 +266,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(tester.takeException(), isNull, reason: 'KaraokeModeScreen threw exception in landscape');
-    expect(find.byType(PlayerControls), findsOneWidget, reason: 'KaraokeModeScreen missing controls in landscape');
-    expect(find.byType(PlayerSeekBar), findsOneWidget, reason: 'KaraokeModeScreen missing seekbar in landscape');
+    expect(tester.takeException(), isNull,
+        reason: 'KaraokeModeScreen threw exception in landscape');
+    expect(find.byType(PlayerControls), findsOneWidget,
+        reason: 'KaraokeModeScreen missing controls in landscape');
+    expect(find.byType(PlayerSeekBar), findsOneWidget,
+        reason: 'KaraokeModeScreen missing seekbar in landscape');
 
     // 2. Rotate to Portrait Phone
     tester.view.physicalSize = const Size(390, 844);
@@ -257,9 +283,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(tester.takeException(), isNull, reason: 'KaraokeModeScreen threw exception in portrait');
-    expect(find.byType(PlayerControls), findsOneWidget, reason: 'KaraokeModeScreen lost controls when rotating back to portrait');
-    expect(find.byType(PlayerSeekBar), findsOneWidget, reason: 'KaraokeModeScreen lost seekbar when rotating back to portrait');
+    expect(tester.takeException(), isNull,
+        reason: 'KaraokeModeScreen threw exception in portrait');
+    expect(find.byType(PlayerControls), findsOneWidget,
+        reason:
+            'KaraokeModeScreen lost controls when rotating back to portrait');
+    expect(find.byType(PlayerSeekBar), findsOneWidget,
+        reason:
+            'KaraokeModeScreen lost seekbar when rotating back to portrait');
   });
 }
-

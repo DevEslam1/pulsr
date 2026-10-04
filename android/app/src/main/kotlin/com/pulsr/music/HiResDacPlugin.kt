@@ -173,10 +173,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioManager != null) {
             audioDeviceCallback = object : AudioDeviceCallback() {
                 override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                    // A failure reason belongs to the topology it was produced
+                    // on. Without this, a rejection on the speaker would keep
+                    // the Bit-Perfect switch disabled after a capable USB DAC
+                    // was plugged in.
+                    lastBitPerfectReason = null
                     notifyDeviceChange()
                 }
 
                 override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                    lastBitPerfectReason = null
                     notifyDeviceChange()
                 }
             }
@@ -191,9 +197,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                             bitPerfectRequested = false
                             try { applyBitPerfectMode(false) } catch (_: Exception) {}
                         }
+                        lastBitPerfectReason = null
                         notifyDeviceChange()
                     }
                     UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                        lastBitPerfectReason = null
                         notifyDeviceChange()
                     }
                 }
@@ -954,14 +962,31 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     /**
+     * Pick the USB sink exclusive mode should target. The active route wins,
+     * then the app-selected device, then the first USB output as a last resort —
+     * with two DACs attached, configuring the first one while the stream plays
+     * on the other would claim exclusive output that is not actually in use.
+     */
+    private fun pickUsbOutputDevice(devices: Array<AudioDeviceInfo>): AudioDeviceInfo? {
+        val active = pickActiveOutputDevice(devices)
+        if (active != null && isUsbOutputType(active.type)) return active
+        val selectedId = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()[0]
+        if (selectedId != 0) {
+            devices.firstOrNull { it.id == selectedId && isUsbOutputType(it.type) }
+                ?.let { return it }
+        }
+        return devices.firstOrNull { isUsbOutputType(it.type) }
+    }
+
+    /**
      * Exclusive (bit-perfect) output exists only through AudioMixerAttributes,
      * added in API 34 and exposed for USB sinks only. There is no wired
      * equivalent, so nothing else can honestly claim support.
      */
     private fun isBitPerfectSupportedOnPlatform(): Boolean {
         if (Build.VERSION.SDK_INT < 34 || audioManager == null) return false
-        val usb = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            .firstOrNull { isUsbOutputType(it.type) } ?: return false
+        val usb = pickUsbOutputDevice(audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS))
+            ?: return false
         return try {
             audioManager.getSupportedMixerAttributes(usb).any { it.mixerBehavior == 1 }
         } catch (_: Throwable) { false }
@@ -1046,7 +1071,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
         // Bluetooth explicitly not supported — transcoded
         val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val usbDevice = devices.firstOrNull { isUsbOutputType(it.type) }
+        val usbDevice = pickUsbOutputDevice(devices)
 
         // Only the active route matters: a paired headset while a DAC is plugged
         // in must not block exclusive mode, and vice versa.
@@ -1211,7 +1236,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val usbDac = try {
             audioManager
                 ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                ?.firstOrNull { isUsbOutputType(it.type) }
+                ?.let { pickUsbOutputDevice(it) }
         } catch (_: Exception) {
             null
         }
@@ -1257,8 +1282,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private fun verifyDopLockInternal(): Map<String, Any?> {
         val usbDac = try {
-            audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.firstOrNull {
-                it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET
+            audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.let {
+                pickUsbOutputDevice(it)
             }
         } catch (_: Exception) { null }
         if (usbDac == null) {
@@ -1315,7 +1340,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
 
         val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val usbDevice = devices.firstOrNull { isUsbOutputType(it.type) }
+        val usbDevice = pickUsbOutputDevice(devices)
 
         val activeDevice = pickActiveOutputDevice(devices)
 

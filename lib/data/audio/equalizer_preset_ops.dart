@@ -47,7 +47,8 @@ extension EqualizerPresetOps on EqualizerManager {
   }
 
   Future<void> setBassBoost(double value) async {
-    final clamped = value.clamp(0.0, 1.0);
+    // NaN survives clamp() and `(NaN * 1000).round()` throws UnsupportedError.
+    final clamped = value.isFinite ? value.clamp(0.0, 1.0).toDouble() : 0.0;
     currentPreset = currentPreset.copyWith(bassBoost: clamped);
     final milliBels = (clamped * 1000).round();
     if (PlatformCapabilities.isAndroid) {
@@ -72,6 +73,8 @@ extension EqualizerPresetOps on EqualizerManager {
   }
 
   Future<void> startAbComparison() async {
+    // Re-entry would snapshot the already-flattened state as "the original".
+    if (isAbComparisonActive) return;
     isAbComparisonActive = true;
     _abComparisonGains = List.from(currentPreset.gains);
     final targetFreqs = activeFrequencies;
@@ -103,11 +106,17 @@ extension EqualizerPresetOps on EqualizerManager {
       // BUG-11: preserve any per-band edits the user made while the comparison
       // was active. Only bands still holding the pre-comparison value are
       // restored; bands the user moved keep their live value.
-      final merged = List<double>.from(_abComparisonGains);
       final live = currentPreset.gains;
-      for (int i = 0; i < merged.length && i < live.length; i++) {
-        if (live[i] != _abComparisonGains[i]) {
-          merged[i] = live[i];
+      // If the band plan changed during the comparison (10 -> 32 bands, ...)
+      // the saved gains no longer match the live layout; restoring them would
+      // write a wrong-sized curve. Keep the live curve in that case.
+      final sameLayout = live.length == _abComparisonGains.length;
+      final merged = List<double>.from(sameLayout ? _abComparisonGains : live);
+      if (sameLayout) {
+        for (int i = 0; i < merged.length; i++) {
+          if (live[i] != _abComparisonGains[i]) {
+            merged[i] = live[i];
+          }
         }
       }
       if (!listEquals(merged, currentPreset.gains)) {
@@ -186,18 +195,28 @@ extension EqualizerPresetOps on EqualizerManager {
     String? eqString,
     bool? linearPhase,
   }) async {
+    final prevString = arbitraryEqString;
+    final prevPhase = arbitraryEqLinearPhase;
     if (eqString != null) arbitraryEqString = eqString;
     if (linearPhase != null) arbitraryEqLinearPhase = linearPhase;
-    if (PlatformCapabilities.isAndroid) {
-      if ((eqString != null && eqString.isNotEmpty) ||
-          (linearPhase != null && arbitraryEqString.isNotEmpty)) {
-        final loaded = await _effectsChannel.loadArbitraryEq(
-          eqString: arbitraryEqString,
-          linearPhase: arbitraryEqLinearPhase,
-        );
-        if (!loaded) throw StateError('Arbitrary EQ response was rejected');
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        if ((eqString != null && eqString.isNotEmpty) ||
+            (linearPhase != null && arbitraryEqString.isNotEmpty)) {
+          final loaded = await _effectsChannel.loadArbitraryEq(
+            eqString: arbitraryEqString,
+            linearPhase: arbitraryEqLinearPhase,
+          );
+          if (!loaded) throw StateError('Arbitrary EQ response was rejected');
+        }
+        await _effectsChannel.setArbitraryEqEnabled(enabled);
       }
-      await _effectsChannel.setArbitraryEqEnabled(enabled);
+    } catch (_) {
+      // Don't leave a rejected curve in state; it would be re-sent (and
+      // persisted) on every restore/reattach.
+      arbitraryEqString = prevString;
+      arbitraryEqLinearPhase = prevPhase;
+      rethrow;
     }
     isArbitraryEqEnabled = enabled;
     _debouncedSavePreferences();
@@ -208,13 +227,19 @@ extension EqualizerPresetOps on EqualizerManager {
     bool enabled, {
     String? code,
   }) async {
+    final prevCode = liveProgCode;
     if (code != null) liveProgCode = code;
-    if (PlatformCapabilities.isAndroid) {
-      if (code != null && code.isNotEmpty) {
-        final status = await _effectsChannel.loadLiveProgCode(code);
-        if (status != 'OK') throw StateError(status);
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        if (code != null && code.isNotEmpty) {
+          final status = await _effectsChannel.loadLiveProgCode(code);
+          if (status != 'OK') throw StateError(status);
+        }
+        await _effectsChannel.setLiveProgEnabled(enabled);
       }
-      await _effectsChannel.setLiveProgEnabled(enabled);
+    } catch (_) {
+      liveProgCode = prevCode; // don't keep code the engine rejected
+      rethrow;
     }
     isLiveProgEnabled = enabled;
     _debouncedSavePreferences();
@@ -240,16 +265,25 @@ extension EqualizerPresetOps on EqualizerManager {
     double? lowCrossoverHz,
     double? highCrossoverHz,
   }) async {
-    if (width != null) stereoWidth = width.clamp(0.0, 2.0);
+    // Central contract + finite guard (bare clamp() lets NaN through to native).
+    if (width != null) stereoWidth = DspParamRanges.stereoWidth.clamp(width);
     if (multiband != null) stereoWidthMultiband = multiband;
-    if (lowWidth != null) stereoWidthLow = lowWidth.clamp(0.0, 2.0);
-    if (midWidth != null) stereoWidthMid = midWidth.clamp(0.0, 2.0);
-    if (highWidth != null) stereoWidthHigh = highWidth.clamp(0.0, 2.0);
+    if (lowWidth != null) {
+      stereoWidthLow = DspParamRanges.stereoWidthBand.clamp(lowWidth);
+    }
+    if (midWidth != null) {
+      stereoWidthMid = DspParamRanges.stereoWidthBand.clamp(midWidth);
+    }
+    if (highWidth != null) {
+      stereoWidthHigh = DspParamRanges.stereoWidthBand.clamp(highWidth);
+    }
     if (lowCrossoverHz != null) {
-      stereoWidthLowCrossoverHz = lowCrossoverHz.clamp(40.0, 1000.0);
+      stereoWidthLowCrossoverHz =
+          DspParamRanges.stereoWidthLowCrossoverHz.clamp(lowCrossoverHz);
     }
     if (highCrossoverHz != null) {
-      stereoWidthHighCrossoverHz = highCrossoverHz.clamp(1000.0, 10000.0);
+      stereoWidthHighCrossoverHz =
+          DspParamRanges.stereoWidthHighCrossoverHz.clamp(highCrossoverHz);
     }
     if (stereoWidthLowCrossoverHz >= stereoWidthHighCrossoverHz) {
       stereoWidthHighCrossoverHz =

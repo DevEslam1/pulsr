@@ -124,8 +124,7 @@ void main() {
       final gains = profile.gainsFromFilters();
       expect(gains.length, EqPreset.centerFrequencies.length);
       // The 1 kHz band (~index 5) should show the boost.
-      final idx =
-          EqPreset.centerFrequencies.indexOf(1000);
+      final idx = EqPreset.centerFrequencies.indexOf(1000);
       expect(gains[idx], greaterThan(4.0));
       // Far-away bands are near flat.
       expect(gains[0].abs(), lessThan(1.0));

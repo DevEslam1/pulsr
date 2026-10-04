@@ -675,7 +675,8 @@ void main() {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
       when(() => mockSettings.state).thenReturn(
-        const SettingsState(followTrackSampleRate: true),
+        const SettingsState(
+            followTrackSampleRate: true, bitPerfectOutput: true),
       );
       when(() => mockSettings.refreshOutputDevice()).thenAnswer((_) async {});
       when(() => mockHiRes.setTargetOutputFormat(
@@ -725,7 +726,8 @@ void main() {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
       when(() => mockSettings.state).thenReturn(
-        const SettingsState(followTrackSampleRate: true),
+        const SettingsState(
+            followTrackSampleRate: true, bitPerfectOutput: true),
       );
       when(() => mockSettings.refreshOutputDevice()).thenAnswer((_) async {});
 

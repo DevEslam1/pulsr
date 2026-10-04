@@ -3,13 +3,15 @@
 
 Floor history (raise as coverage improves; never lower):
   2026-09-16: 3.0   baseline measured ~3.2% over ~36.5k instrumented lines.
+  2026-10-04: 35.0  measured 39.5% over ~85.9k instrumented lines after the
+                    full suite went green (2,315 tests).
 
 Usage: run after `flutter test --coverage`, then `python3 scripts/check_coverage.py`.
 """
 import pathlib
 import sys
 
-FLOOR = 3.0
+FLOOR = 35.0
 
 path = pathlib.Path("coverage/lcov.info")
 if not path.exists():

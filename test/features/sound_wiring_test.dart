@@ -16,16 +16,20 @@ void main() {
       SoundFeedbackService.resetForTesting();
     });
 
-    test('1. PrefsKeys.soundFeedbackEnabled is wired and referenced in production', () {
+    test(
+        '1. PrefsKeys.soundFeedbackEnabled is wired and referenced in production',
+        () {
       expect(PrefsKeys.soundFeedbackEnabled, 'setting_sound_feedback_enabled');
 
-      final soundServiceFile = File('lib/core/services/sound_feedback_service.dart');
+      final soundServiceFile =
+          File('lib/core/services/sound_feedback_service.dart');
       expect(soundServiceFile.existsSync(), isTrue);
       final content = soundServiceFile.readAsStringSync();
       expect(content.contains('PrefsKeys.soundFeedbackEnabled'), isTrue);
     });
 
-    test('2. All semantic verbs are registered and emit corresponding events', () {
+    test('2. All semantic verbs are registered and emit corresponding events',
+        () {
       final emitted = <SoundFeedbackVerb>[];
       SoundFeedbackService.onSoundEmitted = (verb) => emitted.add(verb);
       SoundFeedbackService.setEnabled(true);
@@ -50,12 +54,18 @@ void main() {
     test('3. Mirror haptics flag executes cleanly across all verbs', () {
       SoundFeedbackService.setEnabled(true);
 
-      expect(() => SoundFeedbackService.playClick(mirrorHaptics: true), returnsNormally);
-      expect(() => SoundFeedbackService.playToggle(mirrorHaptics: true), returnsNormally);
-      expect(() => SoundFeedbackService.playSuccess(mirrorHaptics: true), returnsNormally);
-      expect(() => SoundFeedbackService.playWarning(mirrorHaptics: true), returnsNormally);
-      expect(() => SoundFeedbackService.playError(mirrorHaptics: true), returnsNormally);
-      expect(() => SoundFeedbackService.playAlert(mirrorHaptics: true), returnsNormally);
+      expect(() => SoundFeedbackService.playClick(mirrorHaptics: true),
+          returnsNormally);
+      expect(() => SoundFeedbackService.playToggle(mirrorHaptics: true),
+          returnsNormally);
+      expect(() => SoundFeedbackService.playSuccess(mirrorHaptics: true),
+          returnsNormally);
+      expect(() => SoundFeedbackService.playWarning(mirrorHaptics: true),
+          returnsNormally);
+      expect(() => SoundFeedbackService.playError(mirrorHaptics: true),
+          returnsNormally);
+      expect(() => SoundFeedbackService.playAlert(mirrorHaptics: true),
+          returnsNormally);
     });
 
     test('4. Ducking under active music playback gates subtle cues', () {
@@ -75,9 +85,12 @@ void main() {
       expect(SoundFeedbackService.testEmissions.length, 6);
     });
 
-    test('5. P0 call-site static verification: SoundFeedbackService verbs wired into features', () {
+    test(
+        '5. P0 call-site static verification: SoundFeedbackService verbs wired into features',
+        () {
       // Verify queue actions wire SoundFeedbackService
-      final queueFile = File('lib/features/queue/presentation/queue_screen.dart');
+      final queueFile =
+          File('lib/features/queue/presentation/queue_screen.dart');
       expect(queueFile.existsSync(), isTrue);
       final queueContent = queueFile.readAsStringSync();
       expect(queueContent.contains('SoundFeedbackService.playWarning'), isTrue,
@@ -86,37 +99,48 @@ void main() {
           reason: 'Queue undo must emit playSuccess');
 
       // Verify playlist actions wire SoundFeedbackService
-      final playlistFile = File('lib/features/playlists/cubit/playlist_cubit.dart');
+      final playlistFile =
+          File('lib/features/playlists/cubit/playlist_cubit.dart');
       expect(playlistFile.existsSync(), isTrue);
       final playlistContent = playlistFile.readAsStringSync();
-      expect(playlistContent.contains('SoundFeedbackService.playSuccess'), isTrue,
+      expect(
+          playlistContent.contains('SoundFeedbackService.playSuccess'), isTrue,
           reason: 'Playlist create/restore must emit playSuccess');
-      expect(playlistContent.contains('SoundFeedbackService.playWarning'), isTrue,
+      expect(
+          playlistContent.contains('SoundFeedbackService.playWarning'), isTrue,
           reason: 'Playlist delete must emit playWarning');
 
       // Verify download actions wire SoundFeedbackService
-      final downloadsFile = File('lib/features/downloads/cubit/downloads_cubit.dart');
+      final downloadsFile =
+          File('lib/features/downloads/cubit/downloads_cubit.dart');
       expect(downloadsFile.existsSync(), isTrue);
       final downloadsContent = downloadsFile.readAsStringSync();
-      expect(downloadsContent.contains('SoundFeedbackService.playSuccess'), isTrue,
+      expect(
+          downloadsContent.contains('SoundFeedbackService.playSuccess'), isTrue,
           reason: 'Download completion must emit playSuccess');
-      expect(downloadsContent.contains('SoundFeedbackService.playError'), isTrue,
+      expect(
+          downloadsContent.contains('SoundFeedbackService.playError'), isTrue,
           reason: 'Download failure must emit playError');
 
       // Verify library delete & add-to-queue wire SoundFeedbackService
-      final libraryFile = File('lib/features/library/presentation/library_screen.dart');
+      final libraryFile =
+          File('lib/features/library/presentation/library_screen.dart');
       expect(libraryFile.existsSync(), isTrue);
       final libraryContent = libraryFile.readAsStringSync();
-      expect(libraryContent.contains('SoundFeedbackService.playSuccess'), isTrue,
+      expect(
+          libraryContent.contains('SoundFeedbackService.playSuccess'), isTrue,
           reason: 'Add to queue must emit playSuccess');
-      expect(libraryContent.contains('SoundFeedbackService.playWarning'), isTrue,
+      expect(
+          libraryContent.contains('SoundFeedbackService.playWarning'), isTrue,
           reason: 'Delete confirmation must emit playWarning');
 
       // Verify scan action wires SoundFeedbackService
-      final settingsCubitFile = File('lib/features/settings/cubit/settings_cubit.dart');
+      final settingsCubitFile =
+          File('lib/features/settings/cubit/settings_cubit.dart');
       expect(settingsCubitFile.existsSync(), isTrue);
       final settingsContent = settingsCubitFile.readAsStringSync();
-      expect(settingsContent.contains('SoundFeedbackService.playSuccess'), isTrue,
+      expect(
+          settingsContent.contains('SoundFeedbackService.playSuccess'), isTrue,
           reason: 'Device library scan completion must emit playSuccess');
 
       // Verify auth action wires SoundFeedbackService
@@ -129,10 +153,12 @@ void main() {
           reason: 'Auth sign-in/up failure must emit playError');
 
       // Verify onboarding completion wires SoundFeedbackService
-      final onboardingFile = File('lib/features/onboarding/presentation/onboarding_screen.dart');
+      final onboardingFile =
+          File('lib/features/onboarding/presentation/onboarding_screen.dart');
       expect(onboardingFile.existsSync(), isTrue);
       final onboardingContent = onboardingFile.readAsStringSync();
-      expect(onboardingContent.contains('SoundFeedbackService.playSuccess'), isTrue,
+      expect(onboardingContent.contains('SoundFeedbackService.playSuccess'),
+          isTrue,
           reason: 'Onboarding completion must emit playSuccess');
 
       // Verify UI components wire SoundFeedbackService

@@ -15,10 +15,9 @@ import '../../core/utils/error_logger.dart';
 ///  * Suppresses duplicate same-id re-emissions (e.g. BehaviorSubject replay
 ///    after re-subscribe) so a repeated event never triggers a native
 ///    release/recreate cycle.
-///  * Serializes out-of-order updates: if several ids arrive while a
-///    re-attach is still in flight, only the most recently requested id is
-///    applied once the in-flight operation completes; intermediate ids are
-///    collapsed.
+///  * Serializes out-of-order updates: if several ids arrive before the
+///    drain runs, only the most recently requested id is applied;
+///    intermediate ids are collapsed (latest wins).
 class AudioSessionIdRouter {
   /// Invoked at most once per distinct session id, in application order.
   final void Function(int sessionId) onSessionChanged;
@@ -52,23 +51,23 @@ class AudioSessionIdRouter {
       return;
     }
 
-    if (_pendingSessionIds.isEmpty && sessionId == _currentSessionId) {
-      return;
-    }
-
-    if (_pendingSessionIds.isNotEmpty && _pendingSessionIds.last == sessionId) {
-      return;
-    }
+    // Duplicate of whatever will be the effective id once the queue drains.
+    final effective = _pendingSessionIds.isEmpty
+        ? _currentSessionId
+        : _pendingSessionIds.last;
+    if (sessionId == effective) return;
 
     ErrorLogger.log(
       'AudioSessionIdRouter received sessionId: $sessionId (current: $_currentSessionId)',
       category: 'AudioSessionIdRouter',
     );
 
-    if (_pendingSessionIds.length >= 2) {
-      _pendingSessionIds.removeLast();
-    }
-    _pendingSessionIds.add(sessionId);
+    // Latest wins: a newer id supersedes any not-yet-applied one. (Previously
+    // the oldest pending id was kept as well, so an "intermediate" id was
+    // still applied, contradicting the documented contract.)
+    _pendingSessionIds
+      ..clear()
+      ..add(sessionId);
 
     if (!_drainQueued) {
       _drainQueued = true;
@@ -140,5 +139,8 @@ class AudioSessionIdRouter {
   void resetForTest() {
     _currentSessionId = null;
     _pendingSessionIds.clear();
+    _routeResyncPending = false;
+    _isDraining = false;
+    _drainQueued = false;
   }
 }

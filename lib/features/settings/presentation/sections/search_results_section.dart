@@ -466,9 +466,17 @@ mixin SettingsSearchResults
         categoryId: 'about',
         category: aboutCat,
         title: aboutCat,
-        subtitle: context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
+        subtitle:
+            context.l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
         icon: Icons.info_outline_rounded,
-        keywords: ['about', 'version', 'info', 'changelog', 'licenses', 'specs'],
+        keywords: [
+          'about',
+          'version',
+          'info',
+          'changelog',
+          'licenses',
+          'specs'
+        ],
         onTap: () {
           _searchController.clear();
           setState(() => _selectedCategoryId = 'about');

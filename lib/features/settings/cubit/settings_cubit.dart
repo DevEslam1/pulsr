@@ -212,7 +212,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       if (isClosed) return;
       final lostBitPerfect = state.bitPerfectOutput &&
           state.currentOutputDevice?.isBitPerfectActive == true &&
-          !device.isBitPerfectActive && device.activeDeviceType != 'unknown';
+          !device.isBitPerfectActive &&
+          device.activeDeviceType != 'unknown';
       safeEmit(state.copyWith(currentOutputDevice: device));
       // A DAC may have just been plugged/unplugged: re-probe DoP support so the
       // DSD output control enables/disables truthfully without a manual refresh.

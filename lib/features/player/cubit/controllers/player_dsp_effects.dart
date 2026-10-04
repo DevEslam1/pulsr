@@ -416,13 +416,12 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       );
 
   Future<void> setCrossfeed(bool enabled,
-          {double? delayUs, double? feedDb, int? mode}) {
+      {double? delayUs, double? feedDb, int? mode}) {
     final clampedDelay = delayUs != null
         ? DspParamRanges.crossfeedDelayUs.clampRaw(delayUs)
         : null;
-    final clampedFeed = feedDb != null
-        ? DspParamRanges.crossfeedFeedDb.clampRaw(feedDb)
-        : null;
+    final clampedFeed =
+        feedDb != null ? DspParamRanges.crossfeedFeedDb.clampRaw(feedDb) : null;
     final clampedMode =
         mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : null;
     return applyDspEffect(
@@ -452,7 +451,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setLookaheadLimiter(bool enabled,
-          {double? thresholdDb, double? releaseMs, double? lookaheadMs}) {
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) {
     final clampedThresh = thresholdDb != null
         ? DspParamRanges.limiterThresholdDb.clampRaw(thresholdDb)
         : null;
@@ -608,14 +607,9 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setSaturation(bool enabled,
-          {double? drive,
-          double? mix,
-          double? tilt,
-          int? mode,
-          bool? multiband}) {
-    final clampedDrive = drive != null
-        ? DspParamRanges.saturationDrive.clampRaw(drive)
-        : null;
+      {double? drive, double? mix, double? tilt, int? mode, bool? multiband}) {
+    final clampedDrive =
+        drive != null ? DspParamRanges.saturationDrive.clampRaw(drive) : null;
     final clampedMix =
         mix != null ? DspParamRanges.saturationMix.clampRaw(mix) : null;
     final clampedTilt =
@@ -652,13 +646,13 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       );
 
   Future<void> setStereoWidth(bool enabled,
-          {double? width,
-          bool? multiband,
-          double? lowWidth,
-          double? midWidth,
-          double? highWidth,
-          double? lowCrossoverHz,
-          double? highCrossoverHz}) {
+      {double? width,
+      bool? multiband,
+      double? lowWidth,
+      double? midWidth,
+      double? highWidth,
+      double? lowCrossoverHz,
+      double? highCrossoverHz}) {
     final clampedWidth =
         width != null ? DspParamRanges.stereoWidth.clampRaw(width) : null;
     final clampedLow = lowWidth != null
@@ -714,17 +708,17 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         loudnessContourIntensity:
             clampedIntensity ?? dsp.loudnessContourIntensity,
       ),
-      applyAudioHandler: () =>
-          _audioHandler.setLoudnessContour(enabled, intensity: clampedIntensity),
+      applyAudioHandler: () => _audioHandler.setLoudnessContour(enabled,
+          intensity: clampedIntensity),
     );
   }
 
   Future<void> setSubCrossover(bool enabled,
-          {double? cornerHz,
-          double? slopeDbPerOct,
-          double? gain,
-          bool? bassMono,
-          bool? antiPop}) {
+      {double? cornerHz,
+      double? slopeDbPerOct,
+      double? gain,
+      bool? bassMono,
+      bool? antiPop}) {
     final clampedCorner = cornerHz != null
         ? DspParamRanges.subCrossoverCornerHz.clampRaw(cornerHz)
         : null;
@@ -869,9 +863,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     final clampedStrength = strength != null
         ? DspParamRanges.dynamicBassStrength.clampRaw(strength)
         : null;
-    final clampedPreset = preset != null
-        ? DspParamRanges.dynamicBassPreset.clamp(preset)
-        : null;
+    final clampedPreset =
+        preset != null ? DspParamRanges.dynamicBassPreset.clamp(preset) : null;
     return applyDspEffect(
       featureName: 'Dynamic Bass',
       guardCondition: enabled,

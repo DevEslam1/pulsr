@@ -1,5 +1,42 @@
 # Pulsr — Feature Audit & Gap Register
 
+> ## Remediation status — 2026-10-04 (supersedes the baseline below)
+>
+> Since this register was written, the listed defects were triaged and the
+> verifiable gates now pass on the current tree:
+>
+> | Gate | Result |
+> |---|---|
+> | `flutter analyze --fatal-infos --fatal-warnings` | **0 issues** |
+> | `dart format --set-exit-if-changed lib test` | **0 files changed** |
+> | `flutter test` | **2,318 / 2,318 passed** |
+> | `flutter test --coverage` | **39.1 %** lines, floor raised **3 % → 35 %** |
+> | CI guard suites (hygiene, ratchets, a11y, security, fuzz, property, perf) | **green** |
+>
+> Closed criticals and gaps:
+> - **Security:** deletes validated through `SafeFilePath` (`music_repository.dart`),
+>   radio hosts reject loopback/RFC1918/link-local (`radio_station.dart`), WebView
+>   navigation uses exact-domain allowlisting (`ytm_web_login_sheet.dart`).
+> - **Quran Mode:** persistence/restore wired through `PlayerQuranManager` +
+>   `QuranModeService`; `reapplyQuranProfile` restores the reciter profile; vocal
+>   warmth setter validated and applied on release.
+> - **ADR-002:** `ErrorLogger` now classifies every failure through
+>   `resolveAppError` and tags crash reports with the sealed `AppError` type.
+> - **Hygiene ratchets:** Player controllers all ≤ 400 lines; empty-catch ceiling
+>   397 → **367**; fat-file ratchet extended to `ytm_account_service`,
+>   `yt_download_service`, `ytm_service`, `playlists_screen`; raw `Text` literal
+>   ratchet 24 → **17**; RTL positioning ratchet stays **0**; 245 MB of committed
+>   test audio and debug logs removed from tracking.
+> - **Bug fixes:** DoP byte order corrected to the v1.1 little-endian layout,
+>   duplicate detection refined to same-recording (album + duration tolerance),
+>   player badge row no longer overflows portrait widths, dock style sheet is
+>   scrollable, unknown output rates fall back to 44.1 kHz/16-bit labels.
+>
+> Still open (structural, multi-sprint): DB-at-rest encryption, the remaining
+> god-files (`ytm_account_service` ≈3.1k lines, `playlists_screen` ≈2.2k,
+> `yt_download_service` ≈1.7k), ~367 empty catches, and coverage above ~39 %.
+> The per-module scores below are the **pre-remediation baseline**.
+
 Consolidated rating of **every module** under `lib/features`, `lib/core`, `lib/data`, and `lib/domain`.
 Each module is scored on **11 dimensions, each out of 10 (the maximum possible rate)**. The
 **Overall** score is the holistic module rating out of 10.

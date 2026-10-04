@@ -38,7 +38,8 @@ class PlayerMetadataController {
         _isClosed = isClosed,
         _isSameTrack = isSameTrack;
 
-  Future<void> loadLyrics(SongsTableData song, {bool isOfflineOnly = false}) async {
+  Future<void> loadLyrics(SongsTableData song,
+      {bool isOfflineOnly = false}) async {
     if (_isClosed() || !_isSameTrack(_getState().currentSong, song)) return;
 
     final cached = _lyricsManager.getCachedLyrics(song);
@@ -78,7 +79,9 @@ class PlayerMetadataController {
         )
         .timeout(PlayerConstants.lyricsTimeout, onTimeout: () => null);
 
-    if (_isClosed() || gen != _lyricsManager.generation || !_isSameTrack(_getState().currentSong, song)) {
+    if (_isClosed() ||
+        gen != _lyricsManager.generation ||
+        !_isSameTrack(_getState().currentSong, song)) {
       return;
     }
 
@@ -92,7 +95,8 @@ class PlayerMetadataController {
     ));
   }
 
-  Future<void> loadSponsorBlock(SongsTableData song, {bool isOfflineOnly = false}) async {
+  Future<void> loadSponsorBlock(SongsTableData song,
+      {bool isOfflineOnly = false}) async {
     try {
       await _sponsorBlockManager
           .loadSegmentsForSong(
@@ -101,7 +105,8 @@ class PlayerMetadataController {
             isStale: () =>
                 _isClosed() || !_isSameTrack(_getState().currentSong, song),
           )
-          .timeout(const Duration(seconds: 10), onTimeout: () => const <SponsorBlockSegment>[]);
+          .timeout(const Duration(seconds: 10),
+              onTimeout: () => const <SponsorBlockSegment>[]);
     } catch (e, st) {
       ErrorLogger.log('Failed to load SponsorBlock for ${song.id}',
           error: e, stackTrace: st, category: 'PlayerMetadataController');
@@ -121,7 +126,8 @@ class PlayerMetadataController {
       final state = _getState();
       if (state.cueChapters.isEmpty && state.currentCueIndex == 0) return;
       _emit(state.copyWith(
-        queueSlice: state.queueSlice.copyWith(cueChapters: const [], currentCueIndex: 0),
+        queueSlice: state.queueSlice
+            .copyWith(cueChapters: const [], currentCueIndex: 0),
       ));
       return;
     }
@@ -164,13 +170,16 @@ class PlayerMetadataController {
     }
   }
 
-  Future<void> enrichTrackParallel(SongsTableData song, {bool isOfflineOnly = false}) async {
+  Future<void> enrichTrackParallel(SongsTableData song,
+      {bool isOfflineOnly = false}) async {
     await Future.wait([
-      loadLyrics(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
+      loadLyrics(song, isOfflineOnly: isOfflineOnly)
+          .catchError((Object e, StackTrace st) {
         ErrorLogger.log('Parallel lyrics failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),
-      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly).catchError((Object e, StackTrace st) {
+      loadSponsorBlock(song, isOfflineOnly: isOfflineOnly)
+          .catchError((Object e, StackTrace st) {
         ErrorLogger.log('Parallel sponsorBlock failed',
             error: e, stackTrace: st, category: 'PlayerMetadataController');
       }),

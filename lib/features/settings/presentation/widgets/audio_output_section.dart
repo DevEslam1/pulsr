@@ -166,7 +166,8 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
     final isAndroid = PlatformCapabilities.isAndroid;
     final unsupported = context.l10n.settingsNotAvailablePlatform;
     final dev = state.currentOutputDevice;
-    final isUsbDac = dev?.isUsbDac == true || (dev == null && state.isProfessional);
+    final isUsbDac =
+        dev?.isUsbDac == true || (dev == null && state.isProfessional);
     final isBluetooth = dev?.isBluetooth == true;
 
     return Column(
@@ -224,9 +225,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                               : isBluetooth
                                   ? Icons.bluetooth_audio_rounded
                                   : Icons.speaker_rounded,
-                          color: isUsbDac
-                              ? p.warning
-                              : p.accent,
+                          color: isUsbDac ? p.warning : p.accent,
                           size: 18,
                         ),
                         const SizedBox(width: AppSpacing.xs),
@@ -252,8 +251,8 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                               color: AppColors.dacGold.withValues(alpha: 0.15),
                               borderRadius: AppRadii.r6All,
                               border: Border.all(
-                                  color: AppColors.dacGold
-                                      .withValues(alpha: 0.6)),
+                                  color:
+                                      AppColors.dacGold.withValues(alpha: 0.6)),
                             ),
                             child: Text(
                               context.l10n.bitPerfectLabel,
@@ -348,7 +347,14 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
             context.l10n.followTrackSampleRateSubtitle,
             value: isAndroid && state.followTrackSampleRate,
             featureInfo: AudioFeatureRegistry.followTrackSampleRate,
-            disabledReason: isAndroid ? null : unsupported,
+            // The native target-format call is only accepted on the exclusive
+            // bit-perfect path, so the toggle would be an honest no-op without
+            // it. Surface that instead of letting users enable a dead switch.
+            disabledReason: !isAndroid
+                ? unsupported
+                : (!state.bitPerfectOutput
+                    ? context.l10n.followTrackRequiresBitPerfect
+                    : null),
             onChanged: isAndroid ? cubit.setFollowTrackSampleRate : (v) {},
           ),
           settingsCardDivider(p),
@@ -549,8 +555,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
             Icons.timer_outlined,
             context.l10n.settingsCalibrateBtLatency,
             context.l10n.settingsLatencyMs(state.bluetoothLatencyOffsetMs),
-            trailing: Icon(Icons.touch_app_rounded,
-                size: 20, color: p.accent),
+            trailing: Icon(Icons.touch_app_rounded, size: 20, color: p.accent),
             onTap: () => BtLatencyTapSheet.show(context),
           ),
           SettingSliderRow(
@@ -623,8 +628,8 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                   : unsupported,
               disabledReason: isAndroid ? null : unsupported,
               onTap: isAndroid
-                  ? () => onShowDspPreference!(
-                      context, cubit, state.dspPreference)
+                  ? () =>
+                      onShowDspPreference!(context, cubit, state.dspPreference)
                   : null,
             ),
             settingsCardDivider(p),

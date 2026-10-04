@@ -1,6 +1,7 @@
 // F1: AB Loop (repeat segment A→B).
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Holds a single A→B loop region and decides when a position tick
@@ -73,13 +74,19 @@ class AbLoopManager {
   }
 
   void clear({bool persistDeletion = true}) {
+    // Capture the scope BEFORE nulling it: persistCleared() falls back to
+    // _scopeSongId, which was already null by the time it ran, so an explicit
+    // clear never removed the stored loop and it came back on the next play.
+    final clearedSongId = _scopeSongId;
     _a = null;
     _b = null;
     _enabled = false;
     _scopeSongId = null;
     _resetWrapLatch();
     _emit();
-    if (persistDeletion) unawaited(persistCleared());
+    if (persistDeletion && clearedSongId != null) {
+      unawaited(persistCleared(clearedSongId));
+    }
   }
 
   /// Returns the seek target when [pos] ran past B, else null.
@@ -102,8 +109,12 @@ class AbLoopManager {
     // jumps far enough that a fixed 20ms window is overshot before it triggers,
     // so widen it by roughly the distance one ~150ms tick travels at `speed`.
     final clampedSpeed = (speed.isFinite && speed > 0) ? speed : 1.0;
-    final toleranceMs =
-        (20 + (clampedSpeed - 1.0) * 150).clamp(20, 600).round();
+    var toleranceMs = (20 + (clampedSpeed - 1.0) * 150).clamp(20, 600).round();
+    // A loop shorter than the tolerance would put the wrap window (b - tol)
+    // before A, so every tick past A wrapped immediately and the loop thrashed.
+    // Keep the window inside the second half of the loop.
+    final halfLoopMs = ((b - a).inMilliseconds / 2).floor();
+    if (toleranceMs > halfLoopMs) toleranceMs = math.max(1, halfLoopMs);
     final tolerance = Duration(milliseconds: toleranceMs);
 
     // Lower the latch once playback has returned below the wrap window (the
@@ -159,6 +170,9 @@ class AbLoopManager {
       final aMs = (entry['a'] as num?)?.toInt();
       final bMs = (entry['b'] as num?)?.toInt();
       if (aMs == null || bMs == null || bMs <= aMs || aMs < 0) return;
+      // The cache load above is async: if the user already set a loop on a
+      // different track while it ran, don't clobber it with this stale restore.
+      if (_scopeSongId != null && _scopeSongId != songId) return;
       _a = Duration(milliseconds: aMs);
       _b = Duration(milliseconds: bMs);
       _scopeSongId = songId;
@@ -176,6 +190,10 @@ class AbLoopManager {
       if (songId == null || _a == null || _b == null) {
         if (songId != null) _memoryCache!.remove(songId.toString());
       } else {
+        // Remove first so the entry moves to the newest position; a plain
+        // assignment keeps the old slot and the eviction below then drops the
+        // loop the user is actively editing instead of the stalest one.
+        _memoryCache!.remove(songId.toString());
         _memoryCache![songId.toString()] = {
           'a': _a!.inMilliseconds,
           'b': _b!.inMilliseconds,

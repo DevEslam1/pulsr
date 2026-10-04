@@ -133,6 +133,15 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
   );
   if (confirmed != true) return;
 
+  // Enable FIRST: the native route may still refuse exclusive output (e.g. the
+  // DAC dropped, another app grabbed it, target format unavailable). Disabling
+  // the user's DSP stages before that round-trip would leave them with a fully
+  // bypassed chain and no bit-perfect — so only tear the conflicts down once
+  // Bit-Perfect is actually on. The native DSP bypass already mutes them in
+  // the meantime; these calls just make the saved preference match.
+  await settings.setBitPerfectOutput(true);
+  if (!settings.state.bitPerfectOutput) return;
+
   for (final c in conflicts) {
     try {
       await c.disable();
@@ -140,5 +149,4 @@ Future<void> requestBitPerfectOutput(BuildContext context, bool enable) async {
       // Keep going: Bit-Perfect's own DSP bypass still covers what we missed.
     }
   }
-  await settings.setBitPerfectOutput(true);
 }

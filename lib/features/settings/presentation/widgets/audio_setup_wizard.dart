@@ -221,8 +221,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.sm),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         side: BorderSide(color: p.hairline),
                         shape: RoundedRectangleBorder(
                             borderRadius: AppRadii.r12All),
@@ -250,8 +250,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                       foregroundColor: p.onAccent,
                       padding:
                           const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: AppRadii.r12All),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                     ),
                     onPressed: _isApplying
                         ? null
@@ -320,8 +320,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           title: 'USB DAC / Dongle',
           subtitle: 'External hardware DAC with bit-perfect & DSD support',
           isSelected: _selectedOutput == AudioWizardOutputType.usbDac,
-          onTap: () => setState(
-              () => _selectedOutput = AudioWizardOutputType.usbDac),
+          onTap: () =>
+              setState(() => _selectedOutput = AudioWizardOutputType.usbDac),
         ),
         const SizedBox(height: AppSpacing.xs),
         _buildOptionCard(
@@ -330,8 +330,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           title: 'Bluetooth Audio',
           subtitle: 'Wireless headphones, TWS earbuds, or car audio',
           isSelected: _selectedOutput == AudioWizardOutputType.bluetooth,
-          onTap: () => setState(
-              () => _selectedOutput = AudioWizardOutputType.bluetooth),
+          onTap: () =>
+              setState(() => _selectedOutput = AudioWizardOutputType.bluetooth),
         ),
         const SizedBox(height: AppSpacing.xs),
         _buildOptionCard(
@@ -340,8 +340,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           title: 'Speaker / Built-in',
           subtitle: 'Phone speakers with system equalization and loudness',
           isSelected: _selectedOutput == AudioWizardOutputType.speaker,
-          onTap: () => setState(
-              () => _selectedOutput = AudioWizardOutputType.speaker),
+          onTap: () =>
+              setState(() => _selectedOutput = AudioWizardOutputType.speaker),
         ),
         const SizedBox(height: AppSpacing.xs),
         _buildOptionCard(
@@ -387,8 +387,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           subtitle: l10n.settingsWizardFidelityDesc,
           badge: 'Hi-Res',
           isSelected: _selectedPriority == AudioWizardPriority.fidelity,
-          onTap: () => setState(
-              () => _selectedPriority = AudioWizardPriority.fidelity),
+          onTap: () =>
+              setState(() => _selectedPriority = AudioWizardPriority.fidelity),
         ),
         const SizedBox(height: AppSpacing.xs),
         _buildOptionCard(
@@ -398,8 +398,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           subtitle: l10n.settingsWizardBalancedDesc,
           badge: 'Recommended',
           isSelected: _selectedPriority == AudioWizardPriority.balanced,
-          onTap: () => setState(
-              () => _selectedPriority = AudioWizardPriority.balanced),
+          onTap: () =>
+              setState(() => _selectedPriority = AudioWizardPriority.balanced),
         ),
         const SizedBox(height: AppSpacing.xs),
         _buildOptionCard(
@@ -408,8 +408,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           title: l10n.settingsWizardDataSaver,
           subtitle: l10n.settingsWizardDataSaverDesc,
           isSelected: _selectedPriority == AudioWizardPriority.dataSaver,
-          onTap: () => setState(
-              () => _selectedPriority = AudioWizardPriority.dataSaver),
+          onTap: () =>
+              setState(() => _selectedPriority = AudioWizardPriority.dataSaver),
         ),
       ],
     );
@@ -464,8 +464,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           title: l10n.rgOff,
           subtitle: 'Standard track separation with zero overlap',
           isSelected: _selectedTransition == AudioWizardTransition.none,
-          onTap: () => setState(
-              () => _selectedTransition = AudioWizardTransition.none),
+          onTap: () =>
+              setState(() => _selectedTransition = AudioWizardTransition.none),
         ),
       ],
     );
@@ -532,7 +532,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                           child: Text(
                             title,
                             style: TextStyle(
-                              color: isSelected ? p.textPrimary : p.textSecondary,
+                              color:
+                                  isSelected ? p.textPrimary : p.textSecondary,
                               fontWeight: isSelected
                                   ? FontWeight.w800
                                   : FontWeight.w600,
@@ -578,9 +579,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
               ),
               const SizedBox(width: AppSpacing.xs),
               Icon(
-                isSelected
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
+                isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
                 color: isSelected ? p.accent : p.textTertiary,
                 size: 20,
               ),

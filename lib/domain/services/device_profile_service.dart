@@ -211,8 +211,7 @@ class DeviceProfileService {
   }
 
   /// Imports device-profile links from JSON (merging with existing links).
-  Future<bool> importLinksJson(String jsonStr) =>
-      _prefsMutex.protect(() async {
+  Future<bool> importLinksJson(String jsonStr) => _prefsMutex.protect(() async {
         try {
           final decoded = json.decode(jsonStr) as Map<String, dynamic>;
           final links = await getLinks();

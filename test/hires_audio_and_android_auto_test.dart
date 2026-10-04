@@ -52,12 +52,15 @@ void main() {
       expect(info.supportedSampleRates, contains(192000));
     });
 
-    test('AudioOutputInfo fallback when map is empty', () {
+    test('AudioOutputInfo fallback when map is empty reports unknown values',
+        () {
       final info = AudioOutputInfo.fromMap({});
       expect(info.deviceName, equals('Default Audio Output'));
       expect(info.isUsbDac, isFalse);
-      expect(info.sampleRate, equals(44100));
-      expect(info.bitDepth, equals(16));
+      // 0 means "unknown" (sentinel); the platform did not report a format.
+      expect(info.sampleRate, equals(0));
+      expect(info.bitDepth, equals(0));
+      expect(info.supportedSampleRates, isEmpty);
       expect(info.isBitPerfectActive, isFalse);
     });
 

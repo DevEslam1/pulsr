@@ -12,7 +12,8 @@ class DuckingController {
   DuckingMode mode;
   double level; // 0.0..1.0 fraction of pre-duck volume to keep
 
-  DuckingController({this.mode = DuckingMode.duck, this.level = 0.3});
+  DuckingController({this.mode = DuckingMode.duck, double level = 0.3})
+      : level = level.isFinite ? level.clamp(0.05, 1.0).toDouble() : 0.3;
 
   double get duckFactor => level.clamp(0.05, 1.0);
 
@@ -24,7 +25,11 @@ class DuckingController {
   bool get shouldDuck => mode == DuckingMode.duck;
 
   void setMode(DuckingMode m) => mode = m;
-  void setLevel(double v) => level = v.clamp(0.05, 1.0);
+  void setLevel(double v) {
+    // NaN survives clamp() and would turn every ducked volume into NaN.
+    if (!v.isFinite) return;
+    level = v.clamp(0.05, 1.0).toDouble();
+  }
 
   static DuckingMode parseMode(String? raw) => DuckingMode.values
       .firstWhere((e) => e.name == raw, orElse: () => DuckingMode.duck);

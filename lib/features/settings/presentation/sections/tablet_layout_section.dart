@@ -29,7 +29,8 @@ mixin TabletLayoutSection
     String activeCatId,
   ) {
     final p = context.palette;
-    final categories = _getCategories(context, pro: state.isProfessional, state: state);
+    final categories =
+        _getCategories(context, pro: state.isProfessional, state: state);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final masterWidth = screenWidth < 1000 ? 280.0 : 320.0;
     final effectiveActiveId = activeCatId == 'all' ? 'sound' : activeCatId;
@@ -181,7 +182,8 @@ mixin TabletLayoutSection
     String activeCatId,
   ) {
     final effectiveId = activeCatId == 'all' ? 'sound' : activeCatId;
-    final categories = _getCategories(context, pro: state.isProfessional, state: state);
+    final categories =
+        _getCategories(context, pro: state.isProfessional, state: state);
     final currentCat = categories.firstWhere(
       (c) => c.id == effectiveId,
       orElse: () => categories.first,

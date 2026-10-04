@@ -55,8 +55,7 @@ abstract class AppRadii {
 
   // Pre-built [BorderRadius] values for the numeric scale so call sites can
   // reference a single const token instead of constructing a radius inline.
-  static const BorderRadius r1_5All =
-      BorderRadius.all(Radius.circular(r1_5));
+  static const BorderRadius r1_5All = BorderRadius.all(Radius.circular(r1_5));
   static const BorderRadius r2All = BorderRadius.all(Radius.circular(r2));
   static const BorderRadius r4All = BorderRadius.all(Radius.circular(r4));
   static const BorderRadius r6All = BorderRadius.all(Radius.circular(r6));

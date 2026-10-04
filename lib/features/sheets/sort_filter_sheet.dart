@@ -76,59 +76,59 @@ class SortFilterSheet extends StatelessWidget {
               selected: isSelected,
               label: option['label'],
               child: PulsrPressable(
-              pressedScale: 0.985,
-              onTap: () {
-                // Newly selected options start in their natural direction:
-                // "Most Played" / "Top Rated" / "Recently ..." are descending,
-                // everything else is ascending. Re-tapping flips the direction.
-                const descendingFirst = {
-                  'playCount',
-                  'rating',
-                  'dateAdded',
-                  'lastPlayed',
-                };
-                final newAsc = isSelected
-                    ? !ascending
-                    : !descendingFirst.contains(option['key']);
-                onApply(option['key']!, newAsc);
-                Navigator.pop(context);
-              },
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 48),
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        option['label']!,
-                        style: TextStyle(
-                          color: isSelected ? p.accent : p.textPrimary,
-                          fontWeight:
-                              isSelected ? FontWeight.w800 : FontWeight.w500,
-                          fontSize: AppFontSize.callout,
+                pressedScale: 0.985,
+                onTap: () {
+                  // Newly selected options start in their natural direction:
+                  // "Most Played" / "Top Rated" / "Recently ..." are descending,
+                  // everything else is ascending. Re-tapping flips the direction.
+                  const descendingFirst = {
+                    'playCount',
+                    'rating',
+                    'dateAdded',
+                    'lastPlayed',
+                  };
+                  final newAsc = isSelected
+                      ? !ascending
+                      : !descendingFirst.contains(option['key']);
+                  onApply(option['key']!, newAsc);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm, horizontal: AppSpacing.xs),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          option['label']!,
+                          style: TextStyle(
+                            color: isSelected ? p.accent : p.textPrimary,
+                            fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w500,
+                            fontSize: AppFontSize.callout,
+                          ),
                         ),
                       ),
-                    ),
-                    if (isSelected)
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.xxs),
-                        decoration: BoxDecoration(
-                          color: p.accentContainer,
-                          shape: BoxShape.circle,
+                      if (isSelected)
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.xxs),
+                          decoration: BoxDecoration(
+                            color: p.accentContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            ascending
+                                ? Icons.arrow_upward_rounded
+                                : Icons.arrow_downward_rounded,
+                            color: p.accent,
+                            size: 18,
+                          ),
                         ),
-                        child: Icon(
-                          ascending
-                              ? Icons.arrow_upward_rounded
-                              : Icons.arrow_downward_rounded,
-                          color: p.accent,
-                          size: 18,
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               ),
             );
           },

@@ -112,7 +112,10 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       if (plan.preferBitPerfect) {
         if (!settings.state.bitPerfectOutput) {
           await settings.setBitPerfectOutput(true);
-          _smartAutoBitPerfectApplied = true;
+          // Only remember the auto-application when the route actually accepted
+          // it; otherwise a later "de-arbitration" would disable a mode that
+          // was never on and the next device change would re-attempt blindly.
+          _smartAutoBitPerfectApplied = settings.state.bitPerfectOutput;
         }
       } else if (_smartAutoBitPerfectApplied) {
         if (settings.state.bitPerfectOutput) {
@@ -252,8 +255,8 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         delayUs: dsp.crossfeedDelayUs,
         feedDb: dsp.crossfeedFeedDb,
         mode: dsp.crossfeedMode));
-    await step(
-        () => _audioHandler.applyHeadphoneProfile(dsp.selectedHeadphoneProfile));
+    await step(() =>
+        _audioHandler.applyHeadphoneProfile(dsp.selectedHeadphoneProfile));
 
     if (_isClosed()) return;
     final s = _getState();

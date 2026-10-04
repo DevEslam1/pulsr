@@ -369,9 +369,7 @@ class WidgetService {
             HttpClient? client;
             try {
               final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
-              if (uri != null &&
-                  uri.scheme == 'https' &&
-                  uri.host.isNotEmpty) {
+              if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty) {
                 client = HttpClient()
                   ..connectionTimeout = const Duration(seconds: 8)
                   ..idleTimeout = const Duration(seconds: 5);

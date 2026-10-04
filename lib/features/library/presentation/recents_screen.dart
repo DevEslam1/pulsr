@@ -441,10 +441,12 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                     borderRadius: AppRadii.r12All,
                                   ),
                                 ),
-                                icon: const Icon(Icons.expand_more_rounded, size: 20),
+                                icon: const Icon(Icons.expand_more_rounded,
+                                    size: 20),
                                 label: Text(
                                   '${context.l10n.loadMoreHistory} (${allRecents.length})',
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 onPressed: () {
                                   if (allRecents.length < _historyLimit) {
@@ -452,9 +454,9 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                     return;
                                   }
                                   setState(() {
-                                    _historyLimit = (_historyLimit + 100)
-                                        .clamp(_persistedHistoryLimit,
-                                            _maxHistoryLimit);
+                                    _historyLimit = (_historyLimit + 100).clamp(
+                                        _persistedHistoryLimit,
+                                        _maxHistoryLimit);
                                     _updateStream();
                                   });
                                 },

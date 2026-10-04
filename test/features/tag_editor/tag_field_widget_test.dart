@@ -7,7 +7,8 @@ import 'package:pulsr/features/tag_editor/tag_field_widget.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('adopts external model changes (undo / auto-fill)', (tester) async {
+  testWidgets('adopts external model changes (undo / auto-fill)',
+      (tester) async {
     var modelValue = 'initial';
 
     await tester.pumpWidget(
@@ -24,7 +25,8 @@ void main() {
                     onChanged: (v) => modelValue = v,
                   ),
                   TextButton(
-                    onPressed: () => setState(() => modelValue = 'model-updated'),
+                    onPressed: () =>
+                        setState(() => modelValue = 'model-updated'),
                     child: const Text('update'),
                   ),
                 ],

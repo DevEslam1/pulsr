@@ -432,7 +432,7 @@ void main() {
           bypassDspOnBitPerfect: true,
           device: _device(),
         ),
-        isNull,
+        isNotNull,
       );
     });
 
@@ -575,6 +575,86 @@ void main() {
         ),
         isNull,
       );
+    });
+
+    test('speed and silence-skip obey the same armed bypass rule', () {
+      const wired = AudioOutputInfo(
+        deviceName: 'Wired',
+        isUsbDac: false,
+        sampleRate: 48000,
+        bitDepth: 16,
+        isBitPerfectActive: false,
+      );
+      expect(
+        AudioConflicts.speedBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+          device: wired,
+        ),
+        isNotNull,
+      );
+      expect(
+        AudioConflicts.speedBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: false,
+          device: wired,
+        ),
+        isNull,
+      );
+      expect(
+        AudioConflicts.speedBlockedByBitPerfect(
+          bitPerfectOutput: false,
+          bypassDspOnBitPerfect: true,
+          device: wired,
+        ),
+        isNull,
+      );
+      expect(
+        AudioConflicts.silenceSkipBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+          device: _device(isBluetooth: true),
+        ),
+        isNull,
+      );
+      expect(
+        AudioConflicts.silenceSkipBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+          device: wired,
+        ),
+        isNotNull,
+      );
+    });
+
+    test('transient native failures never lock the Bit-Perfect switch', () {
+      for (final reason in const [
+        'target_format_unavailable',
+        'set_mixer_attributes_failed',
+        'clear_mixer_attributes_failed',
+        'unknown_error_boom',
+        'channel_error',
+      ]) {
+        expect(
+          AudioConflicts.bitPerfectBlockedReason(_device(reason: reason)),
+          isNull,
+          reason: '$reason must stay retryable',
+        );
+      }
+      for (final reason in const [
+        'requires_android_14_for_usb',
+        'no_supported_mixer_attributes',
+        'usb_not_supported',
+        'exclusive_requires_usb_dac',
+        'reflection_method_not_found',
+        'audio_mixer_class_not_found',
+      ]) {
+        expect(
+          AudioConflicts.bitPerfectBlockedReason(_device(reason: reason)),
+          isNotNull,
+          reason: '$reason is structural and keeps the switch disabled',
+        );
+      }
     });
 
     test('dspBlockedByAaudioDirect only fires when AAudio is on', () {

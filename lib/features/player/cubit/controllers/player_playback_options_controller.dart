@@ -1,5 +1,4 @@
 // lib/features/player/cubit/controllers/player_playback_options_controller.dart
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -23,9 +22,12 @@ import '../../../../domain/models/quran_mode_profile.dart';
 import '../managers/player_quran_manager.dart';
 import '../player_state.dart';
 import '../quran_restore_snapshot.dart';
+import 'playback_sleep_timer.dart';
+import 'playback_volume_mute.dart';
 
 part 'player_playback_options_lyrics.dart';
 part 'player_playback_options_quran.dart';
+part 'player_playback_options_rate_guard.dart';
 
 /// Owns playback options: sleep timer, speed, pitch, ratings, per-track overrides, AB loop, and overlays.
 class PlayerPlaybackOptionsController {
@@ -35,7 +37,8 @@ class PlayerPlaybackOptionsController {
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
   final bool Function() _isClosed;
-  final Future<void> Function(SongsTableData song, {bool isOfflineOnly})? _onLoadLyrics;
+  final Future<void> Function(SongsTableData song, {bool isOfflineOnly})?
+      _onLoadLyrics;
   final PerSongPlaybackStore _perSongPlaybackStore;
   final PerSongVolumeStore _perSongVolumeStore;
   final PerSongEqStore _perSongEqStore;
@@ -43,6 +46,12 @@ class PlayerPlaybackOptionsController {
   final SongRatingStore _songRatingStore;
 
   final bool Function(String feature, {bool showError})? _guardDsp;
+
+  /// Returns the reason playback speed/pitch cannot be changed right now
+  /// (bit-perfect bypass active), or null when allowed. Speed and pitch are
+  /// applied by ExoPlayer's Sonic processor in the same sink chain the native
+  /// bit-perfect early-return protects, so they must obey their own guard.
+  final String? Function()? _playbackRateBlockedReason;
   bool _isTogglingQuranMode = false;
   int _reciterStyleGen = 0;
 
@@ -58,14 +67,17 @@ class PlayerPlaybackOptionsController {
     PlayerQuranManager? quranManager,
     SongRatingStore? songRatingStore,
     bool Function(String feature, {bool showError})? guardDsp,
+    String? Function()? playbackRateBlockedReason,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required bool Function() isClosed,
-    Future<void> Function(SongsTableData song, {bool isOfflineOnly})? onLoadLyrics,
+    Future<void> Function(SongsTableData song, {bool isOfflineOnly})?
+        onLoadLyrics,
   })  : _audioHandler = audioHandler,
         _earbudOptimizationService = earbudOptimizationService,
         _hiResAudioService = hiResAudioService,
         _guardDsp = guardDsp,
+        _playbackRateBlockedReason = playbackRateBlockedReason,
         _getState = getState,
         _emit = emit,
         _isClosed = isClosed,
@@ -82,90 +94,24 @@ class PlayerPlaybackOptionsController {
   // ──────────────────────────────────────────────
   // Sleep Timer
   // ──────────────────────────────────────────────
-  void startSleepTimer(int minutes) {
-    if (minutes <= 0) return;
-    final duration = Duration(minutes: minutes);
-    _audioHandler.startSleepTimer(duration);
-    final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        sleepTimerRemaining: duration,
-        sleepTimerRemainingTracks: null,
-      ),
-    ));
-  }
-
-  void startAbsoluteSleepTimer(DateTime stopTime) {
-    var effectiveStopTime = stopTime;
-    final now = DateTime.now();
-    var diff = stopTime.difference(now);
-    if (diff.isNegative) {
-      effectiveStopTime = stopTime.add(const Duration(days: 1));
-      diff = effectiveStopTime.difference(now);
-    }
-    _audioHandler.startAbsoluteSleepTimer(effectiveStopTime);
-    final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        sleepTimerRemaining: diff,
-        sleepTimerRemainingTracks: null,
-      ),
-    ));
-  }
-
-  void startEndOfTrackTimer() {
-    _audioHandler.startEndOfTrackTimer();
-    final s = _getState();
-    final remaining = s.duration > s.position
-        ? s.duration - s.position
-        : const Duration(minutes: 1);
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        sleepTimerRemaining: remaining,
-        sleepTimerRemainingTracks: null,
-      ),
-    ));
-  }
-
-  void startAfterNTracksTimer(int trackCount) {
-    if (trackCount <= 0) return;
-    _audioHandler.startAfterNTracksTimer(trackCount);
-    final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        sleepTimerRemaining: null,
-        sleepTimerRemainingTracks: trackCount,
-      ),
-    ));
-  }
-
-  void startEndOfQueueTimer() {
-    _audioHandler.startEndOfQueueTimer();
-    final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        sleepTimerRemaining: null,
-        sleepTimerRemainingTracks: null,
-      ),
-    ));
-  }
-
-  void cancelSleepTimer() {
-    _audioHandler.cancelSleepTimer();
-    final s = _getState();
-    _emit(s.copyWith(
-      playback: s.playback.copyWith(
-        sleepTimerRemaining: null,
-        sleepTimerRemainingTracks: null,
-      ),
-    ));
-  }
-
-  int? get sleepTimerRemainingTracks => _audioHandler.sleepTimerRemainingTracks;
-  SleepTimerMode get sleepTimerMode => _audioHandler.sleepTimerMode;
-  bool get isEndOfQueueSleepTimer => sleepTimerMode == SleepTimerMode.endOfQueue;
+  late final PlaybackSleepTimer _sleepTimer = PlaybackSleepTimer(
+    audioHandler: _audioHandler,
+    getState: _getState,
+    emit: _emit,
+  );
+  void startSleepTimer(int minutes) => _sleepTimer.start(minutes);
+  void startAbsoluteSleepTimer(DateTime stopTime) =>
+      _sleepTimer.startAbsolute(stopTime);
+  void startEndOfTrackTimer() => _sleepTimer.startEndOfTrack();
+  void startAfterNTracksTimer(int trackCount) =>
+      _sleepTimer.startAfterNTracks(trackCount);
+  void startEndOfQueueTimer() => _sleepTimer.startEndOfQueue();
+  void cancelSleepTimer() => _sleepTimer.cancel();
+  int? get sleepTimerRemainingTracks => _sleepTimer.remainingTracks;
+  SleepTimerMode get sleepTimerMode => _sleepTimer.mode;
+  bool get isEndOfQueueSleepTimer => _sleepTimer.isEndOfQueue;
   Stream<int?> get sleepTimerRemainingTracksStream =>
-      _audioHandler.sleepTimerRemainingTracksStream;
+      _sleepTimer.remainingTracksStream;
 
   // ──────────────────────────────────────────────
   // Speed & Pitch
@@ -179,6 +125,10 @@ class PlayerPlaybackOptionsController {
     final s = _getState();
     final prevSpeed = s.playbackSpeed;
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
+    if ((clamped - 1.0).abs() >= 1e-9 &&
+        !checkPlaybackRateGuard('Playback speed')) {
+      return;
+    }
     _emit(s.copyWith(playback: s.playback.copyWith(playbackSpeed: clamped)));
     try {
       await _audioHandler.setSpeed(clamped);
@@ -191,13 +141,15 @@ class PlayerPlaybackOptionsController {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback speed',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
       final cur = _getState();
       _emit(cur.copyWith(
           playback: cur.playback.copyWith(
-            playbackSpeed: prevSpeed,
-            errorMessage: 'Speed change failed',
-          )));
+        playbackSpeed: prevSpeed,
+        errorMessage: 'Speed change failed',
+      )));
     }
   }
 
@@ -205,6 +157,10 @@ class PlayerPlaybackOptionsController {
     final s = _getState();
     final prevPitch = s.playbackPitch;
     final clamped = pitch.clamp(minPlaybackPitch, maxPlaybackPitch);
+    if ((clamped - 1.0).abs() >= 1e-9 &&
+        !checkPlaybackRateGuard('Pitch shift')) {
+      return;
+    }
     _emit(s.copyWith(playback: s.playback.copyWith(playbackPitch: clamped)));
     try {
       await _audioHandler.setPitch(clamped);
@@ -217,13 +173,15 @@ class PlayerPlaybackOptionsController {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to set playback pitch',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
       final cur = _getState();
       _emit(cur.copyWith(
           playback: cur.playback.copyWith(
-            playbackPitch: prevPitch,
-            errorMessage: 'Pitch change failed',
-          )));
+        playbackPitch: prevPitch,
+        errorMessage: 'Pitch change failed',
+      )));
     }
   }
 
@@ -235,7 +193,8 @@ class PlayerPlaybackOptionsController {
     await _songRatingStore.setRating(songId.toString(), clamped);
     final s = _getState();
     if (s.currentSong?.id == songId) {
-      _emit(s.copyWith(playback: s.playback.copyWith(currentSongRating: clamped)));
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(currentSongRating: clamped)));
     }
   }
 
@@ -309,67 +268,21 @@ class PlayerPlaybackOptionsController {
     }
   }
 
-  Future<void> setVolume(double volume) async {
-    try {
-      await _audioHandler.setVolume(volume);
-      if (volume > 0.0) _muted = false;
-    } catch (e, st) {
-      ErrorLogger.log('Set volume failed',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
-      final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
-    }
-  }
+  late final PlaybackVolumeMute _volumeControl = PlaybackVolumeMute(
+    audioHandler: _audioHandler,
+    getState: _getState,
+    emit: _emit,
+  );
 
-  Future<void> adjustVolume(double delta) async {
-    try {
-      final current = _audioHandler.volume;
-      final target = (current + delta).clamp(0.0, 1.0);
-      await _audioHandler.setVolume(target);
-      if (target > 0.0) _muted = false;
-    } catch (e, st) {
-      ErrorLogger.log('Adjust volume failed',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
-      final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
-    }
-  }
+  Future<void> setVolume(double volume) => _volumeControl.setVolume(volume);
 
-  bool _muted = false;
-  double _volumeBeforeMute = 1.0;
-  bool _isMuting = false;
+  Future<void> adjustVolume(double delta) => _volumeControl.adjustVolume(delta);
 
   /// A-06: Toggle output mute, remembering the pre-mute volume so unmuting
   /// restores it. Exposed for the global keyboard-shortcut layer.
-  Future<void> toggleMute() async {
-    if (_isMuting) return;
-    _isMuting = true;
-    try {
-      if (_muted) {
-        final targetVol = _volumeBeforeMute > 0.0 ? _volumeBeforeMute : 1.0;
-        await _audioHandler.setVolume(targetVol);
-        _muted = false;
-      } else {
-        final currentVol = _audioHandler.volume;
-        if (currentVol > 0.0) {
-          _volumeBeforeMute = currentVol;
-        }
-        await _audioHandler.setVolume(0.0);
-        _muted = true;
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Toggle mute failed',
-          error: e,
-          stackTrace: st,
-          category: 'PlayerPlaybackOptionsController');
-    } finally {
-      _isMuting = false;
-    }
-  }
+  Future<void> toggleMute() => _volumeControl.toggleMute();
 
-  bool get isMuted => _muted;
+  bool get isMuted => _volumeControl.isMuted;
 
   int _playbackMemoryGen = 0;
 
@@ -394,12 +307,20 @@ class PlayerPlaybackOptionsController {
 
     try {
       if (speed != null) {
-        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
+        if (_isClosed() ||
+            gen != _playbackMemoryGen ||
+            _getState().currentSong?.id != song.id) {
+          return;
+        }
         await _audioHandler.setSpeed(speed);
         speedSucceeded = true;
       }
       if (pitch != null) {
-        if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
+        if (_isClosed() ||
+            gen != _playbackMemoryGen ||
+            _getState().currentSong?.id != song.id) {
+          return;
+        }
         await _audioHandler.setPitch(pitch);
         pitchSucceeded = true;
       }
@@ -410,7 +331,11 @@ class PlayerPlaybackOptionsController {
           category: 'PlayerPlaybackOptionsController');
     }
 
-    if (_isClosed() || gen != _playbackMemoryGen || _getState().currentSong?.id != song.id) return;
+    if (_isClosed() ||
+        gen != _playbackMemoryGen ||
+        _getState().currentSong?.id != song.id) {
+      return;
+    }
     final s = _getState();
     if (s.currentSong?.id != song.id) return;
     _emit(s.copyWith(
@@ -431,7 +356,9 @@ class PlayerPlaybackOptionsController {
   void toggleLyricsVisibility() {
     HapticFeedback.lightImpact();
     final s = _getState();
-    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
+    _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+            isLyricsVisible: !s.isLyricsVisible, isQueueVisible: false)));
   }
 
   void toggleQueue() => toggleQueueVisibility();
@@ -439,19 +366,28 @@ class PlayerPlaybackOptionsController {
   void toggleQueueVisibility() {
     HapticFeedback.lightImpact();
     final s = _getState();
-    _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
+    _emit(s.copyWith(
+        lyricsSlice: s.lyricsSlice.copyWith(
+            isQueueVisible: !s.isQueueVisible, isLyricsVisible: false)));
   }
 
   void resetOverlayViews() {
     final s = _getState();
     if (s.isLyricsVisible || s.isQueueVisible) {
-      _emit(s.copyWith(lyricsSlice: s.lyricsSlice.copyWith(isLyricsVisible: false, isQueueVisible: false)));
+      _emit(s.copyWith(
+          lyricsSlice: s.lyricsSlice
+              .copyWith(isLyricsVisible: false, isQueueVisible: false)));
     }
   }
 
-  void setExpanded(bool expanded) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
-  Future<void> setTrackBpm(SongsTableData song, double? bpm) => _audioHandler.setTrackBpm(song, bpm);
-  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
-  void setSilenceSkipSensitivity(int sensitivity) => _emit(_getState().copyWith(playback: _getState().playback.copyWith(silenceSkipSensitivity: sensitivity)));
+  void setExpanded(bool expanded) => _emit(_getState()
+      .copyWith(playback: _getState().playback.copyWith(isExpanded: expanded)));
+  Future<void> setTrackBpm(SongsTableData song, double? bpm) =>
+      _audioHandler.setTrackBpm(song, bpm);
+  void setTrackDelayMs(int delayMs) => _emit(_getState().copyWith(
+      playback: _getState().playback.copyWith(trackDelayMs: delayMs)));
+  void setSilenceSkipSensitivity(int sensitivity) => _emit(_getState().copyWith(
+      playback:
+          _getState().playback.copyWith(silenceSkipSensitivity: sensitivity)));
   void dispose() {}
 }

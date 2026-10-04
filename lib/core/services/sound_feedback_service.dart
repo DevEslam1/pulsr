@@ -28,7 +28,8 @@ enum SoundFeedbackVerb {
 class SoundFeedbackService {
   SoundFeedbackService._();
 
-  static final ValueNotifier<bool> _enabledNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> _enabledNotifier =
+      ValueNotifier<bool>(false);
 
   /// ValueNotifier exposing the current enabled state for reactive UI bindings.
   static ValueNotifier<bool> get enabledNotifier => _enabledNotifier;

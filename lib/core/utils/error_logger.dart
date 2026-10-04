@@ -2,6 +2,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../errors/app_error.dart';
+
 class ErrorLogger {
   static void Function(dynamic error, StackTrace? stackTrace, String category)?
       onCrashReported;
@@ -58,6 +60,11 @@ class ErrorLogger {
       );
     }
     if (error != null) {
+      // ADR-002: every failure that reaches the logger is classified into the
+      // sealed AppError taxonomy so crash reports carry a stable error type
+      // instead of an opaque runtime type.
+      final classified = resolveAppError(error, stackTrace);
+      final errorType = classified.runtimeType.toString();
       debugPrint('[Pulsr.Error][$category] $sanitizedMessage: $error');
       onCrashReported?.call(error, stackTrace, category);
       if (Sentry.isEnabled) {
@@ -66,7 +73,12 @@ class ErrorLogger {
           stackTrace: stackTrace,
           withScope: (scope) {
             scope.setTag('category', category);
+            scope.setTag('errorType', errorType);
             scope.setContexts('message', {'value': sanitizedMessage});
+            scope.setContexts('classifiedError', {
+              'type': errorType,
+              'message': classified.userMessage,
+            });
             if (meta != null) {
               scope.setContexts('meta', meta);
             }

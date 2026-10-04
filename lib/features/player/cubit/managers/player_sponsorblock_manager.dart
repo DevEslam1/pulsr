@@ -96,8 +96,7 @@ class PlayerSponsorBlockManager {
     // A backwards jump (manual rewind or repeat-one restart) invalidates the
     // previous skip, so the same segment is skipped again on the next pass.
     final lastPos = _lastCheckPosition;
-    if (lastPos != null &&
-        pos < lastPos - const Duration(milliseconds: 500)) {
+    if (lastPos != null && pos < lastPos - const Duration(milliseconds: 500)) {
       _lastSkippedTarget = null;
     }
     _lastCheckPosition = pos;

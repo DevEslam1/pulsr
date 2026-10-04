@@ -20,7 +20,8 @@ void main() {
       bgColor: const Color(0xFF1C1B1F),
     );
 
-    testWidgets('renders PlayerThemeScaffold with header and custom body', (tester) async {
+    testWidgets('renders PlayerThemeScaffold with header and custom body',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: const [
@@ -32,10 +33,14 @@ void main() {
           home: Scaffold(
             body: PlayerThemeScaffold(
               props: dummyProps,
-              viewSwitcher: (context, metrics) => const SizedBox(key: ValueKey('test_switcher')),
-              seekBar: (context, metrics) => const SizedBox(key: ValueKey('test_seek')),
-              controls: (context, metrics) => const SizedBox(key: ValueKey('test_controls')),
-              bottomDock: (context, metrics) => const SizedBox(key: ValueKey('test_dock')),
+              viewSwitcher: (context, metrics) =>
+                  const SizedBox(key: ValueKey('test_switcher')),
+              seekBar: (context, metrics) =>
+                  const SizedBox(key: ValueKey('test_seek')),
+              controls: (context, metrics) =>
+                  const SizedBox(key: ValueKey('test_controls')),
+              bottomDock: (context, metrics) =>
+                  const SizedBox(key: ValueKey('test_dock')),
               body: (context, metrics) => const SizedBox(
                 key: ValueKey('test_body'),
                 child: Center(child: Text('Custom Visuals')),
@@ -54,7 +59,9 @@ void main() {
       expect(find.byKey(const ValueKey('test_dock')), findsOneWidget);
     });
 
-    testWidgets('calculates landscape metrics and layout when constraints are wide', (tester) async {
+    testWidgets(
+        'calculates landscape metrics and layout when constraints are wide',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: const [

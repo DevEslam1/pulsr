@@ -31,14 +31,14 @@ void main() {
         final base = i * 6;
         final marker = i.isEven ? dopMarkerA : dopMarkerB;
 
-        // Left: DSD0, DSD1, marker (little-endian 24-bit).
-        expect(dop[base + 0], _dsdL[i * 2], reason: 'L byte 0 frame $i');
-        expect(dop[base + 1], _dsdL[i * 2 + 1], reason: 'L byte 1 frame $i');
+        // Left: newer DSD byte, older DSD byte, marker (little-endian 24-bit).
+        expect(dop[base + 0], _dsdL[i * 2 + 1], reason: 'L byte 0 frame $i');
+        expect(dop[base + 1], _dsdL[i * 2], reason: 'L byte 1 frame $i');
         expect(dop[base + 2], marker, reason: 'L marker frame $i');
 
-        // Right: DSD0, DSD1, marker.
-        expect(dop[base + 3], _dsdR[i * 2], reason: 'R byte 0 frame $i');
-        expect(dop[base + 4], _dsdR[i * 2 + 1], reason: 'R byte 1 frame $i');
+        // Right: newer DSD byte, older DSD byte, marker.
+        expect(dop[base + 3], _dsdR[i * 2 + 1], reason: 'R byte 0 frame $i');
+        expect(dop[base + 4], _dsdR[i * 2], reason: 'R byte 1 frame $i');
         expect(dop[base + 5], marker, reason: 'R marker frame $i');
       }
     });
@@ -61,16 +61,16 @@ void main() {
         final base = i * 8;
         final marker = i.isEven ? dopMarkerA : dopMarkerB;
 
-        // Left: pad, DSD0, DSD1, marker.
+        // Left: pad, newer DSD byte, older DSD byte, marker.
         expect(dop[base + 0], 0x00, reason: 'L pad frame $i');
-        expect(dop[base + 1], _dsdL[i * 2], reason: 'L byte 0 frame $i');
-        expect(dop[base + 2], _dsdL[i * 2 + 1], reason: 'L byte 1 frame $i');
+        expect(dop[base + 1], _dsdL[i * 2 + 1], reason: 'L byte 0 frame $i');
+        expect(dop[base + 2], _dsdL[i * 2], reason: 'L byte 1 frame $i');
         expect(dop[base + 3], marker, reason: 'L marker frame $i');
 
-        // Right: pad, DSD0, DSD1, marker.
+        // Right: pad, newer DSD byte, older DSD byte, marker.
         expect(dop[base + 4], 0x00, reason: 'R pad frame $i');
-        expect(dop[base + 5], _dsdR[i * 2], reason: 'R byte 0 frame $i');
-        expect(dop[base + 6], _dsdR[i * 2 + 1], reason: 'R byte 1 frame $i');
+        expect(dop[base + 5], _dsdR[i * 2 + 1], reason: 'R byte 0 frame $i');
+        expect(dop[base + 6], _dsdR[i * 2], reason: 'R byte 1 frame $i');
         expect(dop[base + 7], marker, reason: 'R marker frame $i');
       }
     });

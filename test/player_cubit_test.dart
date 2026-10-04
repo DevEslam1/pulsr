@@ -579,7 +579,8 @@ void main() {
       cubit.close();
     });
 
-    test('TTFA playing mark only fires when ExoPlayer is ready AND playing, '
+    test(
+        'TTFA playing mark only fires when ExoPlayer is ready AND playing, '
         'never while loading', () async {
       final tracker = PlaybackLatencyTracker.withClock(const SystemClock());
       final cubit = PlayerCubit(

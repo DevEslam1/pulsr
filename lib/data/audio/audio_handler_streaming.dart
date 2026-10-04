@@ -1,5 +1,22 @@
 part of 'audio_handler.dart';
 
+/// Loudness-normalisation boost applied when the user has no custom boost.
+const double _kNormalizationBoost = 0.35;
+bool _isNear(double a, double b) => (a - b).abs() < 0.001;
+
+/// True when Bit-Perfect output and its native DSP bypass are both persisted.
+/// Silence skipping edits the sample stream, so it must stay off on this path
+/// even across restarts (where the settings UI guard is bypassed).
+Future<bool> _isBitPerfectBypassActivePrefs(SharedPreferences? cached) async {
+  try {
+    final prefs = cached ?? await SharedPreferences.getInstance();
+    return (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+        (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+  } catch (_) {
+    return false;
+  }
+}
+
 mixin PulsrAudioStreaming on BaseAudioHandler {
   int get _preloadCountForCurrentBucket {
     switch (_currentBucket) {
@@ -22,12 +39,13 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         PulsrAudioHandler._loadConfigForBucket(bucket);
     debugPrint(
         '[AudioHandler] Buffer bucket transitioned to $bucket — applying load control');
-    unawaited(_activePlayer
-        .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
-    unawaited(_inactivePlayer
-        .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
-    unawaited(_prefetchPlayer
-        .setAudioLoadConfiguration(_currentAudioLoadConfiguration));
+    for (final p in [_activePlayer, _inactivePlayer, _prefetchPlayer]) {
+      // Players can be mid-dispose; a rejected native call must not become an
+      // unhandled async error.
+      unawaited(p
+          .setAudioLoadConfiguration(_currentAudioLoadConfiguration)
+          .catchError((Object _) {}));
+    }
   }
 
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
@@ -88,7 +106,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // Background pre-fetches (online carousels, lookahead, gapless preloads)
     // fail silently above; pushing them to `_errorSubject` spammed the app-level
     // toast with "No connection" even when nothing was playing.
-    _errorSubject.add(errorMessage);
+    if (!_errorSubject.isClosed) _errorSubject.add(errorMessage);
 
     if (!_activePlayer.playing) {
       debugPrint(
@@ -104,6 +122,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         return;
       }
       debugPrint('[AudioHandler] Track blocked/unavailable. Skipping to next.');
+      // Count the skip. Previously this branch never incremented, so the
+      // `>= 2` guard above could not trip and a queue of unavailable tracks
+      // was skipped through indefinitely.
+      _consecutiveFailures++;
       unawaited(skipToNext());
       return;
     }
@@ -267,8 +289,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     _resolveEpoch++;
     _streamCache.clear();
     _inFlightResolves.clear();
-    _prefetching.clear();
-    cancelPrefetches();
+    cancelPrefetches(); // also clears _prefetching
   }
 
   // --- SkipSilence + Normalization (InnerTune parity) ---
@@ -276,6 +297,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   Future<void> setSkipSilenceEnabled(bool enabled) async {
     try {
+      // Silence skipping removes frames and would break the exact bitstream.
+      if (enabled && await _isBitPerfectBypassActivePrefs(_cachedPrefs)) {
+        enabled = false;
+      }
       silenceSkipController.setEnabled(enabled);
       await _playerA.setSkipSilenceEnabled(enabled);
       await _playerB.setSkipSilenceEnabled(enabled);
@@ -358,7 +383,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   Future<void> _restoreSkipSilence() async {
     try {
       await silenceSkipController.load();
-      final enabled = silenceSkipController.enabled;
+      final enabled = silenceSkipController.enabled &&
+          !await _isBitPerfectBypassActivePrefs(_cachedPrefs);
       if (enabled) {
         await _playerA.setSkipSilenceEnabled(true);
         await _playerB.setSkipSilenceEnabled(true);
@@ -366,9 +392,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
       final normEnabled = prefs.getBool('audio_normalization_enabled') ?? false;
       final savedBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost);
-      if (normEnabled && (savedBoost == null || savedBoost == 0.0)) {
+      if (normEnabled && (savedBoost == null || _isNear(savedBoost, 0.0))) {
         // Apply mild loudness normalization for streams without ReplayGain tags only if user hasn't set custom boost
-        await _equalizerManager.setVolumeBoost(0.35);
+        await _equalizerManager.setVolumeBoost(_kNormalizationBoost);
       }
     } catch (_) {}
   }
@@ -378,11 +404,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
       await prefs.setBool('audio_normalization_enabled', enabled);
       if (enabled) {
-        if (_equalizerManager.volumeBoost == 0.0) {
-          await _equalizerManager.setVolumeBoost(0.35);
+        if (_isNear(_equalizerManager.volumeBoost, 0.0)) {
+          await _equalizerManager.setVolumeBoost(_kNormalizationBoost);
         }
       } else {
-        if (_equalizerManager.volumeBoost == 0.35) {
+        if (_isNear(_equalizerManager.volumeBoost, _kNormalizationBoost)) {
           await _equalizerManager.setVolumeBoost(0.0);
         }
       }
@@ -417,7 +443,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   }
 
   void _smartPrefetch() {
-    if (_songs.isEmpty || _currentIndex < 0 || _consecutiveFailures >= 3) {
+    if (_songs.isEmpty ||
+        _currentIndex < 0 ||
+        _currentIndex >= _songs.length ||
+        _consecutiveFailures >= 3) {
       return;
     }
     if (_batteryAwarePlayback.currentLevel ==

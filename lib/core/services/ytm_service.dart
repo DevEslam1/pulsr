@@ -707,12 +707,12 @@ class YtmService {
   }
 
   static String? _innertubeArtwork(Map<String, dynamic> renderer) {
-    final responsive = ((renderer['thumbnail'] as Map?)?['musicThumbnailRenderer']
-        as Map?)?['thumbnail'];
+    final responsive = ((renderer['thumbnail']
+        as Map?)?['musicThumbnailRenderer'] as Map?)?['thumbnail'];
     final fromResponsive = _extractThumbnailUrl(responsive);
     if (fromResponsive != null) return fromResponsive;
-    final twoRow = ((renderer['thumbnailRenderer'] as Map?)?[
-            'musicThumbnailRenderer'] as Map?)?['thumbnail'] ??
+    final twoRow = ((renderer['thumbnailRenderer']
+            as Map?)?['musicThumbnailRenderer'] as Map?)?['thumbnail'] ??
         ((renderer['thumbnail'] as Map?)?['musicThumbnailRenderer']
             as Map?)?['thumbnail'];
     return _extractThumbnailUrl(twoRow);

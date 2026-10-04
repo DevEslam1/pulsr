@@ -74,7 +74,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // cycle (re-fetches) instead of silently doing nothing.
     final playerState = _activePlayer.processingState;
     final stillLoading = playerState == ProcessingState.loading ||
-        playerState == ProcessingState.buffering ||
+        (playerState == ProcessingState.buffering &&
+            _activePlayer.duration == null) ||
         playerState == ProcessingState.idle;
     if (stillLoading) {
       _playGeneration++;
@@ -98,6 +99,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // NOTE: PlayerCubit already throttles scrub floods (100ms). This layer
     // only coalesces sub-60ms bursts, so a discrete tap passes through a
     // single layer, not two stacked 100ms windows.
+    if (position < Duration.zero) position = Duration.zero;
     _positionSubject.add(position);
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastSeekMs < 60) {
@@ -116,6 +118,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       return;
     }
     _lastSeekMs = now;
+    // A newer direct seek supersedes any debounced one still waiting to fire.
+    _pendingSeekPosition = null;
+    _seekDebounceTimer?.cancel();
     await _performSeek(position);
   }
 
@@ -181,10 +186,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         _activePlayer.processingState == ProcessingState.completed;
 
     try {
-      if (_crossfadeManager.isCrossfading) {
-        await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-            restoreVolume: _volume);
-      }
+      // Unconditional: cancel() is a cheap no-op when idle, and it also stops
+      // a plain fadeVolume() (e.g. a pause fade) that isCrossfading misses.
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+          restoreVolume: _volume);
       if (_gaplessMode && _gaplessLoaded) {
         // Native advance: invalidate any in-flight manual playSongAt resolve so
         // a slow YouTube URL fetch cannot clobber the new current item.
@@ -210,7 +215,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
             if (wasPlaying) {
               await playSongAt(fallbackIdx);
             } else {
-              await _loadSongPaused(fallbackIdx, initialPosition: Duration.zero);
+              await _loadSongPaused(fallbackIdx,
+                  initialPosition: Duration.zero);
             }
           } else {
             // True end-of-queue: restart the current track instead of
@@ -255,6 +261,19 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> skipToPrevious() async {
+    try {
+      await _skipToPreviousImpl();
+    } catch (e, st) {
+      // Mirror skipToNext: never let a failed skip kill the service silently.
+      ErrorLogger.log('skipToPrevious failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      try {
+        _broadcastState(_activePlayer.playbackEvent);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _skipToPreviousImpl() async {
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
     try {
       unawaited(HapticFeedback.lightImpact());
@@ -279,10 +298,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     final wasPlaying = _activePlayer.playing ||
         _activePlayer.processingState == ProcessingState.completed;
 
-    if (_crossfadeManager.isCrossfading) {
-      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-          restoreVolume: _volume);
-    }
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+        restoreVolume: _volume);
     if (_gaplessMode && _gaplessLoaded) {
       _playGeneration++;
       if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
@@ -355,8 +372,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // rather than on the next unrelated playback-state broadcast.
     _broadcastState(_activePlayer.playbackEvent);
     final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
-    await prefs.setBool(
-        PrefsKeys.playbackShuffle, shuffleMode == AudioServiceShuffleMode.all);
+    await prefs.setBool(PrefsKeys.playbackShuffle, enable);
   }
 
   @override
@@ -388,6 +404,16 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> click([MediaButton button = MediaButton.media]) async {
+    // Dedicated next/previous buttons (Bluetooth/AVRCP, car kits) act
+    // immediately; only the generic media button uses click-count mapping.
+    if (button == MediaButton.next) {
+      await skipToNext();
+      return;
+    }
+    if (button == MediaButton.previous) {
+      await skipToPrevious();
+      return;
+    }
     _headsetClickCount++;
     _headsetClickTimer?.cancel();
 
@@ -408,7 +434,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _headsetClickTimer = Timer(Duration(milliseconds: windowMs), () async {
       final count = _headsetClickCount;
       _headsetClickCount = 0;
-      await _performHeadsetAction(count);
+      try {
+        await _performHeadsetAction(count);
+      } catch (e, st) {
+        // An async Timer callback has no caller: log instead of going uncaught.
+        ErrorLogger.log('Headset action failed',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
     });
   }
 
@@ -547,6 +579,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> setSpeed(double speed) async {
+    if (!speed.isFinite) return;
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
     await Future.wait([
       _playerA.setSpeed(clamped),
@@ -563,6 +596,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> setPitch(double pitch) async {
+    if (!pitch.isFinite) return;
     final clamped = pitch.clamp(0.5, 2.0);
     _pitch = clamped;
     await Future.wait([
@@ -602,7 +636,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       final songRes = await _repository.getSongById(songId);
       final song = songRes.fold((l) => null, (r) => r);
       if (song != null) {
+        // State may have changed during the await (rapid double-add, cap hit).
+        if (_songs.length >= PulsrAudioHandler.maxQueueSize ||
+            _songs.any((s) => s.id == song.id)) {
+          return;
+        }
         _songs.add(song);
+        _streamPreResolver.onTrackEnqueuedOrTapped(song);
         _queueDirty = true;
         queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
         _saveCurrentPosition();
@@ -672,8 +712,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (_songs.isEmpty) return;
     final wasPlaying = _activePlayer.playing;
     if (_currentIndex >= 0 && _currentIndex < _songs.length) {
-      final current = _songs[_currentIndex];
-      _songs = [current];
+      if (_songs.length == 1) return; // nothing but the current track
+      // Remove every other track back-to-front through the state machine so
+      // _shuffleHistory and _currentIndex stay consistent (assigning a new
+      // list left stale shuffle history -> wrong/out-of-range "Previous").
+      for (var i = _songs.length - 1; i >= 0; i--) {
+        if (i != _currentIndex) _queueStateMachine.removeSongAt(i);
+      }
       _currentIndex = 0;
       if (_gaplessMode && _gaplessLoaded) {
         await _loadGaplessQueue(preload: wasPlaying);
@@ -682,6 +727,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       _songs.clear();
       _currentIndex = 0;
       _gaplessLoaded = false;
+      queue.add([]);
+      mediaItem.add(null);
       await stop();
     }
     _queueDirty = true;
@@ -796,7 +843,18 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // shift emit for the (unchanged) current song is swallowed.
     if (_gaplessMode && _gaplessLoaded) {
       _lastGaplessIndex = _currentIndex;
-      await _activePlayer.moveAudioSource(oldIndex, newIndex);
+      try {
+        await _activePlayer.moveAudioSource(oldIndex, newIndex);
+      } catch (e, st) {
+        ErrorLogger.log(
+            'Failed to move audio source $oldIndex -> $newIndex; resyncing gapless queue',
+            error: e,
+            stackTrace: st,
+            category: 'AudioHandler');
+        if (_activePlayer.audioSources.isNotEmpty) {
+          await _loadGaplessQueue(preload: _activePlayer.playing);
+        }
+      }
     }
 
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
@@ -887,7 +945,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   set _seekDebounceTimer(Timer? value);
 
   List<SongsTableData> get _songs;
-  set _songs(List<SongsTableData> value);
 
   StreamPreResolver get _streamPreResolver;
   double get _volume;

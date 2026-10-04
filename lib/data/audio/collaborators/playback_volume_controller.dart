@@ -43,8 +43,7 @@ class PlaybackVolumeController {
   bool get dvcEnabled => _dvcEnabled;
   bool get bitPerfectBypass => _bitPerfectBypass;
   bool get isDisposed => _isDisposed;
-  bool get hasActiveTransitionTimer =>
-      _isTransitionActive && !_isDisposed;
+  bool get hasActiveTransitionTimer => _isTransitionActive && !_isDisposed;
 
   void setDopActive(bool active) {
     _isDopActive = active;

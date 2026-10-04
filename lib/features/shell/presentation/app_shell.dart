@@ -72,8 +72,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _syncSystemUiForOrientation([Orientation? orientation]) {
-    final currentOrientation =
-        orientation ?? MediaQuery.orientationOf(context);
+    final currentOrientation = orientation ?? MediaQuery.orientationOf(context);
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isModalOpen = PulsrModalTracker.isModalOpen.value;
 
@@ -121,7 +120,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
-
 
   void _onTapNav(int index) {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
@@ -438,8 +436,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     child: TabletPlayerBar(
                       onOpenNowPlaying: () => _openNowPlaying(context),
                       onToggleSideInspector: canShowInspector
-                          ? () => setState(
-                              () => _isSideInspectorOpen = !_isSideInspectorOpen)
+                          ? () => setState(() =>
+                              _isSideInspectorOpen = !_isSideInspectorOpen)
                           : null,
                       isInspectorOpen: inspectorOpen,
                     ),

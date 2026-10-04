@@ -910,6 +910,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> setSilenceSkipSensitivity(int v) async {
     markDirty('silenceSkipSensitivity');
     final clamped = v.clamp(0, 100);
+    if (clamped > 0) {
+      final blocked = AudioConflicts.silenceSkipBlockedByBitPerfect(
+        bitPerfectOutput: state.bitPerfectOutput,
+        bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+        device: state.currentOutputDevice,
+      );
+      if (blocked != null) {
+        safeEmit(state.copyWith(errorMessage: blocked));
+        return;
+      }
+    }
     safeEmit(state.copyWith(silenceSkipSensitivity: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.silenceSkipSensitivity, clamped);

@@ -907,6 +907,7 @@
   "followTrackSampleRateTitle": "متابعة معدل عينات المسار",
   "followTrackSampleRateSubtitle": "إعادة ضبط الإخراج إلى المعدل الأصلي لكل مسار؛ يتم تخطيه في البلوتوث وبدون تكرار",
   "followTrackSampleRateBluetooth": "يتم تخطيه في البلوتوث — رابط الترميز/AVRCP يتحكم في معدل العينات",
+  "followTrackRequiresBitPerfect": "يتطلب إخراج Bit-Perfect — لا يُطبَّق معدل المسار إلا على مسار USB الحصري",
   "strictBitPerfectTitle": "بت-بيرفكت صارم (بدون إعادة عينات)",
   "strictBitPerfectSubtitle": "يفرض بت-بيرفكت + تجاوز DSP ويتابع معدل كل مسار ليصل إلى DAC العينات الأصلية",
   "strictBitPerfectBluetooth": "غير متاح: البلوتوث يعيد الترميز — يحتاج بت-بيرفكت الصارم إلى DAC USB",
@@ -4342,6 +4343,8 @@
   "conflictCrossfadeNeedsGaplessOff": "معطَّل: التشغيل دون فواصل مفعّل — يحتاج Crossfade إلى إيقافه. عطّل التشغيل دون فواصل لتمكين Crossfade.",
   "conflictStrictBitPerfectActive": "Bit-Perfect الصارم مفعّل: EQ وReplayGain وVirtualizer/Dynamics وCrossfade مكتومة كي تصل عينات المصدر الدقيقة إلى DAC. أوقف Bit-Perfect الصارم لإعادة تفعيلها.",
   "conflictCrossfadeBitPerfectBypass": "معطَّل: تجاوز Bit-Perfect مفعّل — يتداخل Crossfade بين مقطعين وسيغيّر تيار البتات. أوقف Bit-Perfect (أو تجاوز DSP الخاص به) لاستخدام Crossfade.",
+  "conflictSpeedBitPerfectBypass": "معطَّل: تجاوز Bit-Perfect مفعّل — تغيير السرعة أو النغمة يعيد أخذ العينات ويُغيّر تدفق البتات الحصري. أعد السرعة إلى 1.0× أو أوقف Bit-Perfect.",
+  "conflictSilenceSkipBitPerfectBypass": "معطَّل: تجاوز Bit-Perfect مفعّل — تخطي الصمت يعدّل تدفق العينات. أوقف Bit-Perfect (أو تجاوز DSP) لاستخدامه.",
   "conflictNoDeviceDetected": "لا يمكن التفعيل: لم يُكتشف أي جهاز إخراج بعد. وصّل DAC USB وأعد المحاولة.",
   "conflictNoExclusiveMixer": "لا يمكن التفعيل: مسار الإخراج هذا لا يكشف سمات خلاط Bit-Perfect حصرية.",
   "conflictAaudioDirectCrossfade": "معطَّل: AAudio Direct مفعّل — يُطبَّق Crossfade في سلسلة DSP في ExoPlayer التي يتجاوزها. أوقف AAudio Direct لاستخدام Crossfade.",
@@ -4422,5 +4425,11 @@
   "unifiedFavoritesHeader": "مجموعة المفضلة",
   "unifiedFavoritesHeaderSubtitle": "جميع مقاطعك المفضلة والمميزة في مكان واحد",
   "unifiedFavoritesViewAll": "فتح المفضلة بالكامل",
-  "folderPersistentExcludedBadge": "مستبعد من الفحص"
+  "folderPersistentExcludedBadge": "مستبعد من الفحص",
+  "audioQualityCapabilityProbe": "فحص القدرات فقط؛ لا يُقاس تنسيق مخرج العتاد.",
+  "audioQualityOutputSwitchUnavailable": "تبديل المخرج غير متاح لمحرك التشغيل هذا.",
+  "audioQualityFormatFollowsEngine": "يتبع التنسيق محرك التشغيل. التحويل اليدوي غير متاح.",
+  "upNext": "التالي",
+  "proBadge": "PRO",
+  "nowPlayingPreview": "▶ قيد التشغيل الآن"
 }

@@ -11,15 +11,17 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         return;
       }
       final restoreGen = _playGeneration;
+      // True once anything else (a user tap, another restore) has taken the
+      // player while this restore was awaiting.
+      bool isStale() =>
+          _songs.isNotEmpty ||
+          _playGeneration != restoreGen ||
+          _activePlayer.playing ||
+          _activePlayer.audioSources.isNotEmpty;
 
       // Restore shuffle and repeat preferences from storage (Issue #12)
       final prefs = await SharedPreferences.getInstance();
-      if (_songs.isNotEmpty ||
-          _playGeneration != restoreGen ||
-          _activePlayer.playing ||
-          _activePlayer.audioSources.isNotEmpty) {
-        return;
-      }
+      if (isStale()) return;
 
       final shufflePref = prefs.getBool(PrefsKeys.playbackShuffle) ?? false;
       final repeatModePref =
@@ -32,28 +34,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       await setShuffleMode(shufflePref
           ? AudioServiceShuffleMode.all
           : AudioServiceShuffleMode.none);
-      if (_songs.isNotEmpty ||
-          _playGeneration != restoreGen ||
-          _activePlayer.playing ||
-          _activePlayer.audioSources.isNotEmpty) {
-        return;
-      }
+      if (isStale()) return;
 
       await setRepeatMode(repeatMode);
-      if (_songs.isNotEmpty ||
-          _playGeneration != restoreGen ||
-          _activePlayer.playing ||
-          _activePlayer.audioSources.isNotEmpty) {
-        return;
-      }
+      if (isStale()) return;
 
       final queueRes = await _repository.getSavedQueue();
-      if (_songs.isNotEmpty ||
-          _playGeneration != restoreGen ||
-          _activePlayer.playing ||
-          _activePlayer.audioSources.isNotEmpty) {
-        return;
-      }
+      if (isStale()) return;
 
       final queueItems =
           queueRes.fold((l) => <QueueItemsTableData>[], (r) => r);
@@ -62,12 +49,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       // Batch query songs instead of N+1 synchronous disk checks (Issue #18)
       final songIds = queueItems.map((q) => q.songId).toList();
       final songsRes = await _repository.getSongsByIds(songIds);
-      if (_songs.isNotEmpty ||
-          _playGeneration != restoreGen ||
-          _activePlayer.playing ||
-          _activePlayer.audioSources.isNotEmpty) {
-        return;
-      }
+      if (isStale()) return;
 
       final songsMap = {
         for (final s in songsRes.fold((l) => <SongsTableData>[], (r) => r))
@@ -115,12 +97,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       }
 
       if (songs.isNotEmpty) {
-        if (_songs.isNotEmpty ||
-            _playGeneration != restoreGen ||
-            _activePlayer.playing ||
-            _activePlayer.audioSources.isNotEmpty) {
-          return;
-        }
+        if (isStale()) return;
         _songs = songs;
         _currentIndex = targetIndex.clamp(0, songs.length - 1);
         final currentSong = _songs[_currentIndex];
@@ -565,7 +542,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   @override
   void _broadcastState(PlaybackEvent event) {
-    if (event.processingState == ProcessingState.ready && _activePlayer.playing) {
+    if (event.processingState == ProcessingState.ready &&
+        _activePlayer.playing) {
       _pendingPlaybackStart = false;
     }
     // Player events are already filtered to the active player by
@@ -795,6 +773,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       _currentIndex = 0;
       _queueDirty = true;
       _gaplessLoaded = false;
+      // A stale target keeps _broadcastState suppressed (up to 8s) after the
+      // queue is cleared, and stale history points at tracks that are gone.
+      _gaplessTargetIndex = null;
+      _shuffleHistory.clear();
       _pendingLazyPosition = null;
       queue.add([]);
       mediaItem.add(null);
@@ -803,32 +785,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     }
 
     _isManualSkip = true;
-    // Immediately warm the target song so network resolution overlaps
-    // with crossfade cancellation, queue assembly, and player teardown.
-    final targetIdx =
-        initialIndex.clamp(0, songs.isEmpty ? 0 : songs.length - 1);
-    final initialSong = songs[targetIdx];
-    if (initialSong.source == SongSource.youtube &&
-        (initialSong.remoteId?.isNotEmpty ?? false) &&
-        (initialSong.path.startsWith('ytmusic://') ||
-            initialSong.path.isEmpty ||
-            (!initialSong.path.startsWith('content:') &&
-                initialSong.isDownloaded != true))) {}
-
-    // Gapless Album Pre-buffering: pre-buffer upcoming tracks (1, 2) with a short delay
-    // so track 0 gets 100% of network bandwidth, thread pool, and rate-limiter headroom.
-    final warmGeneration = _playGeneration;
+    // Warm artwork for the next two tracks so the notification/queue UI is
+    // ready. (The former YouTube "warm" blocks here were empty no-ops.)
+    final targetIdx = initialIndex.clamp(0, songs.length - 1);
     for (int i = 1; i <= 2; i++) {
       final lookaheadIdx = targetIdx + i;
       if (lookaheadIdx < songs.length) {
-        final lookaheadSong = songs[lookaheadIdx];
-        if (lookaheadSong.source == SongSource.youtube &&
-            (lookaheadSong.remoteId?.isNotEmpty ?? false)) {
-          unawaited(Future.delayed(Duration(seconds: 2 * i), () async {
-            if (_playGeneration != warmGeneration) return;
-          }));
-        }
-        unawaited(ArtworkUriResolver.resolveArtworkUri(lookaheadSong));
+        unawaited(ArtworkUriResolver.resolveArtworkUri(songs[lookaheadIdx]));
       }
     }
 
@@ -874,13 +837,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           queueIndex: targetIndex,
         ),
       );
-
-      if (song.source == SongSource.youtube &&
-          (song.remoteId?.isNotEmpty ?? false) &&
-          (song.path.startsWith('ytmusic://') ||
-              song.path.isEmpty ||
-              (!song.path.startsWith('content:') &&
-                  song.isDownloaded != true))) {}
 
       if (await _isGenerationCancelled(generation)) return;
 
@@ -1056,31 +1012,37 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       );
     }
 
-    // Pre-resolve the target online URL BEFORE stopping current playback:
-    // a YouTube resolve can take seconds, and stopping first turns that into
-    // seconds of dead silence followed by a cold start. Resolving first keeps
-    // the old track playing until the swap is near-instant (the URL lands in
-    // _streamCache/YtmUrlCache, which the lazy child then reuses). On failure
-    // the current track keeps playing and only an error toast is shown.
-    // Fire-and-forget: if the warm completes before setAudioSources, the
-    // YtmResolvingSource child hits a hot cache; if not, the child resolves
-    // lazily on its own.
-    if (song.source == SongSource.youtube &&
-        (song.path.startsWith('ytmusic://') ||
-            song.path.isEmpty ||
-            (!song.path.startsWith('content:') && song.isDownloaded != true)) &&
-        (song.remoteId?.isNotEmpty ?? false)) {}
-
     try {
       // Soft-landing fade so the stop doesn't click, then cleanly stop any
       // existing playing source to release hanging native sockets.
-      final sources = await Future.wait(songsSnapshot.map((queuedSong) {
-        final art = queuedSong.artworkUri != null
-            ? Uri.tryParse(queuedSong.artworkUri!)
-            : null;
-        return _resolveAudioSource(
-            queuedSong, PulsrAudioHandler._songToMediaItem(queuedSong, art));
-      }));
+      // Bounded, not Future.wait over the whole queue: resolving every row at
+      // once (file-exists checks, DB lookups, DSD/MQA decode setup) stalled
+      // big libraries, and one throwing row failed the entire load.
+      final sources = await _boundedParallelMap<SongsTableData, AudioSource>(
+        songsSnapshot,
+        (queuedSong) async {
+          final art = queuedSong.artworkUri != null
+              ? Uri.tryParse(queuedSong.artworkUri!)
+              : null;
+          final tag = PulsrAudioHandler._songToMediaItem(queuedSong, art);
+          try {
+            return await _resolveAudioSource(queuedSong, tag);
+          } catch (e, st) {
+            // Online rows keep the original behaviour (the error classifier
+            // below handles them). A broken local decoder path degrades to a
+            // plain source so only that track can fail, not the whole queue.
+            if (queuedSong.source == SongSource.youtube) rethrow;
+            ErrorLogger.log(
+                'Gapless child resolve failed for "${queuedSong.title}"; '
+                'using plain source',
+                error: e,
+                stackTrace: st,
+                category: 'AudioHandler');
+            return _createAudioSource(queuedSong, tag);
+          }
+        },
+        concurrency: 8,
+      );
       if (await _isGenerationCancelled(generation)) return;
       try {
         await _activePlayer.stop();
@@ -1326,17 +1288,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     final song = _songs[index];
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
 
-    // Fire-and-forget background warm: if the URL is already cached this
-    // returns instantly; if not, it populates the cache in the background
-    // so the lazy YtmResolvingSource hits a hot cache when just_audio
-    // requests bytes. Never blocks the tap→play path.
-    if (song.source == SongSource.youtube &&
-        (song.remoteId?.isNotEmpty ?? false) &&
-        (song.path.startsWith('ytmusic://') ||
-            song.path.isEmpty ||
-            (!song.path.startsWith('content:') &&
-                song.isDownloaded != true))) {}
-
     // Soft-landing fade so pause/stop doesn't click, then ensure the previous
     // MediaCodec EventHandler is fully released before creating a new decoder
     // — prevents LegacyMessageQueue dead-thread crash on rapid Hi-Res FLAC switch (LOG-12)
@@ -1484,25 +1435,36 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   /// Stops the loop if playback is already paused (user hit pause) or after
   /// 3 consecutive failures — prevents infinite skip loop on bot-blocked IP.
   Future<void> _failCurrentPlayback({required bool fatal}) async {
-    // User paused during the failure chain → never auto-resume/skip.
-    if (!_activePlayer.playing) {
+    Future<void> halt() async {
       _consecutiveFailures = 0;
-      await _activePlayer.pause();
+      // Clear the autoplay intent too, or a later engine switch would think
+      // playback was requested and start the player on its own.
+      _pendingPlaybackStart = false;
+      try {
+        await _activePlayer.pause();
+      } catch (_) {}
       _broadcastState(_activePlayer.playbackEvent);
+    }
+
+    // User paused during the failure chain -> never auto-resume/skip.
+    // `playing` alone is not a reliable signal: playSongAt pauses the player
+    // itself during teardown, so a failure while loading a tapped/skipped
+    // track saw playing == false and never skipped. A pending start means
+    // the user still wants playback.
+    if (!_activePlayer.playing && !_pendingPlaybackStart) {
+      await halt();
       return;
     }
     if (fatal) {
-      _consecutiveFailures = 0;
-      await _activePlayer.pause();
-      _broadcastState(_activePlayer.playbackEvent);
+      await halt();
       return;
     }
     _consecutiveFailures++;
     if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
-      _consecutiveFailures = 0;
-      _errorSubject.add('Playback failed for consecutive tracks. Stopping.');
-      await _activePlayer.pause();
-      _broadcastState(_activePlayer.playbackEvent);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add('Playback failed for consecutive tracks. Stopping.');
+      }
+      await halt();
     } else {
       await skipToNext();
     }
@@ -1515,6 +1477,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   AudioPlayer get _activePlayer;
 
   AudioSessionIdRouter get _audioSessionIdRouter;
+
+  Future<List<R>> _boundedParallelMap<T, R>(
+    List<T> items,
+    Future<R> Function(T) mapper, {
+    int concurrency = 6,
+  });
 
   double _calculateReplayGainVolume(SongsTableData? song);
 
@@ -1572,6 +1540,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   double get _pitch;
 
   int get _playGeneration;
+  bool get _pendingPlaybackStart;
   set _pendingPlaybackStart(bool value);
   set _playGeneration(int value);
 

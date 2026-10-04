@@ -366,18 +366,21 @@ class MusicRepository implements IMusicRepository {
             _db.songsTable.path.like('ytmusic://%').not() &
             _db.songsTable.cueStartMs.isNull());
       final rows = await query.get();
-      final entries = rows.map((r) {
-        final path = r.read(_db.songsTable.path);
-        final id = r.read(_db.songsTable.id);
-        if (path == null || id == null) return null;
-        return FolderSongEntry(
-          path: path,
-          id: id,
-          albumId: r.read(_db.songsTable.albumId),
-          artworkUri: r.read(_db.songsTable.artworkUri),
-          remoteArtworkUrl: r.read(_db.songsTable.remoteArtworkUrl),
-        );
-      }).whereType<FolderSongEntry>().toList();
+      final entries = rows
+          .map((r) {
+            final path = r.read(_db.songsTable.path);
+            final id = r.read(_db.songsTable.id);
+            if (path == null || id == null) return null;
+            return FolderSongEntry(
+              path: path,
+              id: id,
+              albumId: r.read(_db.songsTable.albumId),
+              artworkUri: r.read(_db.songsTable.artworkUri),
+              remoteArtworkUrl: r.read(_db.songsTable.remoteArtworkUrl),
+            );
+          })
+          .whereType<FolderSongEntry>()
+          .toList();
       return Right(entries);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch folder song entries', e));

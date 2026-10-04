@@ -52,7 +52,9 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
     // _switchPlaybackEngine calls that interleaved.
     _crossfadeSwitchDebounce?.cancel();
     _crossfadeSwitchDebounce = Timer(const Duration(milliseconds: 300), () {
-      unawaited(_switchPlaybackEngine(toGapless: toGapless));
+      // Re-evaluate at fire time: the setting may have flipped again during
+      // the debounce window, and the captured value would be stale.
+      unawaited(_switchPlaybackEngine(toGapless: _gaplessMode));
     });
   }
 
@@ -62,37 +64,41 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
     // During source preparation, the native player may still be stopped even
     // though loadQueue has accepted an autoplay request. Preserve that intent
     // when startup settings switch the engine before the first decoded frame.
-    final wasPlaying = _activePlayer.playing || _pendingPlaybackStart ||
+    final wasPlaying = _activePlayer.playing ||
+        _pendingPlaybackStart ||
         playbackState.value.playing;
     try {
       if (toGapless) {
         await _loadGaplessQueue(
             initialPosition: resumePos, preload: wasPlaying);
-      } else {
+        return;
+      }
+      if (_currentIndex < 0 || _currentIndex >= _songs.length) return;
+      if (wasPlaying) {
         _gaplessLoaded = false;
-        if (generation != _engineSwitchGeneration) return;
-        if (wasPlaying) {
-          await playSongAt(_currentIndex, initialPosition: resumePos);
-        } else {
-          if (_currentIndex >= 0 && _currentIndex < _songs.length) {
-            final song = _songs[_currentIndex];
-            final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-            final item = PulsrAudioHandler._songToMediaItem(song, artUri);
-            mediaItem.add(item);
-            if (song.source != SongSource.youtube) {
-              await _activePlayer.setAudioSource(
-                _createAudioSource(song, item),
-                initialPosition: resumePos,
-                preload: false,
-              );
-            } else {
-              _pendingLazyPosition = resumePos;
-            }
-            _broadcastState(_activePlayer.playbackEvent);
-          }
-        }
+        await playSongAt(_currentIndex, initialPosition: resumePos);
+        return;
+      }
+      final song = _songs[_currentIndex];
+      final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
+      // The old stale-check ran before any await (always true) and AFTER
+      // _gaplessLoaded was cleared, so a superseded switch could still flip
+      // state under a newer one. Check after the await, before mutating.
+      if (generation != _engineSwitchGeneration) return;
+      _gaplessLoaded = false;
+      final item = PulsrAudioHandler._songToMediaItem(song, artUri);
+      mediaItem.add(item);
+      if (song.source != SongSource.youtube) {
+        await _activePlayer.setAudioSource(
+          _createAudioSource(song, item),
+          initialPosition: resumePos,
+          preload: false,
+        );
+      } else {
+        _pendingLazyPosition = resumePos;
       }
       if (generation != _engineSwitchGeneration) return;
+      _broadcastState(_activePlayer.playbackEvent);
     } catch (e, st) {
       _pendingLazyPosition = null;
       ErrorLogger.log('Error switching playback engine on crossfade toggle',

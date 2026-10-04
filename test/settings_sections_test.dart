@@ -77,6 +77,9 @@ void main() {
 
       // Conflict card visible with the one-tap resolution.
       expect(find.text('Turn off Gapless & enable Crossfade'), findsOneWidget);
+      await tester
+          .ensureVisible(find.text('Turn off Gapless & enable Crossfade'));
+      await tester.pump();
       await tester.tap(find.text('Turn off Gapless & enable Crossfade'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -98,6 +101,8 @@ void main() {
       )));
 
       expect(find.text('Turn off Gapless'), findsOneWidget);
+      await tester.ensureVisible(find.text('Turn off Gapless'));
+      await tester.pump();
       await tester.tap(find.text('Turn off Gapless'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -198,7 +203,7 @@ void main() {
     });
 
     test(
-        'AudioConflicts logic: only blocks when bit-perfect is armed and on DAC',
+        'AudioConflicts logic: the DSP bypass blocks on any non-Bluetooth route',
         () {
       const normalSpeaker = AudioOutputInfo(
         deviceName: 'Speaker',
@@ -224,14 +229,16 @@ void main() {
         isBitPerfectActive: true,
       );
 
-      // Normal speaker with isDirectSupported: true does NOT block DSP when bit-perfect is on
+      // The native DSP bypass is pushed as soon as Bit-Perfect is enabled, so
+      // it blocks even on a route that does not report the live mixer as
+      // active (armed/paused) — otherwise the UI would edit muted stages.
       expect(
         AudioConflicts.dspBlockedByBitPerfect(
           bitPerfectOutput: true,
           bypassDspOnBitPerfect: true,
           device: normalSpeaker,
         ),
-        isNull,
+        isNotNull,
       );
 
       // Bluetooth does NOT block DSP

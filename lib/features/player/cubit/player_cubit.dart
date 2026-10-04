@@ -173,6 +173,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       ),
       guardDsp: (feature, {showError = true}) =>
           dspController.guardDsp(feature, showError: showError),
+      playbackRateBlockedReason: dspController.playbackRateBlockedReason,
       getState: () => state,
       emit: safeEmit,
       isClosed: () => isClosed,
@@ -337,7 +338,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           ErrorLogger.log('Re-apply volume on settings change failed',
               error: e, stackTrace: st, category: 'PlayerCubit');
         }));
-        if (settingsState.followTrackSampleRate) {
+        if (settingsState.followTrackSampleRate &&
+            settingsState.bitPerfectOutput) {
           final song = state.currentSong;
           if (song != null) {
             unawaited(dspController.maybeFollowTrackSampleRate(song));

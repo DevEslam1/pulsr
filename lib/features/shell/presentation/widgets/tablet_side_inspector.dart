@@ -192,8 +192,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                 : p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
             GpuBudget.isGpuSaverActive
                 ? p.surfaceContainer
-                : p.surfaceContainer
-                    .withValues(alpha: p.isDark ? 0.72 : 0.84),
+                : p.surfaceContainer.withValues(alpha: p.isDark ? 0.72 : 0.84),
           ],
         ),
         border: BorderDirectional(
@@ -245,8 +244,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                           onTap: () => setState(
                                               () => _selectedTabIndex = i),
                                           child: Container(
-                                            padding:
-                                                const EdgeInsets.symmetric(
+                                            padding: const EdgeInsets.symmetric(
                                               vertical: AppSpacing.s6,
                                             ),
                                             decoration: BoxDecoration(
@@ -295,8 +293,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                                             color: safeTabIndex ==
                                                                     i
                                                                 ? p.onAccent
-                                                                : p
-                                                                    .textSecondary,
+                                                                : p.textSecondary,
                                                           ),
                                                         ),
                                                 ),

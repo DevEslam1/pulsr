@@ -64,6 +64,94 @@ void main() {
       expect(duplicates.first.reason, contains('Identical Title & Artist'));
     });
 
+    test('same title/artist on different albums are not duplicates', () async {
+      final duplicates = await service.findDuplicates([
+        _testSong(
+            id: 1,
+            title: 'Intro',
+            artist: 'Band',
+            album: 'Album A',
+            path: '/a/intro.mp3'),
+        _testSong(
+            id: 2,
+            title: 'Intro',
+            artist: 'Band',
+            album: 'Album B',
+            path: '/b/intro.mp3'),
+      ]);
+
+      expect(duplicates, isEmpty);
+    });
+
+    test('durations beyond tolerance are not duplicates', () async {
+      final duplicates = await service.findDuplicates([
+        _testSong(
+            id: 1,
+            title: 'Intro',
+            artist: 'Band',
+            durationMs: 100000,
+            path: '/a/intro.mp3'),
+        _testSong(
+            id: 2,
+            title: 'Intro',
+            artist: 'Band',
+            durationMs: 130000,
+            path: '/b/intro.mp3'),
+      ]);
+
+      expect(duplicates, isEmpty);
+    });
+
+    test('codec variants with different file sizes still cluster', () async {
+      final duplicates = await service.findDuplicates([
+        _testSong(
+            id: 1,
+            title: 'Song Alpha',
+            artist: 'Artist One',
+            path: '/a/song.flac',
+            fileSize: 40000000),
+        _testSong(
+            id: 2,
+            title: 'Song Alpha',
+            artist: 'Artist One',
+            path: '/a/song.mp3',
+            fileSize: 8000000),
+      ]);
+
+      expect(duplicates.length, equals(1));
+      expect(duplicates.first.songs.length, equals(2));
+    });
+
+    test('two recordings sharing a title cluster into separate groups',
+        () async {
+      final duplicates = await service.findDuplicates([
+        _testSong(
+            id: 1,
+            title: 'Live',
+            artist: 'Band',
+            album: 'Live Album',
+            durationMs: 200000,
+            path: '/live/a.mp3'),
+        _testSong(
+            id: 2,
+            title: 'Live',
+            artist: 'Band',
+            album: 'Live Album',
+            durationMs: 200500,
+            path: '/live/b.flac'),
+        _testSong(
+            id: 3,
+            title: 'Live',
+            artist: 'Band',
+            album: 'Studio Album',
+            durationMs: 180000,
+            path: '/studio/a.mp3'),
+      ]);
+
+      expect(duplicates.length, equals(1));
+      expect(duplicates.first.songs.map((s) => s.id), unorderedEquals([1, 2]));
+    });
+
     test(
         'Pass 2 disambiguates keys for multiple checksum clusters in same bucket',
         () {

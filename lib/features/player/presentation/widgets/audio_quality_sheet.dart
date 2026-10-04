@@ -354,7 +354,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.s2),
                           Text(
-                            'Capability probe only; hardware output format is not measured.',
+                            context.l10n.audioQualityCapabilityProbe,
                             style: TextStyle(
                               fontSize: AppFontSize.tiny,
                               color: p.textSecondary,
@@ -651,10 +651,9 @@ class AudioQualitySheet extends StatelessWidget {
                     final applied =
                         await cubit?.selectOutputDevice(dev.id) ?? false;
                     if (!applied && context.mounted) {
-                      ScaffoldMessenger.maybeOf(context)
-                          ?.showSnackBar(const SnackBar(
+                      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
                         content: Text(
-                            'Output switch unavailable for this playback engine.'),
+                            context.l10n.audioQualityOutputSwitchUnavailable),
                       ));
                     }
                   },
@@ -948,8 +947,7 @@ class AudioQualitySheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-            'Format follows the playback engine. Manual conversion is unavailable.',
+        Text(context.l10n.audioQualityFormatFollowsEngine,
             style: TextStyle(
                 color: p.textSecondary, fontSize: AppFontSize.caption)),
         if (isBitPerfectActive)
@@ -1037,8 +1035,7 @@ class AudioQualitySheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-            'Format follows the playback engine. Manual conversion is unavailable.',
+        Text(context.l10n.audioQualityFormatFollowsEngine,
             style: TextStyle(
                 color: p.textSecondary, fontSize: AppFontSize.caption)),
         if (isBitPerfectActive)

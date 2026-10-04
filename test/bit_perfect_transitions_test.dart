@@ -157,6 +157,20 @@ void main() {
     await routes.close();
   });
 
+  test('silence skipping is refused while the bit-perfect bypass is active',
+      () async {
+    await cubit.close();
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.bitPerfectOutput: true,
+      PrefsKeys.bypassDspOnBitPerfect: true,
+    });
+    cubit = SettingsCubit(scannerService: _Scanner(), hiResAudioService: hires);
+    await cubit.preferencesReady;
+    await cubit.setSilenceSkipSensitivity(50);
+    expect(cubit.state.silenceSkipSensitivity, 0);
+    expect(cubit.state.errorMessage, contains('silence'));
+  });
+
   test('AAudio disables DVC and refuses re-enabling it on the bypassed path',
       () async {
     await cubit.setDvcEnabled(true);

@@ -130,11 +130,8 @@ mixin SettingsCategoryWidgetsSection
               context.l10n.settingsDeviceProfilesSectionSubtitle,
               [
                 const Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(
-                      AppSpacing.md,
-                      AppSpacing.sm,
-                      AppSpacing.md,
-                      AppSpacing.xs),
+                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
+                      AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
                   child: DeviceProfilesSection(),
                 ),
               ],

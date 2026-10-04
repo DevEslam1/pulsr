@@ -377,7 +377,6 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
   bool _isOnlineFavorite(SongsTableData s) => isOnlineFavorite(s);
 
-
   void _downloadFavorites(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -46,7 +46,12 @@ class DspWarmupScheduler {
     int channels = 2,
     int durationMs = 100,
   }) {
-    final sampleCount = (sampleRate * (durationMs / 1000.0) * channels).toInt();
-    return Float32List(sampleCount);
+    // Integer math: the old double multiply could land on x.999… and truncate
+    // to an odd sample count, i.e. a torn final stereo frame.
+    if (sampleRate <= 0 || channels <= 0 || durationMs <= 0) {
+      return Float32List(0);
+    }
+    final frames = sampleRate * durationMs ~/ 1000;
+    return Float32List(frames * channels);
   }
 }

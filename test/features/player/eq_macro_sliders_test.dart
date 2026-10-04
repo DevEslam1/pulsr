@@ -33,7 +33,8 @@ void main() {
       return 0.0;
     }
 
-    test('Bass dial reads anchor band 0 and preserves set value after reopen', () {
+    test('Bass dial reads anchor band 0 and preserves set value after reopen',
+        () {
       const setGain = 6.0;
       final gains = List.filled(10, 0.0);
       // Simulate _setBassMacro
@@ -51,7 +52,8 @@ void main() {
       expect(getBassGain(state), equals(setGain));
     });
 
-    test('Mid dial reads anchor band 5 and preserves set value after reopen', () {
+    test('Mid dial reads anchor band 5 and preserves set value after reopen',
+        () {
       const setGain = 4.5;
       final gains = List.filled(10, 0.0);
       // Simulate _setMidMacro
@@ -70,7 +72,8 @@ void main() {
       expect(getMidGain(state), equals(setGain));
     });
 
-    test('Treble dial reads anchor band 8 and preserves set value after reopen', () {
+    test('Treble dial reads anchor band 8 and preserves set value after reopen',
+        () {
       const setGain = 5.0;
       final gains = List.filled(10, 0.0);
       // Simulate _setTrebleMacro
@@ -90,7 +93,8 @@ void main() {
 
     test('Negative bass cut clears bass boost amount', () {
       const negativeVal = -4.0;
-      final boost = negativeVal > 0 ? (negativeVal / 12.0).clamp(0.0, 1.0) : 0.0;
+      final boost =
+          negativeVal > 0 ? (negativeVal / 12.0).clamp(0.0, 1.0) : 0.0;
       expect(boost, equals(0.0));
     });
   });

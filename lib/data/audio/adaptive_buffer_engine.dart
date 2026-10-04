@@ -189,7 +189,9 @@ class AdaptiveBufferEngine {
 
   /// Updates rolling network throughput average with EWMA and tracks variance.
   void updateNetworkSpeed(double speedMbps) {
-    if (speedMbps <= 0) return;
+    // NaN/inf compare false against <= 0, and one such sample would poison the
+    // EWMA and variance permanently, pinning the bucket to 'generous'.
+    if (!speedMbps.isFinite || speedMbps <= 0) return;
     if (!_isInitialized) {
       _ewmaMbps = speedMbps;
       _varianceMbps = 0.0;

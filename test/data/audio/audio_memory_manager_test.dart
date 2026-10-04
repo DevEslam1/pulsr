@@ -71,7 +71,9 @@ void main() {
       expect(manager.preloadedHeadCount, equals(1));
     });
 
-    test('get and touch promote entry to MRU so oldest unaccessed item is evicted first', () {
+    test(
+        'get and touch promote entry to MRU so oldest unaccessed item is evicted first',
+        () {
       const entrySize = 4 * 1024 * 1024; // 4MB per entry
 
       // Add 8 entries = 32MB

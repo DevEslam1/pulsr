@@ -27,7 +27,8 @@ class AudioMemoryManager {
   /// head cache cannot serve indefinitely-old data.
   static const Duration headEntryTtl = Duration(minutes: 5);
 
-  /// Adapts preload budget based on available system memory heuristic (clamped 16–64MB).
+  /// Adapts the preload budget using a CPU-core heuristic (16–32MB). Core
+  /// count is only a rough proxy for device class, not a RAM measurement.
   static void adaptBudgetToSystemRam() {
     maxPreloadBudgetBytes = computeAdaptiveBudget();
   }
@@ -69,7 +70,10 @@ class AudioMemoryManager {
       // 10 seconds of compressed stream
       return (bitrateKbps * 1000 ~/ 8) * 10;
     }
-    if (sampleRate != null && bitDepth != null) {
+    if (sampleRate != null &&
+        sampleRate > 0 &&
+        bitDepth != null &&
+        bitDepth >= 8) {
       // 10 seconds of uncompressed/lossless audio: sampleRate * channels(2) * (bitDepth / 8) * 10
       final bytesPerSec = sampleRate * 2 * (bitDepth ~/ 8);
       return (bytesPerSec * 10).clamp(1 * 1024 * 1024, 4 * 1024 * 1024);
@@ -77,20 +81,24 @@ class AudioMemoryManager {
     return defaultHeadSizeBytes;
   }
 
+  bool _isExpired(PreloadedHead entry) =>
+      DateTime.now().difference(entry.timestamp) > headEntryTtl;
+
   /// Determines whether preloading is permitted based on battery status and memory budget.
   bool canPreload(
       {required bool isBatteryConstrained,
       int estimatedBytes = defaultHeadSizeBytes}) {
     if (isBatteryConstrained) return false;
+    // Stale heads must not count against the budget.
+    evictExpired();
     return (_currentPreloadBytes + estimatedBytes) <= maxPreloadBudgetBytes;
   }
 
   /// Evicts entries older than [headEntryTtl] (BUG-29).
   void evictExpired() {
     if (_headCache.isEmpty) return;
-    final cutoff = DateTime.now().subtract(headEntryTtl);
     final expired = _headCache.entries
-        .where((e) => e.value.timestamp.isBefore(cutoff))
+        .where((e) => _isExpired(e.value))
         .map((e) => e.key)
         .toList(growable: false);
     for (final key in expired) {
@@ -99,8 +107,11 @@ class AudioMemoryManager {
     }
   }
 
-  /// Registers a preloaded stream head and evicts oldest items if exceeding 32MB cap.
+  /// Registers a preloaded stream head and evicts oldest items if exceeding the budget.
   void registerPreload(String key, int sizeBytes) {
+    if (sizeBytes <= 0) {
+      return; // a zero/negative size would corrupt the byte count
+    }
     // BUG-29: drop stale heads before applying the budget.
     evictExpired();
     // FIX B2: reject a single item larger than the whole budget. Without this,
@@ -121,7 +132,7 @@ class AudioMemoryManager {
       _currentPreloadBytes -= existing.sizeBytes;
     }
 
-    // Evict LRU entries until we fit within 32MB budget
+    // Evict LRU entries until we fit within the budget
     while (_headCache.isNotEmpty &&
         (_currentPreloadBytes + sizeBytes) > maxPreloadBudgetBytes) {
       final oldestKey = _headCache.keys.first;
@@ -140,35 +151,40 @@ class AudioMemoryManager {
   }
 
   /// Retrieves a preloaded head from cache, promoting it to Most Recently Used (MRU).
+  /// Expired entries are evicted and reported as a miss (BUG-29).
   PreloadedHead? get(String key) {
-    if (_headCache.containsKey(key)) {
-      final entry = _headCache.remove(key)!;
-      _headCache[key] = entry; // Moves to end (MRU)
-      return entry;
+    final entry = _headCache.remove(key);
+    if (entry == null) return null;
+    if (_isExpired(entry)) {
+      _currentPreloadBytes -= entry.sizeBytes;
+      return null;
     }
-    return null;
+    _headCache[key] = entry; // Moves to end (MRU)
+    return entry;
   }
 
   /// Marks a preloaded head as accessed, promoting it to Most Recently Used (MRU).
   void touch(String key) {
-    if (_headCache.containsKey(key)) {
-      final entry = _headCache.remove(key)!;
-      _headCache[key] = entry; // Moves to end (MRU)
-    }
+    get(key);
   }
 
-  /// Returns true if a preloaded head exists for [key].
-  bool containsKey(String key) => _headCache.containsKey(key);
+  /// Returns true if a non-expired preloaded head exists for [key].
+  bool containsKey(String key) {
+    final entry = _headCache[key];
+    return entry != null && !_isExpired(entry);
+  }
 
-  /// Peeks at a preloaded head without updating its LRU position.
-  PreloadedHead? peek(String key) => _headCache[key];
+  /// Peeks at a non-expired preloaded head without updating its LRU position.
+  PreloadedHead? peek(String key) {
+    final entry = _headCache[key];
+    if (entry == null || _isExpired(entry)) return null;
+    return entry;
+  }
 
   /// Releases a specific preloaded head from cache.
   void evict(String key) {
-    if (_headCache.containsKey(key)) {
-      final entry = _headCache.remove(key)!;
-      _currentPreloadBytes -= entry.sizeBytes;
-    }
+    final entry = _headCache.remove(key);
+    if (entry != null) _currentPreloadBytes -= entry.sizeBytes;
   }
 
   /// Releases every preloaded head for [prefix], including the
@@ -189,8 +205,11 @@ class AudioMemoryManager {
     _currentPreloadBytes = 0;
   }
 
-  /// Called when a track finishes playback to release completed audio buffers.
+  /// Called when a track finishes playback. Drops expired heads and asks the
+  /// owner to release completed audio buffers. [trackId] is currently unused
+  /// (heads are keyed by `prefix:quality`, not by track id).
   void onTrackCompleted(Object trackId) {
+    evictExpired();
     onEvictOldestCacheRequested?.call();
   }
 
@@ -207,10 +226,11 @@ class AudioMemoryManager {
         prefetchPlayer.stop().catchError((_) {});
       }
     } catch (_) {}
+    evictExpired();
     onBackgroundReleaseRequested?.call();
   }
 
-  /// Trims stream cache map to [maxStreamCacheEntries].
+  /// Trims stream cache map to [maxStreamCacheEntries] (oldest-inserted first).
   static void trimStreamCache<T>(Map<String, T> cache) {
     if (cache.length > maxStreamCacheEntries) {
       final excess = cache.length - maxStreamCacheEntries;

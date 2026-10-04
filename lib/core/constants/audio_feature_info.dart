@@ -557,6 +557,21 @@ class AudioFeatureRegistry {
 
 /// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.
 class AudioConflicts {
+  /// True when the native DSP bypass is active: Bit-Perfect output + its DSP
+  /// bypass are both enabled on a non-Bluetooth route.
+  ///
+  /// Deliberately does NOT require `device.isBitPerfectActive`: the native
+  /// bypass is pushed the moment Bit-Perfect turns on, so gating on the live
+  /// mixer confirmation (false while paused/armed or before the stream matches)
+  /// let users edit DSP stages that the engine was already muting. Bluetooth is
+  /// excluded because bit-perfect can never be active on a transcoded link.
+  static bool dspBypassActive({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) =>
+      bitPerfectOutput && bypassDspOnBitPerfect && device?.isBluetooth != true;
+
   /// Bit-perfect bypass disables all native DSP, virtualizer and software gain.
   ///
   /// AAudio Direct bypasses the same DSP chain, and a live DSD-over-PCM carrier
@@ -577,12 +592,69 @@ class AudioConflicts {
       return L10nHolder.current?.conflictDsdDop ??
           'Disabled: DSD over PCM (DoP) is playing — any DSP or gain would corrupt the DoP carrier. Switch DSD output to PCM to re-enable DSP.';
     }
-    if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
-    if (device?.isBluetooth == true) return null;
-    if (device?.isBitPerfectActive != true) return null;
+    if (!dspBypassActive(
+      bitPerfectOutput: bitPerfectOutput,
+      bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+      device: device,
+    )) {
+      return null;
+    }
     return L10nHolder.current?.conflictDspBitPerfectBypass ??
         'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
   }
+
+  /// Playback speed (and pitch) is applied by ExoPlayer's Sonic processor in the
+  /// same sink chain as the native DSP, so any rate other than 1.0× resamples
+  /// the exact bitstream while the bypass is active.
+  static String? speedBlockedByBitPerfect({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) {
+    if (!dspBypassActive(
+      bitPerfectOutput: bitPerfectOutput,
+      bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+      device: device,
+    )) {
+      return null;
+    }
+    return L10nHolder.current?.conflictSpeedBitPerfectBypass ??
+        'Disabled: Bit-Perfect bypass is ON — changing playback speed or pitch resamples the audio and would alter the exclusive bitstream. Set speed/pitch back to 1.0×, or turn off Bit-Perfect (or its DSP bypass).';
+  }
+
+  /// Silence skipping edits the sample stream (removes frames), which no longer
+  /// matches the source bitstream.
+  static String? silenceSkipBlockedByBitPerfect({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) {
+    if (!dspBypassActive(
+      bitPerfectOutput: bitPerfectOutput,
+      bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+      device: device,
+    )) {
+      return null;
+    }
+    return L10nHolder.current?.conflictSilenceSkipBitPerfectBypass ??
+        'Disabled: Bit-Perfect bypass is ON — silence skipping edits the sample stream. Turn off Bit-Perfect (or its DSP bypass) to use it.';
+  }
+
+  /// Structural native failure reasons that genuinely cannot change without a
+  /// device/OS change. Transient failures (`target_format_unavailable`,
+  /// `set_mixer_attributes_failed`, channel/unknown errors) deliberately do NOT
+  /// disable the switch: the user must be able to retry, and the user-facing
+  /// error still surfaces from the failed attempt itself.
+  static const Set<String> _structuralBitPerfectFailures = {
+    'requires_android_14_for_usb',
+    'requires_android_14',
+    'usb_not_supported',
+    'exclusive_requires_usb_dac',
+    'bluetooth_transcoded',
+    'no_supported_mixer_attributes',
+    'reflection_method_not_found',
+    'audio_mixer_class_not_found',
+  };
 
   static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
     if (device == null) return null;
@@ -590,7 +662,14 @@ class AudioConflicts {
       return L10nHolder.current?.conflictBtBitPerfectUnsupported ??
           'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
     }
-    return bitPerfectReasonMessage(device.bitPerfectFailureReason);
+    final reason = device.bitPerfectFailureReason;
+    // Stale/transient reasons must not permanently lock the switch. The native
+    // layer clears the reason on every audio device topology change; only
+    // structural reasons keep it disabled here.
+    if (reason == null || !_structuralBitPerfectFailures.contains(reason)) {
+      return null;
+    }
+    return bitPerfectReasonMessage(reason);
   }
 
   /// Maps a native bit-perfect rejection reason code to a user message.
@@ -679,8 +758,13 @@ class AudioConflicts {
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
   }) {
-    if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
-    if (device?.isBluetooth == true) return null;
+    if (!dspBypassActive(
+      bitPerfectOutput: bitPerfectOutput,
+      bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+      device: device,
+    )) {
+      return null;
+    }
     return L10nHolder.current?.conflictStrictBitPerfectActive ??
         'Strict bit-perfect is ON: EQ, ReplayGain, Virtualizer/Dynamics and Crossfade are muted so the exact source samples reach the DAC. Turn Strict bit-perfect off to re-enable them.';
   }
@@ -697,8 +781,13 @@ class AudioConflicts {
       return L10nHolder.current?.conflictAaudioDirectCrossfade ??
           'Disabled: AAudio Direct is ON — crossfade is applied in the ExoPlayer DSP chain it bypasses. Turn AAudio Direct off to use crossfade.';
     }
-    if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
-    if (device?.isBluetooth == true) return null;
+    if (!dspBypassActive(
+      bitPerfectOutput: bitPerfectOutput,
+      bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+      device: device,
+    )) {
+      return null;
+    }
     return L10nHolder.current?.conflictCrossfadeBitPerfectBypass ??
         'Disabled: Bit-Perfect bypass is ON — crossfade overlaps two tracks and would alter the bitstream. Turn off Bit-Perfect (or its DSP bypass) to use crossfade.';
   }

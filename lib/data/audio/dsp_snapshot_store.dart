@@ -25,19 +25,34 @@ class DspSnapshot {
     this.effects,
   });
 
+  static double _finite(double v) => v.isFinite ? v : 0.0;
+
+  /// Recursively replaces NaN/Infinity so the nested effects map (dozens of
+  /// DSP params, IR samples) can never make jsonEncode throw.
+  static dynamic _sanitize(dynamic v) {
+    if (v is double) return _finite(v);
+    if (v is List) return v.map(_sanitize).toList();
+    if (v is Map) return v.map((k, val) => MapEntry(k, _sanitize(val)));
+    return v;
+  }
+
+  // jsonEncode throws on NaN/Infinity, and persist() swallows the error, so one
+  // bad value used to silently stop ALL snapshots from ever being saved.
   Map<String, dynamic> toMap() => {
         'preset': presetName,
-        'gains': gains,
-        'volumeBoost': volumeBoost,
-        'bassBoost': bassBoost,
+        'gains': gains.map(_finite).toList(),
+        'volumeBoost': _finite(volumeBoost),
+        'bassBoost': _finite(bassBoost),
         'savedAt': savedAt.millisecondsSinceEpoch,
-        if (effects != null) 'effects': effects,
+        if (effects != null) 'effects': _sanitize(effects),
       };
 
   static DspSnapshot? fromMap(Map<String, dynamic> m) {
     try {
-      final gains =
-          (m['gains'] as List).map((e) => (e as num).toDouble()).toList();
+      final gains = (m['gains'] as List)
+          .map((e) => (e as num).toDouble())
+          .map((g) => g.isFinite ? g : 0.0)
+          .toList();
       final rawEffects = m['effects'];
       return DspSnapshot(
         presetName: m['preset'] as String? ?? 'Flat',
@@ -71,6 +86,18 @@ class DspSnapshotStore {
       'artist:${artist.trim().toLowerCase()}';
   static String genreKey(String genre) => 'genre:${genre.trim().toLowerCase()}';
 
+  /// False for empty / placeholder tags. Without this every "Unknown Album" (or
+  /// empty-artist) track shared ONE snapshot key and overwrote each other.
+  static bool isUsableScope(String? value) {
+    if (value == null) return false;
+    final v = value.trim().toLowerCase();
+    return v.isNotEmpty &&
+        v != 'unknown' &&
+        v != '<unknown>' &&
+        v != 'unknown album' &&
+        v != 'unknown artist';
+  }
+
   void save(String scopeKey, DspSnapshot snap) {
     if (!enabled) return;
     _snapshots.remove(scopeKey);
@@ -92,18 +119,21 @@ class DspSnapshotStore {
     String? artist,
     String? genre,
   }) {
+    // A disabled store must not apply snapshots (it previously only blocked
+    // saving, so the toggle did nothing for recall).
+    if (!enabled) return null;
     // Route through recall() so a hit is refreshed to the MRU position and is
     // not evicted ahead of stale entries by the LRU cap.
-    if (album != null && artist != null) {
-      final s = recall(albumKey(album, artist));
+    if (isUsableScope(album) && isUsableScope(artist)) {
+      final s = recall(albumKey(album!, artist!));
       if (s != null) return s;
     }
-    if (artist != null) {
-      final s = recall(artistKey(artist));
+    if (isUsableScope(artist)) {
+      final s = recall(artistKey(artist!));
       if (s != null) return s;
     }
-    if (genre != null) {
-      final s = recall(genreKey(genre));
+    if (isUsableScope(genre)) {
+      final s = recall(genreKey(genre!));
       if (s != null) return s;
     }
     return null;
@@ -126,6 +156,9 @@ class DspSnapshotStore {
           if (s != null) _snapshots[k] = s;
         }
       });
+      while (_snapshots.length > maxEntries) {
+        _snapshots.remove(_snapshots.keys.first);
+      }
     } catch (_) {}
   }
 

@@ -74,7 +74,8 @@ void main() {
       expect(items.single.isExcluded, isTrue);
     });
 
-    test('populates representative artwork metadata from song entries', () async {
+    test('populates representative artwork metadata from song entries',
+        () async {
       when(() => repo.getLocalSongEntries()).thenAnswer(
         (_) async => const Right([
           FolderSongEntry(

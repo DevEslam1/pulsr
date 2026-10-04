@@ -95,55 +95,57 @@ class _DockStylePickerSheetState extends State<DockStylePickerSheet> {
           AppSpacing.md,
           AppSpacing.md,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.dockStyleTitle,
-              style: TextStyle(
-                fontSize: AppFontSize.titleLarge,
-                fontWeight: FontWeight.w800,
-                color: p.textPrimary,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.dockStyleTitle,
+                style: TextStyle(
+                  fontSize: AppFontSize.titleLarge,
+                  fontWeight: FontWeight.w800,
+                  color: p.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Text(
-              context.l10n.dockStyleSubtitle,
-              style: TextStyle(
-                fontSize: AppFontSize.bodySmall,
-                fontWeight: FontWeight.w500,
-                color: p.textSecondary,
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                context.l10n.dockStyleSubtitle,
+                style: TextStyle(
+                  fontSize: AppFontSize.bodySmall,
+                  fontWeight: FontWeight.w500,
+                  color: p.textSecondary,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
 
-            // Live Interactive Preview Banner
-            _LiveDockPreviewBanner(
-              previewMode: _previewMode,
-              selectedMode: widget.current,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            for (final (mode, name, desc, bestFor) in options)
-              _DockStyleOption(
-                mode: mode,
-                name: name,
-                description: desc,
-                bestFor: bestFor,
-                selected: mode == widget.current,
-                onHover: () {
-                  if (_previewMode != mode) {
-                    setState(() => _previewMode = mode);
-                  }
-                },
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.of(context).pop();
-                  widget.onSelected(mode);
-                },
+              // Live Interactive Preview Banner
+              _LiveDockPreviewBanner(
+                previewMode: _previewMode,
+                selectedMode: widget.current,
               ),
-          ],
+              const SizedBox(height: AppSpacing.sm),
+
+              for (final (mode, name, desc, bestFor) in options)
+                _DockStyleOption(
+                  mode: mode,
+                  name: name,
+                  description: desc,
+                  bestFor: bestFor,
+                  selected: mode == widget.current,
+                  onHover: () {
+                    if (_previewMode != mode) {
+                      setState(() => _previewMode = mode);
+                    }
+                  },
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).pop();
+                    widget.onSelected(mode);
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -343,7 +345,8 @@ class _LiveDockPreviewBanner extends StatelessWidget {
                 transitionBuilder: (child, animation) => FadeTransition(
                   opacity: animation,
                   child: ScaleTransition(
-                    scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+                    scale:
+                        Tween<double>(begin: 0.95, end: 1.0).animate(animation),
                     child: child,
                   ),
                 ),
@@ -370,7 +373,10 @@ class _HeroDockStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    Widget nowPlayingCard({double opacity = 1.0, double scale = 1.0, bool elevated = false}) =>
+    Widget nowPlayingCard(
+            {double opacity = 1.0,
+            double scale = 1.0,
+            bool elevated = false}) =>
         Transform.scale(
           scale: scale,
           child: Container(
@@ -383,7 +389,8 @@ class _HeroDockStage extends StatelessWidget {
                   : p.surfaceContainer.withValues(alpha: opacity),
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color: elevated ? p.accent : p.hairline.withValues(alpha: opacity),
+                color:
+                    elevated ? p.accent : p.hairline.withValues(alpha: opacity),
                 width: elevated ? 1.2 : 1,
               ),
               boxShadow: elevated
@@ -418,7 +425,10 @@ class _HeroDockStage extends StatelessWidget {
           ),
         );
 
-    Widget navBarCard({double opacity = 1.0, double scale = 1.0, bool elevated = false}) =>
+    Widget navBarCard(
+            {double opacity = 1.0,
+            double scale = 1.0,
+            bool elevated = false}) =>
         Transform.scale(
           scale: scale,
           child: Container(
@@ -431,7 +441,8 @@ class _HeroDockStage extends StatelessWidget {
                   : p.surfaceContainerHigh.withValues(alpha: opacity),
               borderRadius: AppRadii.r12All,
               border: Border.all(
-                color: elevated ? p.accent : p.hairline.withValues(alpha: opacity),
+                color:
+                    elevated ? p.accent : p.hairline.withValues(alpha: opacity),
                 width: elevated ? 1.2 : 1,
               ),
               boxShadow: elevated
@@ -449,7 +460,8 @@ class _HeroDockStage extends StatelessWidget {
               children: [
                 Icon(Icons.home_rounded, size: 12, color: p.accent),
                 Icon(Icons.search_rounded, size: 12, color: p.textTertiary),
-                Icon(Icons.library_music_rounded, size: 12, color: p.textTertiary),
+                Icon(Icons.library_music_rounded,
+                    size: 12, color: p.textTertiary),
               ],
             ),
           ),
@@ -481,7 +493,8 @@ class _HeroDockStage extends StatelessWidget {
           child: Stack(
             alignment: Alignment.bottomCenter,
             children: [
-              Positioned(bottom: 2, child: navBarCard(opacity: 0.5, scale: 0.92)),
+              Positioned(
+                  bottom: 2, child: navBarCard(opacity: 0.5, scale: 0.92)),
               Positioned(bottom: 12, child: nowPlayingCard(elevated: true)),
             ],
           ),
@@ -493,7 +506,8 @@ class _HeroDockStage extends StatelessWidget {
           child: Stack(
             alignment: Alignment.bottomCenter,
             children: [
-              Positioned(bottom: 14, child: nowPlayingCard(opacity: 0.5, scale: 0.92)),
+              Positioned(
+                  bottom: 14, child: nowPlayingCard(opacity: 0.5, scale: 0.92)),
               Positioned(bottom: 2, child: navBarCard(elevated: true)),
             ],
           ),
@@ -523,7 +537,8 @@ class _DockMicroMockup extends StatelessWidget {
           decoration: BoxDecoration(
             color: miniColor.withValues(alpha: opacity),
             borderRadius: AppRadii.r6All,
-            border: Border.all(color: borderColor.withValues(alpha: opacity), width: 0.8),
+            border: Border.all(
+                color: borderColor.withValues(alpha: opacity), width: 0.8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -532,7 +547,7 @@ class _DockMicroMockup extends StatelessWidget {
               const SizedBox(width: 2),
               Flexible(
                 child: Text(
-                  '▶ Now Playing',
+                  context.l10n.nowPlayingPreview,
                   style: TextStyle(
                     fontSize: 6,
                     fontWeight: FontWeight.w700,
@@ -553,7 +568,8 @@ class _DockMicroMockup extends StatelessWidget {
           decoration: BoxDecoration(
             color: navColor.withValues(alpha: opacity),
             borderRadius: AppRadii.r6All,
-            border: Border.all(color: p.hairline.withValues(alpha: opacity), width: 0.8),
+            border: Border.all(
+                color: p.hairline.withValues(alpha: opacity), width: 0.8),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

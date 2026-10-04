@@ -44,7 +44,8 @@ class PlayerWidgetBridge {
   }) {
     _widgetClickSub = _widgetService?.listenToWidgetClicks((uri) {
       if (uri != null && uri.scheme.toLowerCase() == 'pulsrwidget') {
-        final action = uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
+        final action =
+            uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
         switch (action) {
           case 'play_pause':
             onPlayPause();
@@ -78,7 +79,8 @@ class PlayerWidgetBridge {
     } catch (_) {}
   }
 
-  void updateWidgetThrottled(PlayerState state, {int queueVersion = 0, bool force = false}) {
+  void updateWidgetThrottled(PlayerState state,
+      {int queueVersion = 0, bool force = false}) {
     _widgetCoordinator.updateThrottled(state, queueVersion, force: force);
   }
 
@@ -86,9 +88,11 @@ class PlayerWidgetBridge {
     _widgetCoordinator.updateProgressThrottled(state);
   }
 
-  void updateWidgetProgressThrottled(PlayerState state) => updateProgressThrottled(state);
+  void updateWidgetProgressThrottled(PlayerState state) =>
+      updateProgressThrottled(state);
 
-  void debouncedScrobble(SongsTableData song, Duration position, bool isPlaying) {
+  void debouncedScrobble(
+      SongsTableData song, Duration position, bool isPlaying) {
     _scrobbleCoordinator.debouncedScrobble(song, position, isPlaying);
   }
 
@@ -107,4 +111,3 @@ class PlayerWidgetBridge {
     _widgetCoordinator.dispose();
   }
 }
-

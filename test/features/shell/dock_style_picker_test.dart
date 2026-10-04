@@ -33,7 +33,9 @@ void main() {
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Side by side'), findsOneWidget);
+      // The live preview banner renders the previewed style name too, so the
+      // initially previewed "Side by side" appears twice (banner + option).
+      expect(find.text('Side by side'), findsNWidgets(2));
       expect(find.text('Floating pill'), findsOneWidget);
       expect(find.text('Mini player in front'), findsOneWidget);
       expect(find.text('Navigation in front'), findsOneWidget);

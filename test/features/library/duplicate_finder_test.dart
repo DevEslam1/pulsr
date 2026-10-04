@@ -1,170 +1,170 @@
 // test/features/library/duplicate_finder_test.dart
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/services/duplicate_finder_service.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/features/library/presentation/widgets/duplicate_finder_sheet.dart';
+import 'package:pulsr/domain/repositories/music_repository_interface.dart';
+import 'package:pulsr/features/library/presentation/duplicate_finder_screen.dart';
+import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import '../../helpers/test_song_factory.dart';
 
+class MockMusicRepository extends Mock implements IMusicRepository {}
+
+class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 void main() {
-  group('DuplicateFinderSheet Tests', () {
-    final songFlac = createTestSong(
-      id: 1,
-      title: 'Comfortably Numb',
-      artist: 'Pink Floyd',
-      album: 'The Wall',
-      durationMs: 382000,
-      bitrateKbps: 950,
-      path: '/storage/music/Comfortably Numb.flac',
-      isFavorite: false,
-    );
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    final songMp3 = createTestSong(
-      id: 2,
-      title: 'comfortably numb',
-      artist: 'Pink Floyd',
-      album: 'The Wall',
-      durationMs: 382000,
-      bitrateKbps: 320,
-      path: '/storage/music/Comfortably Numb.mp3',
-      isFavorite: false,
-    );
+  late MockMusicRepository repo;
+  late MockPlayerCubit cubit;
 
-    final uniqueSong = createTestSong(
-      id: 3,
-      title: 'Time',
-      artist: 'Pink Floyd',
-      album: 'The Dark Side of the Moon',
-      durationMs: 425000,
-      bitrateKbps: 320,
-      path: '/storage/music/Time.mp3',
-      isFavorite: false,
-    );
-
-    testWidgets(
-        'identifies duplicates and allows auto-selecting lower quality version',
-        (tester) async {
-      List<SongsTableData>? deletedItems;
-
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: DuplicateFinderSheet(
-              allSongs: [songFlac, songMp3, uniqueSong],
-              onDeleteSelected: (items) {
-                deletedItems = items;
-              },
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byType(DuplicateFinderSheet), findsOneWidget);
-      expect(find.text('1 duplicate clusters found'), findsOneWidget);
-
-      // Tap 'Keep this one' auto-selection button
-      final keepBestBtn = find.text('Keep this one');
-      expect(keepBestBtn, findsOneWidget);
-      await tester.tap(keepBestBtn);
-      await tester.pump();
-
-      // Lower quality MP3 should be selected for removal
-      final removeBtn = find.text('Remove Selected (1)');
-      expect(removeBtn, findsOneWidget);
-
-      await tester.tap(removeBtn);
-      await tester.pump();
-
-      expect(deletedItems, isNotNull);
-      expect(deletedItems!.length, equals(1));
-      expect(deletedItems!.first.id, equals(songMp3.id));
-    });
+  setUpAll(() {
+    registerFallbackValue(<int>[]);
   });
 
-  group('DuplicateFinderSheet key collision', () {
-    Future<void> pumpSheet(
-      WidgetTester tester,
-      List<SongsTableData> songs,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
+  setUp(() {
+    repo = MockMusicRepository();
+    cubit = MockPlayerCubit();
+    when(() => cubit.state).thenReturn(const PlayerState());
+    when(() => cubit.stream)
+        .thenAnswer((_) => const Stream<PlayerState>.empty());
+
+    if (getIt.isRegistered<DuplicateFinderService>()) {
+      getIt.unregister<DuplicateFinderService>();
+    }
+    getIt.registerLazySingleton<DuplicateFinderService>(
+        () => DuplicateFinderService());
+    if (getIt.isRegistered<IMusicRepository>()) {
+      getIt.unregister<IMusicRepository>();
+    }
+    getIt.registerSingleton<IMusicRepository>(repo);
+  });
+
+  tearDown(() async {
+    await getIt.reset();
+  });
+
+  Future<void> pumpScreen(
+      WidgetTester tester, List<SongsTableData> songs) async {
+    when(() => repo.getAllSongs()).thenAnswer((_) async => Right(songs));
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [BlocProvider<PlayerCubit>.value(value: cubit)],
+        child: MaterialApp(
+          theme: AuraTheme.darkTheme,
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: DuplicateFinderSheet(allSongs: songs),
-          ),
+          home: const DuplicateFinderScreen(),
         ),
-      );
-    }
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
 
-    SongsTableData song({
-      required int id,
-      String title = 'Intro',
-      String artist = 'Same Artist',
-      String album = 'Same Album',
-      int durationMs = 100000,
-      int? fileSize,
-    }) {
-      return createTestSong(
+  SongsTableData song({
+    required int id,
+    String title = 'Comfortably Numb',
+    String artist = 'Pink Floyd',
+    String album = 'The Wall',
+    int durationMs = 382000,
+    String path = '/storage/music/song.mp3',
+    int? bitrateKbps,
+    int? fileSize,
+  }) =>
+      createTestSong(
         id: id,
         title: title,
         artist: artist,
         album: album,
         durationMs: durationMs,
+        path: path,
+        bitrateKbps: bitrateKbps,
       ).copyWith(fileSize: Value(fileSize));
-    }
 
-    testWidgets('same title/artist on different albums are not duplicates',
-        (tester) async {
-      await pumpSheet(tester, [
-        song(id: 1, album: 'Album A'),
-        song(id: 2, album: 'Album B'),
-      ]);
+  testWidgets(
+      'detects duplicates, auto-selects the best quality and deletes the copy',
+      (tester) async {
+    when(() => repo.deleteSongs(any(that: equals([2]))))
+        .thenAnswer((_) async => const Right(null));
 
-      expect(find.text('0 duplicate clusters found'), findsOneWidget);
-    });
+    final flac = song(
+        id: 1, path: '/storage/music/Comfortably Numb.flac', bitrateKbps: 950);
+    final mp3 = song(
+        id: 2,
+        title: 'comfortably numb',
+        path: '/storage/music/Comfortably Numb.mp3',
+        bitrateKbps: 320);
+    final unique = song(
+        id: 3,
+        title: 'Time',
+        album: 'The Dark Side of the Moon',
+        durationMs: 425000,
+        path: '/storage/music/Time.mp3',
+        bitrateKbps: 320);
 
-    testWidgets('durations in different buckets are not duplicates',
-        (tester) async {
-      await pumpSheet(tester, [
-        song(id: 1, durationMs: 100000),
-        song(id: 2, durationMs: 130000),
-      ]);
+    await pumpScreen(tester, [flac, mp3, unique]);
 
-      expect(find.text('0 duplicate clusters found'), findsOneWidget);
-    });
+    expect(find.text('Identical Title & Artist (2 copies)'), findsOneWidget);
+    expect(find.text('2 tracks'), findsOneWidget);
+    expect(find.text('Kept'), findsNothing);
 
-    testWidgets(
-        'same metadata/duration but different file size are not duplicates',
-        (tester) async {
-      await pumpSheet(tester, [
-        song(id: 1, fileSize: 1000),
-        song(id: 2, fileSize: 2000),
-      ]);
+    await tester.tap(find.byIcon(Icons.auto_awesome_rounded));
+    await tester.pumpAndSettle();
 
-      expect(find.text('0 duplicate clusters found'), findsOneWidget);
-    });
+    expect(find.text('Selected highest quality for 1 groups'), findsOneWidget);
+    expect(find.text('Kept'), findsOneWidget);
 
-    testWidgets('identical metadata/duration/size are grouped', (tester) async {
-      await pumpSheet(tester, [
-        song(id: 1, fileSize: 1000),
-        song(id: 2, fileSize: 1000),
-      ]);
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete file'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('1 duplicate clusters found'), findsOneWidget);
-    });
+    verify(() => repo.deleteSongs(any(that: equals([2])))).called(1);
+    expect(find.text('No Duplicates Found!'), findsOneWidget);
+  });
+
+  testWidgets('same title/artist on different albums are not duplicates',
+      (tester) async {
+    await pumpScreen(tester, [
+      song(id: 1, title: 'Intro', album: 'Album A'),
+      song(id: 2, title: 'Intro', album: 'Album B'),
+    ]);
+
+    expect(find.text('No Duplicates Found!'), findsOneWidget);
+  });
+
+  testWidgets('durations in different buckets are not duplicates',
+      (tester) async {
+    await pumpScreen(tester, [
+      song(id: 1, title: 'Intro', durationMs: 100000),
+      song(id: 2, title: 'Intro', durationMs: 130000),
+    ]);
+
+    expect(find.text('No Duplicates Found!'), findsOneWidget);
+  });
+
+  testWidgets('codec variants of one recording are grouped', (tester) async {
+    await pumpScreen(tester, [
+      song(id: 1, title: 'Intro', path: '/a/intro.flac', fileSize: 40000000),
+      song(id: 2, title: 'Intro', path: '/a/intro.mp3', fileSize: 8000000),
+    ]);
+
+    expect(find.text('Identical Title & Artist (2 copies)'), findsOneWidget);
   });
 }

@@ -74,7 +74,8 @@ mixin PhoneLayoutSection
       );
     }
 
-    final categories = _getCategories(context, pro: state.isProfessional, state: state);
+    final categories =
+        _getCategories(context, pro: state.isProfessional, state: state);
     final selectedId = categories.any((c) => c.id == _selectedCategoryId)
         ? _selectedCategoryId
         : categories.first.id;
@@ -121,7 +122,8 @@ mixin PhoneLayoutSection
     SettingsCubit cubit,
   ) {
     final p = context.palette;
-    final categories = _getCategories(context, pro: state.isProfessional, state: state);
+    final categories =
+        _getCategories(context, pro: state.isProfessional, state: state);
 
     return categories.map((cat) {
       Widget statusLine;
@@ -130,11 +132,13 @@ mixin PhoneLayoutSection
       switch (cat.id) {
         case 'sound':
           final dev = state.currentOutputDevice;
-          final devName = dev?.deviceName ?? context.l10n.settingsAudioOutputDevice;
+          final devName =
+              dev?.deviceName ?? context.l10n.settingsAudioOutputDevice;
           final rate = dev != null
               ? '${(dev.sampleRate / 1000).toStringAsFixed(dev.sampleRate % 1000 == 0 ? 0 : 1)} kHz / ${dev.bitDepth}-bit'
               : '44.1 kHz / 16-bit';
-          final isBitPerfect = dev?.isBitPerfectActive == true || state.bitPerfectOutput;
+          final isBitPerfect =
+              dev?.isBitPerfectActive == true || state.bitPerfectOutput;
 
           topAction = Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -178,7 +182,8 @@ mixin PhoneLayoutSection
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_forward_rounded, color: p.accent, size: 18),
+                    Icon(Icons.arrow_forward_rounded,
+                        color: p.accent, size: 18),
                   ],
                 ),
               ),

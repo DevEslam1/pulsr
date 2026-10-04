@@ -26,7 +26,8 @@ void main() {
             data: MediaQueryData(size: c.size),
             child: Builder(
               builder: (context) {
-                viewportWidth = PulsrViewport.fromContext(context).contentMaxWidth;
+                viewportWidth =
+                    PulsrViewport.fromContext(context).contentMaxWidth;
                 metricsWidth = PulsrLayoutMetrics.contentMaxWidth(context);
                 delegateWidth = PulsrLayoutDelegate.of(context).contentMaxWidth;
                 return const SizedBox.shrink();

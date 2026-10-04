@@ -2,6 +2,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../core/constants/audio_formats.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_quality_info.dart';
 import '../db/app_database.dart';
 import 'dsd_decoder_helper.dart';
@@ -51,12 +52,23 @@ class FormatAwareDecoder {
       // 1. High-Res Lossless & MQA
       case 'flac':
       case 'wav':
-        final isMqa = await MqaDecoderHelper.isMqaFile(song.path);
-        if (isMqa) {
-          MqaDecoderHelper.markMqaPath(song.path);
-          if (MqaDecoderHelper.isMqaEnabled?.call() ?? true) {
-            return MqaDecoderHelper.decodeMqaFile(song, tag);
+        // MQA detection/unfolding is an enhancement: if probing or decoding
+        // throws (unreadable header, native helper missing) the track must
+        // still play as plain FLAC/WAV instead of failing the whole load.
+        try {
+          final isMqa = await MqaDecoderHelper.isMqaFile(song.path);
+          if (isMqa) {
+            MqaDecoderHelper.markMqaPath(song.path);
+            if (MqaDecoderHelper.isMqaEnabled?.call() ?? true) {
+              return await MqaDecoderHelper.decodeMqaFile(song, tag);
+            }
           }
+        } catch (e, st) {
+          ErrorLogger.log(
+              'MQA probe/decode failed for ${song.path}; playing as plain .$ext',
+              error: e,
+              stackTrace: st,
+              category: 'FormatAwareDecoder');
         }
         return AudioSource.uri(Uri.file(song.path), tag: tag);
       case 'alac':

@@ -41,7 +41,9 @@ class EqPresetSchemaValidator {
   static const double minAllowedGain = -30.0;
   static const double maxAllowedGain = 30.0;
   static const double minFrequencyHz = 10.0;
-  static const double maxFrequencyHz = 48000.0;
+  // Matches DspParamRanges.eqFilterFrequencyHz; above Nyquist (24 kHz at 48 kHz)
+  // a biquad is unstable.
+  static const double maxFrequencyHz = 24000.0;
   static const double minQFactor = 0.1;
   static const double maxQFactor = 50.0;
 
@@ -121,9 +123,19 @@ class EqPresetSchemaValidator {
         }
         lastFreq = f;
       }
+      if (freqs.length != preset.gains.length) {
+        return EqPresetValidationResult.failure(
+          'customFrequencies has ${freqs.length} entries but gains has ${preset.gains.length}.',
+        );
+      }
     }
 
     if (preset.qFactors != null) {
+      if (preset.qFactors!.length != preset.gains.length) {
+        return EqPresetValidationResult.failure(
+          'qFactors has ${preset.qFactors!.length} entries but gains has ${preset.gains.length}.',
+        );
+      }
       for (int i = 0; i < preset.qFactors!.length; i++) {
         final q = preset.qFactors![i];
         if (q.isNaN || q.isInfinite || q < minQFactor || q > maxQFactor) {
@@ -235,6 +247,18 @@ class EqPresetSchemaValidator {
           }
           qFactors.add(qVal.toDouble().clamp(minQFactor, maxQFactor));
         }
+      }
+
+      // Per-band tables must line up with gains or the native EQ reads past
+      // the shorter list.
+      if (customFrequencies != null &&
+          customFrequencies.length != gains.length) {
+        return EqPresetValidationResult.failure(
+            "'customFrequencies' length (${customFrequencies.length}) must match 'gains' length (${gains.length}).");
+      }
+      if (qFactors != null && qFactors.length != gains.length) {
+        return EqPresetValidationResult.failure(
+            "'qFactors' length (${qFactors.length}) must match 'gains' length (${gains.length}).");
       }
 
       final rawBandsMap = decoded['bandsMap'] as Map<String, dynamic>?;

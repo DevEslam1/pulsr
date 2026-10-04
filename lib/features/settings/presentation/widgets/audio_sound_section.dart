@@ -194,7 +194,7 @@ class _AudioEffectsDspSectionState extends State<AudioEffectsDspSection> {
                                   borderRadius: AppRadii.full,
                                 ),
                                 child: Text(
-                                  'PRO',
+                                  context.l10n.proBadge,
                                   style: TextStyle(
                                     color: p.accent,
                                     fontSize: AppFontSize.tiny,

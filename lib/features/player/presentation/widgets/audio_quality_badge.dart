@@ -47,11 +47,13 @@ class AudioQualityBadge extends StatelessWidget {
 
     final outputRate = (output != null && output.targetSampleRate > 0)
         ? output.targetSampleRate ~/ 1000
-        : (output != null ? output.sampleRate ~/ 1000 : 44);
+        : (output != null && output.sampleRate > 0
+            ? output.sampleRate ~/ 1000
+            : 44);
 
     final outputBitDepth = (output != null && output.targetBitDepth > 0)
         ? output.targetBitDepth
-        : (output?.bitDepth ?? 16);
+        : (output != null && output.bitDepth > 0 ? output.bitDepth : 16);
 
     final deviceShortName = isUsb
         ? 'USB DAC'

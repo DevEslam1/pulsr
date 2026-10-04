@@ -25,8 +25,8 @@ abstract class IMusicRepository {
   /// Lightweight song entry used for folder aggregation with artwork metadata.
   Future<Result<List<FolderSongEntry>>> getLocalSongEntries() async {
     final pathsResult = await getLocalSongPaths();
-    return pathsResult.map((paths) =>
-        paths.map((p) => FolderSongEntry(path: p, id: 0)).toList());
+    return pathsResult.map(
+        (paths) => paths.map((p) => FolderSongEntry(path: p, id: 0)).toList());
   }
 
   /// Path-only listing of local songs. Folder aggregation uses this instead of

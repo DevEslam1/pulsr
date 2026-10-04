@@ -1,7 +1,8 @@
 // lib/features/player/cubit/controllers/player_playback_options_lyrics.dart
 part of 'player_playback_options_controller.dart';
 
-extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsController {
+extension PlayerPlaybackOptionsLyricsExtension
+    on PlayerPlaybackOptionsController {
   // ──────────────────────────────────────────────
   // AB Loop
   // ──────────────────────────────────────────────
@@ -41,7 +42,8 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     if (!s.abLoopEnabled && (s.abPointA == null || s.abPointB == null)) {
       return;
     }
-    _emit(s.copyWith(playback: s.playback.copyWith(abLoopEnabled: !s.abLoopEnabled)));
+    _emit(s.copyWith(
+        playback: s.playback.copyWith(abLoopEnabled: !s.abLoopEnabled)));
   }
 
   void seekToBookmark() {
@@ -63,14 +65,14 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
     try {
       final key = PlaybackBookmarkStore.keyFor(
           songId: song.id, remoteId: song.remoteId, path: song.path);
-      _audioHandler.bookmarkStore.save(key, posMs,
-          durationMs: s.duration.inMilliseconds);
+      _audioHandler.bookmarkStore
+          .save(key, posMs, durationMs: s.duration.inMilliseconds);
       await _audioHandler.persistBookmarks();
       if (_isClosed()) return false;
       final cur = _getState();
       _emit(cur.copyWith(
-          playback: cur.playback.copyWith(
-              bookmarkPosition: Duration(milliseconds: posMs))));
+          playback: cur.playback
+              .copyWith(bookmarkPosition: Duration(milliseconds: posMs))));
       return true;
     } catch (_) {
       return false;
@@ -93,7 +95,8 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
       await _audioHandler.clearBookmarkFor(song);
       if (_isClosed()) return;
       final cur = _getState();
-      _emit(cur.copyWith(playback: cur.playback.copyWith(bookmarkPosition: null)));
+      _emit(cur.copyWith(
+          playback: cur.playback.copyWith(bookmarkPosition: null)));
     } catch (_) {}
   }
 
@@ -137,8 +140,7 @@ extension PlayerPlaybackOptionsLyricsExtension on PlayerPlaybackOptionsControlle
       final baseName = path.split(RegExp(r'[\\/]')).last;
       final dot = baseName.lastIndexOf('.');
       final stem = dot > 0 ? baseName.substring(0, dot) : baseName;
-      final sidecar =
-          File('${dir.path}${Platform.pathSeparator}$stem.lrc');
+      final sidecar = File('${dir.path}${Platform.pathSeparator}$stem.lrc');
       await sidecar.writeAsString(LrcParser.formatToLrc(lines), flush: true);
       LrcParser.cacheLyricsResult(
         LyricsResult(lines: lines, source: source),

@@ -2523,6 +2523,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se omite en Bluetooth: el enlace del códec/AVRCP controla la frecuencia';
 
   @override
+  String get followTrackRequiresBitPerfect =>
+      'Requiere salida Bit-Perfect: la frecuencia de la pista solo se aplica en la ruta USB exclusiva';
+
+  @override
   String get strictBitPerfectTitle => 'Bit-perfect estricto (sin remuestreo)';
 
   @override
@@ -7968,6 +7972,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Desactivado: la omisión bit-perfect está activada — el crossfade solapa dos pistas y alteraría el flujo de bits. Desactiva Bit-Perfect (o su omisión de DSP) para usar el crossfade.';
 
   @override
+  String get conflictSpeedBitPerfectBypass =>
+      'Desactivado: la omisión bit-perfect está activada — cambiar la velocidad o el tono remuestrea el audio y alteraría el flujo de bits exclusivo. Vuelve a 1.0× o desactiva Bit-Perfect.';
+
+  @override
+  String get conflictSilenceSkipBitPerfectBypass =>
+      'Desactivado: la omisión bit-perfect está activada — el salto de silencio edita el flujo de muestras. Desactiva Bit-Perfect (o su omisión de DSP) para usarlo.';
+
+  @override
   String get conflictNoDeviceDetected =>
       'No se puede activar: aún no se ha detectado ningún dispositivo de salida. Conecta un DAC USB e inténtalo de nuevo.';
 
@@ -8249,4 +8261,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get folderPersistentExcludedBadge => 'Excluido del escaneo';
+
+  @override
+  String get audioQualityCapabilityProbe =>
+      'Solo sondeo de capacidades; no se mide el formato de salida del hardware.';
+
+  @override
+  String get audioQualityOutputSwitchUnavailable =>
+      'El cambio de salida no está disponible para este motor de reproducción.';
+
+  @override
+  String get audioQualityFormatFollowsEngine =>
+      'El formato sigue al motor de reproducción. La conversión manual no está disponible.';
+
+  @override
+  String get upNext => 'A CONTINUACIÓN';
+
+  @override
+  String get proBadge => 'PRO';
+
+  @override
+  String get nowPlayingPreview => '▶ Reproduciendo ahora';
 }

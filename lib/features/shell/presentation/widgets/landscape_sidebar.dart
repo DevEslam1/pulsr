@@ -473,7 +473,6 @@ class _SidebarBrandHeader extends StatelessWidget {
   }
 }
 
-
 class _SidebarNavItem extends StatelessWidget {
   final IconData icon;
   final IconData activeIcon;

@@ -125,7 +125,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       keepOnPause = prefs.getBool(PrefsKeys.keepNotificationOnPause) ?? true;
       final langCode = prefs.getString(PrefsKeys.languageCode) ??
           prefs.getString('setting_language') ??
-          Platform.localeName.split('_').first.toLowerCase();
+          Platform.localeName.split(RegExp(r'[_-]')).first.toLowerCase();
       if (langCode == 'ar') {
         channelName = 'تشغيل الصوت Pulsr';
         channelDesc =
@@ -427,7 +427,14 @@ class PulsrAudioHandler extends BaseAudioHandler
         while (player.playing &&
             player.processingState != ProcessingState.completed) {
           final gain = await player.dspGetTransitionGain();
-          if (gain != null && gain <= 0.0001) break;
+          if (gain == null) {
+            // The native side cannot report the gain, so polling can never
+            // succeed. Give the fade a short fixed window instead of spinning
+            // until the 3s deadline and then aborting the profile change.
+            await Future<void>.delayed(const Duration(milliseconds: 60));
+            break;
+          }
+          if (gain <= 0.0001) break;
           if (DateTime.now().isAfter(deadline)) {
             throw StateError('DSP profile fade did not reach silence');
           }
@@ -639,7 +646,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     };
     // Backstop: if _init() throws before reaching its restore block, the
     // effects-ready signal must still fire so listeners aren't left waiting.
-    _init().whenComplete(() {
+    _init().catchError((Object e, StackTrace st) {
+      // Without this, the Future returned by whenComplete() below re-throws the
+      // error with no listener and it surfaces as an unhandled async error.
+      ErrorLogger.log('PulsrAudioHandler._init failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }).whenComplete(() {
       if (!_effectsReadyCompleter.isCompleted) {
         _effectsReadyCompleter.complete();
       }
@@ -851,7 +863,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       album: song.album,
       title: song.title,
       artist: song.artist,
-      duration: Duration(milliseconds: song.durationMs),
+      // 0 means "unknown" (streams); null lets the platform show an indeterminate
+      // bar until the player's durationStream reports the real length.
+      duration:
+          song.durationMs > 0 ? Duration(milliseconds: song.durationMs) : null,
       artUri: finalArtUri,
       extras: {
         'path': song.path,
@@ -1123,7 +1138,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   int? _lastNativeRgSongId;
 
   Future<void> setVolume(double volume) async {
-    _volume = volume.clamp(0.0, 1.0);
+    // NaN.clamp() returns NaN, which would poison every composed gain after it.
+    _volume = volume.isFinite ? volume.clamp(0.0, 1.0) : _volume;
     if (!_effectsReadyCompleter.isCompleted) {
       await _effectsReadyCompleter.future;
     }
@@ -1168,6 +1184,23 @@ class PulsrAudioHandler extends BaseAudioHandler
       ErrorLogger.log('Failed to re-apply active player volume',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
+  }
+
+  /// Resets every piece of duck bookkeeping in one place so the interruption
+  /// paths (pause end, unknown end, stop) cannot forget a field and leave a
+  /// stale timer or captured volume behind.
+  void _clearDuckState() {
+    _duckSafetyTimer?.cancel();
+    _duckSafetyTimer = null;
+    _systemSoundTimer?.cancel();
+    _systemSoundTimer = null;
+    _duckActive = false;
+    _duckDepthCounter = 0;
+    _preDuckVolume = null;
+    _preDuckInactiveVolume = null;
+    _preDuckSongId = null;
+    _preDuckRgTarget = null;
+    _volumeController?.updateSettings(isDucked: false);
   }
 
   /// Toggles Direct Volume Control. Enabling pins Android's media stream to
@@ -1236,10 +1269,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _equalizerManager.onAppPaused();
   }
 
+  File? _cachedRecoveryFile;
+
   Future<File?> _getLastPositionRecoveryFile() async {
+    // Resolved once: this runs every ~2s while playing and the path never
+    // changes, so don't hit the path_provider platform channel each time.
+    final cached = _cachedRecoveryFile;
+    if (cached != null) return cached;
     try {
       final dir = await getApplicationDocumentsDirectory();
-      return File(p.join(dir.path, 'last_position.json'));
+      return _cachedRecoveryFile = File(p.join(dir.path, 'last_position.json'));
     } catch (_) {
       return null;
     }
@@ -1268,8 +1307,34 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  Future<void>? _positionSaveInFlight;
+  bool _positionSaveQueued = false;
+
+  /// Serialized + coalesced: the 2s timer, [didChangeAppLifecycleState] and the
+  /// lifecycle observer can all fire together on backgrounding, and two
+  /// overlapping DB/file writes can land out of order. While a write is in
+  /// flight, further calls just request one more pass and await the same run.
   @override
   Future<void> saveCurrentPositionImmediate() async {
+    final inFlight = _positionSaveInFlight;
+    if (inFlight != null) {
+      _positionSaveQueued = true;
+      return inFlight;
+    }
+    final completer = Completer<void>();
+    _positionSaveInFlight = completer.future;
+    try {
+      do {
+        _positionSaveQueued = false;
+        await _writePositionSnapshot();
+      } while (_positionSaveQueued && !_disposed);
+    } finally {
+      _positionSaveInFlight = null;
+      completer.complete();
+    }
+  }
+
+  Future<void> _writePositionSnapshot() async {
     final hasPosition = _songs.isNotEmpty &&
         _currentIndex >= 0 &&
         _currentIndex < _songs.length;
@@ -1406,9 +1471,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     _preloadScheduler = SmartPreloadScheduler(
-      onPreloadRequested: (song, {required priority}) async {
-        if (song.source == SongSource.youtube && song.remoteId != null) {}
-      },
+      // Intentional no-op: URL warming is handled by _smartPrefetch() and
+      // StreamPreResolver, so the scheduler only needs the cancel hook below.
+      onPreloadRequested: (song, {required priority}) async {},
       onCancelRequested: () => cancelPrefetches(),
       qualityProvider: _currentStreamingQuality,
     );
@@ -1479,6 +1544,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     _syncVolumeControllerSettings();
     unawaited(HeadsetControlConfig.load(_cachedPrefs).then((cfg) {
       _cachedHeadsetConfig = cfg;
+    }).catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Failed to load headset control config',
+          error: e, stackTrace: st, category: 'AudioHandler');
     }));
     _streamResolutionPipeline = StreamResolutionPipeline(
       ytmService: _ytmService,
@@ -1509,10 +1577,15 @@ class PulsrAudioHandler extends BaseAudioHandler
       // The subscription stays registered in _subscriptions, so it is still
       // cancelled on dispose exactly as before.
       Stream.periodic(const Duration(seconds: 120)).listen((_) async {
-        if (!_activePlayer.playing) return;
-        final level = await BatteryOptimizationService.getBatteryLevel();
-        if (level != null) {
-          _batteryAwarePlayback.onBatteryLevelChanged(level);
+        if (_disposed || !_activePlayer.playing) return;
+        try {
+          final level = await BatteryOptimizationService.getBatteryLevel();
+          if (level != null) {
+            _batteryAwarePlayback.onBatteryLevelChanged(level);
+          }
+        } catch (_) {
+          // Best-effort telemetry; a platform hiccup must not become an
+          // uncaught async error every two minutes.
         }
       }),
     );
@@ -1577,8 +1650,21 @@ class PulsrAudioHandler extends BaseAudioHandler
               if (_gaplessMode &&
                   state.processingState == ProcessingState.completed &&
                   _activePlayer.loopMode == LoopMode.all) {
-                await _activePlayer.seek(Duration.zero, index: 0);
-                unawaited(_activePlayer.play());
+                // `completed` can also fire mid-queue while the next item is
+                // swapped in (see the comment below). Only wrap to the start
+                // when the LAST item actually finished, otherwise this would
+                // yank playback back to track 1 on every transition.
+                final idx = _activePlayer.currentIndex;
+                final len = _activePlayer.sequence.length;
+                if (idx == null || idx >= len - 1) {
+                  try {
+                    await _activePlayer.seek(Duration.zero, index: 0);
+                    unawaited(_activePlayer.play());
+                  } catch (e, st) {
+                    ErrorLogger.log('Failed to wrap queue for repeat-all',
+                        error: e, stackTrace: st, category: 'AudioHandler');
+                  }
+                }
                 return;
               }
               // In gapless mode the ConcatenatingAudioSource advances itself, so a
@@ -1606,7 +1692,10 @@ class PulsrAudioHandler extends BaseAudioHandler
                   if (_getNextIndex(peek: true) == null) {
                     unawaited(_sleepTimerManager.onQueueCompleted());
                   }
-                  skipToNext();
+                  unawaited(skipToNext().catchError((Object e, StackTrace st) {
+                    ErrorLogger.log('Auto-advance skipToNext failed',
+                        error: e, stackTrace: st, category: 'AudioHandler');
+                  }));
                 }
               }
             }
@@ -1709,12 +1798,12 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
               }
               final rawDuration = player.duration;
+              final songDurationMs = currentSong?.durationMs ?? 0;
               final duration =
                   (rawDuration != null && rawDuration > Duration.zero)
                       ? rawDuration
-                      : ((currentSong?.durationMs != null &&
-                              currentSong!.durationMs > 0)
-                          ? Duration(milliseconds: currentSong!.durationMs)
+                      : (songDurationMs > 0
+                          ? Duration(milliseconds: songDurationMs)
                           : Duration.zero);
               // Warm the next YouTube stream URL before the crossfade window even
               // opens, so resolve latency does not truncate the fade. Cheap no-op
@@ -1838,8 +1927,14 @@ class PulsrAudioHandler extends BaseAudioHandler
                 // Stack-safe: a second duck begin while already ducked must not
                 // clobber the saved pre-duck level. Duck both engines so a
                 // navigation prompt during a crossfade doesn't blast the fade-in.
-                _duckDepthCounter++;
-                if (!_duckActive && _activePlayer.playing) {
+                // Count depth only for ducks that are really engaged. Counting a
+                // begin that arrived while paused left the counter one too high,
+                // so the matching end never reached 0 and the volume stayed
+                // ducked after playback resumed.
+                if (_duckActive) {
+                  _duckDepthCounter++;
+                } else if (_activePlayer.playing) {
+                  _duckDepthCounter = 1;
                   // Capture the clean (un-ducked) RG target and song identity
                   // first so a later duck-end can restore the EXACT pre-duck
                   // level when nothing changed during the duck.
@@ -2012,19 +2107,19 @@ class PulsrAudioHandler extends BaseAudioHandler
                   // guard.
                   unawaited(play());
                 }
-                _preDuckVolume = null;
-                _preDuckInactiveVolume = null;
-                _duckActive = false;
-                _volumeController?.updateSettings(isDucked: false);
-                _duckDepthCounter = 0;
+                // A call can arrive in the middle of a navigation-prompt duck.
+                // The duck-end event may never come after that, so clear the duck
+                // here AND put the volume back; before, the flags were reset but
+                // the player stayed at the ducked level.
+                final hadDuck = _duckActive;
+                _clearDuckState();
+                if (hadDuck) unawaited(_reapplyActiveVolume());
                 break;
               case AudioInterruptionType.unknown:
                 _interruption.reset();
-                _preDuckVolume = null;
-                _preDuckInactiveVolume = null;
-                _duckActive = false;
-                _volumeController?.updateSettings(isDucked: false);
-                _duckDepthCounter = 0;
+                final hadUnknownDuck = _duckActive;
+                _clearDuckState();
+                if (hadUnknownDuck) unawaited(_reapplyActiveVolume());
                 break;
             }
           }
@@ -2180,12 +2275,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   static bool _isStreamUrl(String path) =>
       path.startsWith('http://') || path.startsWith('https://');
 
-  /// Builds a gapless-queue child for [song] with no network I/O, so an entire
-  /// queue can be assembled up front. Local tracks resolve to a file/content
-  /// source; a YouTube row (not yet downloaded) becomes a [YtmResolvingSource]
-  /// that resolves its URL and caches its bytes lazily on first playback. A
-  /// downloaded YouTube row with a real file on disk plays straight off disk.
-  @override
+  static final RegExp _videoIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
 
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
   /// one until it nears expiry. Throws [YtmException] when nothing usable comes
@@ -2206,8 +2296,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     // Guard against placeholder local IDs (e.g. n_1f2cbFnkQ) that would waste
     // BotGuard + Innertube retries and then loop as VideoGone. Skip quietly.
-    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) ||
-        videoId.startsWith('n_')) {
+    if (!_videoIdPattern.hasMatch(videoId) || videoId.startsWith('n_')) {
       throw const YtmException('YTM_UNAVAILABLE', 'Invalid video id');
     }
 
@@ -2522,8 +2611,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       case 'bassBoost':
         final current = _equalizerManager.currentPreset.bassBoost;
         final enable = extras?['enable'] as bool? ?? (current <= 0.05);
+        // When disabling, always force 0: a stray `strength` in extras used to
+        // leave bass boost active while this action reported `false`.
         final strength =
-            (extras?['strength'] as num?)?.toDouble() ?? (enable ? 0.6 : 0.0);
+            enable ? ((extras?['strength'] as num?)?.toDouble() ?? 0.6) : 0.0;
         await _equalizerManager.setBassBoost(strength);
         return enable;
       case 'action_virtualizer':
@@ -2542,7 +2633,9 @@ class PulsrAudioHandler extends BaseAudioHandler
           _sleepTimerManager.cancelSleepTimer();
           return false;
         } else {
-          final minutes = (extras?['minutes'] as num?)?.toInt() ?? 30;
+          // 0 / negative would fire immediately and pause playback at once.
+          final minutes =
+              ((extras?['minutes'] as num?)?.toInt() ?? 30).clamp(1, 24 * 60);
           _sleepTimerManager.startDurationTimer(Duration(minutes: minutes));
           return true;
         }
@@ -2554,6 +2647,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         return nextSpeed;
       case 'switchEqPreset':
         final presets = EqPreset.defaultPresets;
+        if (presets.isEmpty) return null;
         final current = _equalizerManager.currentPreset;
         final idx = presets.indexWhere((p) => p.name == current.name);
         final next = presets[(idx + 1) % presets.length];
@@ -2584,21 +2678,60 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> stop() async {
     _pendingPlaybackStart = false;
+    // Invalidate any slow in-flight resolve so it cannot start playback after
+    // the user stopped (pause() already does this; stop() did not).
+    _playGeneration++;
     _headsetClickTimer?.cancel();
     _headsetClickTimer = null;
+    _seekDebounceTimer?.cancel();
+    _seekDebounceTimer = null;
+    _crossfadeSwitchDebounce?.cancel();
+    _crossfadeSwitchDebounce = null;
     _sleepTimerManager.cancelSleepTimer();
     unawaited(AudioSessionLog.instance.endSession());
-    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-        restoreVolume: _volume);
-    _saveCurrentPosition();
+    try {
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+          restoreVolume: _volume);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to cancel crossfade during stop',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+    // Reset transient volume/interruption state so the next session does not
+    // start ducked, mid-fade or with a stale "resume after call" decision.
+    _clearDuckState();
+    _sleepFadeFactor = 1.0;
+    _interruption.reset();
+    _pausedForNoisy = false;
+    // Persist the REAL position before the players are stopped. Previously this
+    // only set a dirty flag; the 2s timer then ran after stop() had reset the
+    // player to 0 and overwrote the saved resume position with 0:00.
+    try {
+      await saveCurrentPositionImmediate();
+    } catch (_) {}
     unawaited(PositionCrashGuard.recordCleanShutdown());
     _gaplessLoaded = false;
     _gaplessTargetIndex = null;
     mediaItem.add(null);
     queue.add([]);
-    await _playerA.stop();
-    await _playerB.stop();
-    await AudioEffectsChannel().releaseEffects();
+    // Each platform call is isolated: one throwing must not skip the rest and
+    // leave the notification / foreground service stuck in a playing state.
+    for (final player in [_playerA, _playerB]) {
+      try {
+        await player.stop();
+      } catch (e, st) {
+        ErrorLogger.log('Failed to stop player',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+    }
+    // The stopped players report position 0; make sure the timer cannot write
+    // that over the position saved above.
+    _positionDirty = false;
+    try {
+      await AudioEffectsChannel().releaseEffects();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to release effects during stop',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
     try {
       final session = await AudioSession.instance;
       await session.setActive(false);
@@ -2619,7 +2752,6 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> onTaskRemoved() async {
-    await saveCurrentPositionImmediate();
     // Route through the public pause path so it performs the same cleanup as a
     // user pause: reset the interruption bookkeeping, cancel any crossfade and
     // bump the play generation so a slow in-flight resolve cannot start
@@ -2627,22 +2759,32 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       await pause();
     } catch (_) {}
+    // Save AFTER pausing: saving first let the track keep playing during the
+    // DB/file writes, so the stored position was already stale on resume.
+    try {
+      await saveCurrentPositionImmediate();
+    } catch (_) {}
     await super.onTaskRemoved();
   }
 
   @disposeMethod
   Future<void> dispose() async {
+    // Idempotency check first: a second call used to re-run the observer and
+    // timer teardown before bailing out.
+    if (_disposed) return;
+    _disposed = true;
     _headsetClickTimer?.cancel();
     _headsetClickTimer = null;
-    if (_lifecycleObserver != null) {
-      WidgetsBinding.instance.removeObserver(_lifecycleObserver!);
+    final lifecycleObserver = _lifecycleObserver;
+    if (lifecycleObserver != null) {
+      try {
+        WidgetsBinding.instance.removeObserver(lifecycleObserver);
+      } catch (_) {}
       _lifecycleObserver = null;
     }
     try {
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
-    if (_disposed) return;
-    _disposed = true;
     _positionSaveTimer?.cancel();
     _positionSaveTimer = null;
     _seekDebounceTimer?.cancel();
@@ -2662,8 +2804,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _subscriptions.clear();
     // Dispose sleep timer before closing its subject to avoid add-after-close race
-    _sleepTimerManager.dispose();
-    _gaplessMonitor.dispose();
+    try {
+      _sleepTimerManager.dispose();
+    } catch (_) {}
+    try {
+      _gaplessMonitor.dispose();
+    } catch (_) {}
     try {
       abLoopManager.dispose();
     } catch (_) {}
@@ -2701,7 +2847,21 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       _equalizerManager.dispose();
     } catch (_) {}
-    _crossfadeManager.dispose();
+    try {
+      _crossfadeManager.dispose();
+    } catch (_) {}
+    // Don't leave disposed objects registered in DI: a later consumer (or a
+    // rebuilt handler) would otherwise resolve a dead EqualizerManager.
+    try {
+      if (getIt.isRegistered<EqualizerManager>() &&
+          identical(getIt<EqualizerManager>(), _equalizerManager)) {
+        getIt.unregister<EqualizerManager>();
+      }
+      if (getIt.isRegistered<AdaptiveBufferEngine>() &&
+          identical(getIt<AdaptiveBufferEngine>(), _adaptiveBufferEngine)) {
+        getIt.unregister<AdaptiveBufferEngine>();
+      }
+    } catch (_) {}
     try {
       await AudioEffectsChannel().releaseEffects();
     } catch (e, st) {

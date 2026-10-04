@@ -1,5 +1,4 @@
 // lib/data/audio/dsp_chain_validator.dart
-import 'dart:async';
 import 'dart:math' as math;
 import '../../core/utils/error_logger.dart';
 import 'audio_effects_channel.dart';
@@ -229,7 +228,9 @@ class DspChainValidator {
     double limiterLatency = 2.8;
     const limiterHealthy = true;
     if (eqManager != null && eqManager.isLimiterEnabled) {
-      limiterLatency = eqManager.limiterLookaheadMs.toDouble().clamp(0.5, 10.0);
+      // Full contract range (DspParamRanges.limiterLookaheadMs is 0..20 ms);
+      // the old 0.5..10 clamp under-reported long lookaheads.
+      limiterLatency = eqManager.limiterLookaheadMs.toDouble().clamp(0.0, 20.0);
     }
     stages['limiter'] = StageHealth(
       stageName: 'True Peak Limiter',

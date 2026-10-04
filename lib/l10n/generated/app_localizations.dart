@@ -4547,6 +4547,12 @@ abstract class AppLocalizations {
   /// **'Skipped on Bluetooth — the codec/AVRCP link owns the sample rate'**
   String get followTrackSampleRateBluetooth;
 
+  /// No description provided for @followTrackRequiresBitPerfect.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires Bit-Perfect output — the track rate is only pushed on the exclusive USB path'**
+  String get followTrackRequiresBitPerfect;
+
   /// No description provided for @strictBitPerfectTitle.
   ///
   /// In en, this message translates to:
@@ -14114,6 +14120,18 @@ abstract class AppLocalizations {
   /// Audio conflict reason message
   ///
   /// In en, this message translates to:
+  /// **'Disabled: Bit-Perfect bypass is ON — changing speed or pitch resamples the audio and would alter the exclusive bitstream. Reset to 1.0× or turn off Bit-Perfect.'**
+  String get conflictSpeedBitPerfectBypass;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled: Bit-Perfect bypass is ON — silence skipping edits the sample stream. Turn off Bit-Perfect (or its DSP bypass) to use it.'**
+  String get conflictSilenceSkipBitPerfectBypass;
+
+  /// Audio conflict reason message
+  ///
+  /// In en, this message translates to:
   /// **'Cannot enable: no output device detected yet. Connect a USB DAC and retry.'**
   String get conflictNoDeviceDetected;
 
@@ -14597,6 +14615,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Excluded from scan'**
   String get folderPersistentExcludedBadge;
+
+  /// Note that the output format shown is a capability probe, not a measurement
+  ///
+  /// In en, this message translates to:
+  /// **'Capability probe only; hardware output format is not measured.'**
+  String get audioQualityCapabilityProbe;
+
+  /// Snackbar shown when switching audio output is not supported by the active engine
+  ///
+  /// In en, this message translates to:
+  /// **'Output switch unavailable for this playback engine.'**
+  String get audioQualityOutputSwitchUnavailable;
+
+  /// Note that output format is controlled by the playback engine
+  ///
+  /// In en, this message translates to:
+  /// **'Format follows the playback engine. Manual conversion is unavailable.'**
+  String get audioQualityFormatFollowsEngine;
+
+  /// Overline label for the next track strip below the seek bar
+  ///
+  /// In en, this message translates to:
+  /// **'UP NEXT'**
+  String get upNext;
+
+  /// Badge marking a professional-mode-only setting
+  ///
+  /// In en, this message translates to:
+  /// **'PRO'**
+  String get proBadge;
+
+  /// Mock mini-player pill label inside the dock style preview
+  ///
+  /// In en, this message translates to:
+  /// **'▶ Now Playing'**
+  String get nowPlayingPreview;
 }
 
 class _AppLocalizationsDelegate
