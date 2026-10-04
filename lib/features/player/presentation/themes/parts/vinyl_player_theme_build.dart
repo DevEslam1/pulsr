@@ -8,82 +8,110 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
     final song = state.currentSong;
     final isTablet = context.isTablet;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isInSplitView = PlayerSplitViewScope.of(context);
-        final metrics = PlayerThemeMetrics.calculate(context, constraints);
-        final isLandscape = metrics.isLandscape;
-
-        final viewSwitcher = PlayerViewSwitcher(
-          state: state,
-          cubit: cubit,
-          activeColor: activeColor,
-          isTablet: isTablet,
-          barWidth: metrics.pillBarWidth,
-          barHeight: metrics.pillBarHeight,
-          trackIcon: Icons.album_rounded,
-          surfaceFillAlpha: 0.06,
-          borderAlpha: 0.12,
-        );
-
-        final bottomDock = PlayerBottomActionDock(
-          props: widget.props,
-          isTablet: isTablet,
-          barWidth: metrics.pillBarWidth,
-          barHeight: metrics.pillBarHeight,
-        );
-
-        final centerDisplay = AnimatedSwitcher(
-          duration: context.motionMs(300),
-          child: state.isLyricsVisible
-              ? LyricsView(
-                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                  lyrics: state.lyrics,
-                  isLoading: state.isLoadingLyrics,
-                  activeColor: activeColor,
-                  source: state.lyricsSource,
-                )
-              : state.isQueueVisible
-                  ? const NowPlayingQueueView(
-                      key: ValueKey('queue_view'),
-                    )
-                  : Center(
-                      key: const ValueKey('turntable_view'),
-                      child: _VinylTurntableDeck(
-                        props: widget.props,
-                        isTablet: isTablet,
-                        isLandscape: isLandscape,
-                        rotationController: _rotationController,
-                        tonearmAnimation: _tonearmAnimation,
-                      ),
-                    ),
-        );
-
-        final controlsColumn = PlayerControlsColumn(
-          props: widget.props,
-          isTablet: isTablet,
-          isLandscape: isLandscape,
-          isInSplitView: isInSplitView,
-          heightRatio: metrics.heightRatio,
-          trackHeader:
-              PlayerTrackHeader(props: widget.props, isTablet: isTablet),
-          scaleMainButtonByHeight: true,
-          dock: bottomDock,
-        );
-
-        if (isInSplitView) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Column(
-                children: [
-                  Expanded(child: centerDisplay),
-                  controlsColumn,
-                ],
+    return Stack(
+      children: [
+        // Ambient backdrop glow behind turntable plinth
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.2),
+                  radius: 0.85,
+                  colors: [
+                    activeColor.withValues(alpha: 0.20),
+                    activeColor.withValues(alpha: 0.04),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.52, 1.0],
+                ),
               ),
             ),
-          );
-        }
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isInSplitView = PlayerSplitViewScope.of(context);
+            final metrics = PlayerThemeMetrics.calculate(context, constraints);
+            final isLandscape = metrics.isLandscape;
+
+            final viewSwitcher = PlayerViewSwitcher(
+              state: state,
+              cubit: cubit,
+              activeColor: activeColor,
+              isTablet: isTablet,
+              barWidth: metrics.pillBarWidth,
+              barHeight: metrics.pillBarHeight,
+              trackIcon: Icons.album_rounded,
+              surfaceFillAlpha: 0.06,
+              borderAlpha: 0.12,
+            );
+
+            final bottomDock = PlayerBottomActionDock(
+              props: widget.props,
+              isTablet: isTablet,
+              barWidth: metrics.pillBarWidth,
+              barHeight: metrics.pillBarHeight,
+            );
+
+            final turntableStage = Center(
+              key: const ValueKey('turntable_view'),
+              child: Hero(
+                tag: 'now_playing_art_full',
+                child: _VinylTurntableDeck(
+                  props: widget.props,
+                  isTablet: isTablet,
+                  isLandscape: isLandscape,
+                  rotationController: _rotationController,
+                  tonearmAnimation: _tonearmAnimation,
+                ),
+              ),
+            );
+
+            final centerDisplay = isInSplitView
+                ? turntableStage
+                : AnimatedSwitcher(
+                    duration: context.motionMs(300),
+                    child: state.isLyricsVisible
+                        ? LyricsView(
+                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            lyrics: state.lyrics,
+                            isLoading: state.isLoadingLyrics,
+                            activeColor: activeColor,
+                            source: state.lyricsSource,
+                          )
+                        : state.isQueueVisible
+                            ? const NowPlayingQueueView(
+                                key: ValueKey('queue_view'),
+                              )
+                            : turntableStage,
+                  );
+
+            final controlsColumn = PlayerControlsColumn(
+              props: widget.props,
+              isTablet: isTablet,
+              isLandscape: isLandscape,
+              isInSplitView: isInSplitView,
+              heightRatio: metrics.heightRatio,
+              trackHeader:
+                  PlayerTrackHeader(props: widget.props, isTablet: isTablet),
+              scaleMainButtonByHeight: true,
+              dock: bottomDock,
+            );
+
+            if (isInSplitView) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Column(
+                    children: [
+                      Expanded(child: turntableStage),
+                      controlsColumn,
+                    ],
+                  ),
+                ),
+              );
+            }
 
         if (isLandscape) {
           return SafeArea(
@@ -180,8 +208,11 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+          );
+        },
+      ),
+    ],
+  );
 }
+}
+

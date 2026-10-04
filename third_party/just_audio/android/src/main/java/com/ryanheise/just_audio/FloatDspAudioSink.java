@@ -21,6 +21,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor) {
         super(delegate);
         this.processor = processor;
+        if (this.processor != null) {
+            this.processor.setFloatOutput(true);
+        }
     }
 
     @Override
@@ -31,7 +34,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         inputEncoding = format.pcmEncoding;
         processFloat = inputEncoding == C.ENCODING_PCM_FLOAT
                 || inputEncoding == C.ENCODING_PCM_24BIT
-                || inputEncoding == C.ENCODING_PCM_32BIT;
+                || inputEncoding == C.ENCODING_PCM_32BIT
+                || inputEncoding == C.ENCODING_PCM_16BIT;
         if (processFloat) {
             try {
                 processor.configure(new AudioProcessor.AudioFormat(
@@ -54,7 +58,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         if (pendingOutput == null) {
             ByteBuffer pcm = input.duplicate().order(ByteOrder.nativeOrder());
             if (inputEncoding != C.ENCODING_PCM_FLOAT) {
-                int sampleBytes = inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+                int sampleBytes = inputEncoding == C.ENCODING_PCM_16BIT ? 2
+                        : (inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4);
                 int samples = pcm.remaining() / sampleBytes;
                 int outputBytes = samples * 4;
                 if (converted == null || converted.capacity() < outputBytes) {
@@ -62,10 +67,17 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 }
                 converted.clear();
                 for (int i = 0; i < samples; i++) {
-                    int value = inputEncoding == C.ENCODING_PCM_24BIT
-                            ? ((pcm.get() & 0xff) << 8) | ((pcm.get() & 0xff) << 16) | (pcm.get() << 24)
-                            : pcm.getInt();
-                    converted.putFloat((float) (value / 2147483648.0));
+                    float floatVal;
+                    if (inputEncoding == C.ENCODING_PCM_16BIT) {
+                        floatVal = pcm.getShort() / 32768.0f;
+                    } else if (inputEncoding == C.ENCODING_PCM_24BIT) {
+                        int value = ((pcm.get() & 0xff) << 8) | ((pcm.get() & 0xff) << 16) | (pcm.get() << 24);
+                        floatVal = (float) (value / 2147483648.0);
+                    } else {
+                        int value = pcm.getInt();
+                        floatVal = (float) (value / 2147483648.0);
+                    }
+                    converted.putFloat(floatVal);
                 }
                 converted.flip();
                 pcm = converted;

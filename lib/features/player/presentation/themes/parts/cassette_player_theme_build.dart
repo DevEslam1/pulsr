@@ -17,108 +17,143 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
         ));
     final isTablet = context.isTablet;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isInSplitView = PlayerSplitViewScope.of(context);
-        final metrics = PlayerThemeMetrics.calculate(context, constraints);
-        final isLandscape = metrics.isLandscape;
-
-        final viewSwitcher = PlayerViewSwitcher(
-          state: state,
-          cubit: cubit,
-          activeColor: activeColor,
-          isTablet: isTablet,
-          barWidth: metrics.pillBarWidth,
-          barHeight: metrics.pillBarHeight,
-          trackIcon: Icons.radio_rounded,
-          surfaceFillAlpha: 0.06,
-          borderAlpha: 0.12,
-        );
-
-        final bottomDock = PlayerBottomActionDock(
-          props: widget.props,
-          isTablet: isTablet,
-          barWidth: metrics.pillBarWidth,
-          barHeight: metrics.pillBarHeight,
-        );
-
-        final centerDisplay = AnimatedSwitcher(
-          duration: context.motionMs(300),
-          child: state.isLyricsVisible
-              ? LyricsView(
-                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                  lyrics: state.lyrics,
-                  isLoading: state.isLoadingLyrics,
-                  activeColor: activeColor,
-                  source: state.lyricsSource,
-                )
-              : state.isQueueVisible
-                  ? const NowPlayingQueueView(
-                      key: ValueKey('queue_view'),
-                    )
-                  : GestureDetector(
-                      onTap: () => cubit.togglePlayPause(),
-                      onDoubleTap: () {
-                        switch (nowPlayingDoubleTap) {
-                          case NowPlayingDoubleTapAction.toggleFavorite:
-                            if (song != null) cubit.toggleFavorite(song.id);
-                            break;
-                          case NowPlayingDoubleTapAction.toggleLyrics:
-                            cubit.toggleLyricsVisibility();
-                            break;
-                          case NowPlayingDoubleTapAction.none:
-                            break;
-                        }
-                      },
-                      onHorizontalDragEnd: (details) {
-                        if (nowPlayingArtworkSwipe ==
-                                NowPlayingArtworkSwipeAction.nextPrev &&
-                            details.primaryVelocity != null) {
-                          if (details.primaryVelocity! < -200) {
-                            cubit.next();
-                          } else if (details.primaryVelocity! > 200) {
-                            cubit.previous();
-                          }
-                        }
-                      },
-                      child: Center(
-                        key: const ValueKey('cassette_view'),
-                        child: _CassetteBody(
-                          song: song,
-                          activeColor: activeColor,
-                          spoolController: _spoolController,
-                          isLandscape: isLandscape,
-                          isTablet: isTablet,
-                        ),
-                      ),
-                    ),
-        );
-
-        final controlsColumn = PlayerControlsColumn(
-          props: widget.props,
-          isTablet: isTablet,
-          isLandscape: isLandscape,
-          isInSplitView: isInSplitView,
-          heightRatio: metrics.heightRatio,
-          trackHeader:
-              PlayerTrackHeader(props: widget.props, isTablet: isTablet),
-          scaleMainButtonByHeight: true,
-          dock: bottomDock,
-        );
-
-        if (isInSplitView) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Column(
-                children: [
-                  Expanded(child: centerDisplay),
-                  controlsColumn,
-                ],
+    return Stack(
+      children: [
+        // Ambient Backdrop Glow
+        PositionedDirectional(
+          top: -30,
+          start: -20,
+          end: -20,
+          height: isTablet ? 500 : 380,
+          child: IgnorePointer(
+            child: AnimatedContainer(
+              duration: context.motionMs(500),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 0.85,
+                  colors: [
+                    activeColor.withValues(alpha: 0.22),
+                    activeColor.withValues(alpha: 0.05),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.52, 1.0],
+                ),
               ),
             ),
-          );
-        }
+          ),
+        ),
+
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isInSplitView = PlayerSplitViewScope.of(context);
+            final metrics = PlayerThemeMetrics.calculate(context, constraints);
+            final isLandscape = metrics.isLandscape;
+
+            final viewSwitcher = PlayerViewSwitcher(
+              state: state,
+              cubit: cubit,
+              activeColor: activeColor,
+              isTablet: isTablet,
+              barWidth: metrics.pillBarWidth,
+              barHeight: metrics.pillBarHeight,
+              trackIcon: Icons.radio_rounded,
+              surfaceFillAlpha: 0.06,
+              borderAlpha: 0.12,
+            );
+
+            final bottomDock = PlayerBottomActionDock(
+              props: widget.props,
+              isTablet: isTablet,
+              barWidth: metrics.pillBarWidth,
+              barHeight: metrics.pillBarHeight,
+            );
+
+            final cassetteStage = GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => cubit.togglePlayPause(),
+              onDoubleTap: () {
+                switch (nowPlayingDoubleTap) {
+                  case NowPlayingDoubleTapAction.toggleFavorite:
+                    if (song != null) cubit.toggleFavorite(song.id);
+                    break;
+                  case NowPlayingDoubleTapAction.toggleLyrics:
+                    cubit.toggleLyricsVisibility();
+                    break;
+                  case NowPlayingDoubleTapAction.none:
+                    break;
+                }
+              },
+              onHorizontalDragEnd: (details) {
+                if (nowPlayingArtworkSwipe ==
+                        NowPlayingArtworkSwipeAction.nextPrev &&
+                    details.primaryVelocity != null) {
+                  if (details.primaryVelocity! < -200) {
+                    cubit.next();
+                  } else if (details.primaryVelocity! > 200) {
+                    cubit.previous();
+                  }
+                }
+              },
+              child: Center(
+                key: const ValueKey('cassette_view'),
+                child: Hero(
+                  tag: 'now_playing_art_full',
+                  child: _CassetteBody(
+                    song: song,
+                    activeColor: activeColor,
+                    spoolController: _spoolController,
+                    isLandscape: isLandscape,
+                    isTablet: isTablet,
+                  ),
+                ),
+              ),
+            );
+
+            final centerDisplay = isInSplitView
+                ? cassetteStage
+                : AnimatedSwitcher(
+                    duration: context.motionMs(300),
+                    child: state.isLyricsVisible
+                        ? LyricsView(
+                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            lyrics: state.lyrics,
+                            isLoading: state.isLoadingLyrics,
+                            activeColor: activeColor,
+                            source: state.lyricsSource,
+                          )
+                        : state.isQueueVisible
+                            ? const NowPlayingQueueView(
+                                key: ValueKey('queue_view'),
+                              )
+                            : cassetteStage,
+                  );
+
+            final controlsColumn = PlayerControlsColumn(
+              props: widget.props,
+              isTablet: isTablet,
+              isLandscape: isLandscape,
+              isInSplitView: isInSplitView,
+              heightRatio: metrics.heightRatio,
+              trackHeader:
+                  PlayerTrackHeader(props: widget.props, isTablet: isTablet),
+              scaleMainButtonByHeight: true,
+              dock: bottomDock,
+            );
+
+            if (isInSplitView) {
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Column(
+                    children: [
+                      Expanded(child: cassetteStage),
+                      controlsColumn,
+                    ],
+                  ),
+                ),
+              );
+            }
 
         if (isLandscape) {
           return SafeArea(
@@ -216,8 +251,10 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+          );
+        },
+      ),
+    ],
+  );
+}
 }

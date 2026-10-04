@@ -38,6 +38,8 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:flutter/services.dart';
+import '../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 
 class HomeScreen extends StatelessWidget {
   final YtmService? ytmService;
@@ -274,12 +276,18 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   });
                 }
               },
-              child: ListView(
-                key: const PageStorageKey('home_screen_scroll'),
-                physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: AppSpacing.scrollBottom),
-                children: [
+              child: ValueListenableBuilder<double>(
+                valueListenable: PulsrDockTracker.dockHeight,
+                builder: (context, dockHeight, _) {
+                  final bottomPad = dockHeight > 0
+                      ? dockHeight + AppSpacing.md
+                      : PulsrLayoutMetrics.scrollBottom(context, extra: 24.0);
+                  return ListView(
+                    key: const PageStorageKey('home_screen_scroll'),
+                    physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics()),
+                    padding: EdgeInsets.only(bottom: bottomPad),
+                    children: [
                   // ---------- Header ----------
                   Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(
@@ -489,7 +497,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     ),
                   ),
                 ],
-              ),
+              );
+            },
+          ),
             ),
           ),
         ),

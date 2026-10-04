@@ -288,6 +288,8 @@ extension EqualizerEffectOps on EqualizerManager {
     double? predelayMs,
     double? damping,
   }) async {
+    final prevPreset = reverbPreset;
+    final prevEnabled = isReverbEnabled;
     if (preset != null) {
       // Wire values are ReverbPreset ordinals (0..N); anything else has no
       // synthesizable IR on the native side, so clamp instead of forwarding
@@ -304,21 +306,25 @@ extension EqualizerEffectOps on EqualizerManager {
       reverbDamping = DspParamRanges.reverbDamping.clamp(damping);
     }
     if (PlatformCapabilities.isAndroid) {
-      // Forward the clamped field, not the raw argument, so an out-of-range
-      // ordinal never reaches native and produce the wrong room (see clamp above).
-      if (preset != null) await _effectsChannel.setReverbPreset(reverbPreset);
+      // Only push preset recreation if preset actually changed or we are re-enabling
+      if (preset != null && (reverbPreset != prevPreset || !prevEnabled)) {
+        await _effectsChannel.setReverbPreset(reverbPreset);
+      }
       // FIX M-7: always sync wet/dry after preset change so DSP is not stale
       // Always the clamped field: forwarding the raw `wetDry` argument let
       // NaN / out-of-range values reach native.
       await _effectsChannel.setReverbWetDry(reverbWetDry);
-      // Predelay, damping and cross-channel share one native call; push the
-      // current values so a preset change never leaves them stale.
-      await _effectsChannel.setReverbParams(
-        predelayMs: reverbPredelayMs,
-        damping: reverbDamping,
-        crossChannel: reverbCrossChannel,
-      );
-      await _effectsChannel.setReverbEnabled(enabled);
+      // Only push params if explicitly provided or on initial enable
+      if (predelayMs != null || damping != null || !prevEnabled) {
+        await _effectsChannel.setReverbParams(
+          predelayMs: reverbPredelayMs,
+          damping: reverbDamping,
+          crossChannel: reverbCrossChannel,
+        );
+      }
+      if (enabled != prevEnabled) {
+        await _effectsChannel.setReverbEnabled(enabled);
+      }
     }
     isReverbEnabled = enabled;
     _debouncedSavePreferences();

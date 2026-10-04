@@ -500,7 +500,8 @@ bool isOnGrid(float value, float scale) {
 
 void runDitherStandaloneTest() {
     std::cout << "\n=== [DITHER 1/3] Standalone dither acts without any other stage ===" << std::endl;
-    auto& engine = AudioDspEngine::instance();
+    auto enginePtr = std::make_unique<AudioDspEngine>();
+    auto& engine = *enginePtr;
     engine.setSampleRate(48000.0);
     engine.setAutoDegradeMonitorEnabled(false);
     engine.clearAutoDegradedStages();
@@ -560,7 +561,8 @@ void runDitherStandaloneTest() {
 
 void runDitherBitDepthTest() {
     std::cout << "\n=== [DITHER 2/3] TPDF LSB scaling across 16/24/32-bit targets ===" << std::endl;
-    auto& engine = AudioDspEngine::instance();
+    auto enginePtr = std::make_unique<AudioDspEngine>();
+    auto& engine = *enginePtr;
     engine.setSampleRate(48000.0);
     engine.setAutoDegradeMonitorEnabled(false);
     engine.clearAutoDegradedStages();
@@ -618,7 +620,8 @@ void runDitherBitDepthTest() {
 
 void runDitherBluetoothSkipTest() {
     std::cout << "\n=== [DITHER 3/3] Bluetooth route skips dither (bit-transparent) ===" << std::endl;
-    auto& engine = AudioDspEngine::instance();
+    auto enginePtr = std::make_unique<AudioDspEngine>();
+    auto& engine = *enginePtr;
     engine.setSampleRate(48000.0);
     engine.setAutoDegradeMonitorEnabled(false);
     engine.clearAutoDegradedStages();

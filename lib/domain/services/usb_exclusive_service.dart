@@ -246,8 +246,11 @@ class UsbExclusiveService {
   }
 
   /// Raw UAC2 isochronous streaming (experimental; unvalidated on hardware).
-  Future<UsbStreamResult> startStreaming(
-      {int sampleRate = 48000, int channels = 2}) async {
+  Future<UsbStreamResult> startStreaming({
+    int sampleRate = 48000,
+    int channels = 2,
+    int bitDepth = 16,
+  }) async {
     if (!_isAndroid) return UsbStreamResult.invalidArgs;
     const validRates = [
       44100,
@@ -273,6 +276,7 @@ class UsbExclusiveService {
           await _methodChannel.invokeMethod<dynamic>('startStreaming', {
         'sampleRate': sampleRate,
         'channels': channels,
+        'bitDepth': bitDepth,
       }).timeout(const Duration(seconds: 10));
       await getStatus();
       if (res is Map) {

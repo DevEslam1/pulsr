@@ -200,11 +200,16 @@ class _QuranModePanelState extends State<QuranModePanel> {
               icon: Icons.mosque_rounded,
               title: context.l10n.dspMosqueAmbience,
               subtitle: context.l10n.dspMosqueAmbienceDesc,
-              value: state.reverbWetDry.clamp(0.0, 0.6),
+              value: state.isReverbEnabled
+                  ? state.reverbWetDry.clamp(0.0, 0.6)
+                  : 0.0,
               max: 0.6,
               enabled: enabled,
-              valueLabel: '${(state.reverbWetDry * 100).round()}%',
-              onChanged: (v) => cubit.setQuranAmbience(v),
+              valueLabel: state.isReverbEnabled
+                  ? '${(state.reverbWetDry * 100).round()}%'
+                  : '0%',
+              onChanged: cubit.setQuranAmbience,
+              applyOnRelease: false,
             ),
             _QuranSliderTile(
               icon: Icons.local_fire_department_rounded,
@@ -219,7 +224,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ? '${(state.saturationMix * 100).round()}%'
                   : '0%',
               onChanged: cubit.setQuranWarmth,
-              applyOnRelease: true,
+              applyOnRelease: false,
             ),
 
             // Learning speed
@@ -482,7 +487,9 @@ class _QuranSliderTileState extends State<_QuranSliderTile> {
   @override
   void didUpdateWidget(covariant _QuranSliderTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!widget.enabled || widget.value != oldWidget.value) _dragValue = null;
+    if (!widget.enabled || widget.value != oldWidget.value) {
+      _dragValue = null;
+    }
   }
 
   @override
@@ -538,8 +545,12 @@ class _QuranSliderTileState extends State<_QuranSliderTile> {
                   },
             onChangeEnd: widget.enabled && widget.applyOnRelease
                 ? (value) {
-                    setState(() => _dragValue = null);
-                    widget.onChanged(value);
+                    if ((value - widget.value).abs() < 0.001) {
+                      setState(() => _dragValue = null);
+                    } else {
+                      setState(() => _dragValue = value);
+                      widget.onChanged(value);
+                    }
                   }
                 : null,
             activeColor: p.accent,

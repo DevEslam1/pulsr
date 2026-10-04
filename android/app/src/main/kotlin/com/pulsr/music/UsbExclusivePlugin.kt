@@ -109,6 +109,10 @@ class UsbExclusivePlugin(
         fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
         sampleRate: Int, channels: Int,
     ): Int
+    private external fun nativeUsbStreamStartWithFormat(
+        fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
+        sampleRate: Int, channels: Int, bytesPerSample: Int,
+    ): Int
     private external fun nativeUsbStreamStop()
     private external fun nativeUsbStreamIsActive(): Boolean
     private external fun nativeUsbStreamGetLastError(): Int
@@ -117,6 +121,7 @@ class UsbExclusivePlugin(
     private external fun nativeUsbStreamGetBufferedMs(): Double
     private external fun nativeUsbQuerySupportedRates(fd: Int, interfaceNumber: Int): IntArray
 
+    @Volatile private var lastStreamResultCode: Int? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var permissionReceiver: BroadcastReceiver? = null
 
@@ -195,7 +200,8 @@ class UsbExclusivePlugin(
                 "startStreaming" -> {
                     val sampleRate = call.argument<Int>("sampleRate") ?: 48000
                     val channels = call.argument<Int>("channels") ?: 2
-                    runAsync(call.method, result) { startStreamingInternal(sampleRate, channels) }
+                    val bitDepth = call.argument<Int>("bitDepth") ?: 16
+                    runAsync(call.method, result) { startStreamingInternal(sampleRate, channels, bitDepth) }
                 }
                 "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
                 "isStreamingSupported" -> {
@@ -407,6 +413,7 @@ class UsbExclusivePlugin(
             "interfaceNumber" to parsed.streamingInterface,
             "supportedRates" to parsed.supportedRates,
             "lastError" to if (nativeLoaded) nativeUsbStreamGetLastError() else 0,
+            "resultCode" to lastStreamResultCode,
             "underrunCount" to if (nativeLoaded) nativeUsbStreamGetUnderrunCount() else 0L,
             "overrunCount" to if (nativeLoaded) nativeUsbStreamGetOverrunCount() else 0L,
             "bufferedMs" to if (nativeLoaded) nativeUsbStreamGetBufferedMs() else 0.0,
@@ -719,23 +726,41 @@ class UsbExclusivePlugin(
 
     // ---- raw UAC2 isochronous streaming ----
 
-    private fun startStreamingInternal(sampleRate: Int, channels: Int): Map<String, Any?> {
+    private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16): Map<String, Any?> {
         if (streaming) {
             if (currentStreamingRate == sampleRate) {
-                return buildStatus() + mapOf("success" to true)
+                lastStreamResultCode = 0
+                return buildStatus() + mapOf("success" to true, "resultCode" to 0)
             }
             // Gapless rate switching: stop native isochronous sink worker without releasing claimed interface
             try { nativeUsbStreamStop() } catch (_: Throwable) {}
             streaming = false
         }
-        if (!nativeLoaded) return failure("native_unavailable")
-        val device = findAudioDevice() ?: return failure("no_usb_device")
-        if (usbManager?.hasPermission(device) != true) return failure("permission_required")
-        val conn = ensureConnection(device) ?: return failure("open_failed")
+        if (!nativeLoaded) {
+            lastStreamResultCode = -1
+            return failure("native_unavailable")
+        }
+        val device = findAudioDevice() ?: run {
+            lastStreamResultCode = -1
+            return failure("no_usb_device")
+        }
+        if (usbManager?.hasPermission(device) != true) {
+            lastStreamResultCode = 1
+            return failure("permission_required")
+        }
+        val conn = ensureConnection(device) ?: run {
+            lastStreamResultCode = 1
+            return failure("open_failed")
+        }
         val parsed = parseViaRawDescriptors(conn) ?: parseViaInterfaces(device)
-        val ep = parsed.streamingEndpoint
-            ?: return failure("no_iso_out_endpoint")
-        if (ep.interfaceNumber < 0) return failure("no_streaming_interface")
+        val ep = parsed.streamingEndpoint ?: run {
+            lastStreamResultCode = 5
+            return failure("no_iso_out_endpoint")
+        }
+        if (ep.interfaceNumber < 0) {
+            lastStreamResultCode = 5
+            return failure("no_streaming_interface")
+        }
 
         // Prefer the exact (interface, alternate setting) pair that exposes the
         // isochronous OUT endpoint.
@@ -756,7 +781,10 @@ class UsbExclusivePlugin(
                 }
             }
         }
-        iface ?: return failure("streaming_interface_not_found")
+        iface ?: run {
+            lastStreamResultCode = 5
+            return failure("streaming_interface_not_found")
+        }
 
         // Force-claim detaches Android's kernel audio driver from this
         // interface so the exclusive endpoint is ours. If already claimed from a gapless switch,
@@ -765,6 +793,7 @@ class UsbExclusivePlugin(
         val claimed = if (alreadyClaimed) true else try { conn.claimInterface(iface, true) } catch (_: Exception) { false }
         if (!claimed) {
             claimedStreamingInterface = null
+            lastStreamResultCode = 1
             return failure("claim_failed")
         }
 
@@ -786,17 +815,24 @@ class UsbExclusivePlugin(
             if (fd < 0) {
                 mainHandler.removeCallbacks(watchdog)
                 rebindKernelDriver(conn, iface)
+                lastStreamResultCode = 5
                 return failure("no_fd")
             }
+            val bytesPerSample = when (bitDepth) {
+                24 -> 3
+                32 -> 4
+                else -> 2
+            }
             val resultCode = try {
-                nativeUsbStreamStart(
+                nativeUsbStreamStartWithFormat(
                     fd, ep.address, ep.interfaceNumber, ep.altSetting,
-                    sampleRate, channels,
+                    sampleRate, channels, bytesPerSample,
                 )
             } catch (e: Throwable) {
-                Log.w(TAG, "nativeUsbStreamStart failed: ${e.message}")
+                Log.w(TAG, "nativeUsbStreamStartWithFormat failed: ${e.message}")
                 -1
             }
+            lastStreamResultCode = resultCode
             if (resultCode != 0) {
                 mainHandler.removeCallbacks(watchdog)
                 rebindKernelDriver(conn, iface)
@@ -844,6 +880,7 @@ class UsbExclusivePlugin(
         streaming = false
         directStreamingActive = false
         currentStreamingRate = 0
+        lastStreamResultCode = null
         val iface = claimedStreamingInterface
         val conn = connection
         if (iface != null && conn != null) {

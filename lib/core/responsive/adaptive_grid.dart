@@ -105,8 +105,15 @@ class PulsrAdaptiveGrid {
       columnsFor(context, minItemWidth: 170.0, spacing: 14.0);
 
   /// Calculates columns specifically for song lists.
-  static int songColumns(BuildContext context) =>
-      columns(context, type: GridType.songs);
+  static int songColumns(BuildContext context) {
+    final vp = PulsrViewport.of(context);
+    final width = math.min(vp.width, vp.contentMaxWidth);
+    // Song tiles need at least ~240dp to render artwork and metadata comfortably.
+    // When the usable content width is below 520dp (e.g. phone landscape with sidebar or split panel),
+    // collapse to a single full-width list to prevent cramped overflow.
+    if (width < 520.0) return 1;
+    return columns(context, type: GridType.songs);
+  }
 
   /// Computes dynamic columns given a minimum item width and constraints.
   static int dynamicColumns(

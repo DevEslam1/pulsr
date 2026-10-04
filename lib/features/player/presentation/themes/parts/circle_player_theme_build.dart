@@ -58,7 +58,8 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
               barHeight: metrics.pillBarHeight,
             );
 
-            final centerDisplay = GestureDetector(
+            final circleStage = GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => cubit.toggleLyricsVisibility(),
               onDoubleTap: () {
                 switch (nowPlayingDoubleTap) {
@@ -83,32 +84,39 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
                   }
                 }
               },
-              child: AnimatedSwitcher(
-                duration: context.motionMs(300),
-                child: state.isLyricsVisible
-                    ? LyricsView(
-                        key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                        lyrics: state.lyrics,
-                        isLoading: state.isLoadingLyrics,
-                        activeColor: activeColor,
-                        source: state.lyricsSource,
-                      )
-                    : state.isQueueVisible
-                        ? const NowPlayingQueueView(
-                            key: ValueKey('queue_view'),
-                          )
-                        : Center(
-                            key: const ValueKey('circle_artwork_view'),
-                            child: _CircleArtwork(
-                              song: song,
-                              activeColor: activeColor,
-                              rotationController: _rotationController,
-                              isTablet: isTablet,
-                              isLandscape: isLandscape,
-                            ),
-                          ),
+              child: Center(
+                key: const ValueKey('circle_artwork_view'),
+                child: Hero(
+                  tag: 'now_playing_art_full',
+                  child: _CircleArtwork(
+                    song: song,
+                    activeColor: activeColor,
+                    rotationController: _rotationController,
+                    isTablet: isTablet,
+                    isLandscape: isLandscape,
+                  ),
+                ),
               ),
             );
+
+            final centerDisplay = isInSplitView
+                ? circleStage
+                : AnimatedSwitcher(
+                    duration: context.motionMs(300),
+                    child: state.isLyricsVisible
+                        ? LyricsView(
+                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            lyrics: state.lyrics,
+                            isLoading: state.isLoadingLyrics,
+                            activeColor: activeColor,
+                            source: state.lyricsSource,
+                          )
+                        : state.isQueueVisible
+                            ? const NowPlayingQueueView(
+                                key: ValueKey('queue_view'),
+                              )
+                            : circleStage,
+                  );
 
             final controlsColumn = PlayerControlsColumn(
               props: widget.props,
@@ -127,7 +135,7 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Column(
                   children: [
-                    Expanded(child: centerDisplay),
+                    Expanded(child: circleStage),
                     controlsColumn,
                   ],
                 ),

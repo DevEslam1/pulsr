@@ -2534,7 +2534,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         inputEncoding = format.pcmEncoding;
         processFloat = inputEncoding == C.ENCODING_PCM_FLOAT
                 || inputEncoding == C.ENCODING_PCM_24BIT
-                || inputEncoding == C.ENCODING_PCM_32BIT;
+                || inputEncoding == C.ENCODING_PCM_32BIT
+                || inputEncoding == C.ENCODING_PCM_16BIT;
         if (processFloat) {
             try {
                 processor.configure(new AudioProcessor.AudioFormat(
@@ -2557,7 +2558,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         if (pendingOutput == null) {
             ByteBuffer pcm = input.duplicate().order(ByteOrder.nativeOrder());
             if (inputEncoding != C.ENCODING_PCM_FLOAT) {
-                int sampleBytes = inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+                int sampleBytes = inputEncoding == C.ENCODING_PCM_16BIT ? 2
+                        : (inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4);
                 int samples = pcm.remaining() / sampleBytes;
                 int outputBytes = samples * 4;
                 if (converted == null || converted.capacity() < outputBytes) {
@@ -2565,10 +2567,17 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 }
                 converted.clear();
                 for (int i = 0; i < samples; i++) {
-                    int value = inputEncoding == C.ENCODING_PCM_24BIT
-                            ? ((pcm.get() & 0xff) << 8) | ((pcm.get() & 0xff) << 16) | (pcm.get() << 24)
-                            : pcm.getInt();
-                    converted.putFloat((float) (value / 2147483648.0));
+                    float floatVal;
+                    if (inputEncoding == C.ENCODING_PCM_16BIT) {
+                        floatVal = pcm.getShort() / 32768.0f;
+                    } else if (inputEncoding == C.ENCODING_PCM_24BIT) {
+                        int value = ((pcm.get() & 0xff) << 8) | ((pcm.get() & 0xff) << 16) | (pcm.get() << 24);
+                        floatVal = (float) (value / 2147483648.0);
+                    } else {
+                        int value = pcm.getInt();
+                        floatVal = (float) (value / 2147483648.0);
+                    }
+                    converted.putFloat(floatVal);
                 }
                 converted.flip();
                 pcm = converted;
@@ -4808,15 +4817,35 @@ class PulsrAudioHandler extends BaseAudioHandler
           }
           if (gain <= 0.0001) break;
           if (DateTime.now().isAfter(deadline)) {
-            throw StateError('DSP profile fade did not reach silence');
+            // A player can report `playing` while no frames are rendering (a
+            // temporary stall, a gapless hand-off, or a route where the native
+            // processor is not in the active sink). The fade then never
+            // advances. Aborting here used to drop the entire profile change —
+            // the toggle flipped on but no DSP applied. Prefer applying the
+            // profile over a fully silent hand-off; the mute is released in
+            // `finally` either way.
+            ErrorLogger.log(
+              'DSP transition fade did not reach silence before the deadline; '
+              'applying without a completed fade',
+              category: 'AudioHandler',
+            );
+            break;
           }
           await Future<void>.delayed(const Duration(milliseconds: 10));
         }
       }
       final result = await action();
       if (muted.isNotEmpty) {
+        // The DSP edits have already been dispatched by `action()`. A failed
+        // preparation acknowledgement only means we cannot confirm the native
+        // queue drained; it must not be reported as the profile failing to
+        // apply. Log it and still give the settle window.
         if (!await AudioEffectsChannel().awaitControlUpdates()) {
-          throw StateError('DSP profile preparation did not complete');
+          ErrorLogger.log(
+            'DSP profile preparation did not acknowledge completion; '
+            'releasing the transition anyway',
+            category: 'AudioHandler',
+          );
         }
         // Let reset filters and lookahead buffers settle before fading back in.
         await Future<void>.delayed(const Duration(milliseconds: 80));

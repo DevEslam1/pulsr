@@ -62,7 +62,10 @@ extension PlayerDspFollowRate on PlayerDspController {
       if (!decision.applied) return;
       try {
         if (directStreaming) {
-          final res = await usb.startStreaming(sampleRate: decision.sampleRate);
+          final res = await usb.startStreaming(
+            sampleRate: decision.sampleRate,
+            bitDepth: decision.bitDepth,
+          );
           if (!res.isOk) {
             _lastFollowedSampleRate = null;
             ErrorLogger.log(

@@ -201,9 +201,16 @@ public final class AAudioAudioSink implements AudioSink {
                 configure(previousFormat, 0, null);
             } catch (ConfigurationException refused) {
                 preferredDeviceId = previousDevice;
-                try { configure(previousFormat, 0, null); }
-                catch (ConfigurationException restoreFailed) { /* existing initialization error below */ }
+                try {
+                    configure(previousFormat, 0, null);
+                } catch (ConfigurationException restoreFailed) {
+                    if (listener != null) listener.onAudioSinkError(restoreFailed);
+                }
                 if (listener != null) listener.onAudioSinkError(refused);
+                if (handle == 0L) {
+                    // Do not proceed to write into a dead stream handle
+                    return false;
+                }
             }
         }
         if (handle == 0L) {

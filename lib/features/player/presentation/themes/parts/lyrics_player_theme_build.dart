@@ -48,7 +48,8 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
               barHeight: metrics.pillBarHeight,
             );
 
-            final centerDisplay = GestureDetector(
+            final artworkDisplay = GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => cubit.toggleLyricsVisibility(),
               onDoubleTap: () {
                 switch (nowPlayingDoubleTap) {
@@ -73,95 +74,102 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                   }
                 }
               },
-              child: AnimatedSwitcher(
-                duration: context.motionMs(300),
-                child: state.isLyricsVisible
-                    ? Container(
-                        key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                        decoration: BoxDecoration(
-                          color: context.palette.surfaceContainer
-                              .withValues(alpha: 0.25),
-                          borderRadius: AppRadii.r20All,
-                          border: Border.all(
-                            color: AppColors.specularAt(0.08),
-                            width: 1,
-                          ),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: LyricsView(
-                          lyrics: state.lyrics,
-                          isLoading: state.isLoadingLyrics,
-                          activeColor: activeColor,
-                          source: state.lyricsSource,
-                        ),
-                      )
-                    : state.isQueueVisible
-                        ? const NowPlayingQueueView(
-                            key: ValueKey('queue_view_lyrics'),
-                          )
-                        : Center(
-                            key: const ValueKey('track_art_lyrics_focus'),
-                            child: LayoutBuilder(
-                              builder: (context, artConstraints) {
-                                final double availableWidth =
-                                    artConstraints.maxWidth -
-                                        (isTablet ? 64.0 : 36.0);
-                                final double availableHeight =
-                                    artConstraints.maxHeight -
-                                        (isTablet ? 24.0 : 12.0);
-                                final double maxAllowed =
-                                    isTablet ? 560.0 : 420.0;
-                                final double rawArtSize =
-                                    math.min(availableWidth, availableHeight);
-                                final double artSize = isLandscape
-                                    ? 280.0
-                                    : (rawArtSize <= 0
-                                        ? 0.0
-                                        : math.min(rawArtSize, maxAllowed));
+              child: Center(
+                key: const ValueKey('track_art_lyrics_focus'),
+                child: LayoutBuilder(
+                  builder: (context, artConstraints) {
+                    final double availableWidth =
+                        artConstraints.maxWidth -
+                            (isTablet ? 64.0 : 36.0);
+                    final double availableHeight =
+                        artConstraints.maxHeight -
+                            (isTablet ? 24.0 : 12.0);
+                    final double maxAllowed =
+                        isTablet ? 560.0 : 420.0;
+                    final double rawArtSize =
+                        math.min(availableWidth, availableHeight);
+                    final double artSize = isLandscape
+                        ? 280.0
+                        : (rawArtSize <= 0
+                            ? 0.0
+                            : math.min(rawArtSize, maxAllowed));
 
-                                return ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxHeight: artSize,
-                                    maxWidth: artSize,
-                                  ),
-                                  child: AspectRatio(
-                                    aspectRatio: 1.0,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: AppRadii.circular(
-                                            resolveCustomRadius(context, 20)),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: activeColor.withValues(
-                                                alpha: 0.35),
-                                            blurRadius: 36,
-                                            spreadRadius: 2,
-                                            offset: const Offset(0, 12),
-                                          ),
-                                        ],
-                                      ),
-                                      child: song != null
-                                          ? CachedArtwork(
-                                              id: song.id,
-                                              albumId: song.albumId,
-                                              remoteUrl:
-                                                  song.remoteArtworkUrl ??
-                                                      song.artworkUri,
-                                              type: ArtworkType.AUDIO,
-                                              size: double.infinity,
-                                              borderRadius: resolveCustomRadius(
-                                                  context, 20),
-                                              highQuality: true,
-                                            )
-                                          : const SizedBox.shrink(),
-                                    ),
-                                  ),
-                                );
-                              },
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: artSize,
+                        maxWidth: artSize,
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: Hero(
+                          tag: 'now_playing_art_full',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadii.circular(
+                                  resolveCustomRadius(context, 20)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: activeColor.withValues(
+                                      alpha: 0.35),
+                                  blurRadius: 36,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 12),
+                                ),
+                              ],
                             ),
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    albumId: song.albumId,
+                                    remoteUrl:
+                                        song.remoteArtworkUrl ??
+                                            song.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: double.infinity,
+                                    borderRadius: resolveCustomRadius(
+                                        context, 20),
+                                    highQuality: true,
+                                  )
+                                : const SizedBox.shrink(),
                           ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             );
+
+            final centerDisplay = isInSplitView
+                ? artworkDisplay
+                : AnimatedSwitcher(
+                    duration: context.motionMs(300),
+                    child: state.isLyricsVisible
+                        ? Container(
+                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            decoration: BoxDecoration(
+                              color: context.palette.surfaceContainer
+                                  .withValues(alpha: 0.25),
+                              borderRadius: AppRadii.r20All,
+                              border: Border.all(
+                                color: AppColors.specularAt(0.08),
+                                width: 1,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: LyricsView(
+                              lyrics: state.lyrics,
+                              isLoading: state.isLoadingLyrics,
+                              activeColor: activeColor,
+                              source: state.lyricsSource,
+                            ),
+                          )
+                        : state.isQueueVisible
+                            ? const NowPlayingQueueView(
+                                key: ValueKey('queue_view_lyrics'),
+                              )
+                            : artworkDisplay,
+                  );
 
             final extraBadge = Container(
               padding: const EdgeInsets.symmetric(
@@ -208,7 +216,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Column(
                   children: [
-                    Expanded(child: centerDisplay),
+                    Expanded(child: artworkDisplay),
                     controlsColumn,
                   ],
                 ),

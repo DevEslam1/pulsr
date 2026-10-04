@@ -1241,6 +1241,7 @@ class EqualizerManager {
       saturationMode = DspParamRanges.saturationMode.clamp(mode);
     }
     if (multiband != null) saturationMultiband = multiband;
+    final prevEnabled = isSaturationEnabled;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSaturationParams(
         saturationDrive,
@@ -1248,8 +1249,12 @@ class EqualizerManager {
         saturationTilt,
         mode: saturationMode,
       );
-      await _effectsChannel.setSaturationMultiband(saturationMultiband);
-      await _effectsChannel.setSaturationEnabled(enabled);
+      if (multiband != null) {
+        await _effectsChannel.setSaturationMultiband(saturationMultiband);
+      }
+      if (enabled != prevEnabled) {
+        await _effectsChannel.setSaturationEnabled(enabled);
+      }
     }
     isSaturationEnabled = enabled;
     _debouncedSavePreferences();

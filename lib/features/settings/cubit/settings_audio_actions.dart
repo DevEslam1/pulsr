@@ -38,8 +38,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         final granted = await usb.requestPermission();
         if (!granted) return false;
       }
-      final res =
-          await usb.startStreaming(sampleRate: _directStreamSampleRate());
+      final res = await usb.startStreaming(
+        sampleRate: _directStreamSampleRate(),
+        bitDepth: state.currentOutputDevice?.bitDepth ?? 16,
+      );
       if (!res.isOk) {
         _lastDirectUsbFailure = res.toUserMessage();
         ErrorLogger.log(

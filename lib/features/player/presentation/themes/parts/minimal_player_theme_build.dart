@@ -6,18 +6,24 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe, :visualizerStyle) =
-        context.select<
-            SettingsCubit,
-            ({
-              NowPlayingDoubleTapAction nowPlayingDoubleTap,
-              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-              VisualizerStyle visualizerStyle,
-            })>((c) => (
-              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-              visualizerStyle: c.state.visualizerStyle,
-            ));
+    final (
+      :nowPlayingDoubleTap,
+      :nowPlayingArtworkSwipe,
+      :visualizerStyle,
+      :waveformSeekBarEnabled
+    ) = context.select<
+        SettingsCubit,
+        ({
+          NowPlayingDoubleTapAction nowPlayingDoubleTap,
+          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+          VisualizerStyle visualizerStyle,
+          bool waveformSeekBarEnabled,
+        })>((c) => (
+          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+          visualizerStyle: c.state.visualizerStyle,
+          waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+        ));
     final isTablet = context.isTablet;
 
     return AnimatedContainer(
@@ -50,7 +56,14 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
               barHeight: metrics.pillBarHeight,
             );
 
-            final centerDisplay = GestureDetector(
+            final showVisualizer = visualizerStyle != VisualizerStyle.off &&
+                !waveformSeekBarEnabled &&
+                !state.isLyricsVisible &&
+                !state.isQueueVisible &&
+                !isInSplitView;
+
+            final artworkDisplay = GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => cubit.toggleLyricsVisibility(),
               onDoubleTap: () {
                 switch (nowPlayingDoubleTap) {
@@ -75,89 +88,93 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                   }
                 }
               },
-              child: AnimatedSwitcher(
-                duration: context.motionMs(300),
-                child: state.isLyricsVisible
-                    ? LyricsView(
-                        key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                        lyrics: state.lyrics,
-                        isLoading: state.isLoadingLyrics,
-                        activeColor: activeColor,
-                        source: state.lyricsSource,
-                      )
-                    : state.isQueueVisible
-                        ? const NowPlayingQueueView(
-                            key: ValueKey('queue_view_minimal'),
-                          )
-                        : Column(
-                            key: const ValueKey('minimal_art_display'),
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Center(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxHeight:
-                                        isLandscape ? 280 : double.infinity,
-                                    maxWidth:
-                                        isLandscape ? 280 : double.infinity,
-                                  ),
-                                  child: AspectRatio(
-                                    aspectRatio: 1.0,
-                                    child: Hero(
-                                      tag: 'now_playing_art_minimal',
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius: AppRadii.circular(
-                                              resolveCustomRadius(context, 20)),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: activeColor.withValues(
-                                                  alpha: 0.25),
-                                              blurRadius: 28,
-                                              spreadRadius: 1,
-                                              offset: const Offset(0, 10),
-                                            ),
-                                          ],
-                                        ),
-                                        child: song != null
-                                            ? CachedArtwork(
-                                                id: song.id,
-                                                albumId: song.albumId,
-                                                remoteUrl:
-                                                    song.remoteArtworkUrl ??
-                                                        song.artworkUri,
-                                                type: ArtworkType.AUDIO,
-                                                size: double.infinity,
-                                                borderRadius:
-                                                    resolveCustomRadius(
-                                                        context, 20),
-                                                highQuality: true,
-                                              )
-                                            : const SizedBox.shrink(),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (visualizerStyle != VisualizerStyle.off) ...[
-                                const SizedBox(height: AppSpacing.s10),
-                                AudioVisualizer(
-                                  style: visualizerStyle,
-                                  color: activeColor,
-                                  height: visualizerStyle ==
-                                          VisualizerStyle.circular
-                                      ? 60
-                                      : 36,
-                                  isPlaying: state.isPlaying,
-                                  audioSessionId: state.audioSessionId,
-                                  trackSeed: song?.id,
+              child: Column(
+                key: const ValueKey('minimal_art_display'),
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight:
+                            isLandscape ? 280 : double.infinity,
+                        maxWidth:
+                            isLandscape ? 280 : double.infinity,
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: Hero(
+                          tag: 'now_playing_art_minimal',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadii.circular(
+                                  resolveCustomRadius(context, 20)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: activeColor.withValues(
+                                      alpha: 0.25),
+                                  blurRadius: 28,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 10),
                                 ),
                               ],
-                            ],
+                            ),
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    albumId: song.albumId,
+                                    remoteUrl:
+                                        song.remoteArtworkUrl ??
+                                            song.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: double.infinity,
+                                    borderRadius:
+                                        resolveCustomRadius(
+                                            context, 20),
+                                    highQuality: true,
+                                  )
+                                : const SizedBox.shrink(),
                           ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (showVisualizer) ...[
+                    const SizedBox(height: AppSpacing.s10),
+                    AudioVisualizer(
+                      style: visualizerStyle,
+                      color: activeColor,
+                      height: visualizerStyle ==
+                              VisualizerStyle.circular
+                          ? 60
+                          : 36,
+                      isPlaying: state.isPlaying,
+                      audioSessionId: state.audioSessionId,
+                      trackSeed: song?.id,
+                    ),
+                  ],
+                ],
               ),
             );
+
+            final centerDisplay = isInSplitView
+                ? artworkDisplay
+                : AnimatedSwitcher(
+                    duration: context.motionMs(300),
+                    child: state.isLyricsVisible
+                        ? LyricsView(
+                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            lyrics: state.lyrics,
+                            isLoading: state.isLoadingLyrics,
+                            activeColor: activeColor,
+                            source: state.lyricsSource,
+                          )
+                        : state.isQueueVisible
+                            ? const NowPlayingQueueView(
+                                key: ValueKey('queue_view_minimal'),
+                              )
+                            : artworkDisplay,
+                  );
 
             final controlsColumn = PlayerControlsColumn(
               props: props,
@@ -175,7 +192,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Column(
                   children: [
-                    Expanded(child: centerDisplay),
+                    Expanded(child: artworkDisplay),
                     controlsColumn,
                   ],
                 ),

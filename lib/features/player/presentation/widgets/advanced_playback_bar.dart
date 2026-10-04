@@ -12,6 +12,7 @@ import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
 /// duration itself is formatted with the shared [Formatters.formatDuration] so
@@ -77,86 +78,104 @@ class AdvancedPlaybackBar extends StatelessWidget {
               ),
             if (mode == ExperienceMode.professional)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.center,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // F1: AB loop
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
-                        color: state.abPointA != null
-                            ? context.palette.info
-                            : null,
-                        onPressed: cubit.setAbPointA,
-                        icon: const Text('A',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: Container(
+                    height: 36,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.s6),
+                    decoration: BoxDecoration(
+                      color: AppColors.specularAt(0.06),
+                      borderRadius: AppRadii.r16All,
+                      border: Border.all(
+                        color: AppColors.specularAt(0.12),
+                        width: 1.0,
                       ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
-                        color: state.abPointB != null
-                            ? context.palette.info
-                            : null,
-                        onPressed: cubit.setAbPointB,
-                        icon: const Text('B',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        tooltip: state.abLoopEnabled
-                            ? l10n.disableAbLoop
-                            : l10n.enableAbLoop,
-                        color: state.abLoopEnabled
-                            ? context.palette.success
-                            : null,
-                        onPressed:
-                            (state.abPointA != null && state.abPointB != null)
-                                ? cubit.toggleAbLoop
-                                : null,
-                        icon: const Icon(Icons.repeat_one_rounded),
-                      ),
-                      if (state.abPointA != null || state.abPointB != null)
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // F1: AB loop
                         IconButton(
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                              minWidth: AppSpacing.minTouchTarget,
-                              minHeight: AppSpacing.minTouchTarget),
-                          tooltip: l10n.clearAbLoop,
-                          onPressed: cubit.clearAbLoop,
-                          icon: const Icon(Icons.clear, size: 18),
+                              minWidth: 32, minHeight: 32),
+                          tooltip: l10n.setLoopPointA(_fmt(state.abPointA)),
+                          color: state.abPointA != null
+                              ? context.palette.info
+                              : null,
+                          onPressed: cubit.setAbPointA,
+                          icon: const Text('A',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 13)),
                         ),
-                      const SizedBox(width: AppSpacing.xs),
-                      // F2: per-track delay
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                            minWidth: AppSpacing.minTouchTarget,
-                            minHeight: AppSpacing.minTouchTarget),
-                        tooltip: l10n.audioDelayTooltip(state.trackDelayMs),
-                        onPressed: () =>
-                            _showDelaySheet(context, cubit, state.trackDelayMs),
-                        icon: const Icon(Icons.av_timer_outlined, size: 20),
-                      ),
-                    ],
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 32, minHeight: 32),
+                          tooltip: l10n.setLoopPointB(_fmt(state.abPointB)),
+                          color: state.abPointB != null
+                              ? context.palette.info
+                              : null,
+                          onPressed: cubit.setAbPointB,
+                          icon: const Text('B',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 13)),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 32, minHeight: 32),
+                          tooltip: state.abLoopEnabled
+                              ? l10n.disableAbLoop
+                              : l10n.enableAbLoop,
+                          color: state.abLoopEnabled
+                              ? context.palette.success
+                              : null,
+                          onPressed:
+                              (state.abPointA != null && state.abPointB != null)
+                                  ? cubit.toggleAbLoop
+                                  : null,
+                          icon: const Icon(Icons.repeat_one_rounded, size: 18),
+                        ),
+                        if (state.abPointA != null || state.abPointB != null)
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 32, minHeight: 32),
+                            tooltip: l10n.clearAbLoop,
+                            onPressed: cubit.clearAbLoop,
+                            icon: const Icon(Icons.clear, size: 16),
+                          ),
+                        Container(
+                          width: 1,
+                          height: 16,
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.xxs),
+                          color: AppColors.specularAt(0.16),
+                        ),
+                        // F2: per-track delay
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 32, minHeight: 32),
+                          tooltip: l10n.audioDelayTooltip(state.trackDelayMs),
+                          onPressed: () => _showDelaySheet(
+                              context, cubit, state.trackDelayMs),
+                          icon: const Icon(Icons.av_timer_outlined, size: 18),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -510,8 +510,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                         onTap: () {
                           if (!isTrack) {
                             HapticFeedback.selectionClick();
-                            if (isLyrics) cubit.toggleLyricsVisibility();
-                            if (isQueue) cubit.toggleQueueVisibility();
+                            cubit.resetOverlayViews();
                           }
                         },
                       ),
@@ -575,6 +574,7 @@ class PlayerBottomActionDock extends StatelessWidget {
   final double barWidth;
   final double barHeight;
   final PlayerDockIconStyle dockIconStyle;
+  final bool disableBlur;
 
   const PlayerBottomActionDock({
     super.key,
@@ -584,6 +584,7 @@ class PlayerBottomActionDock extends StatelessWidget {
     required this.barWidth,
     required this.barHeight,
     this.dockIconStyle = PlayerDockIconStyle.common,
+    this.disableBlur = false,
   });
 
   @override
@@ -795,7 +796,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                 ),
               );
 
-              if (GpuBudget.isGpuSaverActive) {
+              if (disableBlur || GpuBudget.isGpuSaverActive) {
                 return dockContainer;
               }
               return BackdropFilter(
@@ -851,6 +852,7 @@ class PlayerTopBar extends StatelessWidget {
   final double verticalPadding;
   final VoidCallback? onDismiss;
   final VoidCallback? onMore;
+  final Widget? centerWidget;
 
   const PlayerTopBar({
     super.key,
@@ -863,6 +865,7 @@ class PlayerTopBar extends StatelessWidget {
     this.verticalPadding = AppSpacing.s2,
     this.onDismiss,
     this.onMore,
+    this.centerWidget,
   });
 
   @override
@@ -925,55 +928,63 @@ class PlayerTopBar extends StatelessWidget {
             },
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      WaveformLogo(
-                        size: 13,
-                        color: state.isPlaying
-                            ? props.activeColor
-                            : resolvedSubtitle,
-                        animate: state.isPlaying,
-                      ),
-                      const SizedBox(width: AppSpacing.s6),
-                      Text(
-                        context.l10n.playingFrom.toUpperCase(),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontSize: AppFontSize.tiny,
-                              letterSpacing: AppTracking.wide,
-                              fontWeight: FontWeight.w800,
-                              color: resolvedSubtitle.withValues(alpha: 0.8),
+            child: centerWidget != null
+                ? Center(child: centerWidget!)
+                : Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            WaveformLogo(
+                              size: 13,
+                              color: state.isPlaying
+                                  ? props.activeColor
+                                  : resolvedSubtitle,
+                              animate: state.isPlaying,
                             ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.s2),
-                  Text(
-                    (song?.album != null && song!.album.trim().isNotEmpty)
-                        ? song.album.trim()
-                        : (song?.artist != null &&
-                                song!.artist.trim().isNotEmpty)
-                            ? song.artist.trim()
-                            : context.l10n.navLibrary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontSize: isTablet
-                              ? AppFontSize.body
-                              : AppFontSize.bodySmall,
-                          color: resolvedTitle,
+                            const SizedBox(width: AppSpacing.s6),
+                            Text(
+                              context.l10n.playingFrom.toUpperCase(),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    fontSize: AppFontSize.tiny,
+                                    letterSpacing: AppTracking.wide,
+                                    fontWeight: FontWeight.w800,
+                                    color:
+                                        resolvedSubtitle.withValues(alpha: 0.8),
+                                  ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: AppSpacing.s2),
+                        Text(
+                          (song?.album != null && song!.album.trim().isNotEmpty)
+                              ? song.album.trim()
+                              : (song?.artist != null &&
+                                      song!.artist.trim().isNotEmpty)
+                                  ? song.artist.trim()
+                                  : context.l10n.navLibrary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: isTablet
+                                        ? AppFontSize.body
+                                        : AppFontSize.bodySmall,
+                                    color: resolvedTitle,
+                                  ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
           ),
           circleButton(
             icon: Icons.more_horiz_rounded,
@@ -1058,36 +1069,36 @@ class PlayerTrackHeader extends StatelessWidget {
               SizedBox(
                 width: isTablet ? 48 : 44,
                 height: isTablet ? 48 : 44,
-                child: hasDownload
-                    ? Center(
-                        child: YtmDownloadButton(
-                          song: song,
-                          activeColor: props.activeColor,
-                          iconColor: resolvedSubtitle,
-                          iconSize: isTablet ? 24 : 22,
-                        ),
-                      )
-                    : Material(
-                        color: AppColors.specularAt(0.06),
-                        shape: const CircleBorder(),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
+                child: Material(
+                  color: AppColors.specularAt(0.06),
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasDownload
+                      ? Center(
+                          child: YtmDownloadButton(
+                            song: song,
+                            activeColor: props.activeColor,
+                            iconColor: resolvedSubtitle,
+                            iconSize: isTablet ? 24 : 22,
+                          ),
+                        )
+                      : InkWell(
                           onTap: () {
                             if (song != null) {
                               HapticFeedback.lightImpact();
-                              AddToPlaylistSheet.show(context, song: song);
+                              SongInfoSheet.show(context, song: song);
                             }
                           },
                           child: Center(
                             child: Icon(
-                              Icons.playlist_add_rounded,
-                              semanticLabel: context.l10n.addToPlaylist,
+                              Icons.info_outline_rounded,
+                              semanticLabel: context.l10n.songInfo,
                               size: isTablet ? 24 : 22,
                               color: resolvedSubtitle,
                             ),
                           ),
                         ),
-                      ),
+                ),
               ),
               Expanded(
                 child: Padding(
@@ -1216,19 +1227,19 @@ class PlayerControlsColumn extends StatelessWidget {
 
     final double spacingTrackToSeek = (isTablet
             ? (classicSizing ? 16.0 : 10.0)
-            : (classicSizing ? 10.0 : 6.0)) *
+            : (isLandscape ? 4.0 : (classicSizing ? 10.0 : 6.0))) *
         heightRatio;
     final double spacingSeekToControls = (isTablet
             ? (classicSizing ? 18.0 : 12.0)
-            : (classicSizing ? 12.0 : 8.0)) *
+            : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 8.0))) *
         heightRatio;
     final double spacingControlsToDock = (isTablet
             ? (classicSizing ? 18.0 : 12.0)
-            : (classicSizing ? 12.0 : 8.0)) *
+            : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 8.0))) *
         heightRatio;
     final double spacingBelowDock = (isTablet
             ? (classicSizing ? 14.0 : 8.0)
-            : (classicSizing ? 8.0 : 4.0)) *
+            : (isLandscape ? 6.0 : (classicSizing ? 8.0 : 4.0))) *
         heightRatio;
 
     final double resolvedMainButtonSize = mainButtonSize ??
@@ -1251,6 +1262,7 @@ class PlayerControlsColumn extends StatelessWidget {
           filePath: state.currentSong?.path,
           loopPointA: state.abPointA,
           loopPointB: state.abPointB,
+          showUpNext: !isInSplitView,
           onSeek: (pos) => cubit.seek(pos),
         ),
         SizedBox(height: spacingSeekToControls),

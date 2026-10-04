@@ -73,9 +73,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     final bottomInset = mq.padding.bottom;
     final isShortHeight =
         mq.size.height < 500 && mq.orientation == Orientation.landscape;
-    final cardHeight = isShortHeight ? 72.0 : 80.0;
-    final bottomMargin =
-        bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10;
+    final cardHeight = isShortHeight ? 64.0 : 80.0;
+    final bottomMargin = isShortHeight
+        ? (bottomInset > 0 ? bottomInset : AppSpacing.xxs)
+        : (bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10);
     _maybeUpdateDock(cardHeight + bottomMargin + 6.0, true);
   }
 
@@ -119,9 +120,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
     final bottomInset = mq.padding.bottom;
     final isShortHeight =
         mq.size.height < 500 && mq.orientation == Orientation.landscape;
-    final cardHeight = isShortHeight ? 72.0 : 80.0;
-    final bottomMargin =
-        bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10;
+    final cardHeight = isShortHeight ? 64.0 : 80.0;
+    final bottomMargin = isShortHeight
+        ? (bottomInset > 0 ? bottomInset : AppSpacing.xxs)
+        : (bottomInset > 0 ? bottomInset + AppSpacing.xxs : AppSpacing.s10);
 
     return BlocListener<PlayerCubit, PlayerState>(
       listenWhen: (prev, curr) =>
@@ -167,13 +169,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                       ? outerConstraints.maxHeight
                       : double.infinity;
                   final effectiveBottomMargin =
-                      availableHeight < 80.0 ? 0.0 : bottomMargin;
+                      availableHeight < 64.0 ? 0.0 : bottomMargin;
                   final maxAllowedHeight = availableHeight.isFinite
                       ? (availableHeight - effectiveBottomMargin)
-                          .clamp(48.0, cardHeight)
+                          .clamp(44.0, cardHeight)
                       : cardHeight;
 
-                  final barRadius = AppRadii.r20All;
+                  final barRadius =
+                      isShortHeight ? AppRadii.r16All : AppRadii.r20All;
 
                   return Padding(
                     padding: EdgeInsetsDirectional.fromSTEB(
@@ -267,16 +270,22 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                         final totalWidth =
                                             barConstraints.maxWidth;
                                         final isCompactBar = totalWidth < 600;
-                                        final leftMaxWidth = isCompactBar
-                                            ? (totalWidth * 0.28)
-                                                .clamp(60.0, 160.0)
-                                            : (totalWidth * 0.25)
-                                                .clamp(120.0, 260.0);
-                                        final rightMaxWidth = isCompactBar
-                                            ? (totalWidth * 0.32)
-                                                .clamp(70.0, 200.0)
-                                            : (totalWidth * 0.35)
-                                                .clamp(140.0, 360.0);
+                                        final leftMaxWidth = isShortHeight
+                                            ? (totalWidth * 0.38)
+                                                .clamp(140.0, 240.0)
+                                            : (isCompactBar
+                                                ? (totalWidth * 0.28)
+                                                    .clamp(60.0, 160.0)
+                                                : (totalWidth * 0.25)
+                                                    .clamp(120.0, 260.0));
+                                        final rightMaxWidth = isShortHeight
+                                            ? (totalWidth * 0.20)
+                                                .clamp(60.0, 110.0)
+                                            : (isCompactBar
+                                                ? (totalWidth * 0.32)
+                                                    .clamp(70.0, 200.0)
+                                                : (totalWidth * 0.35)
+                                                    .clamp(140.0, 360.0));
 
                                         return Row(
                                           children: [
@@ -301,8 +310,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(
-                                                                    AppRadii
-                                                                        .r10),
+                                                                    isShortHeight
+                                                                        ? AppRadii
+                                                                            .r8
+                                                                        : AppRadii
+                                                                            .r10),
                                                         child: CachedArtwork(
                                                           id: song.id,
                                                           albumId: song.albumId,
@@ -311,26 +323,31 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                               song.artworkUri,
                                                           type:
                                                               ArtworkType.AUDIO,
-                                                          size: isCompactBar
-                                                              ? 42
-                                                              : (isShortHeight
-                                                                  ? 48
+                                                          size: isShortHeight
+                                                              ? 40
+                                                              : (isCompactBar
+                                                                  ? 42
                                                                   : 54),
-                                                          borderRadius: 12,
+                                                          borderRadius:
+                                                              isShortHeight
+                                                                  ? 8
+                                                                  : 12,
                                                         ),
                                                       ),
                                                     ),
                                                     SizedBox(
-                                                        width: isCompactBar
+                                                        width: (isCompactBar ||
+                                                                isShortHeight)
                                                             ? AppSpacing.xs
                                                             : AppSpacing.s10),
                                                     ConstrainedBox(
                                                       constraints:
                                                           BoxConstraints(
-                                                        maxWidth:
-                                                            (leftMaxWidth - 90)
-                                                                .clamp(60.0,
-                                                                    160.0),
+                                                        maxWidth: isShortHeight
+                                                            ? (leftMaxWidth - 78)
+                                                                .clamp(80.0, 180.0)
+                                                            : (leftMaxWidth - 90)
+                                                                .clamp(60.0, 160.0),
                                                       ),
                                                       child: GestureDetector(
                                                         onTap: widget
@@ -358,8 +375,11 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     FontWeight
                                                                         .w700,
                                                                 fontSize:
-                                                                    AppFontSize
-                                                                        .bodySmall,
+                                                                    isShortHeight
+                                                                        ? AppFontSize
+                                                                            .label
+                                                                        : AppFontSize
+                                                                            .bodySmall,
                                                               ),
                                                             ),
                                                             const SizedBox(
@@ -379,38 +399,48 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     FontWeight
                                                                         .w500,
                                                                 fontSize:
-                                                                    AppFontSize
-                                                                        .label,
+                                                                    isShortHeight
+                                                                        ? AppFontSize
+                                                                            .tiny
+                                                                        : AppFontSize
+                                                                            .label,
                                                               ),
                                                             ),
-                                                            const SizedBox(
-                                                                height:
-                                                                    AppSpacing
-                                                                        .xxs),
-                                                            AudioQualityBadge(
-                                                              song: song,
-                                                              activeColor:
-                                                                  activeColor,
-                                                              compact: true,
-                                                              showDevice: false,
-                                                            ),
+                                                            if (!isShortHeight) ...[
+                                                              const SizedBox(
+                                                                  height:
+                                                                      AppSpacing
+                                                                          .xxs),
+                                                              AudioQualityBadge(
+                                                                song: song,
+                                                                activeColor:
+                                                                    activeColor,
+                                                                compact: true,
+                                                                showDevice: false,
+                                                              ),
+                                                            ],
                                                           ],
                                                         ),
                                                       ),
                                                     ),
                                                     if (!isCompactBar ||
-                                                        leftMaxWidth >= 110)
+                                                        leftMaxWidth >= 110 ||
+                                                        isShortHeight)
                                                       IconButton(
                                                         visualDensity:
                                                             VisualDensity
                                                                 .compact,
                                                         padding:
                                                             EdgeInsets.zero,
-                                                        constraints: const BoxConstraints(
-                                                            minWidth: AppSpacing
-                                                                .minTouchTarget,
-                                                            minHeight: AppSpacing
-                                                                .minTouchTarget),
+                                                        constraints: BoxConstraints(
+                                                            minWidth: isShortHeight
+                                                                ? 32
+                                                                : AppSpacing
+                                                                    .minTouchTarget,
+                                                            minHeight: isShortHeight
+                                                                ? 32
+                                                                : AppSpacing
+                                                                    .minTouchTarget),
                                                         icon: Icon(
                                                           song.isFavorite
                                                               ? Icons
@@ -420,7 +450,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                           color: song.isFavorite
                                                               ? p.favorite
                                                               : p.textSecondary,
-                                                          size: 20,
+                                                          size: isShortHeight
+                                                              ? 18
+                                                              : 20,
                                                         ),
                                                         tooltip: song.isFavorite
                                                             ? l10n.unlike
@@ -474,220 +506,297 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                     MainAxisAlignment
                                                                         .center,
                                                                 children: [
-                                                                  IconButton(
-                                                                    visualDensity:
-                                                                        VisualDensity
-                                                                            .compact,
-                                                                    padding:
-                                                                        EdgeInsets
-                                                                            .zero,
-                                                                    constraints: const BoxConstraints(
-                                                                        minWidth:
-                                                                            AppSpacing
-                                                                                .minTouchTarget,
-                                                                        minHeight:
-                                                                            AppSpacing.minTouchTarget),
-                                                                    icon: Icon(
-                                                                      Icons
-                                                                          .shuffle_rounded,
-                                                                      size: 19,
-                                                                      color: state
-                                                                              .isShuffle
-                                                                          ? activeColor
-                                                                          : p.textSecondary,
-                                                                    ),
-                                                                    tooltip: state
-                                                                            .isShuffle
-                                                                        ? l10n
-                                                                            .disableShuffle
-                                                                        : l10n
-                                                                            .enableShuffle,
-                                                                    onPressed:
-                                                                        () {
-                                                                      HapticFeedback
-                                                                          .selectionClick();
-                                                                      cubit
-                                                                          .toggleShuffle();
-                                                                    },
-                                                                  ),
-                                                                  const SizedBox(
-                                                                      width: AppSpacing
-                                                                          .s2),
-                                                                  IconButton(
-                                                                    visualDensity:
-                                                                        VisualDensity
-                                                                            .compact,
-                                                                    padding:
-                                                                        EdgeInsets
-                                                                            .zero,
-                                                                    constraints: const BoxConstraints(
-                                                                        minWidth:
-                                                                            AppSpacing
-                                                                                .minTouchTarget,
-                                                                        minHeight:
-                                                                            AppSpacing.minTouchTarget),
-                                                                    icon: Icon(
-                                                                      Icons
-                                                                          .skip_previous_rounded,
-                                                                      size: 24,
-                                                                      color: p
-                                                                          .textPrimary,
-                                                                    ),
-                                                                    tooltip: l10n
-                                                                        .previous,
-                                                                    onPressed:
-                                                                        () {
-                                                                      HapticFeedback
-                                                                          .selectionClick();
-                                                                      cubit
-                                                                          .previous();
-                                                                    },
-                                                                  ),
-                                                                  const SizedBox(
-                                                                      width: AppSpacing
-                                                                          .xxs),
+                                                                  // Shuffle
                                                                   Semantics(
-                                                                    label: state
-                                                                            .isPlaying
-                                                                        ? l10n
-                                                                            .pause
-                                                                        : l10n
-                                                                            .play,
-                                                                    button:
-                                                                        true,
-                                                                    child:
-                                                                        GestureDetector(
-                                                                      onTap:
-                                                                          () {
-                                                                        HapticFeedback
-                                                                            .mediumImpact();
-                                                                        cubit
-                                                                            .togglePlayPause();
-                                                                      },
-                                                                      child:
-                                                                          SizedBox(
-                                                                        width:
-                                                                            44,
-                                                                        height:
-                                                                            44,
-                                                                        child:
-                                                                            Center(
-                                                                          child:
-                                                                              Container(
-                                                                            width:
-                                                                                38,
-                                                                            height:
-                                                                                38,
-                                                                            decoration:
-                                                                                BoxDecoration(
-                                                                              color: activeColor,
+                                                                    label: state.isShuffle
+                                                                        ? l10n.disableShuffle
+                                                                        : l10n.enableShuffle,
+                                                                    button: true,
+                                                                    child: Tooltip(
+                                                                      message: state.isShuffle
+                                                                          ? l10n.disableShuffle
+                                                                          : l10n.enableShuffle,
+                                                                      child: Material(
+                                                                        color: Colors.transparent,
+                                                                        shape: const CircleBorder(),
+                                                                        clipBehavior: Clip.antiAlias,
+                                                                        child: InkWell(
+                                                                          onTap: () {
+                                                                            HapticFeedback.selectionClick();
+                                                                            cubit.toggleShuffle();
+                                                                          },
+                                                                          child: AnimatedContainer(
+                                                                            duration: const Duration(milliseconds: 180),
+                                                                            width: isShortHeight ? 30 : 36,
+                                                                            height: isShortHeight ? 30 : 36,
+                                                                            decoration: BoxDecoration(
                                                                               shape: BoxShape.circle,
-                                                                              boxShadow: [
-                                                                                BoxShadow(
-                                                                                  color: p.glow.withValues(alpha: 0.4),
-                                                                                  blurRadius: 10,
-                                                                                  spreadRadius: 1,
-                                                                                ),
-                                                                              ],
+                                                                              color: state.isShuffle
+                                                                                  ? activeColor.withValues(alpha: 0.16)
+                                                                                  : Colors.transparent,
+                                                                              border: state.isShuffle
+                                                                                  ? Border.all(
+                                                                                      color: activeColor.withValues(alpha: 0.35),
+                                                                                      width: 1.0,
+                                                                                    )
+                                                                                  : null,
                                                                             ),
-                                                                            child:
-                                                                                Icon(
-                                                                              state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                                                              color: p.onAccent,
-                                                                              size: 24,
+                                                                            child: Center(
+                                                                              child: Icon(
+                                                                                Icons.shuffle_rounded,
+                                                                                size: isShortHeight ? 17 : 20,
+                                                                                color: state.isShuffle
+                                                                                    ? activeColor
+                                                                                    : p.textSecondary,
+                                                                              ),
                                                                             ),
                                                                           ),
                                                                         ),
                                                                       ),
                                                                     ),
                                                                   ),
-                                                                  const SizedBox(
-                                                                      width: AppSpacing
-                                                                          .xxs),
-                                                                  IconButton(
-                                                                    visualDensity:
-                                                                        VisualDensity
-                                                                            .compact,
-                                                                    padding:
-                                                                        EdgeInsets
-                                                                            .zero,
-                                                                    constraints: const BoxConstraints(
-                                                                        minWidth:
-                                                                            AppSpacing
-                                                                                .minTouchTarget,
-                                                                        minHeight:
-                                                                            AppSpacing.minTouchTarget),
-                                                                    icon: Icon(
-                                                                      Icons
-                                                                          .skip_next_rounded,
-                                                                      size: 24,
-                                                                      color: p
-                                                                          .textPrimary,
+                                                                  SizedBox(
+                                                                      width: isShortHeight
+                                                                          ? AppSpacing.s10
+                                                                          : AppSpacing.s14),
+                                                                  // Previous Button
+                                                                  Semantics(
+                                                                    label: l10n.previous,
+                                                                    button: true,
+                                                                    child: Tooltip(
+                                                                      message: l10n.previous,
+                                                                      child: Material(
+                                                                        color: Colors.transparent,
+                                                                        shape: const CircleBorder(),
+                                                                        clipBehavior: Clip.antiAlias,
+                                                                        child: InkWell(
+                                                                          onTap: () {
+                                                                            HapticFeedback.lightImpact();
+                                                                            cubit.previous();
+                                                                          },
+                                                                          child: Container(
+                                                                            width: isShortHeight ? 34 : 40,
+                                                                            height: isShortHeight ? 34 : 40,
+                                                                            decoration: BoxDecoration(
+                                                                              shape: BoxShape.circle,
+                                                                              color: p.textPrimary.withValues(alpha: 0.08),
+                                                                              border: Border.all(
+                                                                                color: p.textPrimary.withValues(alpha: 0.13),
+                                                                                width: 1.0,
+                                                                              ),
+                                                                              boxShadow: [
+                                                                                BoxShadow(
+                                                                                  color: Colors.black.withValues(alpha: 0.18),
+                                                                                  blurRadius: 4,
+                                                                                  offset: const Offset(0, 1),
+                                                                                ),
+                                                                              ],
+                                                                            ),
+                                                                            child: Center(
+                                                                              child: Icon(
+                                                                                Icons.skip_previous_rounded,
+                                                                                size: isShortHeight ? 20 : 24,
+                                                                                color: p.textPrimary,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
                                                                     ),
-                                                                    tooltip: l10n
-                                                                        .next,
-                                                                    onPressed:
-                                                                        () {
-                                                                      HapticFeedback
-                                                                          .selectionClick();
-                                                                      cubit
-                                                                          .next();
-                                                                    },
                                                                   ),
-                                                                  const SizedBox(
-                                                                      width: AppSpacing
-                                                                          .s2),
-                                                                  IconButton(
-                                                                    visualDensity:
-                                                                        VisualDensity
-                                                                            .compact,
-                                                                    padding:
-                                                                        EdgeInsets
-                                                                            .zero,
-                                                                    constraints: const BoxConstraints(
-                                                                        minWidth:
-                                                                            AppSpacing
-                                                                                .minTouchTarget,
-                                                                        minHeight:
-                                                                            AppSpacing.minTouchTarget),
-                                                                    icon: Icon(
-                                                                      state.repeatMode ==
-                                                                              PlayerRepeatMode
-                                                                                  .one
-                                                                          ? Icons
-                                                                              .repeat_one_rounded
-                                                                          : Icons
-                                                                              .repeat_rounded,
-                                                                      size: 19,
-                                                                      color: state.repeatMode !=
-                                                                              PlayerRepeatMode.off
-                                                                          ? activeColor
-                                                                          : p.textSecondary,
+                                                                  SizedBox(
+                                                                      width: isShortHeight
+                                                                          ? AppSpacing.s10
+                                                                          : AppSpacing.s14),
+                                                                  // Main Play / Pause Button
+                                                                  Semantics(
+                                                                    label: state.isPlaying
+                                                                        ? l10n.pause
+                                                                        : l10n.play,
+                                                                    button: true,
+                                                                    child: Tooltip(
+                                                                      message: state.isPlaying
+                                                                          ? l10n.pause
+                                                                          : l10n.play,
+                                                                      child: GestureDetector(
+                                                                        behavior: HitTestBehavior.opaque,
+                                                                        onTap: () {
+                                                                          HapticFeedback.mediumImpact();
+                                                                          cubit.togglePlayPause();
+                                                                        },
+                                                                        child: AnimatedContainer(
+                                                                          duration: const Duration(milliseconds: 180),
+                                                                          width: isShortHeight ? 40 : 48,
+                                                                          height: isShortHeight ? 40 : 48,
+                                                                          decoration: BoxDecoration(
+                                                                            shape: BoxShape.circle,
+                                                                            gradient: LinearGradient(
+                                                                              begin: Alignment.topLeft,
+                                                                              end: Alignment.bottomRight,
+                                                                              colors: [
+                                                                                Color.lerp(activeColor, Colors.white, 0.22) ?? activeColor,
+                                                                                activeColor,
+                                                                              ],
+                                                                            ),
+                                                                            boxShadow: [
+                                                                              BoxShadow(
+                                                                                color: activeColor.withValues(
+                                                                                    alpha: state.isPlaying ? 0.45 : 0.28),
+                                                                                blurRadius: isShortHeight ? 12 : 18,
+                                                                                spreadRadius: state.isPlaying ? 1.5 : 0.5,
+                                                                                offset: const Offset(0, 2),
+                                                                              ),
+                                                                              BoxShadow(
+                                                                                color: Colors.black.withValues(alpha: 0.25),
+                                                                                blurRadius: 6,
+                                                                                offset: const Offset(0, 2),
+                                                                              ),
+                                                                            ],
+                                                                            border: Border.all(
+                                                                              color: Colors.white.withValues(alpha: 0.30),
+                                                                              width: 1.2,
+                                                                            ),
+                                                                          ),
+                                                                          child: Center(
+                                                                            child: AnimatedSwitcher(
+                                                                              duration: const Duration(milliseconds: 160),
+                                                                              transitionBuilder: (child, anim) => ScaleTransition(
+                                                                                scale: anim,
+                                                                                child: child,
+                                                                              ),
+                                                                              child: Icon(
+                                                                                state.isPlaying
+                                                                                    ? Icons.pause_rounded
+                                                                                    : Icons.play_arrow_rounded,
+                                                                                key: ValueKey<bool>(state.isPlaying),
+                                                                                color: activeColor.computeLuminance() > 0.5
+                                                                                    ? const Color(0xFF101223)
+                                                                                    : Colors.white,
+                                                                                size: isShortHeight ? 22 : 26,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
                                                                     ),
-                                                                    tooltip: state.repeatMode ==
-                                                                            PlayerRepeatMode
-                                                                                .one
-                                                                        ? l10n
-                                                                            .repeatOne
-                                                                        : state.repeatMode ==
-                                                                                PlayerRepeatMode.all
+                                                                  ),
+                                                                  SizedBox(
+                                                                      width: isShortHeight
+                                                                          ? AppSpacing.s10
+                                                                          : AppSpacing.s14),
+                                                                  // Next Button
+                                                                  Semantics(
+                                                                    label: l10n.next,
+                                                                    button: true,
+                                                                    child: Tooltip(
+                                                                      message: l10n.next,
+                                                                      child: Material(
+                                                                        color: Colors.transparent,
+                                                                        shape: const CircleBorder(),
+                                                                        clipBehavior: Clip.antiAlias,
+                                                                        child: InkWell(
+                                                                          onTap: () {
+                                                                            HapticFeedback.lightImpact();
+                                                                            cubit.next();
+                                                                          },
+                                                                          child: Container(
+                                                                            width: isShortHeight ? 34 : 40,
+                                                                            height: isShortHeight ? 34 : 40,
+                                                                            decoration: BoxDecoration(
+                                                                              shape: BoxShape.circle,
+                                                                              color: p.textPrimary.withValues(alpha: 0.08),
+                                                                              border: Border.all(
+                                                                                color: p.textPrimary.withValues(alpha: 0.13),
+                                                                                width: 1.0,
+                                                                              ),
+                                                                              boxShadow: [
+                                                                                BoxShadow(
+                                                                                  color: Colors.black.withValues(alpha: 0.18),
+                                                                                  blurRadius: 4,
+                                                                                  offset: const Offset(0, 1),
+                                                                                ),
+                                                                              ],
+                                                                            ),
+                                                                            child: Center(
+                                                                              child: Icon(
+                                                                                Icons.skip_next_rounded,
+                                                                                size: isShortHeight ? 20 : 24,
+                                                                                color: p.textPrimary,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  SizedBox(
+                                                                      width: isShortHeight
+                                                                          ? AppSpacing.s10
+                                                                          : AppSpacing.s14),
+                                                                  // Repeat
+                                                                  Semantics(
+                                                                    label: state.repeatMode == PlayerRepeatMode.one
+                                                                        ? l10n.repeatOne
+                                                                        : state.repeatMode == PlayerRepeatMode.all
                                                                             ? l10n.repeatAll
                                                                             : l10n.repeatOff,
-                                                                    onPressed:
-                                                                        () {
-                                                                      HapticFeedback
-                                                                          .selectionClick();
-                                                                      cubit
-                                                                          .toggleRepeat();
-                                                                    },
+                                                                    button: true,
+                                                                    child: Tooltip(
+                                                                      message: state.repeatMode == PlayerRepeatMode.one
+                                                                          ? l10n.repeatOne
+                                                                          : state.repeatMode == PlayerRepeatMode.all
+                                                                              ? l10n.repeatAll
+                                                                              : l10n.repeatOff,
+                                                                      child: Material(
+                                                                        color: Colors.transparent,
+                                                                        shape: const CircleBorder(),
+                                                                        clipBehavior: Clip.antiAlias,
+                                                                        child: InkWell(
+                                                                          onTap: () {
+                                                                            HapticFeedback.selectionClick();
+                                                                            cubit.toggleRepeat();
+                                                                          },
+                                                                          child: AnimatedContainer(
+                                                                            duration: const Duration(milliseconds: 180),
+                                                                            width: isShortHeight ? 30 : 36,
+                                                                            height: isShortHeight ? 30 : 36,
+                                                                            decoration: BoxDecoration(
+                                                                              shape: BoxShape.circle,
+                                                                              color: state.repeatMode != PlayerRepeatMode.off
+                                                                                  ? activeColor.withValues(alpha: 0.16)
+                                                                                  : Colors.transparent,
+                                                                              border: state.repeatMode != PlayerRepeatMode.off
+                                                                                  ? Border.all(
+                                                                                      color: activeColor.withValues(alpha: 0.35),
+                                                                                      width: 1.0,
+                                                                                    )
+                                                                                  : null,
+                                                                            ),
+                                                                            child: Center(
+                                                                              child: Icon(
+                                                                                state.repeatMode == PlayerRepeatMode.one
+                                                                                    ? Icons.repeat_one_rounded
+                                                                                    : Icons.repeat_rounded,
+                                                                                size: isShortHeight ? 17 : 20,
+                                                                                color: state.repeatMode != PlayerRepeatMode.off
+                                                                                    ? activeColor
+                                                                                    : p.textSecondary,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ),
                                                                   ),
                                                                 ],
                                                               ),
                                                             ),
-                                                            const SizedBox(
+                                                            SizedBox(
                                                                 height:
-                                                                    AppSpacing
-                                                                        .xxs),
+                                                                    isShortHeight
+                                                                        ? 2
+                                                                        : AppSpacing
+                                                                            .xxs),
                                                             // Seekbar Row
                                                             BlocSelector<
                                                                 PlayerCubit,
@@ -738,7 +847,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                                 valueLabel,
                                                                             child:
                                                                                 PulsrSlider(
-                                                                              height: 24,
+                                                                              height: isShortHeight ? 16 : 24,
                                                                               min: 0.0,
                                                                               max: state.duration.inMilliseconds.toDouble() > 0 ? state.duration.inMilliseconds.toDouble() : 1.0,
                                                                               value: (dragSeekValue ?? position.inMilliseconds.toDouble()).clamp(
@@ -814,7 +923,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                     mainAxisAlignment:
                                                         MainAxisAlignment.end,
                                                     children: [
-                                                      // Volume Mute / Slider
+                                                      if (!isShortHeight) ...[
+                                                        // Volume Mute / Slider
                                                       ValueListenableBuilder<
                                                           double?>(
                                                         valueListenable:
@@ -977,6 +1087,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 context),
                                                       ),
 
+                                                      ],
                                                       // Queue inspector toggle
                                                       if (widget
                                                               .onToggleSideInspector !=
@@ -988,14 +1099,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                           padding:
                                                               EdgeInsets.zero,
                                                           constraints:
-                                                              const BoxConstraints(
-                                                                  minWidth: 48,
+                                                              BoxConstraints(
+                                                                  minWidth: isShortHeight ? 36 : 48,
                                                                   minHeight:
-                                                                      48),
+                                                                      isShortHeight ? 36 : 48),
                                                           icon: Icon(
                                                             Icons
                                                                 .queue_music_rounded,
-                                                            size: 19,
+                                                            size: isShortHeight ? 18 : 19,
                                                             color: widget
                                                                     .isInspectorOpen
                                                                 ? activeColor
@@ -1015,9 +1126,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                         padding:
                                                             EdgeInsets.zero,
                                                         constraints:
-                                                            const BoxConstraints(
-                                                                minWidth: 48,
-                                                                minHeight: 48),
+                                                            BoxConstraints(
+                                                                minWidth: isShortHeight ? 36 : 48,
+                                                                minHeight: isShortHeight ? 36 : 48),
                                                         icon: Icon(
                                                           Icons
                                                               .open_in_full_rounded,

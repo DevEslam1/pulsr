@@ -7,18 +7,24 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe, :visualizerStyle) =
-        context.select<
-            SettingsCubit,
-            ({
-              NowPlayingDoubleTapAction nowPlayingDoubleTap,
-              NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-              VisualizerStyle visualizerStyle,
-            })>((c) => (
-              nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-              nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-              visualizerStyle: c.state.visualizerStyle,
-            ));
+    final (
+      :nowPlayingDoubleTap,
+      :nowPlayingArtworkSwipe,
+      :visualizerStyle,
+      :waveformSeekBarEnabled
+    ) = context.select<
+        SettingsCubit,
+        ({
+          NowPlayingDoubleTapAction nowPlayingDoubleTap,
+          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+          VisualizerStyle visualizerStyle,
+          bool waveformSeekBarEnabled,
+        })>((c) => (
+          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
+          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
+          visualizerStyle: c.state.visualizerStyle,
+          waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
+        ));
     final isTablet = context.isTablet;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -94,9 +100,11 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                 isTablet: isTablet,
                 barWidth: metrics.pillBarWidth,
                 barHeight: metrics.pillBarHeight,
+                disableBlur: true,
               );
 
-              final centerDisplay = GestureDetector(
+              final artworkCard = GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => cubit.toggleLyricsVisibility(),
                 onDoubleTap: () {
                   switch (nowPlayingDoubleTap) {
@@ -121,88 +129,92 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                     }
                   }
                 },
-                child: AnimatedSwitcher(
-                  duration: context.motionMs(300),
-                  child: state.isLyricsVisible
-                      ? LyricsView(
-                          key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                          lyrics: state.lyrics,
-                          isLoading: state.isLoadingLyrics,
-                          activeColor: activeColor,
-                          source: state.lyricsSource,
-                        )
-                      : state.isQueueVisible
-                          ? const NowPlayingQueueView(
-                              key: ValueKey('queue_view'))
-                          : Center(
-                              key: const ValueKey('artwork_card'),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxHeight:
-                                      isLandscape ? 320 : double.infinity,
-                                  maxWidth: isLandscape ? 320 : double.infinity,
-                                ),
-                                child: AspectRatio(
-                                  aspectRatio: 1.0,
-                                  child: Hero(
-                                    tag: 'now_playing_art_full',
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: AppRadii.circular(
-                                            resolveCustomRadius(
-                                                context, AppRadii.r28)),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: AppColors.scrimAt(
-                                                isDark ? 0.6 : 0.2),
-                                            blurRadius: 30,
-                                            spreadRadius: 4,
-                                            offset: const Offset(0, 12),
-                                          ),
-                                          BoxShadow(
-                                            color: activeColor.withValues(
-                                                alpha: 0.3),
-                                            blurRadius: 24,
-                                            spreadRadius: -2,
-                                            offset: const Offset(0, 8),
-                                          ),
-                                        ],
-                                      ),
-                                      child: song != null
-                                          ? CachedArtwork(
-                                              id: song.id,
-                                              albumId: song.albumId,
-                                              remoteUrl:
-                                                  song.remoteArtworkUrl ??
-                                                      song.artworkUri,
-                                              type: ArtworkType.AUDIO,
-                                              size: double.infinity,
-                                              borderRadius: 28,
-                                              highQuality: true,
-                                            )
-                                          : Container(
-                                              decoration: BoxDecoration(
-                                                color: p.surfaceContainer,
-                                                borderRadius: AppRadii.r28All,
-                                              ),
-                                              child: Icon(
-                                                Icons.music_note_rounded,
-                                                size: 96,
-                                                color: textSubtitleColor
-                                                    .withValues(alpha: 0.4),
-                                              ),
-                                            ),
-                                    ),
+                child: Center(
+                  key: const ValueKey('artwork_card'),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: isLandscape ? 320 : double.infinity,
+                      maxWidth: isLandscape ? 320 : double.infinity,
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: Hero(
+                        tag: 'now_playing_art_full',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.circular(
+                                resolveCustomRadius(context, AppRadii.r28)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.scrimAt(isDark ? 0.6 : 0.2),
+                                blurRadius: 30,
+                                spreadRadius: 4,
+                                offset: const Offset(0, 12),
+                              ),
+                              BoxShadow(
+                                color: activeColor.withValues(alpha: 0.3),
+                                blurRadius: 24,
+                                spreadRadius: -2,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: song != null
+                              ? CachedArtwork(
+                                  id: song.id,
+                                  albumId: song.albumId,
+                                  remoteUrl:
+                                      song.remoteArtworkUrl ?? song.artworkUri,
+                                  type: ArtworkType.AUDIO,
+                                  size: double.infinity,
+                                  borderRadius: 28,
+                                  highQuality: true,
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    color: p.surfaceContainer,
+                                    borderRadius: AppRadii.r28All,
+                                  ),
+                                  child: Icon(
+                                    Icons.music_note_rounded,
+                                    size: 96,
+                                    color: textSubtitleColor.withValues(
+                                        alpha: 0.4),
                                   ),
                                 ),
-                              ),
-                            ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               );
 
-              final visualizer = (visualizerStyle != VisualizerStyle.off &&
-                      !state.isLyricsVisible &&
-                      !state.isQueueVisible)
+              final centerDisplay = isInSplitView
+                  ? artworkCard
+                  : AnimatedSwitcher(
+                      duration: context.motionMs(300),
+                      child: state.isLyricsVisible
+                          ? LyricsView(
+                              key: ValueKey(
+                                  'lyrics_${song?.id}_${song?.remoteId}'),
+                              lyrics: state.lyrics,
+                              isLoading: state.isLoadingLyrics,
+                              activeColor: activeColor,
+                              source: state.lyricsSource,
+                            )
+                          : state.isQueueVisible
+                              ? const NowPlayingQueueView(
+                                  key: ValueKey('queue_view'))
+                              : artworkCard,
+                    );
+
+              final showVisualizer = visualizerStyle != VisualizerStyle.off &&
+                  !waveformSeekBarEnabled &&
+                  !state.isLyricsVisible &&
+                  !state.isQueueVisible &&
+                  !isInSplitView;
+
+              final visualizer = showVisualizer
                   ? Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.lg, vertical: AppSpacing.s2),
@@ -354,7 +366,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                     ),
                   ),
 
-                  if (visualizer != const SizedBox.shrink()) visualizer,
+                  if (showVisualizer) visualizer,
 
                   const SizedBox(height: AppSpacing.s6),
 

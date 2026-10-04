@@ -1,207 +1,208 @@
-import 'dart:math' as math;
-import 'dart:ui' show DisplayFeature, DisplayFeatureType;
-import 'package:flutter/material.dart';
-
-enum WindowClass { compact, medium, expanded }
-
-/// Adaptive layout engine: phone → bottom nav, tablet → side rail + grids.
-abstract class Adaptive {
-  static const double compactBreakpoint = 600;
-  static const double tabletBreakpoint = 700;
-  static const double railExtendedBreakpoint = 1000;
-  static const double maxContentWidth = 1160;
-  static const double maxSheetWidth = 620;
-
-  /// Standard baseline reference screen dimensions used for responsive calculations.
-  static const double designWidth = 390.0;
-  static const double designHeight = 844.0;
-
-  /// Proportional width scaling factor relative to baseline design width (390dp).
-  static double scaleFactorW(
-    BuildContext context, {
-    double minScale = 0.80,
-    double maxScale = 1.35,
-  }) {
-    final w = widthOf(context);
-    final effectiveW = isTablet(context) ? (w.clamp(360.0, maxSheetWidth)) : w;
-    return (effectiveW / designWidth).clamp(minScale, maxScale);
-  }
-
-  /// Proportional height scaling factor relative to baseline design height (844dp).
-  static double scaleFactorH(
-    BuildContext context, {
-    double minScale = 0.70,
-    double maxScale = 1.30,
-  }) {
-    final h = heightOf(context);
-    return (h / designHeight).clamp(minScale, maxScale);
-  }
-
-  /// Combined scaling factor choosing the smaller axis to preserve aspect ratio.
-  static double scaleFactorR(
-    BuildContext context, {
-    double minScale = 0.80,
-    double maxScale = 1.30,
-  }) {
-    final sw = scaleFactorW(context, minScale: minScale, maxScale: maxScale);
-    final sh = scaleFactorH(context, minScale: minScale, maxScale: maxScale);
-    return math.min(sw, sh);
-  }
-
-  /// Proportional font scaling factor.
-  static double fontScale(
-    BuildContext context, {
-    double minScale = 0.85,
-    double maxScale = 1.25,
-  }) {
-    return scaleFactorW(context, minScale: minScale, maxScale: maxScale);
-  }
-
-  static double widthOf(BuildContext context) =>
-      MediaQuery.sizeOf(context).width;
-  static double heightOf(BuildContext context) =>
-      MediaQuery.sizeOf(context).height;
-
-  static WindowClass windowOf(BuildContext context) {
-    final w = widthOf(context);
-    if (w >= 1200) return WindowClass.expanded;
-    if (w >= tabletBreakpoint) return WindowClass.medium;
-    return WindowClass.compact;
-  }
-
-  static bool isTablet(BuildContext context) {
-    final w = widthOf(context);
-    final h = heightOf(context);
-    final smallestDim = math.min(w, h);
-    return smallestDim >= 600.0 || (w >= tabletBreakpoint && h >= 550.0);
-  }
-
-  static bool isLandscape(BuildContext context) =>
-      MediaQuery.orientationOf(context) == Orientation.landscape;
-
-  /// Returns true when screen width/orientation is ideal for a 2-pane master-detail arrangement.
-  static bool isTwoPane(BuildContext context) {
-    final w = widthOf(context);
-    final h = heightOf(context);
-    return isLandscape(context) || (w >= tabletBreakpoint && w > h);
-  }
-
-  /// Returns the display feature corresponding to a foldable hinge / fold if present (D13).
-  static DisplayFeature? hinge(BuildContext context) {
-    for (final feature in MediaQuery.displayFeaturesOf(context)) {
-      if (feature.type == DisplayFeatureType.hinge ||
-          feature.type == DisplayFeatureType.fold) {
-        return feature;
-      }
-    }
-    return null;
-  }
-
-  static bool hasHinge(BuildContext context) => hinge(context) != null;
-
-  static bool isTabletPortrait(BuildContext context) =>
-      isTablet(context) && !isLandscape(context);
-
-  static bool isTabletLandscape(BuildContext context) =>
-      isTablet(context) && isLandscape(context);
-
-  static bool isLargeTablet(BuildContext context) => widthOf(context) >= 900;
-
-  /// Optimal column count for song/track tile lists across phone, tablet portrait, and tablet landscape
-  static int trackGridColumns(BuildContext context) {
-    final w = widthOf(context);
-    if (w >= 1200) return 3;
-    if (w >= tabletBreakpoint || (isLandscape(context) && w >= 600)) return 2;
-    return 1;
-  }
-
-  /// Responsive column count for grids dynamically computed from available width.
-  static int gridColumns(
-    BuildContext context, {
-    required double minItemWidth,
-    int phoneColumns = 2,
-    int maxColumns = 8,
-  }) {
-    final w = widthOf(context);
-    final isTab = isTablet(context);
-    final railWidth =
-        isTab ? (w >= railExtendedBreakpoint ? 232.0 : 92.0) : 0.0;
-    final available = (w - railWidth).clamp(0.0, maxContentWidth);
-    final usable = available - pagePadding(context) * 2;
-    final calculated = (usable / minItemWidth).floor();
-    return calculated.clamp(phoneColumns, maxColumns);
-  }
-
-  static double pagePadding(BuildContext context) {
-    final w = widthOf(context);
-    if (w >= 1200) return 32;
-    if (w >= tabletBreakpoint) return 24;
-    if (w < 360) return 12;
-    return 16;
-  }
-
-  /// Center-rail constraint for readable ultra-wide layouts.
-  static BoxConstraints contentConstraints(BuildContext context) =>
-      const BoxConstraints(maxWidth: maxContentWidth);
-
-  /// Max-width constraint for bottom sheets / dialogs on tablets & desktops.
-  static BoxConstraints sheetConstraints(BuildContext context) =>
-      const BoxConstraints(maxWidth: maxSheetWidth);
-}
-
-extension AdaptiveContextX on BuildContext {
-  double get screenWidth => MediaQuery.sizeOf(this).width;
-  double get screenHeight => MediaQuery.sizeOf(this).height;
-  bool get isLandscape =>
-      MediaQuery.orientationOf(this) == Orientation.landscape;
-  bool get isTablet => Adaptive.isTablet(this);
-  bool get isTabletPortrait => Adaptive.isTabletPortrait(this);
-  bool get isTabletLandscape => Adaptive.isTabletLandscape(this);
-  bool get isLargeTablet => Adaptive.isLargeTablet(this);
-  bool get isTwoPane => Adaptive.isTwoPane(this);
-  bool get isTwoPanePlaylist =>
-      Adaptive.widthOf(this) > 840 || Adaptive.isTabletLandscape(this);
-  DisplayFeature? get hinge => Adaptive.hinge(this);
-  bool get hasHinge => Adaptive.hasHinge(this);
-  int get trackGridColumns => Adaptive.trackGridColumns(this);
-  double get pagePadding => Adaptive.pagePadding(this);
-  WindowClass get windowClass => Adaptive.windowOf(this);
-
-  /// Scaling factors for this context.
-  double get scaleFactorW => Adaptive.scaleFactorW(this);
-  double get scaleFactorH => Adaptive.scaleFactorH(this);
-  double get scaleFactorR => Adaptive.scaleFactorR(this);
-  double get fontScale => Adaptive.fontScale(this);
-
-  /// Scales a width or horizontal value responsively.
-  double scaleW(double value) => value * scaleFactorW;
-
-  /// Scales a height or vertical value responsively.
-  double scaleH(double value) => value * scaleFactorH;
-
-  /// Scales font size responsively while clamped to balanced limits.
-  double scaleSp(double value) => value * fontScale;
-
-  /// Scales a radius or uniform dimension responsively.
-  double scaleR(double value) => value * scaleFactorR;
-
-  /// Short aliases for convenience
-  double rw(double value) => scaleW(value);
-  double rh(double value) => scaleH(value);
-  double rsp(double value) => scaleSp(value);
-  double rr(double value) => scaleR(value);
-
-  T responsiveAdaptive<T>({
-    required T phone,
-    T? tablet,
-    T? desktop,
-  }) {
-    final w = windowClass;
-    if (w == WindowClass.expanded && desktop != null) return desktop;
-    if ((w == WindowClass.medium || w == WindowClass.expanded) &&
-        tablet != null) {
-      return tablet;
-    }
-    return phone;
-  }
-}
+import 'dart:math' as math;
+import 'dart:ui' show DisplayFeature, DisplayFeatureType;
+import 'package:flutter/material.dart';
+
+enum WindowClass { compact, medium, expanded }
+
+/// Adaptive layout engine: phone → bottom nav, tablet → side rail + grids.
+abstract class Adaptive {
+  static const double compactBreakpoint = 600;
+  static const double tabletBreakpoint = 700;
+  static const double railExtendedBreakpoint = 1000;
+  static const double maxContentWidth = 1160;
+  static const double maxSheetWidth = 620;
+
+  /// Standard baseline reference screen dimensions used for responsive calculations.
+  static const double designWidth = 390.0;
+  static const double designHeight = 844.0;
+
+  /// Proportional width scaling factor relative to baseline design width (390dp).
+  static double scaleFactorW(
+    BuildContext context, {
+    double minScale = 0.80,
+    double maxScale = 1.35,
+  }) {
+    final w = widthOf(context);
+    final effectiveW = isTablet(context) ? (w.clamp(360.0, maxSheetWidth)) : w;
+    return (effectiveW / designWidth).clamp(minScale, maxScale);
+  }
+
+  /// Proportional height scaling factor relative to baseline design height (844dp).
+  static double scaleFactorH(
+    BuildContext context, {
+    double minScale = 0.70,
+    double maxScale = 1.30,
+  }) {
+    final h = heightOf(context);
+    return (h / designHeight).clamp(minScale, maxScale);
+  }
+
+  /// Combined scaling factor choosing the smaller axis to preserve aspect ratio.
+  static double scaleFactorR(
+    BuildContext context, {
+    double minScale = 0.80,
+    double maxScale = 1.30,
+  }) {
+    final sw = scaleFactorW(context, minScale: minScale, maxScale: maxScale);
+    final sh = scaleFactorH(context, minScale: minScale, maxScale: maxScale);
+    return math.min(sw, sh);
+  }
+
+  /// Proportional font scaling factor.
+  static double fontScale(
+    BuildContext context, {
+    double minScale = 0.85,
+    double maxScale = 1.25,
+  }) {
+    return scaleFactorW(context, minScale: minScale, maxScale: maxScale);
+  }
+
+  static double widthOf(BuildContext context) =>
+      MediaQuery.sizeOf(context).width;
+  static double heightOf(BuildContext context) =>
+      MediaQuery.sizeOf(context).height;
+
+  static WindowClass windowOf(BuildContext context) {
+    final w = widthOf(context);
+    if (w >= 1200) return WindowClass.expanded;
+    if (w >= tabletBreakpoint) return WindowClass.medium;
+    return WindowClass.compact;
+  }
+
+  static bool isTablet(BuildContext context) {
+    final w = widthOf(context);
+    final h = heightOf(context);
+    final smallestDim = math.min(w, h);
+    return smallestDim >= 600.0 || (w >= tabletBreakpoint && h >= 550.0);
+  }
+
+  static bool isLandscape(BuildContext context) =>
+      MediaQuery.orientationOf(context) == Orientation.landscape;
+
+  /// Returns true when screen width/orientation is ideal for a 2-pane master-detail arrangement.
+  static bool isTwoPane(BuildContext context) {
+    final w = widthOf(context);
+    final h = heightOf(context);
+    return isLandscape(context) || (w >= tabletBreakpoint && w > h);
+  }
+
+  /// Returns the display feature corresponding to a foldable hinge / fold if present (D13).
+  static DisplayFeature? hinge(BuildContext context) {
+    for (final feature in MediaQuery.displayFeaturesOf(context)) {
+      if (feature.type == DisplayFeatureType.hinge ||
+          feature.type == DisplayFeatureType.fold) {
+        return feature;
+      }
+    }
+    return null;
+  }
+
+  static bool hasHinge(BuildContext context) => hinge(context) != null;
+
+  static bool isTabletPortrait(BuildContext context) =>
+      isTablet(context) && !isLandscape(context);
+
+  static bool isTabletLandscape(BuildContext context) =>
+      isTablet(context) && isLandscape(context);
+
+  static bool isLargeTablet(BuildContext context) => widthOf(context) >= 900;
+
+  /// Optimal column count for song/track tile lists across phone, tablet portrait, and tablet landscape
+  static int trackGridColumns(BuildContext context) {
+    final w = widthOf(context);
+    if (w >= 1200) return 3;
+    // In phone landscape, only use 2 columns if width >= 720 (sufficient room alongside sidebar)
+    if (w >= tabletBreakpoint || (isLandscape(context) && w >= 720)) return 2;
+    return 1;
+  }
+
+  /// Responsive column count for grids dynamically computed from available width.
+  static int gridColumns(
+    BuildContext context, {
+    required double minItemWidth,
+    int phoneColumns = 2,
+    int maxColumns = 8,
+  }) {
+    final w = widthOf(context);
+    final isTab = isTablet(context);
+    final railWidth =
+        isTab ? (w >= railExtendedBreakpoint ? 232.0 : 92.0) : 0.0;
+    final available = (w - railWidth).clamp(0.0, maxContentWidth);
+    final usable = available - pagePadding(context) * 2;
+    final calculated = (usable / minItemWidth).floor();
+    return calculated.clamp(phoneColumns, maxColumns);
+  }
+
+  static double pagePadding(BuildContext context) {
+    final w = widthOf(context);
+    if (w >= 1200) return 32;
+    if (w >= tabletBreakpoint) return 24;
+    if (w < 360) return 12;
+    return 16;
+  }
+
+  /// Center-rail constraint for readable ultra-wide layouts.
+  static BoxConstraints contentConstraints(BuildContext context) =>
+      const BoxConstraints(maxWidth: maxContentWidth);
+
+  /// Max-width constraint for bottom sheets / dialogs on tablets & desktops.
+  static BoxConstraints sheetConstraints(BuildContext context) =>
+      const BoxConstraints(maxWidth: maxSheetWidth);
+}
+
+extension AdaptiveContextX on BuildContext {
+  double get screenWidth => MediaQuery.sizeOf(this).width;
+  double get screenHeight => MediaQuery.sizeOf(this).height;
+  bool get isLandscape =>
+      MediaQuery.orientationOf(this) == Orientation.landscape;
+  bool get isTablet => Adaptive.isTablet(this);
+  bool get isTabletPortrait => Adaptive.isTabletPortrait(this);
+  bool get isTabletLandscape => Adaptive.isTabletLandscape(this);
+  bool get isLargeTablet => Adaptive.isLargeTablet(this);
+  bool get isTwoPane => Adaptive.isTwoPane(this);
+  bool get isTwoPanePlaylist =>
+      Adaptive.widthOf(this) > 840 || Adaptive.isTabletLandscape(this);
+  DisplayFeature? get hinge => Adaptive.hinge(this);
+  bool get hasHinge => Adaptive.hasHinge(this);
+  int get trackGridColumns => Adaptive.trackGridColumns(this);
+  double get pagePadding => Adaptive.pagePadding(this);
+  WindowClass get windowClass => Adaptive.windowOf(this);
+
+  /// Scaling factors for this context.
+  double get scaleFactorW => Adaptive.scaleFactorW(this);
+  double get scaleFactorH => Adaptive.scaleFactorH(this);
+  double get scaleFactorR => Adaptive.scaleFactorR(this);
+  double get fontScale => Adaptive.fontScale(this);
+
+  /// Scales a width or horizontal value responsively.
+  double scaleW(double value) => value * scaleFactorW;
+
+  /// Scales a height or vertical value responsively.
+  double scaleH(double value) => value * scaleFactorH;
+
+  /// Scales font size responsively while clamped to balanced limits.
+  double scaleSp(double value) => value * fontScale;
+
+  /// Scales a radius or uniform dimension responsively.
+  double scaleR(double value) => value * scaleFactorR;
+
+  /// Short aliases for convenience
+  double rw(double value) => scaleW(value);
+  double rh(double value) => scaleH(value);
+  double rsp(double value) => scaleSp(value);
+  double rr(double value) => scaleR(value);
+
+  T responsiveAdaptive<T>({
+    required T phone,
+    T? tablet,
+    T? desktop,
+  }) {
+    final w = windowClass;
+    if (w == WindowClass.expanded && desktop != null) return desktop;
+    if ((w == WindowClass.medium || w == WindowClass.expanded) &&
+        tablet != null) {
+      return tablet;
+    }
+    return phone;
+  }
+}

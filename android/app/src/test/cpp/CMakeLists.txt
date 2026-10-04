@@ -13,6 +13,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 add_compile_options(-fno-strict-aliasing)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+if(WIN32)
+    add_link_options(-static)
+endif()
 
 # Opt-in ASan/UBSan for the sanitizer pass. Enabled by the gradle
 # testNative task via -DPULSR_TEST_SANITIZERS=ON; not part of the parity build.

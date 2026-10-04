@@ -1,6 +1,7 @@
 // lib/features/player/cubit/controllers/player_playback_options_controller.dart
 import 'dart:convert';
 import 'dart:io';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/prefs_keys.dart';
@@ -52,7 +53,8 @@ class PlayerPlaybackOptionsController {
   /// applied by ExoPlayer's Sonic processor in the same sink chain the native
   /// bit-perfect early-return protects, so they must obey their own guard.
   final String? Function()? _playbackRateBlockedReason;
-  bool _isTogglingQuranMode = false;
+  int _quranToggleGen = 0;
+  bool? _targetQuranModeEnabled;
   int _reciterStyleGen = 0;
 
   bool get isClosed => _isClosed();

@@ -12,6 +12,12 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       if (_lastAutoAppliedDeviceKey == key) return;
       _lastAutoAppliedDeviceKey = null;
 
+      if (_getState().isQuranModeEnabled) {
+        // Quran Mode has an active recitation DSP chain tailored to voice.
+        // Prevent generic music device profiles or AutoEQ from overwriting it.
+        return;
+      }
+
       final smart = _smartAudioService;
       final smartEnabled = smart != null && await smart.isEnabled();
 

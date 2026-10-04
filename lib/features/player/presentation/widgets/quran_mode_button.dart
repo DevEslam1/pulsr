@@ -44,6 +44,10 @@ class QuranModeDockButton extends StatelessWidget {
           HapticFeedback.lightImpact();
           QuranModeSheet.show(context);
         },
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          context.read<PlayerCubit>().setQuranModeEnabled(!isActive);
+        },
         borderRadius: AppRadii.r20All,
         child: Tooltip(
           message: label,

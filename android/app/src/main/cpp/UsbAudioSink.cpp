@@ -76,19 +76,19 @@ inline float clampF(float v) {
 inline int packSample(float v, uint8_t* dst, int bytesPerSample) {
     v = clampF(v);
     if (bytesPerSample == 2) {
-        // S16_LE
-        int16_t s = static_cast<int16_t>(std::lround(v * 32767.0f));
+        // S16_LE: [-32768, 32767]
+        int32_t s = static_cast<int32_t>(std::clamp<long>(std::lround(v * 32768.0), -32768L, 32767L));
         dst[0] = static_cast<uint8_t>(s & 0xFF);
         dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
     } else if (bytesPerSample == 3) {
-        // S24_3LE (packed 24-bit, no padding)
-        int32_t s = static_cast<int32_t>(std::lround(v * 8388607.0));
+        // S24_3LE: [-8388608, 8388607] (packed 24-bit, no padding)
+        int32_t s = static_cast<int32_t>(std::clamp<long>(std::lround(v * 8388608.0), -8388608L, 8388607L));
         dst[0] = static_cast<uint8_t>(s & 0xFF);
         dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
         dst[2] = static_cast<uint8_t>((s >> 16) & 0xFF);
     } else {
-        // S32_LE
-        int32_t s = static_cast<int32_t>(std::lround(v * 2147483647.0));
+        // S32_LE: [-2147483648, 2147483647]
+        int64_t s = std::clamp<long long>(std::llround(v * 2147483648.0), -2147483648LL, 2147483647LL);
         dst[0] = static_cast<uint8_t>(s & 0xFF);
         dst[1] = static_cast<uint8_t>((s >> 8) & 0xFF);
         dst[2] = static_cast<uint8_t>((s >> 16) & 0xFF);
@@ -201,10 +201,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         }
     }
 
-    const int framesPerPacket = std::max(1, sampleRate_ / 1000);
-    bytesPerPacket_ = framesPerPacket * channels_ * bytesPerSample_;
+    // Maximum frames per 1 ms packet (ceil(sampleRate / 1000) for fractional rates like 44.1 kHz).
+    const int maxFramesPerPacket = (sampleRate_ + 999) / 1000;
+    const int maxBytesPerPacket = maxFramesPerPacket * channels_ * bytesPerSample_;
+    bytesPerPacket_ = maxBytesPerPacket;
     packetsPerUrb_ = kPacketsPerUrb;
-    bytesPerUrb_ = bytesPerPacket_ * packetsPerUrb_;
+    bytesPerUrb_ = maxBytesPerPacket * packetsPerUrb_;
 
     // Power-of-two ring buffer capacity for mask-based indexing (at least 250ms slack).
     const size_t targetRingBytes = std::max(
@@ -228,6 +230,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     urbBuffers_.assign(numUrbs_, nullptr);
     urbs_.assign(numUrbs_, nullptr);
 
+    uint32_t frameAccumulator = 0;
+    const int frameBytes = channels_ * bytesPerSample_;
     for (int i = 0; i < numUrbs_; ++i) {
         auto* urb = reinterpret_cast<struct usbdevfs_urb*>(
             urbStorage_.data() + static_cast<size_t>(i) * urbStride_);
@@ -242,14 +246,20 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         urb->endpoint = static_cast<unsigned char>(endpoint_);
         urb->flags = USBDEVFS_URB_ISO_ASAP;
         urb->buffer = urbBuffers_[i];
-        urb->buffer_length = static_cast<int>(bytesPerUrb_);
         urb->number_of_packets = packetsPerUrb_;
         urb->usercontext = urb;
+        int urbTotalBytes = 0;
         for (int p = 0; p < packetsPerUrb_; ++p) {
-            urb->iso_frame_desc[p].length = static_cast<unsigned int>(bytesPerPacket_);
+            frameAccumulator += static_cast<uint32_t>(sampleRate_);
+            const int framesInPacket = static_cast<int>(frameAccumulator / 1000);
+            frameAccumulator %= 1000;
+            const int pktBytes = framesInPacket * frameBytes;
+            urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktBytes);
             urb->iso_frame_desc[p].actual_length = 0;
             urb->iso_frame_desc[p].status = 0;
+            urbTotalBytes += pktBytes;
         }
+        urb->buffer_length = urbTotalBytes;
         urbs_[i] = urb;
     }
 
@@ -369,26 +379,25 @@ void UsbAudioSink::workerLoop() {
         if (urb == nullptr) continue;
 
         uint8_t* buf = reinterpret_cast<uint8_t*>(urb->buffer);
-        const size_t bytesPerPkt = static_cast<size_t>(bytesPerPacket_);
         const size_t mask = ringMask_;
         size_t readPos = ringRead_.load(std::memory_order_relaxed);
+        uint8_t* dst = buf;
         for (int p = 0; p < packetsPerUrb_; ++p) {
-            uint8_t* dst = buf + static_cast<size_t>(p) * bytesPerPkt;
+            const size_t pktLen = urb->iso_frame_desc[p].length;
             const size_t w = ringWrite_.load(std::memory_order_acquire);
             const size_t avail = (w >= readPos) ? (w - readPos) : 0;
-            if (avail >= bytesPerPkt) {
-                for (size_t i = 0; i < bytesPerPkt; ++i) {
+            if (avail >= pktLen) {
+                for (size_t i = 0; i < pktLen; ++i) {
                     dst[i] = ring_[(readPos + i) & mask];
                 }
-                readPos += bytesPerPkt;
+                readPos += pktLen;
             } else {
-                std::memset(dst, 0, bytesPerPkt);
+                std::memset(dst, 0, pktLen);
                 underrunCount_.fetch_add(1, std::memory_order_relaxed);
             }
-            urb->iso_frame_desc[p].length =
-                static_cast<unsigned int>(bytesPerPkt);
             urb->iso_frame_desc[p].actual_length = 0;
             urb->iso_frame_desc[p].status = 0;
+            dst += pktLen;
         }
         ringRead_.store(readPos, std::memory_order_release);
 

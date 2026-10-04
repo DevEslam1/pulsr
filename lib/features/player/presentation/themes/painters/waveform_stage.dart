@@ -99,51 +99,54 @@ class _WaveformHeroStage extends StatelessWidget {
 
             // 3. Center Floating Artwork Squircle with Neon Shadow and Border
             Positioned(
-              child: Container(
-                width: artSize,
-                height: artSize,
-                decoration: BoxDecoration(
-                  borderRadius: AppRadii.circular(
-                      resolveCustomRadius(context, AppRadii.r28)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: activeColor.withValues(
-                          alpha: isPlaying ? 0.42 : 0.22),
-                      blurRadius: isPlaying ? 48 : 28,
-                      spreadRadius: isPlaying ? 4 : 1,
-                      offset: const Offset(0, 12),
-                    ),
-                    BoxShadow(
-                      color: AppColors.scrimAt(0.50),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: AppColors.specularAt(0.24),
-                    width: 1.5,
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: song != null
-                    ? CachedArtwork(
-                        id: song.id,
-                        albumId: song.albumId,
-                        remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                        type: ArtworkType.AUDIO,
-                        size: artSize,
-                        borderRadius: 28,
-                        highQuality: true,
-                        fallbackIcon: Icons.music_note_rounded,
-                      )
-                    : Container(
-                        color: Colors.black26,
-                        child: Icon(
-                          Icons.music_note_rounded,
-                          size: artSize * 0.4,
-                          color: Colors.white54,
-                        ),
+              child: Hero(
+                tag: 'now_playing_art_full',
+                child: Container(
+                  width: artSize,
+                  height: artSize,
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadii.circular(
+                        resolveCustomRadius(context, AppRadii.r28)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: activeColor.withValues(
+                            alpha: isPlaying ? 0.42 : 0.22),
+                        blurRadius: isPlaying ? 48 : 28,
+                        spreadRadius: isPlaying ? 4 : 1,
+                        offset: const Offset(0, 12),
                       ),
+                      BoxShadow(
+                        color: AppColors.scrimAt(0.50),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: AppColors.specularAt(0.24),
+                      width: 1.5,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: song != null
+                      ? CachedArtwork(
+                          id: song.id,
+                          albumId: song.albumId,
+                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                          type: ArtworkType.AUDIO,
+                          size: artSize,
+                          borderRadius: 28,
+                          highQuality: true,
+                          fallbackIcon: Icons.music_note_rounded,
+                        )
+                      : Container(
+                          color: Colors.black26,
+                          child: Icon(
+                            Icons.music_note_rounded,
+                            size: artSize * 0.4,
+                            color: Colors.white54,
+                          ),
+                        ),
+                ),
               ),
             ),
           ],

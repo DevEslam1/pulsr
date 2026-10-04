@@ -401,6 +401,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                     setState(() => _isSideInspectorOpen = !_isSideInspectorOpen)
                 : null,
             isSideInspectorOpen: inspectorOpen,
+            showNowPlayingTile: false,
           ),
           const PulsrHingeGap.horizontal(),
 

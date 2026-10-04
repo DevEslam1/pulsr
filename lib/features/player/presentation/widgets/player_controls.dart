@@ -102,24 +102,50 @@ class PlayerControls extends StatelessWidget {
                   color: Colors.transparent,
                   shape: const CircleBorder(),
                   clipBehavior: Clip.antiAlias,
-                  child: IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    tooltip: l10n.previous,
-                    splashRadius: 28,
-                    onPressed: hasPrevious
-                        ? () {
-                            HapticFeedback.lightImpact();
-                            onPrevious();
-                          }
-                        : null,
-                    icon: Icon(
-                      Icons.skip_previous_rounded,
-                      color: hasPrevious
-                          ? p.textPrimary
-                          : p.textTertiary.withValues(alpha: 0.3),
-                      size: 38,
+                  child: Tooltip(
+                    message: l10n.previous,
+                    child: InkWell(
+                      onTap: hasPrevious
+                          ? () {
+                              HapticFeedback.lightImpact();
+                              onPrevious();
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(30),
+                      child: Container(
+                        width: (mainButtonSize * 0.72).clamp(42.0, 52.0),
+                        height: (mainButtonSize * 0.72).clamp(42.0, 52.0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: hasPrevious
+                              ? p.textPrimary.withValues(alpha: 0.08)
+                              : p.textPrimary.withValues(alpha: 0.03),
+                          border: Border.all(
+                            color: hasPrevious
+                                ? p.textPrimary.withValues(alpha: 0.14)
+                                : p.textPrimary.withValues(alpha: 0.05),
+                            width: 1.0,
+                          ),
+                          boxShadow: hasPrevious
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.18),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.skip_previous_rounded,
+                            color: hasPrevious
+                                ? p.textPrimary
+                                : p.textTertiary.withValues(alpha: 0.3),
+                            size: (mainButtonSize * 0.44).clamp(24.0, 32.0),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -210,24 +236,50 @@ class PlayerControls extends StatelessWidget {
                   color: Colors.transparent,
                   shape: const CircleBorder(),
                   clipBehavior: Clip.antiAlias,
-                  child: IconButton(
-                    constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget),
-                    tooltip: l10n.next,
-                    splashRadius: 28,
-                    onPressed: hasNext
-                        ? () {
-                            HapticFeedback.lightImpact();
-                            onNext();
-                          }
-                        : null,
-                    icon: Icon(
-                      Icons.skip_next_rounded,
-                      color: hasNext
-                          ? p.textPrimary
-                          : p.textTertiary.withValues(alpha: 0.3),
-                      size: 38,
+                  child: Tooltip(
+                    message: l10n.next,
+                    child: InkWell(
+                      onTap: hasNext
+                          ? () {
+                              HapticFeedback.lightImpact();
+                              onNext();
+                            }
+                          : null,
+                      borderRadius: BorderRadius.circular(30),
+                      child: Container(
+                        width: (mainButtonSize * 0.72).clamp(42.0, 52.0),
+                        height: (mainButtonSize * 0.72).clamp(42.0, 52.0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: hasNext
+                              ? p.textPrimary.withValues(alpha: 0.08)
+                              : p.textPrimary.withValues(alpha: 0.03),
+                          border: Border.all(
+                            color: hasNext
+                                ? p.textPrimary.withValues(alpha: 0.14)
+                                : p.textPrimary.withValues(alpha: 0.05),
+                            width: 1.0,
+                          ),
+                          boxShadow: hasNext
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.18),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.skip_next_rounded,
+                            color: hasNext
+                                ? p.textPrimary
+                                : p.textTertiary.withValues(alpha: 0.3),
+                            size: (mainButtonSize * 0.44).clamp(24.0, 32.0),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

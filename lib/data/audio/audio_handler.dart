@@ -420,15 +420,35 @@ class PulsrAudioHandler extends BaseAudioHandler
           }
           if (gain <= 0.0001) break;
           if (DateTime.now().isAfter(deadline)) {
-            throw StateError('DSP profile fade did not reach silence');
+            // A player can report `playing` while no frames are rendering (a
+            // temporary stall, a gapless hand-off, or a route where the native
+            // processor is not in the active sink). The fade then never
+            // advances. Aborting here used to drop the entire profile change —
+            // the toggle flipped on but no DSP applied. Prefer applying the
+            // profile over a fully silent hand-off; the mute is released in
+            // `finally` either way.
+            ErrorLogger.log(
+              'DSP transition fade did not reach silence before the deadline; '
+              'applying without a completed fade',
+              category: 'AudioHandler',
+            );
+            break;
           }
           await Future<void>.delayed(const Duration(milliseconds: 10));
         }
       }
       final result = await action();
       if (muted.isNotEmpty) {
+        // The DSP edits have already been dispatched by `action()`. A failed
+        // preparation acknowledgement only means we cannot confirm the native
+        // queue drained; it must not be reported as the profile failing to
+        // apply. Log it and still give the settle window.
         if (!await AudioEffectsChannel().awaitControlUpdates()) {
-          throw StateError('DSP profile preparation did not complete');
+          ErrorLogger.log(
+            'DSP profile preparation did not acknowledge completion; '
+            'releasing the transition anyway',
+            category: 'AudioHandler',
+          );
         }
         // Let reset filters and lookahead buffers settle before fading back in.
         await Future<void>.delayed(const Duration(milliseconds: 80));

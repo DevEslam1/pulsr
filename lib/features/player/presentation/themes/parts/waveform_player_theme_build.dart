@@ -58,7 +58,8 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
               barHeight: metrics.pillBarHeight,
             );
 
-            final centerDisplay = GestureDetector(
+            final waveformHeroStage = GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => cubit.toggleLyricsVisibility(),
               onDoubleTap: () {
                 switch (nowPlayingDoubleTap) {
@@ -83,32 +84,36 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                   }
                 }
               },
-              child: AnimatedSwitcher(
-                duration: context.motionMs(300),
-                child: state.isLyricsVisible
-                    ? LyricsView(
-                        key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                        lyrics: state.lyrics,
-                        isLoading: state.isLoadingLyrics,
-                        activeColor: activeColor,
-                        source: state.lyricsSource,
-                      )
-                    : state.isQueueVisible
-                        ? const NowPlayingQueueView(
-                            key: ValueKey('queue_view_waveform'),
-                          )
-                        : _WaveformHeroStage(
-                            key: const ValueKey('waveform_hero_stage'),
-                            song: song,
-                            activeColor: activeColor,
-                            isPlaying: state.isPlaying,
-                            isLandscape: isLandscape,
-                            isTablet: isTablet,
-                            waveController: _waveController,
-                            audioSessionId: state.audioSessionId,
-                          ),
+              child: _WaveformHeroStage(
+                key: const ValueKey('waveform_hero_stage'),
+                song: song,
+                activeColor: activeColor,
+                isPlaying: state.isPlaying,
+                isLandscape: isLandscape,
+                isTablet: isTablet,
+                waveController: _waveController,
+                audioSessionId: state.audioSessionId,
               ),
             );
+
+            final centerDisplay = isInSplitView
+                ? waveformHeroStage
+                : AnimatedSwitcher(
+                    duration: context.motionMs(300),
+                    child: state.isLyricsVisible
+                        ? LyricsView(
+                            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+                            lyrics: state.lyrics,
+                            isLoading: state.isLoadingLyrics,
+                            activeColor: activeColor,
+                            source: state.lyricsSource,
+                          )
+                        : state.isQueueVisible
+                            ? const NowPlayingQueueView(
+                                key: ValueKey('queue_view_waveform'),
+                              )
+                            : waveformHeroStage,
+                  );
 
             final extraBadge = Container(
               padding: const EdgeInsets.symmetric(
@@ -155,7 +160,7 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Column(
                   children: [
-                    Expanded(child: centerDisplay),
+                    Expanded(child: waveformHeroStage),
                     controlsColumn,
                   ],
                 ),

@@ -37,6 +37,7 @@ class LandscapeSidebar extends StatefulWidget {
   final bool isSideInspectorOpen;
   final Map<int, int>? badgeCounts;
   final SidebarRailMode? modeOverride;
+  final bool showNowPlayingTile;
 
   const LandscapeSidebar({
     super.key,
@@ -49,6 +50,7 @@ class LandscapeSidebar extends StatefulWidget {
     this.isSideInspectorOpen = false,
     this.badgeCounts,
     this.modeOverride,
+    this.showNowPlayingTile = false,
   });
 
   static SidebarRailMode resolveMode({
@@ -351,6 +353,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                   p: p,
                                   onOpenNowPlaying: widget.onOpenNowPlaying,
                                   onToggleExtended: widget.onToggleExtended,
+                                  showNowPlayingTile: widget.showNowPlayingTile,
                                 ),
                               ],
                             ),
@@ -390,10 +393,13 @@ class _SidebarBrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isShort = MediaQuery.sizeOf(context).height < 500;
+    final topPad = isShort ? AppSpacing.xs : AppSpacing.md;
+
     if (!isExtended) {
       return Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(
-            0, AppSpacing.md, 0, AppSpacing.xs),
+        padding: EdgeInsetsDirectional.fromSTEB(
+            0, topPad, 0, AppSpacing.xs),
         child: Center(
           child: GestureDetector(
             onTap: onToggle,
@@ -415,8 +421,8 @@ class _SidebarBrandHeader extends StatelessWidget {
       builder: (context, constraints) {
         final isTight = constraints.maxWidth < 190;
         return Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.md, AppSpacing.md, AppSpacing.sm, AppSpacing.xs),
+          padding: EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, topPad, AppSpacing.sm, AppSpacing.xs),
           child: ClipRect(
             child: Row(
               children: [
@@ -725,16 +731,44 @@ class _SidebarBottomSection extends StatelessWidget {
   final PulsrPalette p;
   final VoidCallback? onOpenNowPlaying;
   final VoidCallback onToggleExtended;
+  final bool showNowPlayingTile;
 
   const _SidebarBottomSection({
     required this.isExtended,
     required this.p,
     required this.onOpenNowPlaying,
     required this.onToggleExtended,
+    this.showNowPlayingTile = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (!showNowPlayingTile) {
+      if (isExtended) {
+        return const SizedBox(height: AppSpacing.xs);
+      }
+      return Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          8,
+          AppSpacing.xs,
+          8,
+          AppSpacing.sm,
+        ),
+        child: IconButton(
+          constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget),
+          tooltip: context.l10n.sidebarExpand,
+          iconSize: 20,
+          icon: Icon(
+            Icons.keyboard_double_arrow_right_rounded,
+            color: p.textTertiary,
+          ),
+          onPressed: onToggleExtended,
+        ),
+      );
+    }
+
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) =>
           prev.currentSong != curr.currentSong ||
