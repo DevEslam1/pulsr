@@ -59,6 +59,10 @@ internal class PoTokenWebView private constructor(
         webView.webViewClient = object : WebViewClient() {
             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                 super.onReceivedError(view, request, error)
+                val url = request?.url?.toString() ?: ""
+                if (url.endsWith("favicon.ico") || error?.errorCode == -1) {
+                    return
+                }
                 Log.w(TAG, "WebView onReceivedError: ${error?.description} (code=${error?.errorCode}) for ${request?.url}")
             }
 

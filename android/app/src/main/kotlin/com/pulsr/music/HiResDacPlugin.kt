@@ -101,6 +101,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     private var bitPerfectRequested: Boolean = false
+    @Volatile private var directRouteFallbackActive: Boolean = false
     private var mixerAttributesApplied: Boolean = false
     private val mediaAttributes = AudioAttributes.Builder()
         .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -194,8 +195,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                        if (bitPerfectRequested) {
+                        if (bitPerfectRequested || directRouteFallbackActive) {
                             bitPerfectRequested = false
+                            directRouteFallbackActive = false
                             try { applyBitPerfectMode(false) } catch (_: Exception) {}
                         }
                         lastBitPerfectReason = null
@@ -248,14 +250,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "setBitPerfectMode" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 val success = applyBitPerfectMode(enabled)
-                if (success) bitPerfectRequested = enabled
+                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
                 notifyDeviceChange()
                 result.success(success)
             }
             "setBitPerfectModeDetailed" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 val success = applyBitPerfectMode(enabled)
-                if (success) bitPerfectRequested = enabled
+                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
                 notifyDeviceChange()
                 result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
             }
@@ -911,10 +913,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 return@postDelayed
             }
             val measured = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
+            val isBt = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.any { it.id == deviceId && isBluetoothOutputType(it.type) } == true
+            val maxAttempts = if (isBt) 29 else 19
             if (measured[0] == deviceId || !com.ryanheise.just_audio.PulsrOutputRouting.isPlaying()) {
                 notifyDeviceChange()
                 result.success(response)
-            } else if (attempt < 19) {
+            } else if (attempt < maxAttempts) {
                 verifyRequestedRoute(deviceId, previousId, response, result, attempt + 1, generation)
             } else {
                 val previous = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
@@ -1079,6 +1083,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // Only the active route matters: a paired headset while a DAC is plugged
         // in must not block exclusive mode, and vice versa.
         if (enabled && usbDevice == null) {
+            directRouteFallbackActive = false
             lastBitPerfectReason =
                 if (isBluetoothActive(devices)) "bluetooth_transcoded" else "exclusive_requires_usb_dac"
             return false
@@ -1098,6 +1103,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     mixerAttributesApplied = false
                 }
                 bitPerfectRequested = false
+                directRouteFallbackActive = false
                 lastBitPerfectReason = null
                 return true
             }
@@ -1132,6 +1138,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                             if (ok) {
                                 mixerAttributesApplied = true
                                 bitPerfectRequested = true
+                                directRouteFallbackActive = false
                                 lastBitPerfectReason = null
                                 return true
                             }
@@ -1142,15 +1149,19 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 }
             }
 
-            // Direct bit-perfect HAL/DSP bypass path for USB DAC:
+            // Direct route fallback for USB DAC when AudioMixerAttributes negotiation is unavailable:
+            // Route to USB device via PulsrOutputRouting, but DO NOT claim bitPerfectRequested.
             com.ryanheise.just_audio.PulsrOutputRouting.select(usbDevice)
             mixerAttributesApplied = false
-            bitPerfectRequested = true
-            lastBitPerfectReason = null
+            bitPerfectRequested = false
+            directRouteFallbackActive = true
+            lastBitPerfectReason = "mixer_attributes_unavailable_fallback_route_only"
             return true
         }
 
         // Nothing to disable when no USB DAC is attached.
+        bitPerfectRequested = false
+        directRouteFallbackActive = false
         lastBitPerfectReason = null
         return true
     }
@@ -1451,10 +1462,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             (activeMixerEncoding == 0 || stream[2] == activeMixerEncoding)
         val directActive =
             isUsb && !isBluetooth && UsbExclusivePlugin.directStreamingActive
-        val finalIsBitPerfectActive = isUsb && !isBluetooth && (mixerActive || directActive || bitPerfectRequested)
+        val finalIsBitPerfectActive = isUsb && !isBluetooth && (mixerActive || directActive)
         val failureReason = when {
             finalIsBitPerfectActive -> null
             isBluetooth -> "bluetooth_transcoded"
+            directRouteFallbackActive -> "mixer_attributes_unavailable_fallback_route_only"
             lastBitPerfectReason != null -> lastBitPerfectReason
             !isUsb -> "exclusive_requires_usb_dac"
             Build.VERSION.SDK_INT < 34 -> "requires_android_14_for_usb"
@@ -1464,6 +1476,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         result["deviceName"] = deviceName
         result["isUsbDac"] = isUsb
+        result["isDirectRouteFallback"] = directRouteFallbackActive
         // Actual output format. Only the accepted mixer attributes report a real
         // rate/depth; otherwise the HAL mixer rate is the closest truth there is.
         // The requested values stay in targetSampleRate/targetBitDepth.

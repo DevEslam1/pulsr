@@ -1029,12 +1029,12 @@ class PlayerTrackHeader extends StatelessWidget {
     required this.isTablet,
     this.horizontalPadding = 16,
     this.tabletHorizontalPadding = 28,
-    this.verticalPadding = AppSpacing.s2,
+    this.verticalPadding = AppSpacing.s6,
     this.titleColor,
     this.subtitleColor,
     this.extraBadge,
-    this.badgeGap = AppSpacing.s6,
-    this.titleArtistGap = AppSpacing.xxs,
+    this.badgeGap = AppSpacing.s8,
+    this.titleArtistGap = AppSpacing.xs,
     this.showQualityBadge = true,
   });
 
@@ -1228,21 +1228,37 @@ class PlayerControlsColumn extends StatelessWidget {
     final state = props.state;
     final cubit = props.cubit;
 
+    ExperienceMode mode = ExperienceMode.normal;
+    try {
+      mode = context.select<SettingsCubit, ExperienceMode>(
+          (c) => c.state.experienceMode);
+    } catch (_) {}
+    final hasAdvancedContent = showAdvancedBar &&
+        (state.bookmarkPosition != null || mode == ExperienceMode.professional);
+
     final double spacingTrackToSeek = (isTablet
-            ? (classicSizing ? 16.0 : 10.0)
-            : (isLandscape ? 4.0 : (classicSizing ? 10.0 : 6.0))) *
+            ? (classicSizing ? 18.0 : 14.0)
+            : (isLandscape ? 4.0 : (classicSizing ? 14.0 : 12.0))) *
         heightRatio;
     final double spacingSeekToControls = (isTablet
-            ? (classicSizing ? 18.0 : 12.0)
-            : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 8.0))) *
+            ? (classicSizing ? 22.0 : 18.0)
+            : (isLandscape ? 6.0 : (classicSizing ? 18.0 : 16.0))) *
+        heightRatio;
+    final double spacingSeekToAdvanced = (isTablet
+            ? 12.0
+            : (isLandscape ? 4.0 : 10.0)) *
+        heightRatio;
+    final double spacingAdvancedToControls = (isTablet
+            ? 14.0
+            : (isLandscape ? 4.0 : 12.0)) *
         heightRatio;
     final double spacingControlsToDock = (isTablet
-            ? (classicSizing ? 18.0 : 12.0)
-            : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 8.0))) *
+            ? (classicSizing ? 20.0 : 16.0)
+            : (isLandscape ? 6.0 : (classicSizing ? 16.0 : 14.0))) *
         heightRatio;
     final double spacingBelowDock = (isTablet
-            ? (classicSizing ? 14.0 : 8.0)
-            : (isLandscape ? 6.0 : (classicSizing ? 8.0 : 4.0))) *
+            ? (classicSizing ? 16.0 : 12.0)
+            : (isLandscape ? 6.0 : (classicSizing ? 12.0 : 10.0))) *
         heightRatio;
 
     final double resolvedMainButtonSize = mainButtonSize ??
@@ -1268,8 +1284,13 @@ class PlayerControlsColumn extends StatelessWidget {
           showUpNext: !isInSplitView,
           onSeek: (pos) => cubit.seek(pos),
         ),
-        SizedBox(height: spacingSeekToControls),
-        if (showAdvancedBar) const AdvancedPlaybackBar(),
+        if (hasAdvancedContent) ...[
+          SizedBox(height: spacingSeekToAdvanced),
+          const AdvancedPlaybackBar(),
+          SizedBox(height: spacingAdvancedToControls),
+        ] else ...[
+          SizedBox(height: spacingSeekToControls),
+        ],
         PlayerControls(
           isPlaying: state.isPlaying,
           isShuffle: state.isShuffle,

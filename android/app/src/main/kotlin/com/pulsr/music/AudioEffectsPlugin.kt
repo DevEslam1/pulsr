@@ -277,6 +277,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // call, and consecutive identical reasons are only logged on transition so
     // a failing slider drag cannot spam the log.
     @Volatile private var lastNotAppliedReason: String? = null
+    @Volatile private var lastLoggedHalEqSuppressed: String? = null
 
     private fun notApplied(reason: String): Boolean {
         synchronized(stateLock) {
@@ -766,10 +767,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isReverbEnabled) mask = mask or STAGE_REVERB
         if (abs(stereoBalance) > 0.001 || monoMix) mask = mask or STAGE_PANNER
         if (isLimiterEnabled) mask = mask or STAGE_LIMITER
-        // Sinc resampler only if actually needed (rate mismatch) — zero-cost zero-mask when bypassed
-        if (isSincResamplerEnabled && Math.abs(resamplerInRate - resamplerOutRate) > 1.0) {
-            mask = mask or STAGE_RESAMPLER
-        }
+        // Sinc resampler: in-place interleaved path is a passthrough (conversion is handled by
+        // AAudio/AudioTrack HAL; planar conversion is only used in convolution reverb wet path).
+        // Bypassed from stages mask so telemetry does not report a phantom active stage.
+        // if (isSincResamplerEnabled && Math.abs(resamplerInRate - resamplerOutRate) > 1.0) {
+        //     mask = mask or STAGE_RESAMPLER
+        // }
         // Phase 1 DSP expansion stages
         if (isSaturationEnabled) mask = mask or STAGE_SATURATION
         if (isStereoWidthEnabled) mask = mask or STAGE_WIDTH
@@ -3119,18 +3122,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 // pre-bypass (hardware*digital) level rather than
                                 // staying at the user's raw system volume.
                                 if (dvcEnabled) {
-                                    dvcActive = true
-                                    try {
-                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                        if (am != null) {
-                                            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                                            if (max > 0) {
-                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
-                                            }
-                                        }
-                                    } catch (_: Throwable) {}
                                     if (isNativeDspLoaded) {
-                                        try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
+                                        dvcActive = true
+                                        try {
+                                            val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                            if (am != null) {
+                                                val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                                if (max > 0) {
+                                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                                                }
+                                            }
+                                        } catch (_: Throwable) {
+                                        }
+                                        try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {
+                                        }
+                                    } else {
+                                        Log.w(TAG, "Cannot re-pin DVC to max volume on bypass restore: native DSP engine not loaded")
                                     }
                                 }
                             }
@@ -3637,6 +3644,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun setVirtualizerState(enabled: Boolean): Boolean {
         isVirtualizerEnabled = enabled
+        if (currentAudioSessionId == 0) return true
         if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
             return notApplied("Virtualizer unsupported on this device")
         }
@@ -3654,6 +3662,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun setVirtualizerStrengthValue(strength: Int): Boolean {
         val clamped = strength.coerceIn(0, 1000).toShort()
         virtualizerStrength = clamped
+        if (currentAudioSessionId == 0) return true
         if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
             return notApplied("Virtualizer unsupported on this device")
         }
@@ -3706,6 +3715,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun setVolumeBoost(milliBels: Int): Boolean {
         volumeBoostMilliBels = milliBels.coerceIn(0, 1000)
+        if (currentAudioSessionId == 0) return true
         if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER)) {
             return notApplied("Volume boost (LoudnessEnhancer) unsupported on this device")
         }
@@ -3738,6 +3748,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun setBassBoostStrengthValue(strength: Int): Boolean {
         val clamped = strength.coerceIn(0, 1000).toShort()
         bassBoostStrength = clamped
+        if (currentAudioSessionId == 0) return true
         if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST)) {
             return notApplied("Bass boost unsupported on this device")
         }
@@ -4168,7 +4179,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val halEqSuppressed = isHalEqSuppressed()
         val effectiveEqEnabled = isEqEnabled && !halEqSuppressed
         if (halEqSuppressed && isEqEnabled) {
-            Log.i(TAG, "buildDynamicsProcessing: HAL EQ suppressed (dspPreference=$dspPreference) — avoiding double-process with OEM audio engine")
+            if (lastLoggedHalEqSuppressed != dspPreference) {
+                lastLoggedHalEqSuppressed = dspPreference
+                Log.d(TAG, "buildDynamicsProcessing: HAL EQ suppressed (dspPreference=$dspPreference) — avoiding double-process with OEM audio engine")
+            }
+        } else {
+            lastLoggedHalEqSuppressed = null
         }
         // Build DynamicsProcessing whenever EQ, dynamics, limiter, or balance/mono are active.
         // Limiter and balance/mono route through the same DynamicsProcessing engine.
@@ -4321,6 +4337,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
         // FIX C-4: Fallback path — route through virtualizer HAL without touching
         // isVirtualizerEnabled so the user's independent Virtualizer choice is preserved.
+        if (currentAudioSessionId == 0) return true
         if (!isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)) {
             return notApplied("Spatializer unavailable and device has no Virtualizer")
         }

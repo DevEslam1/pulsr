@@ -230,7 +230,8 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
                   ),
                 ),
 
-                const SizedBox(height: AppSpacing.xxs),
+                SizedBox(
+                    height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
 
                 // Bottom Controls Section
                 Padding(

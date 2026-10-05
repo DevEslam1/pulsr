@@ -173,7 +173,7 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
                     final double availableWidth =
                         artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
                     final double availableHeight =
-                        artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                        artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
                     final double maxAllowed = isTablet ? 560.0 : 420.0;
                     final double rawSize =
                         math.min(availableWidth, availableHeight);
@@ -199,7 +199,8 @@ extension _VinylPlayerThemeBuild on _VinylPlayerThemeState {
                 ),
               ),
 
-              const SizedBox(height: AppSpacing.xxs),
+              SizedBox(
+                  height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
 
               // Bottom Controls Section
               Padding(

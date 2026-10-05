@@ -688,13 +688,15 @@ void LiveProg::executeBytecode(const std::vector<Instruction>& program) {
             case OpCode::Div:
                 if (sp >= 2) {
                     double b = stack[--sp];
-                    stack[sp - 1] = (std::abs(b) > 1e-12) ? (stack[sp - 1] / b) : 0.0;
+                    double res = (std::abs(b) > 1e-12) ? (stack[sp - 1] / b) : 0.0;
+                    stack[sp - 1] = std::isfinite(res) ? res : 0.0;
                 }
                 break;
             case OpCode::Mod:
                 if (sp >= 2) {
                     double b = stack[--sp];
-                    stack[sp - 1] = (std::abs(b) > 1e-12) ? std::fmod(stack[sp - 1], b) : 0.0;
+                    double res = (std::abs(b) > 1e-8) ? std::fmod(stack[sp - 1], b) : 0.0;
+                    stack[sp - 1] = std::isfinite(res) ? res : 0.0;
                 }
                 break;
             case OpCode::Neg:

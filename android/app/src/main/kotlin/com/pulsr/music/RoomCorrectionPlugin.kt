@@ -69,7 +69,8 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             return
         }
         if (capturing.get()) {
-            if (currentSampleRate == sampleRate) {
+            val record = audioRecord
+            if (currentSampleRate == sampleRate && record != null && record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 result.success(true)
                 return
             }
@@ -113,28 +114,32 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             captureThread = Thread {
                 val buf = ByteArray(8192)
                 var overrunCount = 0
-                while (capturing.get() && !Thread.currentThread().isInterrupted) {
-                    val n = try {
-                        record.read(buf, 0, buf.size)
-                    } catch (_: Throwable) {
-                        break
-                    }
-                    if (n < 0) {
-                        overrunCount++
-                    } else if (n > 0 && capturing.get()) {
-                        val payload = mapOf(
-                            "pcm" to buf.copyOf(n),
-                            "frames" to n / 2,
-                            "overruns" to overrunCount
-                        )
-                        mainHandler.post {
-                            if (capturing.get()) {
-                                try {
-                                    eventSink?.success(payload)
-                                } catch (_: Exception) {}
+                try {
+                    while (capturing.get() && !Thread.currentThread().isInterrupted) {
+                        val n = try {
+                            record.read(buf, 0, buf.size)
+                        } catch (_: Throwable) {
+                            break
+                        }
+                        if (n < 0) {
+                            overrunCount++
+                        } else if (n > 0 && capturing.get()) {
+                            val payload = mapOf(
+                                "pcm" to buf.copyOf(n),
+                                "frames" to n / 2,
+                                "overruns" to overrunCount
+                            )
+                            mainHandler.post {
+                                if (capturing.get()) {
+                                    try {
+                                        eventSink?.success(payload)
+                                    } catch (_: Exception) {}
+                                }
                             }
                         }
                     }
+                } finally {
+                    capturing.set(false)
                 }
             }.apply {
                 name = "PulsrRoomCapture"

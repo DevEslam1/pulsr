@@ -344,7 +344,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                       );
                     },
                   ),
-                  const SizedBox(height: AppSpacing.xxs),
+                  const SizedBox(height: AppSpacing.xs),
                   // Timestamps Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

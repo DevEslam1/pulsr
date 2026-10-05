@@ -215,7 +215,7 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                     final double availableWidth =
                         artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
                     final double availableHeight =
-                        artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                        artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
                     final double maxW = isTablet ? 560.0 : 440.0;
                     final double maxH = isTablet ? 360.0 : 300.0;
                     final double rawW = math.min(availableWidth, maxW);
@@ -242,7 +242,8 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                 ),
               ),
 
-              const SizedBox(height: AppSpacing.xxs),
+              SizedBox(
+                  height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
 
               // Bottom Controls Section
               Padding(

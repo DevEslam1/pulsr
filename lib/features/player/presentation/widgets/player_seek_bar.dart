@@ -362,7 +362,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.s2),
+              const SizedBox(height: AppSpacing.xs),
               // Timestamps
               RepaintBoundary(
                 child: Row(

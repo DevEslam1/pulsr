@@ -160,9 +160,13 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     }
     // Wait for any in-flight producer before reassigning the ring buffer below.
     for (int spin = 0;
-         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 1000;
+         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 5000;
          ++spin) {
         std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+    if (activeWriters_.load(std::memory_order_acquire) != 0) {
+        lastError_.store(EBUSY, std::memory_order_relaxed);
+        return UsbStreamResult::ClaimFailed;
     }
 
     lastError_.store(0, std::memory_order_relaxed);
@@ -326,9 +330,19 @@ void UsbAudioSink::releaseResources() {
     // to finish before touching the ring buffer.
     active_.store(false, std::memory_order_release);
     for (int spin = 0;
-         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 1000;
+         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 5000;
          ++spin) {
         std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+
+    if (activeWriters_.load(std::memory_order_acquire) != 0) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_ERROR, "UsbAudioSink",
+            "releaseResources: writers still active after 500ms; leaking ring to prevent UAF");
+#else
+        fprintf(stderr, "UsbAudioSink: writers still active after 500ms; leaking ring to prevent UAF\n");
+#endif
+        return;
     }
 
     // Cancel + reap any URBs the kernel still owns before freeing their buffers.

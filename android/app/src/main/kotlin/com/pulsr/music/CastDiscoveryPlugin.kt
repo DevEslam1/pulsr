@@ -87,7 +87,7 @@ class CastDiscoveryPlugin(
                     val message = when {
                         !sdkAvailable -> "Google Play Services Cast SDK is not bundled in this build."
                         appId.isNullOrBlank() -> "Google Cast playback requires a Cast receiver application id (--dart-define=CAST_RECEIVER_APP_ID)."
-                        else -> "Connecting to cast device..."
+                        else -> "Cast receiver configured but connection is not implemented in this build."
                     }
                     result.success(
                         mapOf(

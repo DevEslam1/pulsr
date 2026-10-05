@@ -1007,6 +1007,15 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadViperDdc(
     // Parse off-thread and publish the prepared coefficient sets via the
     // snapshot so the audio-thread applyParams never parses/allocates.
     try {
+        if (content.empty()) {
+            AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+                snap.viperDdc.ddcContent.clear();
+                snap.viperDdc.profileName.clear();
+                snap.viperDdc.sections441.reset();
+                snap.viperDdc.sections480.reset();
+            });
+            return JNI_TRUE;
+        }
         std::vector<ViperDdcSection> s441;
         std::vector<ViperDdcSection> s480;
         const bool ok = ViperDdc::parseVdcContent(content, s441, s480);

@@ -59,12 +59,12 @@ class PlayerThemeMetrics {
 
     final double heightRatio =
         (constraints.maxHeight / 720.0).clamp(0.55, 1.25);
-    final double spacingTrackToSeek = (isTablet ? 10.0 : 6.0) * heightRatio;
-    final double spacingSeekToControls = (isTablet ? 12.0 : 8.0) * heightRatio;
-    final double spacingControlsToDock = (isTablet ? 12.0 : 8.0) * heightRatio;
-    final double spacingBelowDock = (isTablet ? 8.0 : 4.0) * heightRatio;
-    final double switcherTopPad = (isTablet ? 4.0 : 2.0) * heightRatio;
-    final double switcherBottomPad = (isTablet ? 6.0 : 3.0) * heightRatio;
+    final double spacingTrackToSeek = (isTablet ? 16.0 : 12.0) * heightRatio;
+    final double spacingSeekToControls = (isTablet ? 20.0 : 16.0) * heightRatio;
+    final double spacingControlsToDock = (isTablet ? 18.0 : 14.0) * heightRatio;
+    final double spacingBelowDock = (isTablet ? 14.0 : 10.0) * heightRatio;
+    final double switcherTopPad = (isTablet ? 6.0 : 4.0) * heightRatio;
+    final double switcherBottomPad = (isTablet ? 10.0 : 6.0) * heightRatio;
 
     final double pillBarWidth = math.min(
       constraints.maxWidth - (isTablet ? 64 : 28),

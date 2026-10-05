@@ -145,6 +145,10 @@ object PoTokenManager {
         managerScope.launch(Dispatchers.IO) {
             try {
                 if (webViewBroken) return@launch
+                // Defer standby pre-warming so it never contends with UI inflation,
+                // frame rendering, or initial playback start on the main thread.
+                kotlinx.coroutines.delay(5000L)
+                if (webViewBroken || standbyGenerator?.isExpired() == false) return@launch
                 val standby = PoTokenWebView.newPoTokenGenerator(ctx)
                 if (!standby.isExpired()) {
                     standbyGenerator = standby

@@ -123,7 +123,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
               final switcherTopPad =
                   (isTablet ? 8.0 : 4.0) * metrics.heightRatio;
               final switcherBottomPad =
-                  (isTablet ? 10.0 : 6.0) * metrics.heightRatio;
+                  (isTablet ? 12.0 : 8.0) * metrics.heightRatio;
               final landscapeArtSize =
                   (constraints.maxHeight - 68).clamp(180.0, 560.0);
 
@@ -294,9 +294,9 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 trackHeader: PlayerTrackHeader(
                   props: props,
                   isTablet: isTablet,
-                  badgeGap: isLandscape ? AppSpacing.xxs : AppSpacing.xs,
-                  titleArtistGap: isLandscape ? 2.0 : AppSpacing.xxs,
-                  verticalPadding: isLandscape ? 0.0 : AppSpacing.s2,
+                  badgeGap: isLandscape ? AppSpacing.xxs : AppSpacing.s8,
+                  titleArtistGap: isLandscape ? 2.0 : AppSpacing.xs,
+                  verticalPadding: isLandscape ? 0.0 : AppSpacing.s6,
                 ),
                 classicSizing: true,
                 scaleMainButtonByHeight: true,
@@ -401,12 +401,12 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 children: [
                   const PlayerPlayHandle(
                     padding: EdgeInsets.only(
-                        top: AppSpacing.s6, bottom: AppSpacing.xxs),
+                        top: AppSpacing.s8, bottom: AppSpacing.xs),
                   ),
                   PlayerTopBar(
                     props: props,
                     isTablet: isTablet,
-                    verticalPadding: AppSpacing.xxs,
+                    verticalPadding: AppSpacing.xs,
                   ),
                   const SizedBox(height: AppSpacing.s2),
                   // View Switcher Bar (Track | Lyrics | Queue)
@@ -425,7 +425,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                 (isTablet ? 64.0 : 32.0);
                         final double availableHeight =
                             artConstraints.maxHeight -
-                                (isTablet ? 24.0 : 12.0);
+                                (isTablet ? 36.0 : 20.0);
                         final double maxAllowed =
                             isTablet ? 560.0 : 420.0;
                         final double rawSize =
@@ -453,6 +453,9 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                     ),
                   ),
                   if (showVisualizer) visualizer,
+                  SizedBox(
+                      height:
+                          (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
                   controlsColumn,
                 ],
               );

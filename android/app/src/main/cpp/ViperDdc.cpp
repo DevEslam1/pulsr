@@ -245,6 +245,19 @@ void ViperDdc::applyParams(const ViperDdcParamSet& params) {
         }
         return;
     }
+    // If no prepared sections are supplied and ddcContent is empty, clear active sections
+    // so loading an empty profile or clearing DDC cleanly deactivates filtering.
+    if (params.ddcContent.empty()) {
+        if (!activeSections_.empty() || prepared441_ || prepared480_) {
+            sections441_.clear();
+            sections480_.clear();
+            activeSections_.clear();
+            prepared441_.reset();
+            prepared480_.reset();
+            reset();
+        }
+        return;
+    }
     // FIX M-18: never parse .vdc text on the audio thread. loadVdcString()
     // calls std::stod, grows std::vectors and copies on the heap — all of which
     // violate real-time constraints. The control-thread JNI setter is

@@ -259,7 +259,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                       final double availableWidth =
                           artConstraints.maxWidth - (isTablet ? 64.0 : 36.0);
                       final double availableHeight =
-                          artConstraints.maxHeight - (isTablet ? 24.0 : 12.0);
+                          artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
                       final double maxAllowed = isTablet ? 560.0 : 420.0;
                       final double rawSize =
                           math.min(availableWidth, availableHeight);
@@ -284,7 +284,8 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                     },
                   ),
                 ),
-                const SizedBox(height: AppSpacing.xxs),
+                SizedBox(
+                    height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
                   child: controlsColumn,

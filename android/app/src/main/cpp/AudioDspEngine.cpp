@@ -852,7 +852,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         //    first so all downstream coefficients (EQ, reverb, crossover) run
         //    at the true rate. In-place polyphase FIR keeps the N-in/N-out
         //    block contract; bypassed when rates match (zero cost).
-        if ((stages & STAGE_RESAMPLER) && snapshot->resampler.enabled && !resampler_.isBypassed()) {
+        if ((stages & STAGE_RESAMPLER) && snapshot->resampler.enabled && !resampler_.isEffectivelyBypassed()) {
             resampler_.processInterleaved(buffer, frames, channels);
         }
 

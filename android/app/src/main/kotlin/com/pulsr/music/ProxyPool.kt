@@ -76,6 +76,8 @@ object ProxyPool {
         var lastFailureType: FailureType = FailureType.UNKNOWN,
         var ewmaSuccessRate: Double = 1.0
     ) {
+        @Transient val nodeLock: Any = Any()
+
         val isAlive: Boolean
             get() {
                 if (!isEnabled) return false
@@ -216,17 +218,19 @@ object ProxyPool {
             }
 
             if (failing != null) {
-                failing.lastFailureType = failureType
-                failing.consecutiveFailures++
-                failing.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * failing.ewmaSuccessRate
-                val timeout = when (failureType) {
-                    FailureType.NETWORK -> 30_000L
-                    FailureType.TIMEOUT -> 60_000L
-                    FailureType.AUTH, FailureType.UNKNOWN -> DEAD_TIMEOUT_MS
-                }
-                if (failing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                    failing.deadUntilTimestamp = nowMs() + timeout
-                    logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for ${timeout / 1000}s due to $failureType")
+                synchronized(failing.nodeLock) {
+                    failing.lastFailureType = failureType
+                    failing.consecutiveFailures++
+                    failing.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * failing.ewmaSuccessRate
+                    val timeout = when (failureType) {
+                        FailureType.NETWORK -> 30_000L
+                        FailureType.TIMEOUT -> 60_000L
+                        FailureType.AUTH, FailureType.UNKNOWN -> DEAD_TIMEOUT_MS
+                    }
+                    if (failing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                        failing.deadUntilTimestamp = nowMs() + timeout
+                        logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for ${timeout / 1000}s due to $failureType")
+                    }
                 }
             }
 
@@ -265,8 +269,10 @@ object ProxyPool {
                     }
             }
             target?.let {
-                it.consecutiveFailures = 0
-                it.ewmaSuccessRate = 0.2 * 1.0 + 0.8 * it.ewmaSuccessRate
+                synchronized(it.nodeLock) {
+                    it.consecutiveFailures = 0
+                    it.ewmaSuccessRate = 0.2 * 1.0 + 0.8 * it.ewmaSuccessRate
+                }
             }
         }
     }
@@ -356,17 +362,21 @@ object ProxyPool {
             val code = conn.responseCode
             val latency = System.currentTimeMillis() - start
             val success = code in 200..399
-            node.latencyMs = if (success) latency else -1L
-            if (success) {
-                node.consecutiveFailures = 0
-                node.deadUntilTimestamp = 0L
-                node.ewmaSuccessRate = 0.2 * 1.0 + 0.8 * node.ewmaSuccessRate
-            } else {
-                node.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * node.ewmaSuccessRate
+            synchronized(node.nodeLock) {
+                node.latencyMs = if (success) latency else -1L
+                if (success) {
+                    node.consecutiveFailures = 0
+                    node.deadUntilTimestamp = 0L
+                    node.ewmaSuccessRate = 0.2 * 1.0 + 0.8 * node.ewmaSuccessRate
+                } else {
+                    node.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * node.ewmaSuccessRate
+                }
             }
             success
         } catch (_: Throwable) {
-            node.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * node.ewmaSuccessRate
+            synchronized(node.nodeLock) {
+                node.ewmaSuccessRate = 0.2 * 0.0 + 0.8 * node.ewmaSuccessRate
+            }
             false
         } finally {
             conn?.disconnect()
@@ -412,17 +422,19 @@ object ProxyPool {
                         val latency = System.currentTimeMillis() - start
                         val success = code in 200..399
 
-                        node.latencyMs = if (success) latency else -1L
-                        if (success) {
-                            node.consecutiveFailures = 0
-                            node.deadUntilTimestamp = 0L
-                        } else {
-                            node.lastFailureType = if (code == 401 || code == 407) FailureType.AUTH else FailureType.NETWORK
-                            node.consecutiveFailures++
-                            val timeout = if (node.lastFailureType == FailureType.AUTH) DEAD_TIMEOUT_MS else 30_000L
-                            if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                                node.deadUntilTimestamp = nowMs() + timeout
-                                logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (HTTP $code); disabled for ${timeout / 1000}s")
+                        synchronized(node.nodeLock) {
+                            node.latencyMs = if (success) latency else -1L
+                            if (success) {
+                                node.consecutiveFailures = 0
+                                node.deadUntilTimestamp = 0L
+                            } else {
+                                node.lastFailureType = if (code == 401 || code == 407) FailureType.AUTH else FailureType.NETWORK
+                                node.consecutiveFailures++
+                                val timeout = if (node.lastFailureType == FailureType.AUTH) DEAD_TIMEOUT_MS else 30_000L
+                                if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                                    node.deadUntilTimestamp = nowMs() + timeout
+                                    logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (HTTP $code); disabled for ${timeout / 1000}s")
+                                }
                             }
                         }
 
@@ -437,12 +449,14 @@ object ProxyPool {
                     } catch (e: Throwable) {
                         val latency = System.currentTimeMillis() - start
                         val isTimeout = e is java.net.SocketTimeoutException
-                        node.lastFailureType = if (isTimeout) FailureType.TIMEOUT else FailureType.NETWORK
-                        node.consecutiveFailures++
-                        val timeout = if (isTimeout) 60_000L else 30_000L
-                        if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                            node.deadUntilTimestamp = nowMs() + timeout
-                            logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (${e.message}); disabled for ${timeout / 1000}s")
+                        synchronized(node.nodeLock) {
+                            node.lastFailureType = if (isTimeout) FailureType.TIMEOUT else FailureType.NETWORK
+                            node.consecutiveFailures++
+                            val timeout = if (isTimeout) 60_000L else 30_000L
+                            if (node.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                                node.deadUntilTimestamp = nowMs() + timeout
+                                logW(TAG, "Proxy ${node.host}:${node.port} tripped circuit breaker during health check (${e.message}); disabled for ${timeout / 1000}s")
+                            }
                         }
                         results[node.id] = mapOf(
                             "id" to node.id,

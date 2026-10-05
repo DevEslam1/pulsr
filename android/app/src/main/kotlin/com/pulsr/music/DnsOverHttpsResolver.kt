@@ -40,9 +40,10 @@ object DnsOverHttpsResolver {
         return false
     }
 
-    private fun putInCache(hostname: String, address: InetAddress, now: Long) {
+    private fun putInCache(hostname: String, address: InetAddress, ttlSeconds: Long, now: Long) {
+        val ttlMs = (ttlSeconds * 1000L).coerceIn(30_000L, CACHE_TTL_MS)
         synchronized(cacheLock) {
-            dnsCache[hostname] = address to now
+            dnsCache[hostname] = address to (now + ttlMs)
         }
     }
 
@@ -50,7 +51,7 @@ object DnsOverHttpsResolver {
         val now = System.currentTimeMillis()
         val cached = synchronized(cacheLock) {
             dnsCache[hostname]?.let { entry ->
-                if ((now - entry.second) < CACHE_TTL_MS) {
+                if (now < entry.second) {
                     entry.first
                 } else {
                     dnsCache.remove(hostname)
@@ -65,21 +66,21 @@ object DnsOverHttpsResolver {
         // Try Cloudflare DoH first (A, then AAAA)
         val cfResolved = resolveViaCloudflare(hostname)
         if (cfResolved != null) {
-            putInCache(hostname, cfResolved, now)
-            return cfResolved
+            putInCache(hostname, cfResolved.first, cfResolved.second, now)
+            return cfResolved.first
         }
 
         // Fallback to Google DoH (A, then AAAA)
         val googleResolved = resolveViaGoogle(hostname)
         if (googleResolved != null) {
-            putInCache(hostname, googleResolved, now)
-            return googleResolved
+            putInCache(hostname, googleResolved.first, googleResolved.second, now)
+            return googleResolved.first
         }
 
         return null
     }
 
-    private fun queryDoH(baseUrl: String, hostname: String, recordType: String): InetAddress? {
+    private fun queryDoH(baseUrl: String, hostname: String, recordType: String): Pair<InetAddress, Long>? {
         return runCatching {
             val url = URL("$baseUrl?name=$hostname&type=$recordType")
             // Bypass proxy — DoH must reach the resolver even when a custom
@@ -103,13 +104,13 @@ object DnsOverHttpsResolver {
                         for (i in 0 until answers.length()) {
                             val ans = answers.getJSONObject(i)
                             val type = ans.optInt("type")
-                            val ttl = ans.optInt("TTL", 0)
-                            if (ttl <= 0) continue
+                            val ttl = ans.optLong("TTL", 0L)
+                            if (ttl <= 0L) continue
                             // Type 1 = A, Type 28 = AAAA
                             if (type == 1 || type == 28) {
                                 val ip = ans.optString("data")
                                 if (ip.isNotEmpty() && isNumericIp(ip)) {
-                                    return@runCatching InetAddress.getByName(ip)
+                                    return@runCatching (InetAddress.getByName(ip) to ttl)
                                 }
                             }
                         }
@@ -122,12 +123,12 @@ object DnsOverHttpsResolver {
         }.getOrNull()
     }
 
-    private fun resolveViaCloudflare(hostname: String): InetAddress? {
+    private fun resolveViaCloudflare(hostname: String): Pair<InetAddress, Long>? {
         return queryDoH("https://1.1.1.1/dns-query", hostname, "A")
             ?: queryDoH("https://1.1.1.1/dns-query", hostname, "AAAA")
     }
 
-    private fun resolveViaGoogle(hostname: String): InetAddress? {
+    private fun resolveViaGoogle(hostname: String): Pair<InetAddress, Long>? {
         return queryDoH("https://dns.google/resolve", hostname, "A")
             ?: queryDoH("https://dns.google/resolve", hostname, "AAAA")
     }

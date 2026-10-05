@@ -118,11 +118,9 @@ class MediaScannerService {
   Future<bool> checkPermission() async {
     if (Platform.isAndroid) {
       final audio = await Permission.audio.status;
+      if (audio.isGranted || audio.isLimited) return true;
       final storage = await Permission.storage.status;
-      return audio.isGranted ||
-          audio.isLimited ||
-          storage.isGranted ||
-          storage.isLimited;
+      return storage.isGranted || storage.isLimited;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.status;
       return status.isGranted || status.isLimited;
