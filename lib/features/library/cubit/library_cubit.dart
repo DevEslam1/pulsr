@@ -155,9 +155,16 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       _songsLimit = songsPageSize;
       _hasMoreSongs = false;
     }
-    final excludedRes = await _folderUseCases.getExcludedFolders();
-    if (isClosed || t != _songsToken) return;
-    final excluded = excludedRes.fold((l) => <String>[], (r) => r);
+    List<String> excluded = const [];
+    try {
+      final excludedRes = await _folderUseCases.getExcludedFolders();
+      if (isClosed || t != _songsToken) return;
+      excluded = excludedRes.fold((l) => <String>[], (r) => r);
+    } catch (e, st) {
+      if (isClosed || t != _songsToken) return;
+      ErrorLogger.log('Failed to fetch excluded folders in _subscribeSongs',
+          error: e, stackTrace: st, category: 'LibraryCubit');
+    }
     // Top-rated sort is prefs-backed: SQL has no rating column, so watch a
     // bounded window and sort in Dart. 5000 covers realistic libraries
     // without holding the full table; pagination is disabled in this mode
@@ -588,22 +595,32 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
       return;
     }
-    final excluded = (await _folderUseCases.getExcludedFolders())
-        .fold((_) => <String>[], (r) => r);
-    if (isClosed) return;
-    final res = await repo
-        .watchAllSongs(limit: selectAllCap, excludedFolders: excluded)
-        .first;
-    if (isClosed) return;
-    res.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (songs) => safeEmit(state.copyWith(
-          selectedSongIds: songs.map((s) => s.id).toSet(),
-          isMultiSelectMode: true,
-          errorMessage: songs.length >= selectAllCap
-              ? 'Selected first $selectAllCap tracks (library exceeds cap)'
-              : null)),
-    );
+    try {
+      final excludedRes = await _folderUseCases.getExcludedFolders();
+      final excluded = excludedRes.fold((_) => <String>[], (r) => r);
+      if (isClosed) return;
+      final res = await repo
+          .watchAllSongs(limit: selectAllCap, excludedFolders: excluded)
+          .first
+          .timeout(const Duration(seconds: 3));
+      if (isClosed) return;
+      res.fold(
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (songs) => safeEmit(state.copyWith(
+            selectedSongIds: songs.map((s) => s.id).toSet(),
+            isMultiSelectMode: true,
+            errorMessage: songs.length >= selectAllCap
+                ? 'Selected first $selectAllCap tracks (library exceeds cap)'
+                : null)),
+      );
+    } catch (e, st) {
+      if (isClosed) return;
+      ErrorLogger.log('selectAllSongs failed, falling back to loaded songs',
+          error: e, stackTrace: st, category: 'LibraryCubit');
+      final allIds = state.songs.map((s) => s.id).toSet();
+      safeEmit(
+          state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
+    }
   }
 
   void clearSelection() {

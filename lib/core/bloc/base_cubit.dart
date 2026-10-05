@@ -100,6 +100,7 @@ abstract class PulsrCubit<S> extends Cubit<S> {
         }
       },
       onError: (Object e, StackTrace s) {
+        if (_closed || isClosed) return;
         if (onError != null) {
           onError(e, s);
         } else {
@@ -157,6 +158,10 @@ abstract class PulsrCubit<S> extends Cubit<S> {
   /// Already-fired/cancelled timers are pruned so repeated debounce churn
   /// cannot grow the registry.
   Timer autoTimer(Timer timer) {
+    if (_closed || isClosed) {
+      timer.cancel();
+      return timer;
+    }
     _timers.removeWhere((t) => !t.isActive);
     _timers.add(timer);
     return timer;

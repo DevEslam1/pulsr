@@ -442,7 +442,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
                   final prefixRes = await _searchUseCase
                       .searchSongs(boundedQuery.substring(0, 2),
                           excludedFolders: excluded, limit: _searchLimit)
-                      .first;
+                      .first
+                      .timeout(const Duration(seconds: 2));
                   // BUG FIX: re-check against the *emission*, not just the
                   // generation, so a slow fallback can't overwrite a newer
                   // emission of the same live stream.

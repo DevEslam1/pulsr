@@ -217,6 +217,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           .loginState
           .addListener(_onYtmLoginStateChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_disposed || isClosed) return;
         autoTimer(Timer(const Duration(seconds: 2), () {
           if (!isClosed) {
             autoFetchOnlineLibrary(force: true);
@@ -372,6 +373,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       }
     } finally {
       _cacheSaveRunning = false;
+      if (_cacheSaveQueue.isNotEmpty && !_disposed && !isClosed) {
+        unawaited(_drainCacheSaveQueue());
+      }
     }
   }
 

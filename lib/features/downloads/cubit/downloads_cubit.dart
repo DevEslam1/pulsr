@@ -359,8 +359,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   Future<void> deleteDownload(String videoId) async {
     final result = await _deleteDownloadUseCase(videoId);
     if (isClosed) return;
-    result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+    await result.fold(
+      (failure) async =>
+          safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) async {
         await _deleteMutex.protect(() async {
           _lastEmitTimeByVideoId.remove(videoId);

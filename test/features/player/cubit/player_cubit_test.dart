@@ -1304,8 +1304,8 @@ void main() {
 
         await cubit.playSong(song);
 
-        // PlaySong should set isPlaying to true
-        expect(cubit.state.isPlaying, isTrue);
+        // BUG-3 FIX: playSong does not optimistically set isPlaying before engine confirmation
+        expect(cubit.state.isPlaying, isFalse);
         expect(cubit.state.currentSong?.id, 555);
 
         // AudioService updates playbackState to playing

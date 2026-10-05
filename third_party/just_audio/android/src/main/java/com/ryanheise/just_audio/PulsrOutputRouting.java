@@ -68,13 +68,13 @@ public final class PulsrOutputRouting {
      * This describes the app stream, not a claim about the downstream DAC/mixer.
      */
     public static synchronized boolean isPlaying() {
-        for (AAudioAudioSink sink : nativeSinks.keySet()) {
+        for (AAudioAudioSink sink : nativeSinks) {
             if (sink.isPlaying() && sink.measuredStream()[1] > 0) return true;
         }
         try {
             Field field = getAudioTrackField();
             if (field == null) return false;
-            for (DefaultAudioSink sink : sinks.keySet()) {
+            for (DefaultAudioSink sink : sinks) {
                 AudioTrack track = (AudioTrack) field.get(sink);
                 if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
             }
@@ -84,7 +84,7 @@ public final class PulsrOutputRouting {
 
     public static synchronized int[] snapshot() {
         int[] nativeFallback = null;
-        for (AAudioAudioSink sink : nativeSinks.keySet()) {
+        for (AAudioAudioSink sink : nativeSinks) {
             int[] measured = sink.measuredStream();
             if (measured[1] == 0) continue;
             nativeFallback = measured;
@@ -94,7 +94,7 @@ public final class PulsrOutputRouting {
             Field field = getAudioTrackField();
             if (field == null) return nativeFallback != null ? nativeFallback : new int[] {0, 0, 0};
             AudioTrack fallback = null;
-            for (DefaultAudioSink sink : sinks.keySet()) {
+            for (DefaultAudioSink sink : sinks) {
                 AudioTrack track = (AudioTrack) field.get(sink);
                 if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
                 fallback = track;

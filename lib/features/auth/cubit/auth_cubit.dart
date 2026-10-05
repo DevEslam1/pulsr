@@ -250,7 +250,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
     safeEmit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
     try {
       final success = await _cloudSyncService.syncAll();
-      if (isClosed) return;
+      if (isClosed || state.user == null) return;
       if (success) {
         safeEmit(state.copyWith(
           syncStatus: SyncStatus.success,
@@ -264,7 +264,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
         ));
       }
     } catch (_) {
-      if (isClosed) return;
+      if (isClosed || state.user == null) return;
       safeEmit(state.copyWith(
         syncStatus: SyncStatus.failure,
         syncError: 'Failed to sync with cloud. Check internet connection.',

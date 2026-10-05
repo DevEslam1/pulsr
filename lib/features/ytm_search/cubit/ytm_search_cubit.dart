@@ -24,6 +24,12 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
   final ValueNotifier<List<String>> historyNotifier =
       ValueNotifier<List<String>>(const []);
+  bool _historyDisposed = false;
+
+  void _updateHistoryNotifier(List<String> list) {
+    if (_historyDisposed || isClosed) return;
+    historyNotifier.value = List.unmodifiable(list.take(10));
+  }
 
   YtmSearchCubit({required YtmService service})
       : _service = service,
@@ -43,9 +49,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
   void _loadHistory() {
     unawaited(getSearchHistory().then((list) {
-      if (!isClosed) {
-        historyNotifier.value = List.unmodifiable(list.take(10));
-      }
+      _updateHistoryNotifier(list);
     }).catchError((_) {}));
   }
 
@@ -71,9 +75,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       list.insert(0, q);
       if (list.length > _maxHistory) list.removeRange(_maxHistory, list.length);
       await prefs.setStringList(_historyKey, list);
-      if (!isClosed) {
-        historyNotifier.value = List.unmodifiable(list.take(10));
-      }
+      _updateHistoryNotifier(list);
     } catch (e, st) {
       // FIX-A05: Log failure to save history
       ErrorLogger.log('Failed to save query to search history',
@@ -88,9 +90,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       final list = prefs.getStringList(_historyKey) ?? [];
       list.removeWhere((e) => e.toLowerCase() == q);
       await prefs.setStringList(_historyKey, list);
-      if (!isClosed) {
-        historyNotifier.value = List.unmodifiable(list.take(10));
-      }
+      _updateHistoryNotifier(list);
     } catch (e, st) {
       ErrorLogger.log('Failed to remove query from search history',
           error: e, stackTrace: st, category: 'YtmSearchCubit');
@@ -101,9 +101,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_historyKey);
-      if (!isClosed) {
-        historyNotifier.value = const [];
-      }
+      _updateHistoryNotifier(const []);
     } catch (e, st) {
       // FIX-A05: Log failure to clear history
       ErrorLogger.log('Failed to clear search history',
@@ -158,16 +156,19 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   Future<void> retry() => _executeSearch(state.query);
 
   Future<void> retryAfterCooldown() async {
+    final gen = _generation;
+    final query = state.query;
     if (_service.isBotCoolingDown) {
       safeEmit(state.copyWith(
         errorMessage:
             'YouTube is rate-limiting requests. Please wait a few minutes.',
       ));
-      while (_service.isBotCoolingDown && !isClosed) {
+      while (_service.isBotCoolingDown && !isClosed && gen == _generation) {
         await Future.delayed(const Duration(milliseconds: 500));
       }
-      if (isClosed) return;
+      if (isClosed || gen != _generation) return;
     }
+    if (query != state.query) return;
     await retry();
   }
 
@@ -314,7 +315,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     // H-04: Invalidate any in-flight search so its late network completion
     // cannot still be doing work for a dead cubit.
     _generation++;
-    historyNotifier.value = const [];
+    _historyDisposed = true;
     historyNotifier.dispose();
     return super.close();
   }
