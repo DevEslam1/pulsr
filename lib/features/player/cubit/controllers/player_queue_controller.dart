@@ -234,7 +234,14 @@ class PlayerQueueController {
         currentSong: song,
         duration: Duration(milliseconds: song.durationMs),
         position: startPos,
-        isPlaying: true,
+        // BUG-3 FIX: do NOT optimistically set isPlaying=true before loadQueue
+        // is called. There is an async gap between this emit and the loadQueue
+        // call below; if the cubit closes or the load fails in that window the
+        // state would permanently claim the track is playing. The playbackState
+        // observer in PlayerCubit flips isPlaying=true once the engine confirms
+        // playback. Keep the previous isPlaying value here so the UI does not
+        // flicker to "playing" and immediately back to "paused" on a fast navigation.
+        isPlaying: state.isPlaying,
         errorMessage: null,
       ),
       lyricsSlice: state.lyricsSlice.copyWith(
@@ -276,20 +283,26 @@ class PlayerQueueController {
         }
         _debouncedPersistQueueSlots();
         _bumpQueueVersion();
-        final s = _getState();
-        _emit(s.copyWith(
-          queueSlice: s.queueSlice.copyWith(
+        // BUG-4 FIX: build the rollback state entirely from the pre-call
+        // snapshots (prev*). The old code fetched _getState() for the playback
+        // sub-tree and mixed it with prev* values for the queue sub-tree. If a
+        // position tick or any other async observer ran between the optimistic
+        // emit and the error catch, those intermediate values leaked into the
+        // rollback — leaving isPlaying/position/etc. inconsistent with the
+        // reverted queue. Using a fully captured snapshot avoids the mismatch.
+        _emit(state.copyWith(
+          queueSlice: state.queueSlice.copyWith(
             queue: prevQueue,
             currentIndex: prevIndex,
           ),
-          playback: s.playback.copyWith(
+          playback: state.playback.copyWith(
             currentSong: prevSong,
             duration: prevDuration,
             position: prevPosition,
             isPlaying: false,
             errorMessage: 'Failed to play ${song.title}',
           ),
-          lyricsSlice: s.lyricsSlice.copyWith(
+          lyricsSlice: state.lyricsSlice.copyWith(
             lyrics: prevLyrics,
             lyricsSource: prevLyricsSource,
           ),

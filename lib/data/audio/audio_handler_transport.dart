@@ -94,33 +94,13 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     } catch (_) {
       // Haptics are best-effort across platforms
     }
-    // Optimistic UI: emit locally first so the slider feels instant,
-    // then debounce the backend call to avoid jitter during scrubbing.
-    // NOTE: PlayerCubit already throttles scrub floods (100ms). This layer
-    // only coalesces sub-60ms bursts, so a discrete tap passes through a
-    // single layer, not two stacked 100ms windows.
+    // BUG-1 FIX: The cubit-layer PlayerSeekThrottle is the canonical throttle
+    // (coalesces drag floods at 100ms and routes discrete taps to seekDirect).
+    // A second 60ms debounce here stacked both windows (up to 160ms total lag)
+    // and caused seekDirect to still hit a 100ms window check first.
+    // This method is now a thin pass-through: clamp, optimistic broadcast, seek.
     if (position < Duration.zero) position = Duration.zero;
     _positionSubject.add(position);
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastSeekMs < 60) {
-      _pendingSeekPosition = position;
-      _seekDebounceTimer?.cancel();
-      _seekDebounceTimer = Timer(const Duration(milliseconds: 60), () {
-        final pending = _pendingSeekPosition;
-        _pendingSeekPosition = null;
-        if (pending != null) {
-          _performSeek(pending).catchError((Object e, StackTrace st) {
-            ErrorLogger.log('Debounced seek failed',
-                error: e, stackTrace: st, category: 'AudioHandler');
-          });
-        }
-      });
-      return;
-    }
-    _lastSeekMs = now;
-    // A newer direct seek supersedes any debounced one still waiting to fire.
-    _pendingSeekPosition = null;
-    _seekDebounceTimer?.cancel();
     await _performSeek(position);
   }
 
@@ -131,9 +111,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     ErrorLogger.addBreadcrumb('Playback seekDirect to ${position.inSeconds}s',
         category: 'player');
     _positionSubject.add(position);
-    _lastSeekMs = DateTime.now().millisecondsSinceEpoch;
-    _pendingSeekPosition = null;
-    _seekDebounceTimer?.cancel();
     await _performSeek(position);
   }
 
@@ -194,7 +171,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         // Native advance: invalidate any in-flight manual playSongAt resolve so
         // a slow YouTube URL fetch cannot clobber the new current item.
         _playGeneration++;
-        if (_activePlayer.hasNext) {
+        if (_activePlayer.hasNext && _songs.isNotEmpty) {
           await _activePlayer.seekToNext();
           if (wasPlaying) {
             await _activePlayer.play();
@@ -712,7 +689,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     if (_songs.isEmpty) return;
     final wasPlaying = _activePlayer.playing;
     if (_currentIndex >= 0 && _currentIndex < _songs.length) {
-      if (_songs.length == 1) return; // nothing but the current track
+      // BUG-6 FIX: removed the early return for a single-song queue. When only
+      // the current track remains, the queue stream still needs to be broadcast
+      // so listeners (notification, widget) reflect the single-song state.
       // Remove every other track back-to-front through the state machine so
       // _shuffleHistory and _currentIndex stay consistent (assigning a new
       // list left stale shuffle history -> wrong/out-of-range "Previous").
@@ -727,7 +706,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       _songs.clear();
       _currentIndex = 0;
       _gaplessLoaded = false;
-      queue.add([]);
+      // BUG-6 FIX: removed the redundant queue.add([]) here. The single
+      // queue.add at the end of the method is the sole broadcast for both
+      // branches, preventing the double-emit that left listeners out of sync.
       mediaItem.add(null);
       await stop();
     }
@@ -905,9 +886,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   DateTime? get _lastPreviousTapTime;
   set _lastPreviousTapTime(DateTime? value);
 
-  int get _lastSeekMs;
-  set _lastSeekMs(int value);
-
   Future<void> _loadGaplessQueue(
       {Duration? initialPosition, bool preload = true});
 
@@ -917,9 +895,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   Duration? get _pendingLazyPosition;
   set _pendingLazyPosition(Duration? value);
-
-  Duration? get _pendingSeekPosition;
-  set _pendingSeekPosition(Duration? value);
 
   double get _pitch;
   set _pitch(double value);
@@ -941,8 +916,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   Future<void> saveCurrentPositionImmediate();
 
-  Timer? get _seekDebounceTimer;
-  set _seekDebounceTimer(Timer? value);
 
   List<SongsTableData> get _songs;
 

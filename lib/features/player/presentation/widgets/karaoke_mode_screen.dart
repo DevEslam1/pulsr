@@ -42,7 +42,10 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // System UI mode is applied exclusively in didChangeDependencies (which
+    // always runs after initState and has the orientation info). Setting
+    // immersiveSticky here unconditionally flashed the hidden status bar for
+    // one frame when entering karaoke in portrait.
   }
 
   void _recordTapTiming(Duration currentPos, Duration targetTime) {

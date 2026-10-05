@@ -401,7 +401,10 @@ class CrossfadeManager {
     // cancel()/dispose() may have run while the arm call above was awaiting.
     // Bail out and drop any curve we just armed, or the player stays muted.
     if (_fadeId != fadeId) {
-      if (nativeArmed) _clearNativeCurve(player);
+      // Cancelled while arming. Clear unconditionally: the native side may have
+      // already applied the curve and still reported false (interrupted), so
+      // gating the clear on nativeArmed could leave a stale 1→0 curve armed.
+      _clearNativeCurve(player);
       if (!completer.isCompleted) completer.complete();
       return;
     }
@@ -542,8 +545,10 @@ class CrossfadeManager {
     });
     final oldArmed = await _armNativeCurve(active, oldCurve, segmentMs);
     if (_fadeId != fadeId) {
-      // Cancelled while arming: do not record/leave the curve armed.
-      if (oldArmed) _clearNativeCurve(active);
+      // Cancelled while arming. Clear unconditionally: the native side may have
+      // already applied the curve and still reported false (interrupted), so
+      // gating the clear on oldArmed could leave a stale outgoing curve armed.
+      _clearNativeCurve(active);
       if (!completer.isCompleted) completer.complete();
       return;
     }

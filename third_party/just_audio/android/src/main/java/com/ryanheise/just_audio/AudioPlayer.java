@@ -125,6 +125,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private volatile boolean aaudioOutputEnabled = false;
     private boolean aaudioPreferExclusive = true;
     private int aaudioTargetBufferMs = 150;
+    // Pulsr fork: strong references to the active sinks so PulsrOutputRouting
+    // can call unobserve() when they are replaced (HashSet requires explicit removal).
+    private DefaultAudioSink currentDefaultSink = null;
+    private AAudioAudioSink currentNativeSink = null;
     private Integer errorCode;
     private String errorMessage;
     private Integer currentIndex;
@@ -531,13 +535,28 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
                             aaudioTargetBufferMs);
                     effective = probe != 0L;
+                    // Bug 6 fix: if exclusive mode was requested, confirm the probe
+                    // actually opened an exclusive stream. A device may silently grant
+                    // shared mode instead, which is not bit-perfect.
+                    if (effective && aaudioPreferExclusive
+                            && !AaudioNativeBridge.nativeIsExclusive(probe)) {
+                        effective = false;
+                        Log.w(TAG, "AAudio probe opened in shared mode; exclusive not available");
+                    }
                     if (effective && format == null && requestedRate == null) {
                         int otherRate = (rate == 48000) ? 44100 : 48000;
                         long probeOther = AaudioNativeBridge.nativeOpen(otherRate, channels,
                                 AaudioNativeBridge.ENCODING_PCM_I16, aaudioPreferExclusive,
                                 aaudioTargetBufferMs);
                         if (probeOther != 0L) {
+                            // Also verify exclusive mode for the second rate probe.
+                            boolean otherExclusive = !aaudioPreferExclusive
+                                    || AaudioNativeBridge.nativeIsExclusive(probeOther);
                             AaudioNativeBridge.nativeClose(probeOther);
+                            if (!otherExclusive) {
+                                effective = false;
+                                Log.w(TAG, "AAudio secondary probe opened in shared mode; exclusive not available");
+                            }
                         } else {
                             effective = false;
                         }
@@ -992,6 +1011,16 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         AudioAttributes attributes = player.getAudioAttributes();
         player.removeListener(this);
         PulsrOutputRouting.unregister(player);
+        // Unobserve the active sinks before releasing, so the routing registry
+        // doesn't hold stale strong references (companion to Bug 5 HashSet fix).
+        if (currentNativeSink != null) {
+            PulsrOutputRouting.unobserve(currentNativeSink);
+            currentNativeSink = null;
+        }
+        if (currentDefaultSink != null) {
+            PulsrOutputRouting.unobserve(currentDefaultSink);
+            currentDefaultSink = null;
+        }
         player.release();
         player = null;
         if (dspAudioProcessor != null) {
@@ -1039,6 +1068,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         try {
                             AAudioAudioSink nativeSink = new AAudioAudioSink(aaudioPreferExclusive,
                                 aaudioTargetBufferMs);
+                            currentNativeSink = nativeSink;
+                            currentDefaultSink = null;
                             PulsrOutputRouting.observe(nativeSink);
                             return nativeSink;
                         } catch (Throwable t) {
@@ -1051,6 +1082,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                         .setAudioProcessors(enableFloatOutput ? new AudioProcessor[0] : new AudioProcessor[] { dspProcessor })
                         .build();
+                    currentDefaultSink = sink;
+                    currentNativeSink = null;
                     PulsrOutputRouting.observe(sink);
                     return enableFloatOutput ? new FloatDspAudioSink(sink, dspProcessor) : sink;
                 }

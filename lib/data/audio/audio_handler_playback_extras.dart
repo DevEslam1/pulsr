@@ -273,7 +273,9 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<({String url, String? userAgent, String? cookies, String quality})>
       _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
 
-  dynamic get _streamCache;
+  LinkedHashMap<String,
+          ({String url, DateTime expires, String? userAgent, String? cookies})>
+      get _streamCache;
 
   StreamResolutionPipeline get _streamResolutionPipeline;
 
@@ -285,7 +287,7 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
 
   SongsTableData? get currentSong;
 
-  dynamic get dspSnapshotStore;
+  DspSnapshotStore get dspSnapshotStore;
 
   DuckingController get duckingController;
 

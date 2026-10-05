@@ -34,8 +34,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         inputEncoding = format.pcmEncoding;
         processFloat = inputEncoding == C.ENCODING_PCM_FLOAT
                 || inputEncoding == C.ENCODING_PCM_24BIT
-                || inputEncoding == C.ENCODING_PCM_32BIT
-                || inputEncoding == C.ENCODING_PCM_16BIT;
+                || inputEncoding == C.ENCODING_PCM_32BIT;
         if (processFloat) {
             try {
                 processor.configure(new AudioProcessor.AudioFormat(

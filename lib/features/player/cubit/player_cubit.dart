@@ -89,9 +89,14 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   int _queueVersion = 0;
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
-  // Guards a SponsorBlock auto-skip seek so overlapping position ticks cannot
-  // fire a second seek while the first is still in flight.
-  bool _isSponsorBlockSeeking = false;
+  // BUG-2 FIX: replaced the boolean _isSponsorBlockSeeking with a generation
+  // counter. The old boolean was reset prematurely because whenComplete() fired
+  // on the Future.value() that PlayerSeekThrottle returns for throttled seeks,
+  // before the actual debounced seek ever ran. A generation counter allows the
+  // in-flight seek to self-cancel if a newer SponsorBlock seek is launched
+  // concurrently, and is only decremented when the seek truly completes.
+  int _sponsorBlockSeekGen = 0;
+  bool get _isSponsorBlockSeeking => _sponsorBlockSeekGen > 0;
 
   Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
 
@@ -375,9 +380,24 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     if (!_negativeIdValues.contains(h)) {
       assigned = h;
     } else {
-      // Fallback: skip any value already in use. The counter lives below the
-      // hash range so it also cannot collide with a hash-derived id.
+      // BUG-5 FIX: added a floor guard. Without it, _nextAssignedNegativeId
+      // could reach dart:core's int.minValue in a very long session with many
+      // hash collisions and wrap to a positive value, colliding with real DB IDs.
+      // The fallback counter lives below the hash range [-1000000001, -2] so it
+      // starts at -1000000002 and is floored at -9000000000000000000.
       do {
+        if (_nextAssignedNegativeId <= -9000000000000000000) {
+          // Safety reset: clear the cache and restart the counter. This is a
+          // last-resort guard for pathological multi-day sessions.
+          _negativeIdValues.removeWhere((v) => v < -1000000001);
+          _remoteIdToNegativeId
+              .removeWhere((_, v) => v < -1000000001);
+          _nextAssignedNegativeId = -1000000002;
+          ErrorLogger.log(
+            'Negative ID counter reset after floor guard triggered',
+            category: 'PlayerCubit',
+          );
+        }
         assigned = _nextAssignedNegativeId--;
       } while (_negativeIdValues.contains(assigned));
     }
@@ -665,13 +685,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         widgetBridge.updateWidgetProgressThrottled(state);
         // SponsorBlock auto-skip: jump past a skippable segment when one covers
         // the current position. Guarded so overlapping ticks never double-seek.
+        // BUG-2 FIX: use a generation counter instead of a boolean so the guard
+        // is cleared only after the engine seek completes, not when the
+        // Future.value() from a throttled seek resolves immediately.
         if (!_isSponsorBlockSeeking) {
           final skipTarget =
               metadataController.sponsorBlockSkipTarget(pos, isPlaying: true);
           if (skipTarget != null) {
-            _isSponsorBlockSeeking = true;
+            final myGen = ++_sponsorBlockSeekGen;
             unawaited(seek(skipTarget).whenComplete(() {
-              _isSponsorBlockSeeking = false;
+              // Only decrement if this is still the active seek generation.
+              if (_sponsorBlockSeekGen == myGen) _sponsorBlockSeekGen = 0;
             }));
           }
         }

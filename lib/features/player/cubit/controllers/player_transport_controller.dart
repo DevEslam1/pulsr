@@ -322,12 +322,24 @@ class PlayerTransportController {
   Future<void> fastForward(
       [Duration step = const Duration(seconds: 10)]) async {
     final state = _getState();
-    await seek(state.position + step);
+    // BUG-7 FIX: clamp at source. Relying solely on PlayerSeekThrottle's
+    // downstream clamp is brittle when state.duration is not yet populated.
+    var target = state.position + step;
+    if (target < Duration.zero) target = Duration.zero;
+    if (state.duration > Duration.zero && target > state.duration) {
+      target = state.duration;
+    }
+    await seek(target);
   }
 
   Future<void> rewind([Duration step = const Duration(seconds: 10)]) async {
     final state = _getState();
-    await seek(state.position - step);
+    // BUG-7 FIX: clamp to Duration.zero at source so a negative value is never
+    // passed to seek(), making the intent explicit rather than relying on the
+    // throttle's isNegative check as a silent side-effect.
+    var target = state.position - step;
+    if (target < Duration.zero) target = Duration.zero;
+    await seek(target);
   }
 
   void dispose() {

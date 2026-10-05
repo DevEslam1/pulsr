@@ -5,15 +5,19 @@ import android.media.AudioTrack;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import java.lang.reflect.Field;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 
 /** App-owned media routing. Preferences and measured routes are deliberately separate. */
 @androidx.media3.common.util.UnstableApi
 public final class PulsrOutputRouting {
     private static final Map<ExoPlayer, Boolean> players = new WeakHashMap<>();
-    private static final Map<DefaultAudioSink, Boolean> sinks = new WeakHashMap<>();
-    private static final Map<AAudioAudioSink, Boolean> nativeSinks = new WeakHashMap<>();
+    // Use explicit-lifetime sets for sinks: WeakHashMap risks silent GC-collection
+    // of active sinks if the renderer holds the only strong reference internally.
+    private static final Set<DefaultAudioSink> sinks = new HashSet<>();
+    private static final Set<AAudioAudioSink> nativeSinks = new HashSet<>();
     private static AudioDeviceInfo preferred;
     private static Field audioTrackField;
     private static boolean reflectionWarningLogged = false;
@@ -44,9 +48,13 @@ public final class PulsrOutputRouting {
 
     public static synchronized void unregister(ExoPlayer player) { players.remove(player); }
 
-    public static synchronized void observe(DefaultAudioSink sink) { sinks.put(sink, true); }
+    public static synchronized void observe(DefaultAudioSink sink) { sinks.add(sink); }
 
-    public static synchronized void observe(AAudioAudioSink sink) { nativeSinks.put(sink, true); }
+    public static synchronized void unobserve(DefaultAudioSink sink) { sinks.remove(sink); }
+
+    public static synchronized void observe(AAudioAudioSink sink) { nativeSinks.add(sink); }
+
+    public static synchronized void unobserve(AAudioAudioSink sink) { nativeSinks.remove(sink); }
 
     public static synchronized boolean select(AudioDeviceInfo device) {
         try {

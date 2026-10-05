@@ -521,7 +521,15 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   FormatAwareDecoder get _formatDecoder;
 
-  dynamic get _inFlightResolves;
+  Map<
+      String,
+      Future<
+          ({
+            String url,
+            String? userAgent,
+            String? cookies,
+            String quality
+          })>> get _inFlightResolves;
 
   AudioPlayer get _inactivePlayer;
 
@@ -554,7 +562,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   List<SongsTableData> get _songs;
 
-  dynamic get _streamCache;
+  LinkedHashMap<String,
+          ({String url, DateTime expires, String? userAgent, String? cookies})>
+      get _streamCache;
 
   YtmService get _ytmService;
 
@@ -564,7 +574,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   SongsTableData? get currentSong;
 
-  dynamic get dspSnapshotStore;
+  DspSnapshotStore get dspSnapshotStore;
 
   Future<bool> recallDspSnapshotFor(SongsTableData song);
 

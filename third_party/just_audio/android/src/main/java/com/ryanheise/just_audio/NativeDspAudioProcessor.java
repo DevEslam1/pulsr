@@ -330,14 +330,14 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
         synchronized (rampLock) {
             if (rampGains == null) {
+                // No active curve: restore transparent unity so a seek or
+                // track-change from a paused state doesn't hold a stale gain.
                 staticGain = 1.0f;
+                rampPosFrames = 0;
             }
+            // An in-flight curve (rampPosFrames > 0) is intentionally preserved:
+            // seeking within a crossfade must not snap the fade back to curve[0].
         }
-        // Media3/ExoPlayer flushes on ordinary seeks within the same stream,
-        // not only on genuinely new sources. Do NOT reset an in-flight curve
-        // (rampPosFrames > 0), otherwise a seek snaps an active fade-out back
-        // to full volume (rampGains[0]). A newly armed curve already sets
-        // rampPosFrames = 0 and staticGain = rampGains[0] in setGainCurve().
     }
 
     @Override

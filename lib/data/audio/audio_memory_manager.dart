@@ -231,7 +231,9 @@ class AudioMemoryManager {
   }
 
   /// Trims stream cache map to [maxStreamCacheEntries] (oldest-inserted first).
-  static void trimStreamCache<T>(Map<String, T> cache) {
+  /// Typed as [LinkedHashMap] because the eviction relies on insertion-order
+  /// iteration; a plain [Map] gives no ordering guarantee.
+  static void trimStreamCache<T>(LinkedHashMap<String, T> cache) {
     if (cache.length > maxStreamCacheEntries) {
       final excess = cache.length - maxStreamCacheEntries;
       final keysToRemove = cache.keys.take(excess).toList();

@@ -236,20 +236,21 @@ public final class AAudioAudioSink implements AudioSink {
             direct.flip();
             int written = AaudioNativeBridge.nativeWrite(handle, direct, 0,
                     remaining);
-            if (written <= 0 || written > remaining) {
+            if (written < 0) {
                 throw new WriteException(-1, configuredFormat,
-                        /* isRecoverable= */ false);
+                        /* isRecoverable= */ true);
             }
             updateMeasuredRoute();
+            // Advance only by actually consumed bytes; Media3 retries if hasRemaining().
             buffer.position(buffer.position() + written);
             return !buffer.hasRemaining();
         }
         int offset = buffer.position();
         int written = AaudioNativeBridge.nativeWrite(handle, buffer, offset,
                 remaining);
-        if (written <= 0 || written > remaining) {
+        if (written < 0) {
             throw new WriteException(-1, configuredFormat,
-                    /* isRecoverable= */ false);
+                    /* isRecoverable= */ true);
         }
         updateMeasuredRoute();
         buffer.position(offset + written);

@@ -19,6 +19,10 @@ class PlaybackStateCoordinator {
   int _lastHighRatePositionEmitMs = 0;
 
   bool _positionDirty = false;
+  /// Guards against overlapping persist calls: a slow save (longer than the
+  /// 2s periodic tick, or a manual [triggerSaveIfDirty]) must not start a
+  /// second write while the first is still in flight.
+  bool _saveInFlight = false;
   Timer? _saveTimer;
   bool _disposed = false;
 
@@ -56,8 +60,9 @@ class PlaybackStateCoordinator {
   /// immediately see it clean) and restored if the callback fails, so a failed
   /// write is retried on the next tick (BUG-10).
   void _executeSave() {
-    if (_disposed || !_positionDirty) return;
+    if (_disposed || !_positionDirty || _saveInFlight) return;
     _positionDirty = false;
+    _saveInFlight = true;
     final positionAtSave = _lastEmittedPosition;
     try {
       onSavePositionRequested().then((_) {
@@ -74,8 +79,11 @@ class PlaybackStateCoordinator {
             category: 'PlaybackStateCoordinator',
           );
         }
+      }).whenComplete(() {
+        _saveInFlight = false;
       });
     } catch (e, st) {
+      _saveInFlight = false;
       _positionDirty = true;
       if (!_disposed) {
         ErrorLogger.log(
@@ -117,6 +125,16 @@ class PlaybackStateCoordinator {
     }
   }
 
+  /// Resets the emit throttles so the next [onPositionTick] broadcasts on both
+  /// the standard and high-rate streams immediately. Call after a seek: a jump
+  /// to a non-zero position otherwise waits out the 16ms/250ms windows and the
+  /// UI shows a stale position until the next tick.
+  void notifySeek() {
+    if (_disposed) return;
+    _lastHighRatePositionEmitMs = 0;
+    _lastStandardPositionEmitMs = 0;
+  }
+
   /// Marks position as needing persistence on next 2s periodic timer tick.
   void markPositionDirty() {
     if (_disposed) return;
@@ -137,6 +155,7 @@ class PlaybackStateCoordinator {
     _saveTimer?.cancel();
     _saveTimer = null;
     _positionDirty = false;
+    _saveInFlight = false;
     _lastSavedPosition = Duration.zero;
     _lastEmittedPosition = Duration.zero;
     if (!_positionSubject.isClosed) {

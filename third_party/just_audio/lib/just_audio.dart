@@ -1625,7 +1625,6 @@ class AudioPlayer {
       await _currentIndexSubject.close();
       await _loopModeSubject.close();
       await _shuffleModeEnabledSubject.close();
-      await _shuffleModeEnabledSubject.close();
     });
   }
 

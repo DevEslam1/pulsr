@@ -328,12 +328,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   // superseded call cannot load its source into the player.
   @override
   int _playGeneration = 0;
-  // Seek throttling: optimistic UI + debounced backend seeks.
-  @override
-  int _lastSeekMs = 0;
-  @override
-  Duration? _pendingSeekPosition;
-  @override
+  // Seek throttling: optimistic UI only — the cubit-layer PlayerSeekThrottle
+  // is the canonical debounce. _seekDebounceTimer is kept for teardown safety
+  // in stop() and dispose() in case a timer was in flight before this handler
+  // was re-created.
   Timer? _seekDebounceTimer;
   @override
   int _lastSmartPrefetchMs = 0;
