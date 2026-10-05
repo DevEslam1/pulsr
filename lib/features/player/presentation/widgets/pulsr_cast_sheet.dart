@@ -9,7 +9,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../data/db/app_database.dart';
-import '../../../../domain/services/cast_service.dart';
+import '../../../../data/services/cast_service.dart';
 import '../../cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';

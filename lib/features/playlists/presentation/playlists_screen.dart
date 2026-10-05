@@ -29,7 +29,7 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
-import '../../../domain/usecases/playlist_io_usecases.dart';
+import '../../../data/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../../data/db/app_database.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';

@@ -1,4 +1,4 @@
-// lib/domain/models/download_settings.dart
+// lib/data/models/download_settings.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/utils/error_logger.dart'; // FIX-A10: Import ErrorLogger for error reporting
 

@@ -165,13 +165,13 @@ These recur across modules and are the highest-leverage fixes.
    `Exception` (auth), `Either<AppFailure>` (downloads), or string classifiers (YTM search).
    `AppFailure` (`core/errors/failures.dart:4`) and the sealed `Result` (`core/utils/result.dart:10`)
    are two unrelated types with the same name.
-2. **Silent-failure surface is systemic.** Empty-catch ratchets allow **435** (`test/code_hygiene_test.dart:19`)
-   vs **397** (`test/empty_catch_ratchet_test.dart:15`) empty `catch {}` blocks; ~155 sit in
+2. **Silent-failure surface is systemic.** Empty-catch ratchets allow **435** (`test/architecture/code_hygiene_test.dart:19`)
+   vs **397** (`test/architecture/empty_catch_ratchet_test.dart:15`) empty `catch {}` blocks; ~155 sit in
    `lib/data/audio`, 63 in `lib/core`, 38 in `features/settings`.
 3. **Coverage floor is 3.0 %** (`scripts/check_coverage.py:12`) — CI "coverage" is effectively
    unenforced, which is why large presentation surfaces (settings 1747-line screen, playlists 2211,
    home 2073, onboarding 1021) and whole features (queue, ytm_browse, all detail screens) ship untested.
-4. **Fat-file ratchet covers only 5 files** (`test/fat_file_ratchet_test.dart:20-26`). The largest
+4. **Fat-file ratchet covers only 5 files** (`test/architecture/fat_file_ratchet_test.dart:20-26`). The largest
    files are excluded: `ytm_account_service.dart` (3384), `yt_download_service.dart` (1879),
    `ytm_service.dart` (1735), `playlists_screen.dart` (2211), `home_screen.dart` (2073),
    `settings_screen.dart` (1747), `equalizer_sheet.dart` (8050).
@@ -190,9 +190,9 @@ These recur across modules and are the highest-leverage fixes.
 9. **Player feature has real functional defects** (see player/quran below): Quran Mode is never
    persisted/restored, the "Reset Profile" button is inverted, preamp compensation is dead, and queue
    read-modify-write ops are not serialized by the advertised mutex.
-10. **No ADRs for most modules.** Six ADRs cover player/DSP/queue/errors/cache only; there is none
-    for DI, network/proxy, responsive, router, telemetry, settings, library, playlists or domain
-    layering, and ADR-003's mutex claim does not match the code.
+10. **ADR coverage has expanded.** Fifteen ADRs now cover player/DSP/queue/errors/cache plus DI, UI
+    sound design, router, responsive, network/proxy, telemetry, settings, playlists and domain
+    layering (ADR-003 corrected); there is still none for library.
 
 ---
 
@@ -202,7 +202,7 @@ These recur across modules and are the highest-leverage fixes.
 
 | Dimension | Score | Key gap (evidence) |
 |---|:---:|---|
-| Architecture | 6 | Strong controller/manager split + 6 ADRs, but `equalizer_sheet.dart` is an 8050-line God-widget and `PlayerQuranManager` is dead code (`player_quran_manager.dart:10`). |
+| Architecture | 6 | Strong controller/manager split + 15 ADRs, but `equalizer_sheet.dart` is an 8050-line God-widget and `PlayerQuranManager` is dead code (`player_quran_manager.dart:10`). |
 | Bug Density | 5 | `reapplyQuranProfile` restores the pre-Quran snapshot instead of the reciter profile (`player_playback_options_quran.dart:264-273`); Quran snapshot is a library-scoped global (`:10`); `preampDb` dead (`quran_mode_profile.dart:93`). |
 | State Management | 6 | Mute state lives outside state (`player_playback_options_controller.dart:279-311`); global Pre-Quran snapshot shared across instances. |
 | Error Handling | 6 | Silent swallows: `player_queue_slots.dart:424-426`, `player_cubit.dart:644`, `player_queue_warming.dart:24,51`; unguarded native `setQuranAmbience`. |
@@ -212,7 +212,7 @@ These recur across modules and are the highest-leverage fixes.
 | Code Hygiene | 5 | 400-line controller rule evaded via `part` files (`player_queue_slots.dart` 629, `player_dsp_effects.dart` 722); 3 injected deps accepted then ignored (`player_cubit.dart:113,118,119`); heavy `dynamic`. |
 | Security | 7 | Positive: 25 MB IR cap + `SafeFilePath.validate` (`player_dsp_effects.dart:427-434`). Gap: arbitrary-EQ/LiveProg strings sent to native with no length/shape validation (`arbitrary_eq_sheet.dart:52-61`). |
 | Accessibility | 7 | Good Semantics on chrome/seek bar; `QuranPanel` slider lacks `semanticFormatterCallback`; a11y suite only covers chrome/waveform. |
-| CI / DX / ADR | 7 | Strong CI + 6 ADRs; `pubspec` declares Flutter `>=3.29.0` while code uses post-3.41 `onReorderItem`; ADR-003 overstates mutex usage. |
+| CI / DX / ADR | 7 | Strong CI + 15 ADRs; `pubspec` declares Flutter `>=3.41.0`, matching the post-3.41 `onReorderItem` usage; ADR-003 corrected. |
 
 **Top gaps**
 1. **Quran Mode is never persisted or restored** — `QuranModeService` injected but never called (`player_cubit.dart:118`), `PlayerQuranManager` dead, enable/style methods never call `setEnabled`/`setStyle` (`player_playback_options_quran.dart:71-109`). *Impact:* mode resets every launch.
@@ -1008,7 +1008,7 @@ These recur across modules and are the highest-leverage fixes.
 | Concurrency | 7 | Singleton caches; no explicit sync. |
 | Code Hygiene | 6 | Duplicate `PulsrToast`; deprecated aliases still shipped. |
 | Security | N/A | — |
-| Accessibility | 7 | Only 13 of 36 widgets reference semantics; a11y suite covers 4 widgets. |
+| Accessibility | 7 | Only 13 of 37 widgets reference semantics; a11y suite covers 4 widgets. |
 | CI / DX / ADR | 8 | Golden + RTL + a11y suites in CI. |
 
 **Top gaps:** (1) `_weakLargeCache` accumulates dead `WeakReference` entries (`cached_artwork.dart:25,46-55,102-108`); (2) thin a11y coverage; (3) duplicate `PulsrToast`; (4) `PulsrErrorBoundary` only catches synchronous build errors (`:107-115`).
@@ -1245,7 +1245,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` implemented & verified.
 
 ### P0 — security & data-loss (fix first)
 - [x] 1. **Arbitrary file deletion** — `MusicRepository.deleteSongs` now gates on `_isSafeLocalDeletePath` (absolute + audio-extension allowlist + symlink/root containment via `SafeFilePath`; fails safe) (`lib/data/repositories/music_repository.dart`).
-- [x] 2. **WebView host allowlist bypass** — `_isTrustedHost` now uses exact/dotted-suffix matching (`lib/features/auth/presentation/ytm_web_login_sheet.dart`).
+- [x] 2. **WebView host allowlist bypass** — `_isTrustedGoogleNavigation` now uses exact/dotted-suffix matching (`lib/features/auth/presentation/ytm_web_login_sheet.dart`).
 - [x] 3. **Radio SSRF** — `RadioStation.isHttpUrl` rejects loopback/private/link-local/unique-local hosts (`lib/domain/models/radio_station.dart`, reused by `radio_screen.dart`).
 - [x] 4. **Playlists undo deletes songs / silent online delete** — undo restores captured `songIds` via `PlaylistCubit.restorePlaylist`; online delete now confirms (`lib/features/playlists/**`).
 - [x] 5. **Tag editor state sync** — `tag_field_widget.dart` is stateful with a `TextEditingController` synced in `didUpdateWidget`.
@@ -1319,6 +1319,6 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` implemented & verified.
 
 ### Notes
 - The working tree already contained unrelated uncommitted work (a "sound" feature: `sound_feedback_service.dart`, `pulsr_toast.dart`, `pulsr_switch.dart`, `prefs_keys.dart`, `auth_cubit.dart`, `library_screen.dart`, `downloads_cubit.dart`, `sounds.md`, ADR `007-ui-sound-design.md`). It was left intact.
-- `test/playlist_cubit_test.dart` now calls `TestWidgetsFlutterBinding.ensureInitialized()` because the pre-existing sound feature triggers haptics from `PlaylistCubit`.
+- `test/features/playlists/playlist_cubit_test.dart` now calls `TestWidgetsFlutterBinding.ensureInitialized()` because the pre-existing sound feature triggers haptics from `PlaylistCubit`.
 - `ftsRebuildFailed` remains static in `AppDatabase` because off-limits static readers in `music_repository.dart` still use it; the repair budget and `migrationFailed` are now per-instance.
 

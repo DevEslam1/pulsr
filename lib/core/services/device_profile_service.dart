@@ -1,1 +1,1 @@
-﻿export '../../domain/services/device_profile_service.dart';
+export '../../data/services/device_profile_service.dart';

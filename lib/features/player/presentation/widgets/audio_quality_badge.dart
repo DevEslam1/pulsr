@@ -5,7 +5,7 @@ import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../settings/cubit/settings_cubit.dart';
-import '../../../../domain/services/usb_exclusive_service.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'audio_quality_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';

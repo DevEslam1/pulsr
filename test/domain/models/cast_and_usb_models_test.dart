@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/domain/services/cast_service.dart';
-import 'package:pulsr/domain/services/usb_exclusive_service.dart';
+import 'package:pulsr/data/services/cast_service.dart';
+import 'package:pulsr/data/services/usb_exclusive_service.dart';
 
 void main() {
   group('CastDevice.fromMap', () {

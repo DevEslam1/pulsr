@@ -1,6 +1,7 @@
 // lib/features/auth/cubit/auth_cubit.dart
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
@@ -67,7 +68,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
     } catch (e) {
       if (isClosed) return;
       SoundFeedbackService.playError(mirrorHaptics: true);
-      final msg = _mapAuthError(e);
+      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
         errorMessage: msg,
@@ -99,7 +100,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
     } catch (e) {
       if (isClosed) return;
       SoundFeedbackService.playError(mirrorHaptics: true);
-      final msg = _mapAuthError(e);
+      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
         errorMessage: msg,
@@ -131,7 +132,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
     } catch (e) {
       if (isClosed) return;
       SoundFeedbackService.playError(mirrorHaptics: true);
-      final msg = _mapAuthError(e);
+      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
         errorMessage: msg,
@@ -150,7 +151,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
       return true;
     } catch (e) {
       if (isClosed) return false;
-      final msg = _mapAuthError(e);
+      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         errorMessage: msg,
       ));
@@ -158,7 +159,8 @@ class AuthCubit extends PulsrCubit<AuthState> {
     }
   }
 
-  String _mapAuthError(Object e) {
+  @visibleForTesting
+  static String mapAuthError(Object e) {
     // Prefer the typed Firebase error code over parsing `toString()`; the
     // message wording is not a stable API and the code is exhaustive.
     if (e is FirebaseAuthException) {

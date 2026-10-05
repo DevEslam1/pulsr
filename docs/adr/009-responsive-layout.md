@@ -22,7 +22,7 @@ We centralize responsive behaviour under `lib/core/responsive/`, driven by a sin
 `ResponsiveValues<T>` (`responsive_values.dart`) resolves a compact/medium/expanded/large fallback chain, so a value only specifies the tiers where it differs. `ResponsiveSpacing`, `ResponsiveFontSize`, `ResponsiveRadius` and `ResponsiveIconSize` build on it, and `PulsrResponsiveTokens` is reachable as `context.responsive` (padding, gap, font scale, radii, icon sizes).
 
 ### 3. Foldable/hinge awareness
-`PulsrBreakpoint.hinge(context)` inspects `MediaQuery.displayFeaturesOf` for a `hinge`/`fold`, and is exposed as `context.foldableHinge`/`hasFoldableHinge`; `pulsr_hinge_gap.dart` and the two-pane scaffolds consume it to keep content clear of the physical seam.
+`PulsrBreakpoint.hinge(context)` inspects `MediaQuery.maybeDisplayFeaturesOf` for a `hinge`/`fold`, and is exposed as `context.foldableHinge`/`hasFoldableHinge`; `pulsr_hinge_gap.dart` and the two-pane scaffolds consume it to keep content clear of the physical seam.
 
 ### 4. Layout primitives
 `adaptive_grid.dart`, `layout_delegate.dart`, `two_pane_scaffold.dart`, `detail_scaffold.dart`, `responsive_sheet.dart`, `pulsr_layout_metrics.dart` and `landscape_compact_adapter.dart` build the shared list/grid/detail/sheet layouts on top of the tiers, so features compose primitives instead of re-deriving breakpoints.

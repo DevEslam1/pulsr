@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:just_audio/just_audio.dart';
-import '../../../../domain/services/room_correction_service.dart';
+import '../../../../data/services/room_correction_service.dart';
 import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';

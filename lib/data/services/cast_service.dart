@@ -1,4 +1,4 @@
-// lib/domain/services/cast_service.dart
+// lib/data/services/cast_service.dart
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';

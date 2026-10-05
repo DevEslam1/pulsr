@@ -418,6 +418,13 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
 
   Future<void> _applyQuranProfile(QuranModeProfile profile,
       {int? expectedGen}) async {
+    // The audio handler restores its persisted music DSP inside its async
+    // `_init()` and only signals `effectsReady` once that restore is done.
+    // Applying the Quran chain before then let `_restorePreferences()`
+    // overwrite it — the toggle flipped on but the engine stayed on the music
+    // curve ("Quran mode has no effect on the sound"). Await effects-ready so
+    // this apply is the last writer at cold start.
+    await _audioHandler.effectsReady;
     final caps = await detectEarbudCapabilities();
     // Re-read the state AFTER the async capability probe. Capturing it before
     // made every later emit use a stale snapshot, so a style/toggle change

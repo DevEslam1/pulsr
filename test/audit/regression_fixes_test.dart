@@ -9,7 +9,7 @@ import 'package:pulsr/core/services/duplicate_finder_service.dart';
 import 'package:pulsr/data/audio/format_aware_decoder.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_quality_info.dart';
-import 'package:pulsr/domain/services/room_correction_service.dart';
+import 'package:pulsr/data/services/room_correction_service.dart';
 
 SongsTableData _song({
   required int id,

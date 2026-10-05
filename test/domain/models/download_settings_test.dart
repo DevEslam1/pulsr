@@ -1,6 +1,6 @@
 // test/domain/models/download_settings_test.dart
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/domain/models/download_settings.dart';
+import 'package:pulsr/data/models/download_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

@@ -15,6 +15,10 @@
     <!-- USB host access for external USB DACs (hardware volume + UAC
          diagnostics). Not required: the app runs fine without a DAC. -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+    <!-- Media apps that can also run on Android Automotive OS (built-in car
+         head units). Not required: the phone/Android Auto experience is
+         unaffected. -->
+    <uses-feature android:name="android.hardware.type.automotive" android:required="false"/>
     <!-- Set a track as system ringtone (user-initiated only, runtime-gated by Settings.System.canWrite) -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <!-- Required solely for the audio visualizer; requested at runtime only when the user enables it -->

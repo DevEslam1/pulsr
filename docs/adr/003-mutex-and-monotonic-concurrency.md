@@ -14,9 +14,9 @@ We implemented two concurrency hardening mechanisms. Note that the mutex is **no
 
 ### 1. Monotonic Generation Counters
 For async operations where only the latest request's outcome is valid, monotonic integer counters invalidate stale results. These are the primary mechanism used across the player/queue pipeline:
-- `_mediaItemResolutionGen`: Incremented before each track transition. When an async resolution completes, it compares its captured generation against the active counter; if mismatched, the result is discarded silently.
-- `_localMatchSwapGen`: Dedicated generation token for offline twin swaps, preventing background local file swaps from overwriting subsequent tracks when skipping rapidly.
-- `_queueRestorationDone`: Guard flag ensuring that in-flight queue restoration tasks immediately abort if a user explicitly selects a track or switches slots.
+- `_mediaItemResolutionGuard`: Advanced before each track transition. When an async resolution completes, it compares its captured generation against the active counter; if mismatched, the result is discarded silently.
+- `_localMatchSwapGuard`: Dedicated generation token for offline twin swaps, preventing background local file swaps from overwriting subsequent tracks when skipping rapidly.
+- `_queueSyncGuard`: Generation guard ensuring that in-flight queue restoration/synchronization tasks immediately abort if a user explicitly selects a track or switches slots.
 
 ### 2. Targeted Mutex / Lock Serialization
 A `Mutex` is used only where a genuine single-writer read-modify-write or non-atomic check-then-set exists. As of this writing those sites are:

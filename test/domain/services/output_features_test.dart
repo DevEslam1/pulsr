@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/audio_feature_info.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
-import 'package:pulsr/domain/services/hires_audio_service.dart';
+import 'package:pulsr/data/services/hires_audio_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

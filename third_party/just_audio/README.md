@@ -1,5 +1,13 @@
 # just_audio
 
+> **Pulsr vendored fork.** This copy is consumed via
+> `dependency_overrides: just_audio: path: third_party/just_audio` in the root
+> `pubspec.yaml`. It adds the `NativeDspAudioProcessor` ExoPlayer audio sink plus
+> the AAudio/float output sinks and `PulsrOutputRouting` so the Pulsr native DSP
+> library (`libpulsr_dsp`) receives the decoded PCM stream. See
+> `android/src/main/java/com/ryanheise/just_audio/` and `audio_pipeline_reference.md`.
+> Nothing else is changed from upstream.
+
 just_audio is a feature-rich audio player for Android, iOS, macOS, web, Linux and Windows.
 
 [Platform Support](#platform-support) — [API Documentation](https://pub.dev/documentation/just_audio/latest/just_audio/just_audio-library.html) — [Tutorials](#tutorials) — [Background Audio](https://pub.dev/packages/just_audio_background) — [Community Support](https://stackoverflow.com/questions/tagged/just-audio)

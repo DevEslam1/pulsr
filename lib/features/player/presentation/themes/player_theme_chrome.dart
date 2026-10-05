@@ -39,7 +39,7 @@ import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
 import '../widgets/quran_mode_button.dart';
 import '../widgets/speed_picker_sheet.dart';
-import '../../../../domain/services/cast_service.dart';
+import '../../../../data/services/cast_service.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import 'player_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';

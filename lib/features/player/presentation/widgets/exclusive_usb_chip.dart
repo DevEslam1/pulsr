@@ -6,7 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/l10n_extensions.dart';
-import '../../../../domain/services/usb_exclusive_service.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
 import 'sync_diagnostics_sheet.dart';
 
 /// Status chip displaying live bit-perfect USB streaming status with real-time underrun counter.

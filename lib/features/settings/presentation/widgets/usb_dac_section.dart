@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
-import '../../../../domain/services/usb_exclusive_service.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';

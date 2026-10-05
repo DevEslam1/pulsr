@@ -1,4 +1,4 @@
-// lib/domain/services/usb_exclusive_service.dart
+// lib/data/services/usb_exclusive_service.dart
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';

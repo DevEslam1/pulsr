@@ -21,7 +21,7 @@ We use `go_router` with a single router definition in `lib/core/router/app_route
 Detail routes prefer a typed object passed via `state.extra` (no refetch, preserves `heroTag`), and fall back to an `?id=` query/path parameter. `_resolveById<T>` builds `EntityByIdLoader` which fetches-or-watches the entity reactively and renders a localized not-found message when the id is absent or matches nothing.
 
 ### 3. Build gating and redirects
-- YTM routes (`/ytm-search`, `/ytm-explore`, `/downloads`, `/online-playlist`) are wrapped in `if (AppConfig.ytmEnabled)` so they tree-shake away in pure builds, and a top-level `redirect` also bounces those paths when disabled.
+- YTM routes (`/ytm-search`, `/ytm-explore`, `/downloads`) are wrapped in `if (AppConfig.ytmEnabled)` so they tree-shake away in pure builds, and a top-level `redirect` also bounces those paths (plus `/online-playlist`) when disabled.
 - `/cloud-backup-dashboard` redirects to `/settings` unless cloud sync is allowed, so a dead surface is never shipped.
 - A global `errorBuilder` renders a localized "page not found" with a home action.
 

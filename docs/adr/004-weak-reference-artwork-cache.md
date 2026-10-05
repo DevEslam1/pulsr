@@ -9,7 +9,7 @@ High-resolution album artwork loaded during continuous scrolling and rapid track
 2. **Cache Thrashing**: Strictly sizing a small LRU cache evicted images too quickly when the user scrolled back and forth, resulting in repetitive disk/network requests and UI stutters.
 
 ## Decision
-We implemented a dual-tier caching strategy combining bounded strong LRU caching with garbage-collection-aware `WeakReference` storage in `lib/core/widgets/cached_artwork.dart` (`ArtworkCacheManager`):
+We implemented a dual-tier caching strategy combining bounded strong LRU caching with garbage-collection-aware `WeakReference` storage in `lib/core/widgets/cached_artwork.dart` (`ArtworkLruCache`):
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -37,7 +37,7 @@ We implemented a dual-tier caching strategy combining bounded strong LRU caching
 ```
 
 ### Architecture
-- **Tier 1 (Strong LRU)**: Retains recently accessed images up to a strictly bounded byte budget (default 32MB) and count budget. When exceeded, the oldest items are evicted from the strong LRU.
+- **Tier 1 (Strong LRU)**: Retains recently accessed images up to a strictly bounded byte budget (default 50MB) and count budget. When exceeded, the oldest items are evicted from the strong LRU.
 - **Tier 2 (WeakReference)**: Evicted items remain accessible in memory via `WeakReference<Uint8List>` as long as the Dart GC has not reclaimed them. If requested again while in memory, they are immediately promoted back to Tier 1 without disk or network I/O.
 - **Dynamic Type & Target Sizing**: Caches downscaled thumbnails (220x220) for playlist lists and full resolution for full-screen player views.
 

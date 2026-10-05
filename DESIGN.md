@@ -78,6 +78,7 @@ Sizes come from `AppFontSize`; tracking from `AppTracking`
 
 | `AppFontSize` | px | Role |
 |---|---|---|
+| `nano` | 8 | ultra-dense micro glyphs, telemetry tick labels |
 | `micro` | 9 | badges, counters |
 | `tiny` | 10 | dense micro-labels |
 | `caption` | 11 | captions, timer readouts |
@@ -129,7 +130,7 @@ inside fixed-height chrome.
 4-pt scale — `AppSpacing` (`lib/core/constants/app_spacing.dart`).
 
 `xxs=4 · xs=8 · sm=12 · md=16 · lg=24 · xl=32 · xxl=48`
-Half-steps: `s2=2 · s6=6 · s10=10 · s14=14 · s18=18 · s20=20 · s28=28 · s40=40 · s64=64`
+Half-steps: `s2=2 · s6=6 · s8=8 · s10=10 · s14=14 · s18=18 · s20=20 · s28=28 · s38=38 · s40=40 · s44=44 · s56=56 · s64=64`
 `AppSpacing.scrollBottom = 160` — bottom padding so content clears the dock.
 
 - **Screen gutters:** always `Adaptive.pagePadding(context)` (12/16/24/32 by
@@ -261,15 +262,15 @@ Center(child: ConstrainedBox(
 | Component | Path | Notes |
 |---|---|---|
 | `PulsrSegmentedControl` | `core/widgets/pulsr_segmented_control.dart` | the only segmented control |
-| `SectionHeader` | `core/widgets/section_header.dart` | aligns to content gutter |
+| `PulsrSectionHeader` | `core/widgets/pulsr_section_header.dart` | aligns to content gutter |
 | `SongTile` | `core/widgets/song_tile.dart` | list rows |
 | `CachedArtwork` | `core/widgets/cached_artwork.dart` | all artwork |
 | `PulsrSlider` | `core/widgets/pulsr_slider.dart` | wavy slider |
 | `PulsrSwitch`, `PulsrPressable`, `PulsrDismissible` | `core/widgets/` | interactions |
 | `PulsrBottomSheetContainer` / `PulsrSheetHelper` | `core/widgets/pulsr_bottom_sheet.dart` | every sheet |
 | `PulsrDialogHelper` / `PulsrDialog` | `core/widgets/pulsr_dialog.dart` | every dialog |
-| `EmptyStateWidget` | `core/widgets/empty_state_widget.dart` | empty **and** error states |
-| `SkeletonBox/Line/List/Grid`, `SkeletonShimmer` | `core/widgets/shimmer_skeleton.dart` | loading |
+| `PulsrEmptyState` | `core/widgets/pulsr_empty_state.dart` | empty **and** error states |
+| `SkeletonBox/Line/SongRow/List/Grid`, `SkeletonShimmer` | `core/widgets/shimmer_skeleton.dart` | loading |
 | `StaggeredReveal` | `core/widgets/staggered_reveal.dart` | sort/re-flow entrance |
 | `EntityByIdLoader<T>` | `core/widgets/entity_by_id_loader.dart` | id-based deep links |
 | `SettingSliderRow` | `features/settings/presentation/widgets/settings_slider_row.dart` | labelled slider |
@@ -282,8 +283,8 @@ Center(child: ConstrainedBox(
    `SkeletonShimmer` (one ticker, synchronized sweep). Use `SkeletonList` for
    rows, `SkeletonGrid` for grids. Never a bare `CircularProgressIndicator` for
    *content* loading (spinners are for button/inline progress only).
-2. **Empty** → `EmptyStateWidget` with a clear CTA.
-3. **Error** → `EmptyStateWidget` with the error icon, the failure message, and
+2. **Empty** → `PulsrEmptyState` with a clear CTA.
+3. **Error** → `PulsrEmptyState` with the error icon, the failure message, and
    a Retry action. A repository `AppFailure` arrives as a `Left` **value**, not a
    stream error — check both (`snapshot.hasError || data.isLeft`).
 4. **Content** → animated in via `StaggeredReveal`, keyed by the sort/group

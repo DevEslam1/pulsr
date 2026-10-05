@@ -5,7 +5,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
-import 'package:pulsr/domain/usecases/playlist_io_usecases.dart';
+import 'package:pulsr/data/usecases/playlist_io_usecases.dart';
 
 class _FakeRepository implements IMusicRepository {
   _FakeRepository(this.songs);

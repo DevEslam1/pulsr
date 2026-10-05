@@ -557,5 +557,37 @@ void main() {
       await warmthFuture;
       expect(handler.lastSaturationMix, 0.45);
     });
+
+    test('waits for handler effectsReady before applying the profile', () async {
+      // The handler restores persisted music DSP during its async init and only
+      // signals effectsReady once done. Applying Quran before that let the
+      // restore overwrite it, so the toggle was on but the engine never changed.
+      final handler = _QuranAudioHandler();
+      handler.readyGate = Completer<void>();
+      var state = const PlayerState();
+      final controller = _controller(
+        handler: handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        service: QuranModeService(),
+      );
+
+      final enable = controller.setQuranModeEnabled(true);
+      await pumpEventQueue();
+
+      // Toggle intent is reflected, but the engine must not be touched while
+      // the handler is still restoring its persisted music DSP.
+      expect(state.isQuranModeEnabled, isTrue);
+      expect(handler.preampValues, isEmpty);
+      expect(handler.currentEqPreset.name, isNot(contains('Quran')));
+
+      handler.readyGate!.complete();
+      await enable;
+      await pumpEventQueue();
+
+      expect(handler.preampValues, isNotEmpty);
+      expect(handler.currentEqPreset.name, contains('Quran'));
+      expect(state.isQuranModeEnabled, isTrue);
+    });
   });
 }

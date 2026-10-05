@@ -9,7 +9,7 @@ Pulsr allows listeners to maintain multiple concurrent playback queues ("Queue S
 Previous implementations stored raw serialized queue documents directly in `SharedPreferences`. This posed several challenges:
 1. **Schema Fragility**: Evolving track metadata (e.g. adding online stream URLs, favorite flags, or custom playback speeds) risked breaking deserialization for users updating across application releases.
 2. **Crash & Inconsistency Risks**: An unexpected audio engine failure during queue swaps or item reorders could leave the visual UI and the native playback queue in conflicting states.
-3. **Large Payload Overhead**: Encoding and decoding large queues (up to 5,000 items) on the UI isolate caused visible frame drops during app shutdown or restoration.
+3. **Large Payload Overhead**: Encoding and decoding large queues (up to 500 items) on the UI isolate caused visible frame drops during app shutdown or restoration.
 
 ## Decision
 We standardized queue management, persistence, and schema evolution around `QueueSlotCodec` and atomic controller boundaries:
@@ -30,7 +30,7 @@ We standardized queue management, persistence, and schema evolution around `Queu
 - Rollback operations are shielded with isolated error handling to guarantee terminal error reporting without leaving dangling corrupted states.
 
 ### 4. Bounded Memory Limits
-- Queues are strictly bounded to `PlayerQueueController.maxQueueSize` (5,000 items).
+- Queues are strictly bounded to `PlayerQueueController.maxQueueSize` (500 items).
 - Individual slots exceeding capacity during restoration are truncated defensively to safeguard device RAM.
 
 ## Consequences

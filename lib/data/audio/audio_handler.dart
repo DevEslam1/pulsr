@@ -96,6 +96,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         PulsrAudioTransport,
         PulsrAudioMediaBrowser,
         PulsrAudioPlaybackExtras {
+  /// UI language used to localize the Android Auto browse tree. Set during
+  /// [create] from the persisted language preference; defaults to English.
+  static String _browseLanguage = 'en';
+
   @factoryMethod
   static Future<PulsrAudioHandler> create(
       IMusicRepository repository, YtmService ytmService) async {
@@ -117,6 +121,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       final langCode = prefs.getString(PrefsKeys.languageCode) ??
           prefs.getString('setting_language') ??
           Platform.localeName.split(RegExp(r'[_-]')).first.toLowerCase();
+      _browseLanguage = langCode;
       if (langCode == 'ar') {
         channelName = 'تشغيل الصوت Pulsr';
         channelDesc =
@@ -142,6 +147,16 @@ class PulsrAudioHandler extends BaseAudioHandler
           androidStopForegroundOnPause: !keepOnPause,
           androidResumeOnClick: true,
           androidNotificationIcon: 'drawable/ic_notification',
+          // Declare Android Auto content-style support so the car can choose
+          // list vs grid templates for the browse tree instead of a generic
+          // list. Per-node hints are attached to each MediaItem's extras.
+          androidBrowsableRootExtras: const <String, dynamic>{
+            AndroidContentStyle.supportedKey: true,
+            AndroidContentStyle.browsableHintKey:
+                AndroidContentStyle.gridItemHintValue,
+            AndroidContentStyle.playableHintKey:
+                AndroidContentStyle.listItemHintValue,
+          },
         ),
       );
       return await initFuture.timeout(const Duration(seconds: 10));
@@ -865,6 +880,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       album: song.album,
       title: song.title,
       artist: song.artist,
+      // Android Auto surfaces this as a heart toggle; handled by [setRating].
+      rating: Rating.newHeartRating(song.isFavorite),
       // 0 means "unknown" (streams); null lets the platform show an indeterminate
       // bar until the player's durationStream reports the real length.
       duration:
@@ -2771,6 +2788,23 @@ class PulsrAudioHandler extends BaseAudioHandler
       await saveCurrentPositionImmediate();
     } catch (_) {}
     await super.onTaskRemoved();
+  }
+
+  /// Android Auto / Bluetooth heart control (`ACTION_SET_RATING`). Pulsr maps
+  /// the heart rating onto the favorite flag so the car's toggle stays in sync
+  /// with the app. Star/percentage ratings are not used by the library yet.
+  @override
+  Future<void> setRating(Rating rating, [Map<String, dynamic>? extras]) async {
+    if (rating.getRatingStyle() != RatingStyle.heart) return;
+    if (_songs.isEmpty || _currentIndex < 0 || _currentIndex >= _songs.length) {
+      return;
+    }
+    final hasHeart = rating.isRated() && rating.hasHeart();
+    final song = _songs[_currentIndex];
+    if (song.isFavorite == hasHeart) return;
+    final result = await _repository.toggleFavorite(song.id);
+    final newFav = result.fold((l) => song.isFavorite, (r) => r);
+    updateFavorite(song.id, newFav);
   }
 
   @disposeMethod

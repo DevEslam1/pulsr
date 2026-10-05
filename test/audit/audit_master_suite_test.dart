@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/errors/failures.dart' hide Result;
+import 'package:fpdart/fpdart.dart';
+import 'package:pulsr/core/errors/app_error.dart';
+import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/core/errors/ytm_error_classifier.dart';
 import 'package:pulsr/core/utils/cache_manager.dart';
 import 'package:pulsr/core/utils/leak_detector.dart';
-import 'package:pulsr/core/utils/result.dart';
 import 'package:pulsr/core/utils/timer_manager.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/repositories/prefs_repository.dart';
@@ -23,58 +24,21 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('I-03 Result<T>', () {
-    test('Result.success holds data and reports flags correctly', () {
-      const res = Result<int>.success(42);
-      expect(res.isSuccess, isTrue);
-      expect(res.isFailure, isFalse);
-      expect(res.isLoading, isFalse);
-      expect(res.dataOrNull, 42);
-      expect(res.failureOrNull, isNull);
-
-      final val = res.when(
-        success: (d) => 'ok: $d',
-        failure: (f, m) => 'fail',
-        loading: () => 'loading',
-      );
-      expect(val, 'ok: 42');
-
-      final folded = res.fold((f) => -1, (d) => d * 2);
-      expect(folded, 84);
+    test('Result carries a success value', () {
+      const Result<int> res = Right(42);
+      final value = res.fold((f) => -1, (d) => d * 2);
+      expect(value, 84);
     });
 
-    test('Result.failure holds failure and reports flags correctly', () {
-      const res =
-          Result<int>.failure(DatabaseFailure('timeout'), 'Network error');
-      expect(res.isSuccess, isFalse);
-      expect(res.isFailure, isTrue);
-      expect(res.isLoading, isFalse);
-      expect(res.dataOrNull, isNull);
-      expect(res.failureOrNull, isA<DatabaseFailure>());
+    test('Result carries a typed AppFailure', () {
+      const Result<int> res = Left(DatabaseFailure('timeout'));
 
-      final val = res.when(
-        success: (d) => 'ok',
-        failure: (f, m) => '$m: ${f.message}',
-        loading: () => 'loading',
-      );
-      expect(val, 'Network error: timeout');
-
-      final folded = res.fold((f) => -1, (d) => d * 2);
-      expect(folded, -1);
-    });
-
-    test('Result.loading reports isLoading true', () {
-      const res = Result<int>.loading();
-      expect(res.isSuccess, isFalse);
-      expect(res.isFailure, isFalse);
-      expect(res.isLoading, isTrue);
-      expect(res.dataOrNull, isNull);
-
-      final val = res.when(
-        success: (d) => 'ok',
-        failure: (f, m) => 'fail',
-        loading: () => 'loading',
-      );
-      expect(val, 'loading');
+      final failure = res.fold<AppFailure?>((f) => f, (d) => null);
+      expect(failure, isA<DatabaseFailure>());
+      expect(failure, isA<AppError>());
+      expect(failure!.message, 'timeout');
+      expect(failure.code, 'DB_FAILURE');
+      expect(failure.userMessage, 'timeout');
     });
   });
 

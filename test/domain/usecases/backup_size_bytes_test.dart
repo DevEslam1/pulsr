@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
-import 'package:pulsr/domain/usecases/backup_usecases.dart';
+import 'package:pulsr/data/usecases/backup_usecases.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
 

@@ -7,7 +7,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
-import '../../../../domain/services/cast_service.dart';
+import '../../../../data/services/cast_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 import 'settings_section.dart';
 import 'settings_tiles.dart';

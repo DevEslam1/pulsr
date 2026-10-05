@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/services/theme_scheduler_service.dart';
-import 'package:pulsr/domain/services/settings_profiles_service.dart';
+import 'package:pulsr/data/services/settings_profiles_service.dart';
 
 void main() {
   setUp(() {

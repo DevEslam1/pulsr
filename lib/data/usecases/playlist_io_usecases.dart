@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../repositories/music_repository_interface.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 
 /// Supported playlist file formats for import/export.
 enum PlaylistFormat {

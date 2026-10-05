@@ -1,4 +1,4 @@
-// lib/domain/usecases/backup_usecases.dart
+// lib/data/usecases/backup_usecases.dart
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:drift/drift.dart';
@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
-import '../repositories/music_repository_interface.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 
 class ImportResult {
   final int restoredFavoritesCount;

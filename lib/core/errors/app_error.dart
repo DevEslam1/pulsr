@@ -1,28 +1,22 @@
 // lib/core/errors/app_error.dart
-// FIX-D1: Strongly-typed sealed error taxonomy for Pulsr
+// FIX-D1: Strongly-typed error taxonomy for Pulsr.
+//
+// `AppError` itself is defined in `app_error_base.dart` (platform-free) so the
+// legacy `AppFailure` hierarchy in `failures.dart` can extend it and the whole
+// app shares one error type. This library adds the six canonical subtypes and
+// the [resolveAppError] classifier, and re-exports the base.
 import 'dart:async';
 import 'dart:io';
 import 'package:drift/drift.dart'
     show DriftWrappedException, InvalidDataException, CouldNotRollBackException;
 import 'package:flutter/services.dart';
 
-/// Sealed hierarchy of domain and system errors across Pulsr.
-sealed class AppError implements Exception {
-  final String code;
-  final String userMessage;
-  final Object? cause;
-  final StackTrace? stackTrace;
+import 'app_error_base.dart';
+// Imported for [classifyFailure]; does not create a cycle because `failures.dart`
+// only depends on the platform-free base.
+import 'failures.dart';
 
-  const AppError({
-    required this.code,
-    required this.userMessage,
-    this.cause,
-    this.stackTrace,
-  });
-
-  @override
-  String toString() => '$runtimeType($code): $userMessage';
-}
+export 'app_error_base.dart';
 
 /// Network connectivity, DNS, HTTP, or timeout errors.
 class NetworkError extends AppError {
@@ -242,4 +236,13 @@ AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
     cause: error,
     stackTrace: stackTrace,
   );
+}
+
+/// Classifies an arbitrary thrown object into a canonical [AppError], then
+/// narrows it to an [AppFailure] suitable for `Result`. A supplied domain
+/// failure is returned unchanged so typed failures are never downgraded.
+AppFailure classifyFailure(Object error, [StackTrace? stackTrace]) {
+  final resolved = resolveAppError(error, stackTrace);
+  if (resolved is AppFailure) return resolved;
+  return GenericFailure(resolved.userMessage, resolved);
 }

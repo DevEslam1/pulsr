@@ -10,7 +10,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
-import '../../../../domain/services/device_profile_service.dart';
+import '../../../../data/services/device_profile_service.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';

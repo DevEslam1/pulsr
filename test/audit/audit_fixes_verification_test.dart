@@ -5,7 +5,7 @@ import 'package:pulsr/data/audio/adaptive_buffer_engine.dart';
 import 'package:pulsr/data/audio/battery_aware_playback.dart';
 import 'package:pulsr/data/audio/crossfade_manager.dart';
 import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/domain/services/cast_service.dart';
+import 'package:pulsr/data/services/cast_service.dart';
 
 void main() {
   group('Audit Fixes Verification Tests', () {

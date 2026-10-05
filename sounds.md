@@ -14,7 +14,7 @@ that connects them. Each area is scored against the maximum possible rate
 
 > **Headline:** the native **DSP engine, bridge, wiring, and UI sound-effect feedback
 > are now all maximum-rate (10/10)** — 18 filter/sink translation units behind a lock-free
-> snapshot bridge, a single 4,296-line `AudioEffectsPlugin.kt` facade, **77/77
+> snapshot bridge, a single 4,334-line `AudioEffectsPlugin.kt` facade, **48/48
 > Dart channel calls resolved on the Kotlin side**, parity host tests, and a
 > fully wired, accessible, ducked semantic `SoundFeedbackService` backed by
 > ADR-007 and persistent settings.
@@ -62,8 +62,8 @@ callouts.
 | Area | Overall | Why it is 10/10 |
 |---|:---:|---|
 | **Audio DSP effects** | **10 / 10** | 18 real-time C++ stages (`ParametricEQ`, `Crossfeed`, `LookaheadLimiter`, `ConvolutionReverb`, `SincResampler`, `DsdDecoder`, `SpatialPanner`, `HarmonicSaturation`, `StereoWidth`, `LoudnessContour`, `SubCrossover`, `DynamicEQ`, `MultibandCompressor`, `DynamicBass`, `ViperDdc`, `ArbitraryResponseEq`, `LiveProg` + `AAudioSink`/`UsbAudioSink`) compiled `-O3 -Wall -Wextra -fno-strict-aliasing`, with an auto-degrade RTF governor and **19 native host tests** (`android/app/src/test/cpp/`). |
-| **Native bridges** | **10 / 10** | One `com.pulsr.music/audio_effects` `MethodChannel` facade (`AudioEffectsPlugin.kt`, 77 methods), plus AAudio/USB JNI, over a JNI layer of **~130 `nativeXxx` entry points** in `eq_jni_bridge.cpp`/`aaudio_jni_bridge.cpp`; JNI on `NativeDspAudioProcessor`, `UsbExclusivePlugin`, `AudioEffectsPlugin`; AAudio sinks with exclusive-mode + xrun telemetry. |
-| **Wiring** | **10 / 10** | **77/77** `AudioEffectChannel` `invokeMethod` calls resolve to a Kotlin `call.method` handler (verified exhaustively); `setAudioSessionId → recreateEffects`, `recalculateActiveStages`, per-track `resyncForTrack`; DSP bridge mixins (`audio_handler_dsp_bridge.dart`, `audio_handler_sleep_bridge.dart`) compose cleanly into `PulsrAudioHandler`. |
+| **Native bridges** | **10 / 10** | One `com.pulsr.music/audio_effects` `MethodChannel` facade (`AudioEffectsPlugin.kt`, ~110 `call.method` handlers), plus AAudio/USB JNI, over a JNI layer of **~112 `nativeXxx` entry points** in `eq_jni_bridge.cpp`/`aaudio_jni_bridge.cpp`; JNI on `NativeDspAudioProcessor`, `UsbExclusivePlugin`, `AudioEffectsPlugin`; AAudio sinks with exclusive-mode + xrun telemetry. |
+| **Wiring** | **10 / 10** | **48/48** `AudioEffectChannel` `invokeMethod` method names resolve to a Kotlin `call.method` handler (verified exhaustively); `setAudioSessionId → recreateEffects`, `recalculateActiveStages`, per-track `resyncForTrack`; DSP bridge mixins (`audio_handler_dsp_bridge.dart`, `audio_handler_sleep_bridge.dart`) compose cleanly into `PulsrAudioHandler`. |
 
 ### Per-feature sound & wiring ratings
 
@@ -136,9 +136,9 @@ singleton plus per-`NativeDspAudioProcessor` engines registered in
 
 | Dimension | Score | Evidence |
 |---|:---:|---|
-| Architecture | 10 | One Dart→Kotlin plugin facade `AudioEffectsPlugin` (`CHANNEL_NAME = "com.pulsr.music/audio_effects"`, `AudioEffectsPlugin.kt:832`) dispatching to three handlers (`handleCoreAndHalCall`, `handleNativeDspCall`, `handleAdvancedAndDiagnosticCall`). |
-| Coverage | 10 | ~130 JNI entry points across `eq_jni_bridge.cpp` / `aaudio_jni_bridge.cpp`; JNI on `NativeDspAudioProcessor`, `AudioEffectsPlugin`, `UsbExclusivePlugin`; AAudio exclusive sinks. |
-| Bridge Integrity | 10 | **77/77** Dart calls resolve on Kotlin (exhaustive diff, 0 missing); Kotlin→JNI symbols match `Java_com_pulsr_music_AudioEffectsPlugin_*`, `Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_*`, `Java_com_ryanheise_just_audio_AaudioNativeBridge_*`, `Java_com_pulsr_music_UsbExclusivePlugin_*`. |
+| Architecture | 10 | One Dart→Kotlin plugin facade `AudioEffectsPlugin` (`CHANNEL_NAME = "com.pulsr.music/audio_effects"`, `AudioEffectsPlugin.kt:843`) dispatching to three handlers (`handleCoreAndHalCall`, `handleNativeDspCall`, `handleAdvancedAndDiagnosticCall`). |
+| Coverage | 10 | ~112 JNI entry points across `eq_jni_bridge.cpp` / `aaudio_jni_bridge.cpp`; JNI on `NativeDspAudioProcessor`, `AudioEffectsPlugin`, `UsbExclusivePlugin`; AAudio exclusive sinks. |
+| Bridge Integrity | 10 | **48/48** Dart `AudioEffectChannel` method names resolve on Kotlin (exhaustive diff, 0 missing); Kotlin→JNI symbols match `Java_com_pulsr_music_AudioEffectsPlugin_*`, `Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_*`, `Java_com_ryanheise_just_audio_AaudioNativeBridge_*`, `Java_com_pulsr_music_UsbExclusivePlugin_*`. |
 | Error Handling | 10 | Kotlin clamps/validates args and surfaces typed errors; Dart channel applies `.timeout(...)` budgets per call. |
 | Performance | 10 | Control-thread-only publishing; snapshot broadcast to all engines via `DspEngineRegistry::broadcastParams` (`AudioDspEngine.h:376`). |
 | Memory Safety | 10 | Native engine create/destroy (`nativeCreateEngine`/`nativeDestroyEngine`) paired per processor; retire-queue drain. |
@@ -152,7 +152,7 @@ singleton plus per-`NativeDspAudioProcessor` engines registered in
 
 | Dimension | Score | Evidence |
 |---|:---:|---|
-| Architecture | 10 | Dart `AudioEffectChannel` (`MethodChannel`, 2,012 lines) → Kotlin facade → C++; handler/cubit layer via `PulsrAudioDspBridge` + `PulsrAudioSleepBridge` mixins over `PulsrAudioHandler`. |
+| Architecture | 10 | Dart `AudioEffectChannel` (`MethodChannel`, 2,124 lines) → Kotlin facade → C++; handler/cubit layer via `PulsrAudioDspBridge` + `PulsrAudioSleepBridge` mixins over `PulsrAudioHandler`. |
 | Coverage | 10 | Every DSP parameter exposed by the engine has a Dart setter and a Kotlin handler; `setAudioSessionId` recreates HAL effects, `resyncForTrack` re-arms the graph per track, `recalculateActiveStages` keeps the stage mask truthful. |
 | Bridge Integrity | 10 | Verified 0 unresolved calls; `sendWarmupBuffer`, `getChainOfCustodyReport`, `getThermalStatus`, `isDvcSupported`, `releaseEffects` all present both sides. |
 | Error Handling | 10 | Bridge failures surface via `platformBridgeDegraded` (`audio_handler.dart:177,647-650`) and the `_watchPlatformBridgeHealth` UI listener (`main.dart:355-382`). |
@@ -162,7 +162,7 @@ singleton plus per-`NativeDspAudioProcessor` engines registered in
 | Code Hygiene | 10 | Mixins declare their host-member contract explicitly (e.g. `audio_handler_dsp_bridge.dart:430-467`), keeping them analyzable and stateless. |
 | Security | 10 | No credentials on the channel; args validated before crossing. |
 | Accessibility | N/A | Headless wiring. |
-| CI / DX / ADR | 10 | `test/playback_engine_wiring_test.dart`, `test/data/audio/dsd_playback_wiring_test.dart`, `test/settings_wiring_test.dart` guard wiring; ADR-005/006. |
+| CI / DX / ADR | 10 | `test/data/audio/playback_engine_wiring_test.dart`, `test/data/audio/dsd_playback_wiring_test.dart`, `test/architecture/settings_wiring_test.dart` guard wiring; ADR-005/006. |
 
 ---
 
@@ -233,7 +233,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` implemented & verified.
 ```bash
 # Dart-side sound wiring/unit tests
 flutter test test/features/polish/phase10_polish_test.dart
-flutter test test/settings_wiring_test.dart test/playback_engine_wiring_test.dart
+flutter test test/architecture/settings_wiring_test.dart test/data/audio/playback_engine_wiring_test.dart
 
 # Native DSP parity + correctness (via Gradle `testNative`, host build)
 ./gradlew :app:testNative
@@ -248,9 +248,9 @@ flutter analyze --fatal-infos --fatal-warnings
 
 | Dart (`AudioEffectChannel`) | Kotlin handler group | JNI symbol family |
 |---|---|---|
-| `setEqEnabled`, `setEqBands`, `setNativeEqBand(sBulk)`, `setEqPreamp`, `setAudioSessionId`, `setVirtualizer*`, `setVolumeBoost`, `setBassBoost`, `getPipelineLatencyFrames`, `getAppliedSampleRate`, `setBandSolo/Mute` | `handleCoreAndHalCall` (`AudioEffectsPlugin.kt:1409`) | `AudioDspEngine` + HAL `AudioEffect` |
-| `setCrossfeed*`, `setLimiter*`, `setReverb*`, `loadImpulseResponse`, `setSaturation*`, `setStereoWidth*`, `setLoudnessContour*`, `setSubCrossover*`, `setDynamicEq*`, `setMultibandCompressor*`, `setDynamicBassParams`, `setBypassCompare`, `setHeadphoneSafetyParams`, `get*Gr*`, `getTelemetry`, `getRtfGovernorStatus` | `handleNativeDspCall` (`AudioEffectsPlugin.kt:1700`) | `Java_com_pulsr_music_AudioEffectsPlugin_nativeXxx` (`eq_jni_bridge.cpp`) |
-| `setViperDdc*`, `loadViperDdc`, `setArbitraryEq*`, `loadArbitraryEq`, `setLiveProg*`, `setDitherParams`, `setBitPerfectParams`, `setDvc*`, `setReplayGain*`, `sendWarmupBuffer`, `releaseEffects`, `getChainOfCustodyReport`, `getThermalStatus` | `handleAdvancedAndDiagnosticCall` (`AudioEffectsPlugin.kt:2652`) | `eq_jni_bridge.cpp` + `AudioEffectsPlugin` |
+| `setEqEnabled`, `setEqBands`, `setNativeEqBand(sBulk)`, `setEqPreamp`, `setAudioSessionId`, `setVirtualizer*`, `setVolumeBoost`, `setBassBoost`, `getPipelineLatencyFrames`, `getAppliedSampleRate`, `setBandSolo/Mute` | `handleCoreAndHalCall` (`AudioEffectsPlugin.kt:1434`) | `AudioDspEngine` + HAL `AudioEffect` |
+| `setCrossfeed*`, `setLimiter*`, `setReverb*`, `loadImpulseResponse`, `setSaturation*`, `setStereoWidth*`, `setLoudnessContour*`, `setSubCrossover*`, `setDynamicEq*`, `setMultibandCompressor*`, `setDynamicBassParams`, `setBypassCompare`, `setHeadphoneSafetyParams`, `get*Gr*`, `getTelemetry`, `getRtfGovernorStatus` | `handleNativeDspCall` (`AudioEffectsPlugin.kt:1725`) | `Java_com_pulsr_music_AudioEffectsPlugin_nativeXxx` (`eq_jni_bridge.cpp`) |
+| `setViperDdc*`, `loadViperDdc`, `setArbitraryEq*`, `loadArbitraryEq`, `setLiveProg*`, `setDitherParams`, `setBitPerfectParams`, `setDvc*`, `setReplayGain*`, `sendWarmupBuffer`, `releaseEffects`, `getChainOfCustodyReport`, `getThermalStatus` | `handleAdvancedAndDiagnosticCall` (`AudioEffectsPlugin.kt:2683`) | `eq_jni_bridge.cpp` + `AudioEffectsPlugin` |
 | USB exclusive stream (`nativeUsbStream*`, `nativeUsbQuerySupportedRates`) | `UsbExclusivePlugin` | `Java_com_pulsr_music_UsbExclusivePlugin_*` |
 | AAudio direct sink (`nativeOpen/Write/Play/...`, `nativeGetOutputLatencyMs`, `nativeGetFramesPerBurst`) | `AaudioNativeBridge` | `Java_com_ryanheise_just_audio_AaudioNativeBridge_*` (`aaudio_jni_bridge.cpp`) |
 | Per-track DSP engine lifecycle (`nativeCreateEngine`, `nativeDestroyEngine`, `nativeResetEngine`, `nativeProcessDirectFloatBuffer`, `nativeResyncForTrack`) | `NativeDspAudioProcessor` | `Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_*` (`eq_jni_bridge.cpp`) |

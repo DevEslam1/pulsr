@@ -65,11 +65,11 @@ import 'package:pulsr/domain/repositories/music_repository_interface.dart'
     as _i320;
 import 'package:pulsr/domain/repositories/smart_playlist_engine_interface.dart'
     as _i632;
-import 'package:pulsr/domain/services/device_profile_service.dart' as _i655;
-import 'package:pulsr/domain/services/hires_audio_service.dart' as _i1053;
-import 'package:pulsr/domain/services/room_correction_service.dart' as _i589;
-import 'package:pulsr/domain/services/settings_profiles_service.dart' as _i341;
-import 'package:pulsr/domain/usecases/backup_usecases.dart' as _i545;
+import 'package:pulsr/data/services/device_profile_service.dart' as _i655;
+import 'package:pulsr/data/services/hires_audio_service.dart' as _i1053;
+import 'package:pulsr/data/services/room_correction_service.dart' as _i589;
+import 'package:pulsr/data/services/settings_profiles_service.dart' as _i341;
+import 'package:pulsr/data/usecases/backup_usecases.dart' as _i545;
 import 'package:pulsr/domain/usecases/delete_download.dart' as _i839;
 import 'package:pulsr/domain/usecases/folder_usecases.dart' as _i1017;
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart' as _i496;
@@ -81,7 +81,7 @@ import 'package:pulsr/domain/usecases/get_songs_usecase.dart' as _i168;
 import 'package:pulsr/domain/usecases/get_years_usecase.dart' as _i651;
 import 'package:pulsr/domain/usecases/observe_downloads.dart' as _i47;
 import 'package:pulsr/domain/usecases/pause_download.dart' as _i308;
-import 'package:pulsr/domain/usecases/playlist_io_usecases.dart' as _i265;
+import 'package:pulsr/data/usecases/playlist_io_usecases.dart' as _i265;
 import 'package:pulsr/domain/usecases/playlist_usecases.dart' as _i792;
 import 'package:pulsr/domain/usecases/queue_download.dart' as _i634;
 import 'package:pulsr/domain/usecases/resume_download.dart' as _i902;

@@ -1,1 +1,1 @@
-﻿export '../../domain/services/room_correction_service.dart';
+export '../../data/services/room_correction_service.dart';

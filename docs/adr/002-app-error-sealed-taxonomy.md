@@ -46,9 +46,27 @@ class GenericAppError extends AppError { ... }   // unexpected domain failure
 ## Consequences
 ### Positive
 - Compile-time error exhaustiveness: the compiler rejects missing error branches when matching on `AppError`.
-- Clear semantic recovery signals (`isRecoverable`, `isOffline`, `isExpired`).
+- Clear semantic signals on the subtypes (`NetworkError.isTimeout`, `YtmError.isBotBlock`, typed fields such as `StorageError.path`).
 - Rich debugging metadata (`cause`, `stackTrace`) preserved without exposing raw traces to end users.
 - Clean centralized mapping in `resolveAppError()`.
 
 ### Negative / Trade-offs
 - Requires migrating legacy `String? errorMessage` cubit state properties toward `AppError? error`.
+
+## Addendum: unified error hierarchy (2026-10)
+
+The audit found the taxonomy existed but had **zero production references**,
+while a parallel `AppFailure` hierarchy and a second `Result` type were used by
+every repository. The two were unified:
+
+- `AppError` now lives in `lib/core/errors/app_error_base.dart` and is
+  `abstract` (not `sealed`). Keeping the base in a platform-free library lets
+  the legacy `AppFailure` hierarchy extend it without pulling Flutter/drift
+  imports into `lib/domain`.
+- `AppFailure` (and `DatabaseFailure`, `AudioPlaybackFailure`, …) in
+  `failures.dart` now `extend AppError`, so **every failure is an `AppError`**
+  and flows through `resolveAppError()`/`classifyFailure()` unchanged. The
+  canonical six subtypes still exist in `app_error.dart`.
+- The dead sealed `Result` class in `lib/core/utils/result.dart` was removed;
+  the single canonical `Result<T> = Either<AppFailure, T>` remains, and the
+  legacy path re-exports it.

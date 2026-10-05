@@ -32,7 +32,7 @@ We standardized the UI sound design architecture around `SoundFeedbackService` a
 
 ### 3. State Persistence and Settings Integration
 - The preference key `PrefsKeys.soundFeedbackEnabled` (`setting_sound_feedback_enabled`) persists user choice across sessions via `SharedPreferences`.
-- Rehydrated synchronously at cold start during `SoundFeedbackService.init()`.
+- Rehydrated at cold start during `SoundFeedbackService.init()`.
 - Exposed in Settings under Appearance & Accessibility with a dedicated `ValueNotifier<bool>` binding, plus indexing in the global settings search registry.
 
 ### 4. Active Music Ducking and Gating

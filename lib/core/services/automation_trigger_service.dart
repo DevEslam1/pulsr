@@ -4,9 +4,9 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import '../../domain/models/audio_output_info.dart';
-import '../../domain/services/device_profile_service.dart';
-import '../../domain/services/hires_audio_service.dart';
-import '../../domain/services/settings_profiles_service.dart';
+import '../../data/services/device_profile_service.dart';
+import '../../data/services/hires_audio_service.dart';
+import '../../data/services/settings_profiles_service.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../di/injection.dart';
 import '../utils/error_logger.dart';

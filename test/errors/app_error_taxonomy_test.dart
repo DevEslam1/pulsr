@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' show DriftWrappedException;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/errors/app_error.dart';
+import 'package:pulsr/core/errors/failures.dart';
 
 void main() {
   group('Phase D: AppError Taxonomy & Classifier Tests', () {
@@ -132,6 +133,33 @@ void main() {
 
       expect(error, isA<StorageError>());
       expect(error.code, equals('DB_ERROR'));
+    });
+  });
+
+  group('Unified error taxonomy', () {
+    test('AppFailure is an AppError (single hierarchy)', () {
+      const failure = DatabaseFailure('boom');
+      expect(failure, isA<AppError>());
+      expect(failure.code, 'DB_FAILURE');
+      expect(failure.userMessage, 'boom');
+      expect(failure.message, 'boom');
+    });
+
+    test('resolveAppError passes typed failures through unchanged', () {
+      const failure = StorageFailure('disk full');
+      expect(identical(resolveAppError(failure), failure), isTrue);
+    });
+
+    test('classifyFailure returns typed failures unchanged', () {
+      const failure = DownloadFailure('cancelled');
+      expect(identical(classifyFailure(failure), failure), isTrue);
+    });
+
+    test('classifyFailure classifies raw platform exceptions', () {
+      final failure = classifyFailure(const SocketException('no route'));
+      expect(failure, isA<GenericFailure>());
+      expect(failure, isA<AppError>());
+      expect(failure.userMessage, contains('Network connection failed'));
     });
   });
 }

@@ -9,7 +9,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
-import '../../../../domain/services/usb_exclusive_service.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
 
 class SyncDiagnosticsSheet extends StatefulWidget {
   final double sampleRate;

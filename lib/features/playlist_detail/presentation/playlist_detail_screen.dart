@@ -22,7 +22,7 @@ import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
-import '../../../domain/usecases/playlist_io_usecases.dart';
+import '../../../data/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';

@@ -15,7 +15,7 @@ We enforce a domain layer with inverted dependencies and document failure semant
 ### 1. Layers
 - `lib/domain/` — pure models, repositories/usecase interfaces and domain services. It must not import Flutter UI or `lib/features/`.
 - `lib/data/` — concrete implementations (Drift database, audio engine, platform channels), implementing domain interfaces.
-- `lib/core/` — cross-cutting infrastructure (DI, router, network, telemetry, responsive, services). Some platform services live here and are exported into the domain namespace (`lib/core/services/hires_audio_service.dart` re-exports the domain service).
+- `lib/core/` — cross-cutting infrastructure (DI, router, network, telemetry, responsive, services). Platform-backed services no longer live in the domain: `cast`, `hires_audio`, `room_correction`, `usb_exclusive`, `device_profile` and `settings_profiles` services, plus `backup`/`playlist_io` usecases and `download_settings`, were moved to `lib/data/services`, `lib/data/usecases` and `lib/data/models`. `lib/core/services/*.dart` remain one-line re-exports so existing call sites keep working; `lib/domain/` now imports no Flutter, `permission_handler`, `shared_preferences` or MethodChannel code.
 - `lib/features/` — cubits + widgets consuming domain/data through DI.
 
 ### 2. Dependency inversion interfaces (`lib/domain/interfaces/`)

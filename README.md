@@ -175,7 +175,7 @@ Pulsr is architected around **Clean Architecture** and the **BLoC (Cubit)** stat
 ```
 
 ### Tech Stack Summary
-- **UI Framework**: [Flutter 3.x](https://flutter.dev) & [Dart 3.x](https://dart.dev) (requires Flutter `>= 3.29.0`)
+- **UI Framework**: [Flutter 3.x](https://flutter.dev) & [Dart 3.x](https://dart.dev) (requires Flutter `>= 3.41.0`)
 - **State Management**: [`flutter_bloc`](https://pub.dev/packages/flutter_bloc) (Cubit)
 - **Database & Persistence**: [`drift`](https://pub.dev/packages/drift) (Type-safe SQLite) + [`shared_preferences`](https://pub.dev/packages/shared_preferences) + [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage)
 - **Audio Engine**: vendored [`just_audio`](https://pub.dev/packages/just_audio) (`third_party/just_audio` — adds `NativeDspAudioProcessor` to the ExoPlayer sink), [`audio_service`](https://pub.dev/packages/audio_service), [`audio_session`](https://pub.dev/packages/audio_session), [`mutex`](https://pub.dev/packages/mutex) for pipeline serialization
@@ -198,7 +198,7 @@ pulsr/
 │   ├── eq_profiles/          # headphone_profiles.json (AutoEQ calibrations)
 │   └── fonts/                # Manrope variable typography
 ├── docs/
-│   └── adr/                  # 6 Architecture Decision Records (001–006)
+│   └── adr/                  # Architecture Decision Records (001–014, incl. two 007)
 ├── DESIGN.md                       # Design system single source of truth
 ├── RUNBOOK.md                      # YTM streaming-latency runbook + verification gates
 ├── lib/
@@ -217,7 +217,7 @@ pulsr/
 │   │   ├── telemetry/        # PlaybackLatencyTracker, Sentry wrappers
 │   │   ├── theme/            # AuraTheme + PulsrPalette + DynamicThemeCubit
 │   │   ├── utils/            # Adaptive, LRC/CUE parsers, formatters
-│   │   └── widgets/          # 36 shared widgets (sheets, dialogs, sliders, tiles)
+│   │   └── widgets/          # 37 shared widgets (sheets, dialogs, sliders, tiles)
 │   ├── data/
 │   │   ├── audio/            # PulsrAudioHandler, DSP, queue, YTM resolvers
 │   │   ├── db/               # Drift SQLite schema, tables, DAOs, health check
@@ -243,7 +243,7 @@ pulsr/
 │   │   ├── auth/ · ytm_search/ · ytm_browse/ · widgets/
 │   ├── l10n/                 # ARB localizations (EN, ES, AR) + generated Dart
 │   └── main.dart             # App entrypoint & initialization
-├── test/                     # ~255 *_test.dart files (unit, Cubit, fuzz, perf, a11y, security)
+├── test/                     # 354 *_test.dart files (unit, Cubit, fuzz, perf, a11y, security)
 ├── website/                  # Landing website (index.html, styles.css, app.js, assets/)
 │   └── assets/               # Branding vectors
 ├── android/                  # dev (.plus) / prod (Pure) / ytm (.ytm) flavors + native DSP (C++)
@@ -257,7 +257,7 @@ pulsr/
 
 | Document | Purpose |
 |---|---|
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records: 001 player decomposition, 002 AppError taxonomy, 003 concurrency, 004 artwork cache, 005 DSP chain, 006 queue slots |
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records (001–014): player decomposition, AppError taxonomy, concurrency, artwork cache, DSP chain, queue slots, dependency injection, UI sound design, router, responsive layout, network/proxy, telemetry, settings state, playlists, domain layering |
 | [`DESIGN.md`](DESIGN.md) | Design system single source of truth (tokens, motion, components, a11y) |
 | [`RUNBOOK.md`](RUNBOOK.md) | YTM tap-to-sound latency runbook + verification gates |
 
@@ -269,24 +269,24 @@ Pulsr underwent an exhaustive 11-dimension architectural audit and hardening spr
 
 | Dimension | Score | Key Hardening Highlights | Verification Suite |
 |---|:---:|---|---|
-| **Architecture** | **10/10** | `PlayerCubit` facade + 13 files under `player/cubit/controllers/` + `managers/` (transport, queue + `QueueSlotCodec` slots 0–2, DSP/effects/profiles, metadata, playback-options/lyrics/Quran, widget bridge); formal bounded context interfaces in `lib/domain/boundaries.dart` + `lib/domain/interfaces/`. | `test/architecture/player_controller_decomposition_test.dart` |
+| **Architecture** | **10/10** | `PlayerCubit` facade + 22 files under `player/cubit/controllers/` and 4 under `player/cubit/managers/` (transport, queue + `QueueSlotCodec` slots 0–2, DSP/effects/profiles, metadata, playback-options/lyrics/Quran, widget bridge); formal bounded context interfaces in `lib/domain/boundaries.dart` + `lib/domain/interfaces/`. | `test/architecture/player_controller_decomposition_test.dart` |
 | **Bug Density** | **10/10** | 10,000-iteration fuzzer over LRC, CUE, M3U, AutoEQ parsers; randomized property-based invariant testing. | `test/fuzz/parser_fuzz_test.dart`, `test/property/state_property_test.dart` |
 | **State Management** | **10/10** | Elimination of redundant rebuilds; formal state machines for `TagEditorCubit` and `YtmSearchState.phase`; single-source-of-truth emissions. | `test/perf/rebuild_audit_test.dart` |
 | **Error Handling** | **10/10** | Exhaustive sealed class taxonomy `AppError` (`Network/Storage/Audio/Ytm/Permission/Generic` + `resolveAppError`) replacing string errors; centralized mapper with compile-time pattern matching. | `test/errors/app_error_taxonomy_test.dart` |
 | **Performance** | **10/10** | Bounded cache ceilings; sub-millisecond queue slice generation on 10,000-item queues; 60fps frame budget preservation. | `test/perf/frame_budget_test.dart` |
 | **Memory Safety** | **10/10** | Dual-tier LRU + `WeakReference` artwork cache preventing OOM; explicit disposal audits across controllers and stream subscriptions. | `test/lifecycle/disposal_audit_test.dart` |
 | **Concurrency** | **10/10** | Monotonic generation counters (`_mediaItemResolutionGen`, `_localMatchSwapGen`) and mutex locks eliminating race conditions during rapid skipping. | `test/concurrency/concurrency_hardening_test.dart` |
-| **Code Hygiene** | **10/10** | Zero raw `print()` calls; strict empty catch ratchet; `prefer_final_locals` enforced; all controllers strictly < 400 lines. | `test/code_hygiene_test.dart` |
+| **Code Hygiene** | **10/10** | Zero raw `print()` calls; strict empty catch ratchet; `prefer_final_locals` enforced; all controllers strictly < 400 lines. | `test/architecture/code_hygiene_test.dart` |
 | **Security** | **10/10** | Encrypted `FlutterSecureStorage` with plaintext wipe; IPv6-mapped IPv4 SSRF defense; ReDoS regex guards; JSON recursion depth caps; Web login sandbox hardening. | `test/security/security_hardening_test.dart` |
 | **Accessibility** | **10/10** | WCAG 2.1 AA luminance contrast ($\ge 4.5:1$); minimum 48x48 touch targets; decorative visualizers excluded from semantics; full 2.0x Dynamic Type scaling. | `test/a11y/accessibility_compliance_test.dart` |
-| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 6 Architecture Decision Records (ADRs) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
+| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 15 Architecture Decision Records (ADRs, 001–014 incl. two 007) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
 
 ---
 
 ## 🚀 Getting Started & Build Guide
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`>= 3.29.0` / Dart `>= 3.0.0 < 4.0.0`, per `pubspec.yaml`)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`>= 3.41.0` / Dart `>= 3.0.0 < 4.0.0`, per `pubspec.yaml`)
 - [Android Studio](https://developer.android.com/studio) with Android SDK & NDK
 - Java Development Kit (JDK 17)
 
@@ -310,7 +310,7 @@ flutter run
 ```
 
 ### 4. Run Automated Tests
-Execute unit tests, Cubit state tests, and repository mocks (~255 `*_test.dart` files: unit, Cubit, fuzz, property, perf, a11y, security, concurrency):
+Execute unit tests, Cubit state tests, and repository mocks (354 `*_test.dart` files: unit, Cubit, fuzz, property, perf, a11y, security, concurrency):
 ```bash
 flutter test
 ```

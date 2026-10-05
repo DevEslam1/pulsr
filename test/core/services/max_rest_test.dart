@@ -4,7 +4,7 @@ import 'package:pulsr/core/services/bluetooth_latency_calibrator.dart';
 import 'package:pulsr/core/services/lrclib_service.dart';
 import 'package:pulsr/core/services/radio_station_store.dart';
 import 'package:pulsr/domain/models/radio_station.dart';
-import 'package:pulsr/domain/usecases/backup_usecases.dart';
+import 'package:pulsr/data/usecases/backup_usecases.dart';
 
 void main() {
   test('7 lyrics batch: empty + blank titles short-circuit without network',

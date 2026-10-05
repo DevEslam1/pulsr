@@ -120,8 +120,8 @@ Infinite/decorative animations should check `context.motionEnabled` first.
 | `PulsrSearchField`, `PulsrRefreshIndicator`, `PulsrBackButton`, `PulsrPagePopScope` | Input / navigation chrome |
 | `SongTile`, `CachedArtwork`, `ArtworkPlaceholder`, `SpinningVinylDisc`, `WaveformLogo` | Music-specific media |
 | `PulsrEmptyState`, `PulsrErrorBoundary`, `AsyncStateBuilder`, `ShimmerSkeleton` / `SkeletonList` / `SkeletonGrid` | Async & empty/error states |
-| `PulsrSectionHeader`, `SectionHeader`, `PulsrStaticGrid`, `StaggeredList`, `StaggeredReveal` | Layout / structure |
-| `PulsrToast`, `PulsrSnackBar`, `MarqueeText`, `HighlightedText`, `PulsrLogo`, `GestureHintOverlay` | Feedback & text |
+| `PulsrSectionHeader`, `PulsrStaticGrid`, `StaggeredListItem`, `StaggeredReveal` | Layout / structure |
+| `PulsrToast`, `MarqueeText`, `PulsrHighlightedText`, `PulsrLogo`, `GestureHintOverlay` | Feedback & text |
 | `PulsrDockTracker`, `PulsrModalTracker` | Dock/modal visibility coordination |
 
 `AsyncStateBuilder<T>` renders the four `AsyncSnapshot` states in one place:

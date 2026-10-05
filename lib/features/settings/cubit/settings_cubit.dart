@@ -11,6 +11,7 @@ import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../data/audio/mqa_decoder_helper.dart';
 import '../../../core/di/injection.dart';
@@ -29,7 +30,7 @@ import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/audio/multi_output_router.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
-import '../../../domain/services/usb_exclusive_service.dart';
+import '../../../data/services/usb_exclusive_service.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'proxy_endpoint_validator.dart';
@@ -1449,9 +1450,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       SoundFeedbackService.playSuccess(mirrorHaptics: true);
       safeEmit(state.copyWith(isScanning: false, scanResultCount: count));
       return count;
-    } catch (e) {
+    } catch (e, st) {
       SoundFeedbackService.playError(mirrorHaptics: true);
-      safeEmit(state.copyWith(isScanning: false, errorMessage: e.toString()));
+      final error = classifyFailure(e, st);
+      ErrorLogger.log('Device library scan failed',
+          error: e, stackTrace: st, category: 'SettingsCubit');
+      safeEmit(
+          state.copyWith(isScanning: false, errorMessage: error.userMessage));
       return 0;
     }
   }

@@ -30,7 +30,7 @@ The per-song stores hydrate their in-memory maps asynchronously in their constru
 
 ### 3. Startup signal and validation
 - `initializationReady` (a `Completer`) completes in a `finally` block once initialization finishes or fails; the splash gates routing on that real signal instead of a fixed delay.
-- `validateDependencies()` asserts the presence of `AppDatabase`, `PulsrAudioHandler`, `PlayerCubit`, `DownloadsCubit` and `YtmDownloadCubit`. This is an `assert`, so it fires in debug/profile and is compiled out in release.
+- `validateDependencies(getIt)` requires the presence of `AppDatabase`, `PulsrAudioHandler`, `PlayerCubit`, `DownloadsCubit` and `YtmDownloadCubit`, throwing an explicit `StateError` when any is missing. This guard survives release builds (unlike an `assert`).
 
 ### 4. Disposal
 `@Singleton(dispose:)` hooks close owned resources deterministically:
@@ -46,5 +46,5 @@ The per-song stores hydrate their in-memory maps asynchronously in their constru
 
 ### Negative / Trade-offs
 - The generated `injection.config.dart` must be regenerated (`build_runner`) after any annotation change; forgetting leaves the graph stale.
-- `validateDependencies` uses `assert` and therefore does not guard release builds.
+- `validateDependencies` throws `StateError` on a missing registration, so an incomplete graph aborts startup rather than degrading gracefully.
 - The locator is a global, so hidden dependencies can be introduced if a type is called through `getIt` instead of injected.

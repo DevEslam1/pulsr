@@ -15,7 +15,7 @@ import '../../core/errors/failures.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
-import '../../domain/models/download_settings.dart';
+import '../models/download_settings.dart';
 import '../../domain/models/download_task.dart';
 import '../../core/di/injection.dart';
 import '../../domain/models/ytm_track.dart';
