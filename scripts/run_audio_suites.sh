@@ -15,5 +15,4 @@ cd "$(dirname "$0")/.."
 
 flutter test \
   test/data/audio \
-  test/core/telemetry \
-  test/dsp_expansion_test.dart
+  test/core/telemetry

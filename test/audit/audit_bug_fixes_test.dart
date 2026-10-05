@@ -13,7 +13,7 @@ import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/player/cubit/dsp_telemetry_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/smart_playlist_builder/smart_playlist_builder_cubit.dart';
-import 'mocks/fake_audio_player_backend.dart';
+import '../mocks/fake_audio_player_backend.dart';
 
 class _FakeSmartPlaylistEngine extends Fake implements ISmartPlaylistEngine {
   @override

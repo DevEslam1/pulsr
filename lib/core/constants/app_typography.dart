@@ -9,10 +9,10 @@
 ///
 /// | token | size | role |
 /// |---|---|---|
-/// | micro | 10 | badges, counters |
-/// | tiny | 11 | dense micro-labels |
-/// | caption | 12 | captions, timer readouts |
-/// | label | 13 | chips, meta, overlines |
+/// | micro | 9 | badges, counters |
+/// | tiny | 10 | dense micro-labels |
+/// | caption | 11 | captions, timer readouts |
+/// | label | 12 | chips, meta, overlines |
 /// | bodySmall | 13 | secondary rows |
 /// | body | 14 | default body |
 /// | callout | 15 | emphasised body |
@@ -26,10 +26,10 @@
 abstract class AppFontSize {
   /// 8 — ultra-dense micro glyphs (badge counters, telemetry tick labels).
   static const double nano = 8;
-  static const double micro = 10;
-  static const double tiny = 11;
-  static const double caption = 12;
-  static const double label = 13;
+  static const double micro = 9;
+  static const double tiny = 10;
+  static const double caption = 11;
+  static const double label = 12;
   static const double bodySmall = 13;
   static const double body = 14;
   static const double callout = 15;

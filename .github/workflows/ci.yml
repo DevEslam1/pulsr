@@ -72,7 +72,7 @@ jobs:
           flutter test test/lifecycle/disposal_audit_test.dart
           flutter test test/security/security_hardening_test.dart
           flutter test test/a11y/accessibility_compliance_test.dart
-          flutter test test/code_hygiene_test.dart
+          flutter test test/architecture/code_hygiene_test.dart
 
       - name: Run Core Widgets Safety & Phase 0-10 Suites
         run: |

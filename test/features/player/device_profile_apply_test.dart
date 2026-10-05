@@ -9,7 +9,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'player_cubit_test.dart'; // TestPulsrAudioHandler + mocktail mocks
+import 'cubit/player_cubit_test.dart'; // TestPulsrAudioHandler + mocktail mocks
 
 /// Host-safe fake: pushes [AudioOutputInfo] events without platform channels.
 class FakeHiResAudioService extends HiResAudioService {

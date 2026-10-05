@@ -140,7 +140,13 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
             await _audioHandler.setShuffleMode(AudioServiceShuffleMode.none);
             final prefs = await SharedPreferences.getInstance();
             await prefs.setBool(PrefsKeys.playbackShuffle, false);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log(
+                'Failed to persist shuffle state for Quran Mode',
+                error: e,
+                stackTrace: st,
+                category: 'PlayerPlaybackOptionsQuran');
+          }
         }
       } else {
         final current = _getState();
