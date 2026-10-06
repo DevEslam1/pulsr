@@ -318,4 +318,11 @@ class PrefsKeys {
   static const String headsetTripleClick = 'setting_headset_triple_click';
   static const String headsetClickWindowMs = 'setting_headset_click_window_ms';
   static const String headsetSeekSeconds = 'setting_headset_seek_seconds';
+
+  // Consolidated in Phase 5:
+  static const String streamingQuality = 'setting_streaming_quality';
+  static const String adaptiveRuntimeQuality = 'adaptive_runtime_quality';
+  static const String offlineOnlyMode = 'setting_offline_only_mode';
+  static const String wifiOnlyMode = 'setting_wifi_only_mode';
+  static const String settingLanguage = 'setting_language';
 }
