@@ -83,8 +83,9 @@ abstract final class DspParamRanges {
   static const DspRange eqFilterGainDb = DspRange(-24.0, 24.0);
 
   /// Parametric-filter Q (headphone-profile PEQ import). defaultValue is the
-  /// Butterworth Q used when the profile omits a finite positive Q.
-  static const DspRange eqFilterQ = DspRange(0.1, 18.0, defaultValue: 1.414);
+  /// Butterworth Q used when the profile omits a finite positive Q. Bounds match
+  /// the native ParametricEQ clamp (0.05..30).
+  static const DspRange eqFilterQ = DspRange(0.05, 30.0, defaultValue: 1.414);
 
   // --- Virtualizer -----------------------------------------------------------
   static const DspRange virtualizerStrength = DspRange(0.0, 1.0);

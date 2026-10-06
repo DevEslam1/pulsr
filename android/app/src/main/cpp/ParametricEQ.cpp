@@ -40,6 +40,9 @@ void ParametricEQ::setSampleRate(double sampleRate) {
     for (int i = 0; i < bandCount_; ++i) {
         computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
     }
+    // Bands outside the current bandCount_ keep old-rate coefficients; force
+    // applyParams() to recompute every band that appears in the next snapshot.
+    coeffsStale_ = true;
     // FIX M-7: a rate change swaps every band's coefficient set, so the
     // retained TDF-II delay registers (s1_/s2_) belong to the old coefficients
     // and thump on the first block. applyParams only clears state on a
@@ -106,6 +109,7 @@ void ParametricEQ::setPreamp(double preampDb) {
 void ParametricEQ::beginEnableRamp() {
     std::memset(s1_, 0, sizeof(s1_));
     std::memset(s2_, 0, sizeof(s2_));
+    std::memset(soloSkipped_, 0, sizeof(soloSkipped_));
     smoothedPreampDb_ = 0.0;
     preampLinear_ = 1.0;
     for (int i = 0; i < bandCount_; ++i) {
@@ -126,6 +130,15 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         std::memset(s1_, 0, sizeof(s1_));
         std::memset(s2_, 0, sizeof(s2_));
     }
+    // A sample-rate change invalidates every retained coefficient set. Consume
+    // the flag here (setSampleRate runs immediately before applyParams in the
+    // engine) so bands previously outside bandCount_ are recomputed too.
+    const bool rateStale = coeffsStale_;
+    coeffsStale_ = false;
+    if (rateStale) {
+        std::memset(s1_, 0, sizeof(s1_));
+        std::memset(s2_, 0, sizeof(s2_));
+    }
     const bool turningOn = params.enabled && !enabled_;
     enabled_ = params.enabled;
     targetPreampDb_ = std::clamp(params.preampDb, -30.0, 30.0);
@@ -143,6 +156,7 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         // avoids recomputing every band's transcendentals on every parameter
         // generation.
         const bool structureChanged =
+            rateStale ||
             std::abs(newFreq - bands_[i].frequency) > 1.0 ||
             std::abs(newQ - bands_[i].q) > 1e-6 ||
             p.type != bands_[i].type ||
@@ -170,6 +184,8 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
 void ParametricEQ::reset() {
     std::memset(s1_, 0, sizeof(s1_));
     std::memset(s2_, 0, sizeof(s2_));
+    std::memset(soloSkipped_, 0, sizeof(soloSkipped_));
+    coeffsStale_ = false;
     smoothedPreampDb_ = targetPreampDb_;
     preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     for (int i = 0; i < bandCount_; ++i) {
@@ -307,6 +323,9 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // leak gain while the stage is off.
     if (!enabled_) return;
 
+    // Keep the real interleave stride; clamp only how many channels we process.
+    // Clamping the stride itself garbles any stream wider than MAX_CHANNELS.
+    const int stride = channels > 0 ? channels : 1;
     channels = std::clamp(channels, 1, MAX_CHANNELS);
 
     // One-pole smoother coefficient for ~20ms time constant (tau = 0.020s)
@@ -325,9 +344,10 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // Apply smoothed preamp
     if (std::abs(preampLinear_ - 1.0) > 1e-4) {
         const float pLinear = static_cast<float>(preampLinear_);
-        const int totalSamples = frames * channels;
-        for (int i = 0; i < totalSamples; ++i) {
-            buffer[i] *= pLinear;
+        for (int f = 0; f < frames; ++f) {
+            for (int ch = 0; ch < channels; ++ch) {
+                buffer[f * stride + ch] *= pLinear;
+            }
         }
     }
 
@@ -343,10 +363,15 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // Update and smooth band gains & recompute coeffs
     for (int b = 0; b < bandCount_; ++b) {
         auto& band = bands_[b];
-        const bool wasBypass = band.bypass;
-        if (hasSolo && !band.solo) {
-            band.bypass = true;
-            if (!wasBypass) {
+        // Solo is a runtime mask, NOT a coefficient property: writing
+        // band.bypass here used to strand every non-soloed band bypassed after
+        // solo was switched off (computeCoeffs only reruns on a structural or
+        // gain change, neither of which happens when solo is cleared).
+        const bool skip = hasSolo && !band.solo;
+        const bool wasSkipped = soloSkipped_[b];
+        soloSkipped_[b] = skip;
+        if (skip) {
+            if (!wasSkipped) {
                 for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
                     s1_[ch][b] = s2_[ch][b] = 0.0;
                 }
@@ -354,6 +379,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             continue;
         }
 
+        const bool wasBypass = band.bypass;
         if (std::abs(band.smoothedGainDb - band.targetGainDb) > 1e-4) {
             band.smoothedGainDb += smoothFactor * (band.targetGainDb - band.smoothedGainDb);
             computeCoeffs(band, band.smoothedGainDb);
@@ -362,7 +388,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             computeCoeffs(band, band.smoothedGainDb);
         }
 
-        if (wasBypass && !band.bypass) {
+        if ((wasBypass && !band.bypass) || wasSkipped) {
             for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
                 s1_[ch][b] = s2_[ch][b] = 0.0;
             }
@@ -372,7 +398,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // Process biquad cascaded filters per band across all channels (TDF-II)
     for (int b = 0; b < bandCount_; ++b) {
         const auto& band = bands_[b];
-        if (band.bypass) continue;
+        if ((hasSolo && !band.solo) || band.bypass) continue;
 
         const double b0 = band.coeffs.b0;
         const double b1 = band.coeffs.b1;
@@ -402,10 +428,14 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                 double x0 = vgetq_lane_f64(vx, 0);
                 double x1 = vgetq_lane_f64(vx, 1);
                 if (!std::isfinite(x0) || !std::isfinite(x1)) {
-                    if (!std::isfinite(x0)) { x0 = 0.0; s1_[0][b] = 0.0; s2_[0][b] = 0.0; }
-                    if (!std::isfinite(x1)) { x1 = 0.0; s1_[1][b] = 0.0; s2_[1][b] = 0.0; }
-                    s1_arr[0] = s1_[0][b]; s1_arr[1] = s1_[1][b];
-                    s2_arr[0] = s2_[0][b]; s2_arr[1] = s2_[1][b];
+                    // Snapshot the RUNNING vector state, not the block-start
+                    // values still sitting in s1_/s2_ (they are only written
+                    // after the frame loop). Reading memory here used to roll
+                    // the clean channel's state back to the block start.
+                    vst1q_f64(s1_arr, vs1);
+                    vst1q_f64(s2_arr, vs2);
+                    if (!std::isfinite(x0)) { x0 = 0.0; s1_arr[0] = 0.0; s2_arr[0] = 0.0; }
+                    if (!std::isfinite(x1)) { x1 = 0.0; s1_arr[1] = 0.0; s2_arr[1] = 0.0; }
                     vs1 = vld1q_f64(s1_arr);
                     vs2 = vld1q_f64(s2_arr);
                     double x_clean[2] = { x0, x1 };
@@ -469,10 +499,16 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                 _mm_store_pd(x_arr, vx);
 
                 if (!std::isfinite(x_arr[0]) || !std::isfinite(x_arr[1])) {
-                    if (!std::isfinite(x_arr[0])) { x_arr[0] = 0.0; s1_[0][b] = 0.0; s2_[0][b] = 0.0; }
-                    if (!std::isfinite(x_arr[1])) { x_arr[1] = 0.0; s1_[1][b] = 0.0; s2_[1][b] = 0.0; }
-                    vs1 = _mm_set_pd(s1_[1][b], s1_[0][b]);
-                    vs2 = _mm_set_pd(s2_[1][b], s2_[0][b]);
+                    // Snapshot the RUNNING vector state so zeroing the poisoned
+                    // lane does not roll back the clean channel to the block
+                    // start (s1_/s2_ are only updated after the frame loop).
+                    alignas(16) double s1_cur[2], s2_cur[2];
+                    _mm_store_pd(s1_cur, vs1);
+                    _mm_store_pd(s2_cur, vs2);
+                    if (!std::isfinite(x_arr[0])) { x_arr[0] = 0.0; s1_cur[0] = 0.0; s2_cur[0] = 0.0; }
+                    if (!std::isfinite(x_arr[1])) { x_arr[1] = 0.0; s1_cur[1] = 0.0; s2_cur[1] = 0.0; }
+                    vs1 = _mm_set_pd(s1_cur[1], s1_cur[0]);
+                    vs2 = _mm_set_pd(s2_cur[1], s2_cur[0]);
                     vx = _mm_set_pd(x_arr[1], x_arr[0]);
                 }
 
@@ -565,7 +601,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                         *chPtr = 0.0f;
                         s1 = 0.0;
                         s2 = 0.0;
-                        chPtr += channels;
+                        chPtr += stride;
                         continue;
                     }
 
@@ -581,7 +617,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                     }
 
                     *chPtr = static_cast<float>(y0);
-                    chPtr += channels;
+                    chPtr += stride;
                 }
 
                 if (std::abs(s1) < 1e-25 || !std::isfinite(s1)) s1 = 0.0;

@@ -1,6 +1,10 @@
 // android/app/src/main/cpp/UsbAudioSink.cpp
 #include "UsbAudioSink.h"
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
 #if defined(__linux__) || defined(__ANDROID__)
 #include <linux/usbdevice_fs.h>
 #include <sys/ioctl.h>

@@ -86,15 +86,16 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         category: 'PlayerDspEffects',
       );
     }
-    final state = _getState();
     await applyDspEffect(
       featureName: 'Bass Boost',
       guardCondition: requested > 0.01,
       // State mirrors the user's requested boost (the slider stays put); the
       // engine receives the headroom-staged value so stacked effects can't
-      // over-drive the signal into the final output clamp.
+      // over-drive the signal into the final output clamp. Read eqPreset from
+      // the lambda's `dsp` argument, not a pre-await snapshot, so rapid slider
+      // updates can't overwrite each other.
       updateDsp: (dsp) => dsp.copyWith(
-        eqPreset: state.eqPreset.copyWith(
+        eqPreset: dsp.eqPreset.copyWith(
           bassBoost: requested,
         ),
       ),
@@ -146,10 +147,11 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     final state = _getState();
     try {
       if (!enabled) {
+        // Only capture a snapshot while effects are actually active. A second
+        // disable (already inactive) must NOT null it out, or the next enable
+        // would have nothing to restore.
         if (state.isDspEffectsActive) {
           _dspSnapshot = state.dsp;
-        } else {
-          _dspSnapshot = null;
         }
         _emit(state.copyWith(
           dsp: state.dsp.copyWith(
@@ -759,28 +761,39 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     // both here so PlayerState never diverges from the engine state.
     if (index < 0 || index >= current.length) return Future.value();
     final sanitized = band.sanitized();
-    final bands = List<DynamicEqBandConfig>.from(current);
-    bands[index] = sanitized;
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
       requiresGuard: true,
       guardCondition: _getState().isDynamicEqEnabled,
       showErrorOnGuard: false,
-      updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
+      // Derive the band list from the lambda's `dsp` argument, not a copy taken
+      // before the await, so concurrent edits to different bands are not lost.
+      updateDsp: (dsp) {
+        if (index < 0 || index >= dsp.dynamicEqBands.length) return dsp;
+        final bands = List<DynamicEqBandConfig>.from(dsp.dynamicEqBands);
+        bands[index] = sanitized;
+        return dsp.copyWith(dynamicEqBands: bands);
+      },
       applyAudioHandler: () => _audioHandler.setDynamicEqBand(index, sanitized),
     );
   }
 
   Future<void> addDynamicEqBand() {
     if (_getState().dynamicEqBands.length >= 8) return Future.value();
-    final bands = List<DynamicEqBandConfig>.from(_getState().dynamicEqBands)
-      ..add(const DynamicEqBandConfig());
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
       requiresGuard: true,
       guardCondition: _getState().isDynamicEqEnabled,
       showErrorOnGuard: false,
-      updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
+      updateDsp: (dsp) {
+        if (dsp.dynamicEqBands.length >= 8) return dsp;
+        return dsp.copyWith(
+          dynamicEqBands: [
+            ...dsp.dynamicEqBands,
+            const DynamicEqBandConfig(),
+          ],
+        );
+      },
       applyAudioHandler: () => _audioHandler.addDynamicEqBand(),
     );
   }
@@ -788,13 +801,17 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   Future<void> removeDynamicEqBand(int index) {
     final currentBands = _getState().dynamicEqBands;
     if (index < 0 || index >= currentBands.length) return Future.value();
-    final bands = List<DynamicEqBandConfig>.from(currentBands)..removeAt(index);
     return applyDspEffect(
       featureName: 'Dynamic EQ Band',
       requiresGuard: true,
       guardCondition: _getState().isDynamicEqEnabled,
       showErrorOnGuard: false,
-      updateDsp: (dsp) => dsp.copyWith(dynamicEqBands: bands),
+      updateDsp: (dsp) {
+        if (index < 0 || index >= dsp.dynamicEqBands.length) return dsp;
+        final bands = List<DynamicEqBandConfig>.from(dsp.dynamicEqBands)
+          ..removeAt(index);
+        return dsp.copyWith(dynamicEqBands: bands);
+      },
       applyAudioHandler: () => _audioHandler.removeDynamicEqBand(index),
     );
   }

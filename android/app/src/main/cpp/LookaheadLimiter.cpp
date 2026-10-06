@@ -55,7 +55,11 @@ void LookaheadLimiter::setSampleRate(double sampleRate) {
 
 void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode) {
     lookaheadMs_ = std::clamp(lookaheadMs, 0.5, 20.0);
-    thresholdDb_ = std::clamp(thresholdDb, -24.0, 0.0);
+    // Match the Dart contract (DspParamRanges.limiterThresholdDb) and the
+    // snapshot sanitizer (-60..0) so a valid UI value is not silently clamped.
+    // The shared class also serves the headphone-safety limiter, whose ceiling
+    // may be as low as -40 dB.
+    thresholdDb_ = std::clamp(thresholdDb, -60.0, 0.0);
     releaseMs_ = std::clamp(releaseMs, 5.0, 1000.0);
     truePeakMode_ = truePeakMode;
 
@@ -205,6 +209,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindowL[TAPS_PER_PHASE] = {};
     float historyWindowR[TAPS_PER_PHASE] = {};
+    float blockMinEnvelope = 1.0f;
 
     for (int i = 0; i < frames; ++i) {
         const float inL = L[i];
@@ -213,7 +218,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
         delayBuf_[0][writeIdx_] = std::isfinite(inL) ? inL : 0.0f;
         delayBuf_[1][writeIdx_] = std::isfinite(inR) ? inR : 0.0f;
 
-        // Gather 6-tap history for true-peak interpolation
+        // Gather TAPS_PER_PHASE (12) samples of history for true-peak interpolation
         for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
             int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap)) & kMask;
             historyWindowL[tap] = delayBuf_[0][histIdx];
@@ -250,7 +255,8 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         // Instantaneous attack to target minimum gain, smooth exponential release when lookahead window clears
         if (targetGain < envelope_) {
-            envelope_ = targetGain;
+            const float attackStep = 1.0f / static_cast<float>(lookaheadSamples_);
+            envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
@@ -258,6 +264,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
             }
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
+        blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
 
         // Read delayed audio from lookahead buffer
         int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
@@ -271,7 +278,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
     }
-    const float gr = (envelope_ < 1.0f && envelope_ > 0.0f) ? (20.0f * std::log10(envelope_)) : 0.0f;
+    const float gr = (blockMinEnvelope < 1.0f && blockMinEnvelope > 0.0f) ? (20.0f * std::log10(blockMinEnvelope)) : 0.0f;
     gainReductionDb_.store(gr, std::memory_order_relaxed);
 }
 
@@ -286,6 +293,7 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindow[TAPS_PER_PHASE] = {};
+    float blockMinEnvelope = 1.0f;
 
     for (int i = 0; i < frames; ++i) {
         const float inSample = inOut[i];
@@ -321,7 +329,8 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
         const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
 
         if (targetGain < envelope_) {
-            envelope_ = targetGain;
+            const float attackStep = 1.0f / static_cast<float>(lookaheadSamples_);
+            envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
@@ -329,6 +338,7 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
             }
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
+        blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
 
         int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
         if (envelope_ == 1.0f) {
@@ -339,7 +349,7 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
     }
-    const float gr = (envelope_ < 1.0f && envelope_ > 0.0f) ? (20.0f * std::log10(envelope_)) : 0.0f;
+    const float gr = (blockMinEnvelope < 1.0f && blockMinEnvelope > 0.0f) ? (20.0f * std::log10(blockMinEnvelope)) : 0.0f;
     gainReductionDb_.store(gr, std::memory_order_relaxed);
 }
 
@@ -351,16 +361,20 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
     }
 
     if (!enabled_ || frames <= 0) return;
-    channels = std::clamp(channels, 1, MAX_CHANNELS);
+    // Keep the real interleave stride; clamp only the number of channels we
+    // process. Using the clamped count as the stride garbles wide streams.
+    const int stride = channels > 0 ? channels : 1;
+    const int processChannels = std::clamp(channels, 1, MAX_CHANNELS);
 
     constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindow[TAPS_PER_PHASE] = {};
+    float blockMinEnvelope = 1.0f;
 
     for (int i = 0; i < frames; ++i) {
         float frameMaxPeak = 0.0f;
 
-        for (int ch = 0; ch < channels; ++ch) {
-            const float inSample = buffer[i * channels + ch];
+        for (int ch = 0; ch < processChannels; ++ch) {
+            const float inSample = buffer[i * stride + ch];
             delayBuf_[ch][writeIdx_] = std::isfinite(inSample) ? inSample : 0.0f;
 
             for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
@@ -394,8 +408,14 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
         }
         const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
 
+        // Attack ramps linearly across the lookahead window instead of stepping
+        // instantly. A constant 1/lookaheadSamples rate is guaranteed to reach
+        // any targetGain before the peak that produced it reaches the output
+        // (the peak is delayed by exactly lookaheadSamples_), so the ceiling is
+        // still enforced while the gain discontinuity is removed.
         if (targetGain < envelope_) {
-            envelope_ = targetGain;
+            const float attackStep = 1.0f / static_cast<float>(lookaheadSamples_);
+            envelope_ = std::max(targetGain, envelope_ - attackStep);
         } else {
             envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
@@ -403,21 +423,22 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
             }
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
+        blockMinEnvelope = std::min(blockMinEnvelope, envelope_);
 
         int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
         if (envelope_ == 1.0f) {
-            for (int ch = 0; ch < channels; ++ch) {
-                buffer[i * channels + ch] = delayBuf_[ch][readIdx];
+            for (int ch = 0; ch < processChannels; ++ch) {
+                buffer[i * stride + ch] = delayBuf_[ch][readIdx];
             }
         } else {
-            for (int ch = 0; ch < channels; ++ch) {
-                buffer[i * channels + ch] = delayBuf_[ch][readIdx] * envelope_;
+            for (int ch = 0; ch < processChannels; ++ch) {
+                buffer[i * stride + ch] = delayBuf_[ch][readIdx] * envelope_;
             }
         }
 
         writeIdx_ = (writeIdx_ + 1) & kMask;
     }
-    const float gr = (envelope_ < 1.0f && envelope_ > 0.0f) ? (20.0f * std::log10(envelope_)) : 0.0f;
+    const float gr = (blockMinEnvelope < 1.0f && blockMinEnvelope > 0.0f) ? (20.0f * std::log10(blockMinEnvelope)) : 0.0f;
     gainReductionDb_.store(gr, std::memory_order_relaxed);
 }
 

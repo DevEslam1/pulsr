@@ -75,9 +75,12 @@ void DynamicBass::updateFilters() {
     yLpMid_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
     yLpSide_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
     // FIX C-5: the X-band defines the acoustic response range around the
-    // boosted Y band. The X cutoffs are clamped to the Y band edges so the X
-    // high-pass can never reject the boosted content (every preset has
-    // xLow > yLow, which would otherwise silence the stage).
+    // boosted Y band. The X low-pass is the only X filter applied to the signal
+    // path (see processInterleaved); it is clamped up to yHigh so it stays
+    // transparent over the boosted band. The X high-pass is retained/configured
+    // for completeness but is not cascaded after the Y band-pass — every preset
+    // has xLow > yHigh, so it would reject the whole Y band and silence the
+    // stage. Clamp it to the Y low edge so any future use cannot do so either.
     xHpBass_.setHighPass(sampleRate_, std::min<double>(static_cast<double>(xLow_),
                                                        static_cast<double>(yLow_)), q);
     xLpBass_.setLowPass(sampleRate_, std::max<double>(static_cast<double>(xHigh_),
@@ -154,12 +157,12 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         const double S = 0.5 * (L - R);
 
         // Y-band isolates the sub-bass that receives the dynamic boost. The X
-        // filters are preset-defined but must not be cascaded after the Y
-        // band-pass: every preset has xLow > yHigh, so the X high-pass would
-        // reject the whole Y band and silence the stage. Keep X as a low-pass
-        // shaper on the boosted tap only (transparent below xHigh).
+        // low-pass is a transparent (below xHigh) shaper on the boosted tap; the
+        // X high-pass is deliberately NOT cascaded after the Y band-pass — every
+        // preset has xLow > yHigh, so it would reject the whole Y band and
+        // silence the stage (see updateFilters()).
         const double yBand = yLpMid_.process(yHpMid_.process(M));
-        const double midY = xLpBass_.process(xHpBass_.process(yBand));
+        const double midY = xLpBass_.process(yBand);
 
         // 3. Peak envelope follower on sub-bass punch
         const double absY = std::abs(midY);
@@ -186,9 +189,16 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         // 5. Sub-band Side Spatial Imaging:
         //    Extract low frequencies of side channel and scale by sideGainLow (mono bass)
         //    High frequencies of side channel scaled by sideGainHigh (wide spatial air)
+        // The narrowing is scaled by the smoothed (normalised) strength so it
+        // fades in with the effect and returns to unity — otherwise the stereo
+        // width steps abruptly when the stage is disabled (the narrowing used to
+        // run at full depth for the ~140 ms until the strength smoother reached 0).
+        const double strNorm = std::clamp((currentStr - 1.0) / 7.0, 0.0, 1.0);
+        const double effLow = 1.0 + strNorm * (sLow - 1.0);
+        const double effHigh = 1.0 + strNorm * (sHigh - 1.0);
         const double sideLow = yLpSide_.process(S);
         const double sideHigh = S - sideLow;
-        const double sideProcessed = sideLow * sLow + sideHigh * sHigh;
+        const double sideProcessed = sideLow * effLow + sideHigh * effHigh;
 
         // 6. Recombine Mid and Side
         double midOut = M + bassBoost;

@@ -29,7 +29,7 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
         auto& b = s.eq.bands[i];
         b.frequency = clampFinite(b.frequency, 10.0, 40000.0, 1000.0);
         b.gainDb = clampFinite(b.gainDb, -30.0, 30.0, 0.0);
-        b.q = clampFinite(b.q, 0.05, 100.0, 1.0);
+        b.q = clampFinite(b.q, 0.05, 30.0, 1.0);
         const int t = static_cast<int>(b.type);
         if (t < 0 || t > 7) b.type = FilterType::Peaking;
     }
@@ -107,7 +107,7 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
             clampFinite(s.multibandCompressor.crossoverFreqs[i], 20.0, 20000.0, 150.0 * (i + 1));
     }
 
-    s.dynamicBass.strength = clampFinite(s.dynamicBass.strength, 0.0, 4.0, 1.0);
+    s.dynamicBass.strength = clampFinite(s.dynamicBass.strength, 0.0, 8.0, 1.0);
     s.dynamicBass.sideGainLow = clampFinite(s.dynamicBass.sideGainLow, 0.0, 2.0, 0.10);
     s.dynamicBass.sideGainHigh = clampFinite(s.dynamicBass.sideGainHigh, 0.0, 2.0, 0.50);
 
@@ -178,6 +178,21 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
 
 void AudioDspEngine::applySampleRateLocked(double sampleRate) {
     auto current = currentParams_.load();
+    // Unchanged-rate resync: do nothing. This is the common case for a seek or a
+    // gapless same-format transition, where regenerating the synthetic reverb IR
+    // would allocate and could glitch. Only skip when the existing IR already
+    // matches the requested rate; a Custom IR is resampled by the reverb, so it
+    // always matches.
+    if (std::abs(sampleRate - current->sampleRate) <= 0.5) {
+        const bool irMatches =
+            current->reverb.preset == static_cast<int>(ReverbPreset::Custom) ||
+            !current->reverb.enabled ||
+            !current->reverb.preparedIr ||
+            current->reverb.preparedIr->createdSampleRate == static_cast<int>(std::round(sampleRate));
+        if (irMatches) {
+            return;
+        }
+    }
     const bool wasCustom = (current->reverb.preset == static_cast<int>(ReverbPreset::Custom));
     std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
     if (!wasCustom && current->reverb.enabled) {
@@ -257,8 +272,6 @@ void AudioDspEngine::retireAndDrain(std::shared_ptr<const DspParamSnapshot> old)
 
 void AudioDspEngine::setSampleRate(double sampleRate) {
     sampleRate = clampFinite(sampleRate, 8000.0, 768000.0, 48000.0);
-    if (sampleRate < 8000.0) sampleRate = 8000.0;
-    if (sampleRate > 768000.0) sampleRate = 768000.0;
 
     std::unique_lock<std::mutex> lock(publishMutex_);
     applySampleRateLocked(sampleRate);
@@ -267,8 +280,6 @@ void AudioDspEngine::setSampleRate(double sampleRate) {
 void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
     sampleRate = clampFinite(sampleRate, 8000.0, 768000.0, 48000.0);
     (void)channels;
-    if (sampleRate < 8000.0) sampleRate = 8000.0;
-    if (sampleRate > 768000.0) sampleRate = 768000.0;
 
     std::unique_lock<std::mutex> lock(publishMutex_);
     applySampleRateLocked(sampleRate);
@@ -508,6 +519,8 @@ void DspEngineRegistry::drainRetireQueues() {
 
 void AudioDspEngine::updateParams(SnapshotMutator mutator) {
     if (!mutator) return;
+    std::shared_ptr<const DspParamSnapshot> snap;
+    bool shouldBroadcast = false;
     // This is the single choke point for every parameter setter, including all
     // JNI entry points. Catch allocation failures here so a std::bad_alloc can
     // never propagate across a JNI frame (undefined behaviour / abort).
@@ -520,14 +533,21 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
         mutator(*updated);
         SanitizeSnapshot(*updated);
         updated->generation = ++snapshotGeneration_;
-        auto snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
+        snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
         swapCurrentLocked(snap);
-
-        if (this == &AudioDspEngine::instance()) {
-            DspEngineRegistry::instance().broadcastParams(snap);
-        }
+        shouldBroadcast = (this == &AudioDspEngine::instance());
     } catch (...) {
         // Leave the previous snapshot in place on failure.
+        return;
+    }
+    // Broadcast AFTER releasing publishMutex_. broadcastParams() takes the
+    // registry mutex_, while registerEngine() takes the registry mutex_ and then
+    // publishMutex_ (via engine->publishParams). Holding publishMutex_ here
+    // while acquiring mutex_ inverted that order and could deadlock against a
+    // concurrent registerEngine(). The snapshot is already installed on this
+    // engine; the fan-out needs no lock of ours.
+    if (shouldBroadcast) {
+        DspEngineRegistry::instance().broadcastParams(snap);
     }
 }
 
@@ -787,6 +807,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // and keep processing its fade after that mask is cleared.
     reverb_.setEnabled((rawStages & ~degraded & STAGE_REVERB) && snapshot->reverb.enabled);
     const uint32_t stages = rawStages & ~degraded;
+    // Mirror the reverb handling for the saturation stage. Its enable state was
+    // only refreshed inside applyParams() (on a snapshot-generation change), so
+    // a mask-only change — or a snapshot whose `saturation.enabled` flag lagged
+    // the stage bit — left HarmonicSaturation::enabled_ stale and the stage
+    // silent while reverb still ran. That is exactly the "Quran vocal warmth
+    // does nothing but mosque ambience works" symptom. Drive it from the
+    // effective mask (which already encodes the user toggle minus auto-degrade)
+    // so it is re-synced every block like reverb.
+    saturation_.setEnabled((stages & STAGE_SATURATION) != 0);
     bool hasNetPositiveGain = smoothedReplayGain_ > 1.001 || smoothedDirectVolume_ > 1.001;
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
         hasNetPositiveGain = true;
@@ -839,11 +868,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     if (nonUnityGain) {
         // Apply smoothed ReplayGain pre-gain before EQ stage
         if (std::abs(smoothedReplayGain_ - 1.0) > 1e-4 || std::abs(startReplayGain - 1.0) > 1e-4) {
-            const int totalSamples = frames * channels;
+            // Ramp per frame so all channels share the same gain for a frame.
             double currentRg = startReplayGain;
-            double rgIncrement = (smoothedReplayGain_ - startReplayGain) / totalSamples;
-            for (int i = 0; i < totalSamples; ++i) {
-                buffer[i] *= static_cast<float>(currentRg);
+            const double rgIncrement = (smoothedReplayGain_ - startReplayGain) / static_cast<double>(frames);
+            for (int f = 0; f < frames; ++f) {
+                const float g = static_cast<float>(currentRg);
+                for (int ch = 0; ch < channels; ++ch) {
+                    buffer[f * channels + ch] *= g;
+                }
                 currentRg += rgIncrement;
             }
         }
@@ -950,11 +982,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 smoothedDirectVolume_ = dvcTarget;
             }
             if (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(startDvc - 1.0) > 1e-4) {
-                const int totalSamples = frames * channels;
+                // Ramp per frame so all channels share the same gain for a frame.
                 double currentDvc = startDvc;
-                double dvcIncrement = (smoothedDirectVolume_ - startDvc) / totalSamples;
-                for (int i = 0; i < totalSamples; ++i) {
-                    buffer[i] *= static_cast<float>(currentDvc);
+                const double dvcIncrement = (smoothedDirectVolume_ - startDvc) / static_cast<double>(frames);
+                for (int f = 0; f < frames; ++f) {
+                    const float g = static_cast<float>(currentDvc);
+                    for (int ch = 0; ch < channels; ++ch) {
+                        buffer[f * channels + ch] *= g;
+                    }
                     currentDvc += dvcIncrement;
                 }
             }
@@ -986,10 +1021,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             }
         }
         const double meanSq = sumSq / static_cast<double>(totalSamples);
+        // The buffer here is the signal BEFORE the safety attenuation below, so
+        // weight the measured energy by the attenuation the safety stage is
+        // currently applying (previous block's smoothed gain). Without this the
+        // dose over-reads by ~6 dB while attenuating.
+        const double doseGain = smoothedSafetyGain_;
+        const double meanSqDelivered = meanSq * doseGain * doseGain;
         // 100% weekly dose = 40 hours continuous at -14 dBFS (mean square power ~ 0.0398107)
         // deltaDose = (meanSq / 0.0398107) * (frames / (40.0 * 3600.0 * currentSr))
         // 0.0398107 * 144000.0 = 5732.74
-        const double deltaDose = (meanSq * static_cast<double>(frames)) / (5732.74 * currentSr);
+        const double deltaDose = (meanSqDelivered * static_cast<double>(frames)) / (5732.74 * currentSr);
 
         // Rolling 7-day exponential decay per block (tau = 7 days = 604,800 s)
         const double decayFactor = std::max(0.0, 1.0 - (static_cast<double>(frames) / (604800.0 * currentSr)));
@@ -1001,7 +1042,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                                                     std::memory_order_relaxed,
                                                     std::memory_order_relaxed));
 
-        const bool thresholdExceeded = (newDose >= snapshot->headphoneSafety.doseThreshold);
+        // Hysteresis: engage at the threshold, release only once the (now
+        // attenuation-weighted) dose has decayed to 95% of it. Without this the
+        // gain could toggle every block at the boundary.
+        const bool wasAttenuating = safetyAttenuationActive_.load(std::memory_order_relaxed);
+        const double engageThreshold = snapshot->headphoneSafety.doseThreshold;
+        const double releaseThreshold = engageThreshold * 0.95;
+        const bool thresholdExceeded = wasAttenuating ? (newDose >= releaseThreshold)
+                                                      : (newDose >= engageThreshold);
         safetyAttenuationActive_.store(thresholdExceeded, std::memory_order_relaxed);
 
         // Smooth broadband attenuation when weekly dose threshold is exceeded (-6 dB gain)
@@ -1016,11 +1064,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             smoothedSafetyGain_ = targetGain;
         }
         if (std::abs(smoothedSafetyGain_ - 1.0) > 1e-4 || std::abs(startGain - 1.0) > 1e-4) {
-            const int total = frames * channels;
+            // Ramp per frame, not per interleaved sample, so every channel of a
+            // frame shares the same gain (per-sample ramps skew L/R slightly).
             double currentGain = startGain;
-            double gainIncrement = (smoothedSafetyGain_ - startGain) / total;
-            for (int i = 0; i < total; ++i) {
-                buffer[i] *= static_cast<float>(currentGain);
+            const double gainIncrement = (smoothedSafetyGain_ - startGain) / static_cast<double>(frames);
+            for (int f = 0; f < frames; ++f) {
+                const float g = static_cast<float>(currentGain);
+                for (int ch = 0; ch < channels; ++ch) {
+                    buffer[f * channels + ch] *= g;
+                }
                 currentGain += gainIncrement;
             }
         }

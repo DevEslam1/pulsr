@@ -64,6 +64,16 @@ private:
     double preampLinear_ = 1.0;
     bool enabled_ = true;
 
+    // Set when the sample rate changes so applyParams() force-recomputes every
+    // band in the incoming snapshot at the new rate, including bands that were
+    // outside the previous bandCount_ (whose retained coefficients belong to the
+    // old rate and would otherwise be kept because their stored freq/Q/type match).
+    bool coeffsStale_ = false;
+    // Tracks which bands were muted by the solo state on the previous block so a
+    // band re-entering can have its delay registers cleared without touching
+    // band.bypass (which computeCoeffs() owns).
+    bool soloSkipped_[MAX_BANDS] = {};
+
     // Per-channel Transposed Direct Form II state: 2 double-precision registers per band per channel
     double s1_[MAX_CHANNELS][MAX_BANDS] = {};
     double s2_[MAX_CHANNELS][MAX_BANDS] = {};

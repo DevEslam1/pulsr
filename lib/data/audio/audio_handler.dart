@@ -1307,10 +1307,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<Map<String, dynamic>?> _readCrashPositionRecovery() async {
     try {
       final file = await _getLastPositionRecoveryFile();
-      if (file != null && await file.exists()) {
-        final content = await file.readAsString();
-        if (content.isNotEmpty) {
-          return jsonDecode(content) as Map<String, dynamic>;
+      if (file == null) return null;
+      // Prefer the committed file, then fall back to the surviving .tmp: if the
+      // process died between writing .tmp and committing the rename, the only
+      // valid snapshot lives in .tmp.
+      for (final candidate in [file, File('${file.path}.tmp')]) {
+        if (await candidate.exists()) {
+          final content = await candidate.readAsString();
+          if (content.isNotEmpty) {
+            return jsonDecode(content) as Map<String, dynamic>;
+          }
         }
       }
     } catch (_) {}
@@ -1379,7 +1385,24 @@ class PulsrAudioHandler extends BaseAudioHandler
           'queueIndex': _currentIndex,
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
-        await recoveryFile.writeAsString(payload, flush: true);
+        // Atomic commit: write to a sibling .tmp then rename, so a crash during
+        // the write cannot leave a truncated recovery file — the exact scenario
+        // this file exists to survive.
+        final tmpFile = File('${recoveryFile.path}.tmp');
+        await tmpFile.writeAsString(payload, flush: true);
+        try {
+          await tmpFile.rename(recoveryFile.path);
+        } on FileSystemException {
+          // Platforms that reject rename-over-existing (e.g. Windows): copy
+          // then delete, leaving the valid .tmp in place until the copy lands.
+          await tmpFile.copy(recoveryFile.path);
+          try {
+            await tmpFile.delete();
+          } catch (e, st) {
+            ErrorLogger.log('Failed to remove recovery temp file',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          }
+        }
       }
     } catch (_) {}
     try {
@@ -2928,27 +2951,38 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   /// Transient system sound interruption: duck and auto-restore in 500ms.
   Future<void> handleSystemUiSoundInterruption() async {
-    if (!_duckActive && _activePlayer.playing) {
-      _duckActive = true;
-      _interruption.begin(InterruptionKind.systemUiSound, playing: true);
+    if (_duckActive || !_activePlayer.playing) return;
+    _duckActive = true;
+    _interruption.begin(InterruptionKind.systemUiSound, playing: true);
+    // Schedule the restore timer BEFORE awaiting the duck. If setVolume throws
+    // and we only created the timer afterwards, _duckActive would stay true
+    // forever with no timer to clear it, permanently blocking later ducks.
+    _systemSoundTimer?.cancel();
+    _systemSoundTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (_duckActive &&
+          _interruption.activeKind == InterruptionKind.systemUiSound) {
+        _duckActive = false;
+        _interruption.end(InterruptionKind.systemUiSound);
+        // Compose with any in-flight sleep fade so this transient duck's
+        // restore doesn't wipe the fade for a tick.
+        final target = _calculateReplayGainVolume(currentSong);
+        try {
+          await _activePlayer
+              .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
+        } catch (_) {}
+      }
+    });
+    try {
       final f = duckingController.duckFactor;
       final curVol = _activePlayer.volume;
       await _activePlayer.setVolume(f * curVol);
+    } catch (_) {
+      // Ducking failed: restore state immediately instead of leaving the
+      // 500 ms timer to do it (or not, if it never fires).
+      _duckActive = false;
+      _interruption.end(InterruptionKind.systemUiSound);
       _systemSoundTimer?.cancel();
-      _systemSoundTimer = Timer(const Duration(milliseconds: 500), () async {
-        if (_duckActive &&
-            _interruption.activeKind == InterruptionKind.systemUiSound) {
-          _duckActive = false;
-          _interruption.end(InterruptionKind.systemUiSound);
-          // Compose with any in-flight sleep fade so this transient duck's
-          // restore doesn't wipe the fade for a tick.
-          final target = _calculateReplayGainVolume(currentSong);
-          try {
-            await _activePlayer
-                .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
-          } catch (_) {}
-        }
-      });
+      _systemSoundTimer = null;
     }
   }
 

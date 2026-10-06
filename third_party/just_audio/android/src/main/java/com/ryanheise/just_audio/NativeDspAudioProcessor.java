@@ -8,6 +8,8 @@ import androidx.media3.common.audio.BaseAudioProcessor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Feeds ExoPlayer's PCM stream through Pulsr's native DSP chain (libpulsr_dsp).
@@ -47,7 +49,64 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
 
-    private long nativeEngineHandle = 0;
+    // Lifetime safety. The playback thread takes the READ side around every JNI
+    // call (queueInput/onFlush/onReset/resetNativeState); release() takes the
+    // WRITE side so it can never destroy the engine while a native call is in
+    // flight. The handle is an AtomicLong so release()/finalize()/Cleaner are
+    // idempotent via getAndSet(0) and can never double-destroy.
+    private final AtomicLong nativeEngineHandle = new AtomicLong(0);
+    private final ReentrantReadWriteLock engineLock = new ReentrantReadWriteLock();
+
+    // Volatile mirror of the configured input sample rate, written on the
+    // playback thread (onConfigure/onFlush) and read from the method-channel
+    // thread (setGainCurve) without touching the non-volatile AudioFormat.
+    private volatile int sampleRate = 0;
+    // Last (sampleRate, channelCount) pushed to nativeResyncForTrack. Playback
+    // thread only. Lets onFlush skip a resync when nothing changed, so a
+    // same-rate seek/gapless transition does not regenerate the reverb IR.
+    private int lastResyncSampleRate = -1;
+    private int lastResyncChannels = -1;
+
+    private boolean loggedJniFailure = false;
+    private boolean loggedShortProcess = false;
+    private volatile Object cleanToken;
+
+    // Cleaner on API 33+; loaded lazily so older runtimes never resolve the
+    // java.lang.ref.Cleaner class. The token is kept as Object on purpose so
+    // this class does not link Cleaner on pre-33 devices.
+    private static final class CleanerHolder {
+        static final java.lang.ref.Cleaner CLEANER = java.lang.ref.Cleaner.create();
+        static Object register(Object target, AtomicLong handle) {
+            return CLEANER.register(target, new EngineDestroyer(handle));
+        }
+        static void clean(Object token) {
+            if (token != null) {
+                ((java.lang.ref.Cleaner.Cleanable) token).clean();
+            }
+        }
+    }
+
+    private static final class EngineDestroyer implements Runnable {
+        private final AtomicLong handle;
+        EngineDestroyer(AtomicLong handle) { this.handle = handle; }
+        @Override public void run() {
+            long h = handle.getAndSet(0);
+            if (h != 0 && NATIVE_AVAILABLE) {
+                try {
+                    nativeDestroyEngine(h);
+                } catch (RuntimeException | UnsatisfiedLinkError e) {
+                    Log.w(TAG, "nativeDestroyEngine (cleaner) failed: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void logJniFailureOnce(String call, Throwable t) {
+        if (!loggedJniFailure) {
+            loggedJniFailure = true;
+            Log.w(TAG, call + " failed; passing audio through unprocessed: " + t.getMessage());
+        }
+    }
 
     // Pulsr fork: opt-in 24/32-bit float path. Off by default so the sink
     // pipeline (and therefore the audible result) is byte-identical to the
@@ -73,23 +132,41 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     public NativeDspAudioProcessor() {
         if (NATIVE_AVAILABLE) {
             try {
-                nativeEngineHandle = nativeCreateEngine();
-            } catch (UnsatisfiedLinkError e) {
+                nativeEngineHandle.set(nativeCreateEngine());
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
                 Log.w(TAG, "nativeCreateEngine failed: " + e.getMessage());
-                nativeEngineHandle = 0;
+                nativeEngineHandle.set(0);
             }
+        }
+        // API 33+: deterministic cleanup via Cleaner instead of relying on
+        // finalize(). Older runtimes keep finalize() (below), which calls the
+        // same idempotent release().
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && nativeEngineHandle.get() != 0) {
+            cleanToken = CleanerHolder.register(this, nativeEngineHandle);
         }
     }
 
     public void release() {
-        if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
-            long handle = nativeEngineHandle;
-            nativeEngineHandle = 0;
-            try {
-                nativeDestroyEngine(handle);
-            } catch (UnsatisfiedLinkError e) {
-                Log.w(TAG, "nativeDestroyEngine failed: " + e.getMessage());
+        // Write lock: waits for any in-flight native call (read side) before
+        // destroying. getAndSet(0) makes release()/finalize()/Cleaner mutually
+        // idempotent, so the engine can never be double-destroyed.
+        engineLock.writeLock().lock();
+        try {
+            long h = nativeEngineHandle.getAndSet(0);
+            if (h != 0 && NATIVE_AVAILABLE) {
+                try {
+                    nativeDestroyEngine(h);
+                } catch (RuntimeException | UnsatisfiedLinkError e) {
+                    Log.w(TAG, "nativeDestroyEngine failed: " + e.getMessage());
+                }
             }
+            Object token = cleanToken;
+            cleanToken = null;
+            if (token != null) {
+                CleanerHolder.clean(token);
+            }
+        } finally {
+            engineLock.writeLock().unlock();
         }
     }
 
@@ -109,7 +186,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     // attenuate (gains are clamped to [0, 1]).
     private final Object rampLock = new Object();
     private float[] rampGains = null;   // null => no ramp armed (transparent unity)
-    private int rampSegmentFrames = 0;  // frames covered by one curve segment
+    private int rampSegmentMs = 0;      // duration of one curve segment, ms
     private long rampPosFrames = 0;     // frames consumed since the curve started
     private float staticGain = 1.0f;    // gain applied when no curve is armed
 
@@ -123,12 +200,9 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
      *         the caller must fall back to stepped setVolume().
      */
     public boolean setGainCurve(double[] gains, int segmentMs) {
-        if (!NATIVE_AVAILABLE || gains == null || gains.length == 0 || segmentMs <= 0) {
+        if (!isNativeReady() || gains == null || gains.length == 0 || segmentMs <= 0) {
             return false;
         }
-        double sampleRate = inputAudioFormat.sampleRate;
-        if (sampleRate <= 0) sampleRate = 48000.0; // sink not configured yet; close enough
-        int segFrames = Math.max(1, (int) Math.round(sampleRate * segmentMs / 1000.0));
         float[] curve = new float[gains.length];
         for (int i = 0; i < gains.length; i++) {
             float g = (float) gains[i];
@@ -136,7 +210,10 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
         synchronized (rampLock) {
             rampGains = curve;
-            rampSegmentFrames = segFrames;
+            // Segment frames are derived in queueInput from the CURRENT input
+            // sample rate (see below), never captured here: the sink may be
+            // reconfigured between arming and the next buffer.
+            rampSegmentMs = segmentMs;
             rampPosFrames = 0;
             staticGain = curve[0]; // first curve gain applies immediately
         }
@@ -144,21 +221,34 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     }
 
     /**
+     * True only when the processor is configured and active AND the native
+     * engine is alive. {@link #setGainCurve} / {@link #clearGainCurve} return
+     * this so callers fall back to stepped {@code setVolume()} whenever the sink
+     * bypassed the processor.
+     */
+    private boolean isNativeReady() {
+        if (!NATIVE_AVAILABLE || !isActive()) return false;
+        engineLock.readLock().lock();
+        try {
+            return nativeEngineHandle.get() != 0;
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    /**
      * Drops any armed curve and restores transparent unity gain.
      *
-     * @return true if the state was reset (native DSP chain active).
+     * @return true if the native DSP chain is active.
      */
     public boolean clearGainCurve() {
-        if (!NATIVE_AVAILABLE) {
-            return false;
-        }
         synchronized (rampLock) {
             rampGains = null;
-            rampSegmentFrames = 0;
+            rampSegmentMs = 0;
             rampPosFrames = 0;
             staticGain = 1.0f;
         }
-        return true;
+        return isNativeReady();
     }
 
     private ByteBuffer scratch;
@@ -175,6 +265,11 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected AudioFormat onConfigure(AudioFormat inputAudioFormat) {
+        // Publish the rate for the method-channel thread and force the next
+        // onFlush to push this format to the native engine.
+        sampleRate = inputAudioFormat.sampleRate;
+        lastResyncSampleRate = -1;
+        lastResyncChannels = -1;
         if (!NATIVE_AVAILABLE) {
             return AudioFormat.NOT_SET;
         }
@@ -217,18 +312,43 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
         int processed = frameCount;
         boolean bitPerfect = false;
-        if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
+        if (NATIVE_AVAILABLE) {
+            // Read side: release() (write side) cannot destroy the engine while
+            // we are inside the native call.
+            engineLock.readLock().lock();
             try {
-                processed = nativeProcessDirectFloatBuffer(
-                        nativeEngineHandle, scratch, 0, frameCount, channelCount);
-                bitPerfect = processed < 0;
-                if (bitPerfect) processed = -processed;
-            } catch (UnsatisfiedLinkError e) {
-                processed = frameCount;
+                final long handle = nativeEngineHandle.get();
+                if (handle != 0) {
+                    try {
+                        processed = nativeProcessDirectFloatBuffer(
+                                handle, scratch, 0, frameCount, channelCount);
+                        bitPerfect = processed < 0;
+                        if (bitPerfect) processed = -processed;
+                    } catch (RuntimeException | UnsatisfiedLinkError e) {
+                        // A JNI RuntimeException must never escape queueInput.
+                        logJniFailureOnce("nativeProcessDirectFloatBuffer", e);
+                        processed = frameCount;
+                        bitPerfect = false;
+                    }
+                }
+            } finally {
+                engineLock.readLock().unlock();
             }
         }
         if (processed <= 0 || processed > frameCount) {
             // Engine declined the block; scratch still holds the untouched input.
+            processed = frameCount;
+            bitPerfect = false;
+        } else if (processed < frameCount) {
+            // The engine processed only part of the block. Never drop the tail:
+            // the un-processed remainder is still the original input in scratch,
+            // so emit the whole block (processed head + raw tail) through the
+            // gain path.
+            if (!loggedShortProcess) {
+                loggedShortProcess = true;
+                Log.w(TAG, "nativeProcess returned " + processed + " of " + frameCount
+                        + " frames; passing the remainder through unprocessed");
+            }
             processed = frameCount;
             bitPerfect = false;
         }
@@ -260,9 +380,20 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         int segFrames;
         long startPos;
         float idleGain;
+        // Segment frames are computed from the CURRENT input rate, not captured
+        // when the curve was armed, so a reconfigure between arm and buffer is
+        // respected.
+        final int curSampleRate = inputAudioFormat.sampleRate > 0
+                ? inputAudioFormat.sampleRate : sampleRate;
         synchronized (rampLock) {
             curve = rampGains;
-            segFrames = rampSegmentFrames;
+            if (curve != null) {
+                final double sr = curSampleRate > 0 ? curSampleRate : 48000.0;
+                segFrames = Math.max(1,
+                        (int) Math.round(sr * (double) rampSegmentMs / 1000.0));
+            } else {
+                segFrames = 0;
+            }
             startPos = rampPosFrames;
             idleGain = staticGain;
             if (curve != null) {
@@ -270,7 +401,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
                     staticGain = curve[curve.length - 1];
                     rampGains = null;
-                    rampSegmentFrames = 0;
+                    rampSegmentMs = 0;
                     rampPosFrames = 0;
                 }
             } else if (bitPerfect && Math.abs(staticGain - 1.0f) > 0.0001f) {
@@ -321,23 +452,35 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onFlush() {
-        if (NATIVE_AVAILABLE && nativeEngineHandle != 0 && inputAudioFormat.sampleRate > 0) {
+        final int sr = inputAudioFormat.sampleRate;
+        final int ch = inputAudioFormat.channelCount;
+        // Publish the rate for other threads (setGainCurve).
+        sampleRate = sr;
+        if (NATIVE_AVAILABLE && sr > 0) {
+            engineLock.readLock().lock();
             try {
-                nativeResyncForTrack(nativeEngineHandle, inputAudioFormat.sampleRate, inputAudioFormat.channelCount);
-            } catch (UnsatisfiedLinkError e) {
-                Log.w(TAG, "nativeResyncForTrack failed: " + e.getMessage());
+                final long handle = nativeEngineHandle.get();
+                // Only resync when the format actually changed. A seek at the
+                // same rate must not regenerate the reverb IR / allocate.
+                if (handle != 0 && (sr != lastResyncSampleRate || ch != lastResyncChannels)) {
+                    try {
+                        nativeResyncForTrack(handle, sr, ch);
+                        lastResyncSampleRate = sr;
+                        lastResyncChannels = ch;
+                    } catch (RuntimeException | UnsatisfiedLinkError e) {
+                        Log.w(TAG, "nativeResyncForTrack failed: " + e.getMessage());
+                    }
+                }
+            } finally {
+                engineLock.readLock().unlock();
             }
         }
-        synchronized (rampLock) {
-            if (rampGains == null) {
-                // No active curve: restore transparent unity so a seek or
-                // track-change from a paused state doesn't hold a stale gain.
-                staticGain = 1.0f;
-                rampPosFrames = 0;
-            }
-            // An in-flight curve (rampPosFrames > 0) is intentionally preserved:
-            // seeking within a crossfade must not snap the fade back to curve[0].
-        }
+        // NOTE: a completed fade-out (rampGains == null, staticGain == 0) is
+        // deliberately NOT reset to unity here. onFlush also runs for gapless
+        // configure transitions, and resetting would make a finished sleep
+        // fade-out jump back to full volume across the transition. staticGain is
+        // only cleared by an explicit clearGainCurve() or a full onReset().
+        // An in-flight curve (rampPosFrames > 0) is likewise preserved.
     }
 
     @Override
@@ -348,16 +491,42 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         scratchFloats = null;
         synchronized (rampLock) {
             rampGains = null;
-            rampSegmentFrames = 0;
+            rampSegmentMs = 0;
             rampPosFrames = 0;
             staticGain = 1.0f;
         }
-        if (NATIVE_AVAILABLE && nativeEngineHandle != 0) {
-            try {
-                nativeResetEngine(nativeEngineHandle);
-            } catch (UnsatisfiedLinkError e) {
-                Log.w(TAG, "nativeResetEngine failed: " + e.getMessage());
+        resetNativeEngineLocked();
+        lastResyncSampleRate = -1;
+        lastResyncChannels = -1;
+    }
+
+    /**
+     * Clears the native engine's processing state (filter history, reverb tails,
+     * limiter envelopes) without reconfiguring it. Called by
+     * {@code FloatDspAudioSink.flush()} on seek/discontinuity so a reverb tail
+     * from the old position cannot bleed into the new one. Does not regenerate
+     * the reverb IR.
+     */
+    public void resetNativeState() {
+        resetNativeEngineLocked();
+        lastResyncSampleRate = -1;
+        lastResyncChannels = -1;
+    }
+
+    private void resetNativeEngineLocked() {
+        if (!NATIVE_AVAILABLE) return;
+        engineLock.readLock().lock();
+        try {
+            final long handle = nativeEngineHandle.get();
+            if (handle != 0) {
+                try {
+                    nativeResetEngine(handle);
+                } catch (RuntimeException | UnsatisfiedLinkError e) {
+                    Log.w(TAG, "nativeResetEngine failed: " + e.getMessage());
+                }
             }
+        } finally {
+            engineLock.readLock().unlock();
         }
     }
 

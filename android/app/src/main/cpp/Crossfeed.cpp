@@ -47,6 +47,7 @@ void Crossfeed::initBs2b(double fcut, double feedDb) {
 }
 
 void Crossfeed::setMode(CrossfeedMode mode) {
+    const CrossfeedMode previousMode = mode_;
     mode_ = mode;
     switch (mode_) {
         case CrossfeedMode::Bs2bDefault:
@@ -77,6 +78,17 @@ void Crossfeed::setMode(CrossfeedMode mode) {
     }
     initBs2b(fcut_, feedDb_);
     configure(delayUs_, feedDb_, fcut_);
+
+    // The Custom delay line is only written while in Custom mode, so switching
+    // into Custom would otherwise read stale samples from a previous Custom run
+    // (or zeros/garbage) until the line refills. Clear it on any mode change.
+    if (mode_ != previousMode) {
+        std::memset(delayBufferL_, 0, sizeof(delayBufferL_));
+        std::memset(delayBufferR_, 0, sizeof(delayBufferR_));
+        writeIdx_ = 0;
+        lpL_ = 0.0f;
+        lpR_ = 0.0f;
+    }
 }
 
 void Crossfeed::configure(double delayUs, double feedDb, double fcut) {
