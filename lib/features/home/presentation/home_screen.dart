@@ -288,218 +288,220 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         parent: BouncingScrollPhysics()),
                     padding: EdgeInsets.only(bottom: bottomPad),
                     children: [
-                  // ---------- Header ----------
-                  Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(
-                        Adaptive.pagePadding(context),
-                        AppSpacing.md,
-                        Adaptive.pagePadding(context),
-                        0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                MaterialLocalizations.of(context)
-                                    .formatMediumDate(DateTime.now())
-                                    .toUpperCase(),
-                                style: TextStyle(
-                                  color: p.textTertiary,
-                                  fontSize: AppFontSize.tiny,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.s6),
-                              Text(
-                                _getGreeting(context),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium
-                                    ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (offlineOnly)
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                                end: AppSpacing.sm),
-                            child: Chip(
-                              avatar: Icon(Icons.wifi_off_rounded,
-                                  size: 14, color: p.accent),
-                              label: Text(
-                                context.l10n.offlineOnlyMode,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.caption,
-                                  fontWeight: FontWeight.w700,
-                                  color: p.accent,
-                                ),
-                              ),
-                              backgroundColor: p.accentContainer,
-                              side: BorderSide(color: p.hairline),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                        // Logo in a soft badge so the header has a visual anchor.
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: p.accentContainer,
-                            borderRadius: AppRadii.r14All,
-                            border: Border.all(
-                                color: p.accent.withValues(alpha: 0.25)),
-                          ),
-                          child: Center(
-                            child: PulsrLogo(
-                                size: 24,
-                                color: p.accent,
-                                glowColor: p.glow,
-                                animate: false),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ---------- Notification Permission Denied Banner (B-37) ----------
-                  if (_notificationDenied && !_notificationBannerDismissed)
-                    Padding(
-                      padding: EdgeInsetsDirectional.fromSTEB(
-                        Adaptive.pagePadding(context),
-                        AppSpacing.sm,
-                        Adaptive.pagePadding(context),
-                        0,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.sm,
-                        ),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: AppRadii.cardRadius,
-                          border: Border.all(
-                              color: p.accent.withValues(alpha: 0.3)),
-                        ),
+                      // ---------- Header ----------
+                      Padding(
+                        padding: EdgeInsetsDirectional.fromSTEB(
+                            Adaptive.pagePadding(context),
+                            AppSpacing.md,
+                            Adaptive.pagePadding(context),
+                            0),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Icon(Icons.notifications_off_outlined,
-                                color: p.accent, size: 20),
-                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
-                              child: Text(
-                                context.l10n.playbackStopsScreenOff,
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.caption,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    MaterialLocalizations.of(context)
+                                        .formatMediumDate(DateTime.now())
+                                        .toUpperCase(),
+                                    style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.tiny,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.1,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.s6),
+                                  Text(
+                                    _getGreeting(context),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineMedium
+                                        ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: -0.5),
+                                  ),
+                                ],
                               ),
                             ),
-                            TextButton(
-                              onPressed: () async {
-                                await openAppSettings();
-                                final prefs =
-                                    await SharedPreferences.getInstance();
-                                await prefs.setBool(
-                                    'notification_permission_denied', false);
-                                if (mounted) {
-                                  setState(() => _notificationDenied = false);
-                                }
-                              },
-                              child: Text(context.l10n.openSettings),
-                            ),
-                            IconButton(
-                              constraints: const BoxConstraints(
-                                  minWidth: AppSpacing.minTouchTarget,
-                                  minHeight: AppSpacing.minTouchTarget),
-                              icon: const Icon(Icons.close, size: 16),
-                              tooltip: context.l10n.close,
-                              // Hide for this session only. Clearing the
-                              // persisted denial flag here made a genuine
-                              // denial disappear permanently.
-                              onPressed: () {
-                                if (mounted) {
-                                  setState(() =>
-                                      _notificationBannerDismissed = true);
-                                }
-                              },
+                            if (offlineOnly)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                    end: AppSpacing.sm),
+                                child: Chip(
+                                  avatar: Icon(Icons.wifi_off_rounded,
+                                      size: 14, color: p.accent),
+                                  label: Text(
+                                    context.l10n.offlineOnlyMode,
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w700,
+                                      color: p.accent,
+                                    ),
+                                  ),
+                                  backgroundColor: p.accentContainer,
+                                  side: BorderSide(color: p.hairline),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                            // Logo in a soft badge so the header has a visual anchor.
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: p.accentContainer,
+                                borderRadius: AppRadii.r14All,
+                                border: Border.all(
+                                    color: p.accent.withValues(alpha: 0.25)),
+                              ),
+                              child: Center(
+                                child: PulsrLogo(
+                                    size: 24,
+                                    color: p.accent,
+                                    glowColor: p.glow,
+                                    animate: false),
+                              ),
                             ),
                           ],
                         ),
                       ),
-                    ),
 
-                  // ---------- Segmented Tab Selector (Local vs Online) ----------
-                  if (showOnlineTab) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    PulsrSegmentedControl(
-                      margin: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
-                      selectedIndex: currentTab,
-                      onChanged: (i) => setState(() => _selectedTab = i),
-                      segments: [
-                        PulsrSegment(
-                          label: context.l10n.localMusic,
-                          icon: Icons.library_music_rounded,
-                        ),
-                        PulsrSegment(
-                          label: context.l10n.onlineStream,
-                          icon: Icons.public_rounded,
-                        ),
-                      ],
-                    ),
-                  ] else if (offlineOnly) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: Adaptive.pagePadding(context)),
-                      child: Row(
-                        children: [
-                          Icon(Icons.cloud_off_rounded,
-                              size: 14, color: p.textTertiary),
-                          const SizedBox(width: AppSpacing.s6),
-                          Expanded(
-                            child: Text(
-                              context.l10n.homeOfflineNotice,
-                              style: TextStyle(
-                                  color: p.textTertiary,
-                                  fontSize: AppFontSize.label),
+                      // ---------- Notification Permission Denied Banner (B-37) ----------
+                      if (_notificationDenied && !_notificationBannerDismissed)
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                            Adaptive.pagePadding(context),
+                            AppSpacing.sm,
+                            Adaptive.pagePadding(context),
+                            0,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.surfaceContainer,
+                              borderRadius: AppRadii.cardRadius,
+                              border: Border.all(
+                                  color: p.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.notifications_off_outlined,
+                                    color: p.accent, size: 20),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: Text(
+                                    context.l10n.playbackStopsScreenOff,
+                                    style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: AppFontSize.caption,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    await openAppSettings();
+                                    final prefs =
+                                        await SharedPreferences.getInstance();
+                                    await prefs.setBool(
+                                        'notification_permission_denied',
+                                        false);
+                                    if (mounted) {
+                                      setState(
+                                          () => _notificationDenied = false);
+                                    }
+                                  },
+                                  child: Text(context.l10n.openSettings),
+                                ),
+                                IconButton(
+                                  constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget),
+                                  icon: const Icon(Icons.close, size: 16),
+                                  tooltip: context.l10n.close,
+                                  // Hide for this session only. Clearing the
+                                  // persisted denial flag here made a genuine
+                                  // denial disappear permanently.
+                                  onPressed: () {
+                                    if (mounted) {
+                                      setState(() =>
+                                          _notificationBannerDismissed = true);
+                                    }
+                                  },
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
+                        ),
 
-                  // ---------- Content (Local vs Online) ----------
-                  AnimatedSwitcher(
-                    duration: PulsrMotion.standard,
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    child: KeyedSubtree(
-                      key: ValueKey('home_tab_$currentTab'),
-                      child: currentTab == 0
-                          ? _buildLocalView(context, p, getSongsUseCase,
-                              playerCubit, isTablet)
-                          : (showOnlineTab
-                              ? _buildOnlineView(
-                                  context, p, playerCubit, isTablet)
-                              : const SizedBox.shrink()),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+                      // ---------- Segmented Tab Selector (Local vs Online) ----------
+                      if (showOnlineTab) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        PulsrSegmentedControl(
+                          margin: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          selectedIndex: currentTab,
+                          onChanged: (i) => setState(() => _selectedTab = i),
+                          segments: [
+                            PulsrSegment(
+                              label: context.l10n.localMusic,
+                              icon: Icons.library_music_rounded,
+                            ),
+                            PulsrSegment(
+                              label: context.l10n.onlineStream,
+                              icon: Icons.public_rounded,
+                            ),
+                          ],
+                        ),
+                      ] else if (offlineOnly) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          child: Row(
+                            children: [
+                              Icon(Icons.cloud_off_rounded,
+                                  size: 14, color: p.textTertiary),
+                              const SizedBox(width: AppSpacing.s6),
+                              Expanded(
+                                child: Text(
+                                  context.l10n.homeOfflineNotice,
+                                  style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.label),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // ---------- Content (Local vs Online) ----------
+                      AnimatedSwitcher(
+                        duration: PulsrMotion.standard,
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child: KeyedSubtree(
+                          key: ValueKey('home_tab_$currentTab'),
+                          child: currentTab == 0
+                              ? _buildLocalView(context, p, getSongsUseCase,
+                                  playerCubit, isTablet)
+                              : (showOnlineTab
+                                  ? _buildOnlineView(
+                                      context, p, playerCubit, isTablet)
+                                  : const SizedBox.shrink()),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -658,7 +660,11 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         final top = list.where((s) => s.playCount > 0).toList()
                           ..sort((a, b) => b.playCount.compareTo(a.playCount));
                         if (top.isNotEmpty) {
-                          playerCubit.playSong(top.first, queue: top);
+                          final existingIds = top.map((s) => s.id).toSet();
+                          final remaining =
+                              list.where((s) => !existingIds.contains(s.id));
+                          playerCubit.playSong(top.first,
+                              queue: [...top, ...remaining]);
                         }
                       },
                     ),

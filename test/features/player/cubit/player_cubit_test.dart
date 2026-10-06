@@ -659,6 +659,56 @@ void main() {
     });
 
     test(
+        'A1: stop pushes idle and empty queue, clearing isPlaying and currentSong',
+        () async {
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+      addTearDown(cubit.close);
+
+      // Start playing
+      final song = const SongsTableData(
+        id: 1,
+        title: 'Song 1',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 120000,
+        path: '/a.mp3',
+        source: 'local',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      testAudioHandler.emitTrackChanged(song);
+      testAudioHandler.emitPlaybackState(
+        PlaybackState(
+          processingState: AudioProcessingState.ready,
+          playing: true,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state.isPlaying, isTrue);
+      expect(cubit.state.currentSong, isNotNull);
+
+      // Simulate stop(): queue emptied, idle processingState, playing: false
+      testAudioHandler.emitQueue([]);
+      testAudioHandler.emitPlaybackState(
+        PlaybackState(
+          processingState: AudioProcessingState.idle,
+          playing: false,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(cubit.state.isPlaying, isFalse);
+      expect(cubit.state.currentSong, isNull);
+    });
+
+    test(
       'equalizer enabling and preset apply updates state and audio handler',
       () async {
         final cubit = PlayerCubit(

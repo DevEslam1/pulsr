@@ -98,7 +98,7 @@ class MiniPlayerState extends State<MiniPlayer> {
           break;
         case MiniPlayerSwipeAction.volume:
           HapticFeedback.selectionClick();
-          await cubit.adjustVolume(swipedLeft ? 0.05 : -0.05);
+          await cubit.adjustVolume(swipedLeft ? -0.05 : 0.05);
           break;
         case MiniPlayerSwipeAction.none:
           break;
@@ -255,6 +255,7 @@ class MiniPlayerState extends State<MiniPlayer> {
       ErrorLogger.log('MiniPlayer swipe failed',
           error: e, stackTrace: st, category: 'MiniPlayer');
     } finally {
+      _isInteracting.value = false;
       if (mounted) {
         setState(() {
           _swipeInFlight = false;
@@ -370,7 +371,9 @@ class MiniPlayerState extends State<MiniPlayer> {
                 onVerticalDragEnd: (d) {
                   if (_swipeInFlight) return;
                   final vy = d.velocity.pixelsPerSecond.dy;
-                  if (_verticalDragDy > 25 || vy > 120) {
+                  if ((_verticalDragDy > 25 || vy > 120) &&
+                      _verticalDragDy >= 0 &&
+                      vy >= 0) {
                     _swipeInFlight = true;
                     HapticFeedback.selectionClick();
                     widget.onSwipeDown?.call();
@@ -379,7 +382,9 @@ class MiniPlayerState extends State<MiniPlayer> {
                         Timer(const Duration(milliseconds: 500), () {
                       if (mounted) setState(() => _swipeInFlight = false);
                     });
-                  } else if (_verticalDragDy < -25 || vy < -120) {
+                  } else if ((_verticalDragDy < -25 || vy < -120) &&
+                      _verticalDragDy <= 0 &&
+                      vy <= 0) {
                     _swipeInFlight = true;
                     HapticFeedback.selectionClick();
                     if (widget.onSwipeUp != null) {
@@ -543,9 +548,9 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                       }
                                                     } else if (notification
                                                         is ScrollEndNotification) {
+                                                      _isInteracting.value =
+                                                          false;
                                                       if (!_swipeInFlight) {
-                                                        _isInteracting.value =
-                                                            false;
                                                         _drainPendingSync();
                                                       }
                                                     }
@@ -564,7 +569,14 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                           page !=
                                                               currentIndex) {
                                                         _lastKnownIndex = page;
-                                                        _swipeInFlight = true;
+                                                        if (mounted) {
+                                                          setState(() {
+                                                            _swipeInFlight =
+                                                                true;
+                                                          });
+                                                        } else {
+                                                          _swipeInFlight = true;
+                                                        }
                                                         unawaited(
                                                             _completeSwipe(
                                                                 page, cubit));
@@ -891,6 +903,8 @@ class _MiniPlayerProgressBar extends StatefulWidget {
 class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   double? _dragProgress;
+  Duration? _optimisticSeekPosition;
+  DateTime? _optimisticSeekTime;
   bool _isAppActive = true;
   late final AnimationController _waveController = AnimationController(
     vsync: this,
@@ -946,6 +960,26 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
     super.dispose();
   }
 
+  void _recordSeek(Duration target) {
+    _optimisticSeekPosition = target;
+    _optimisticSeekTime = DateTime.now();
+    widget.onSeek(target);
+  }
+
+  Duration _resolveEffectivePosition(Duration enginePosition) {
+    if (_optimisticSeekPosition != null && _optimisticSeekTime != null) {
+      final elapsed = DateTime.now().difference(_optimisticSeekTime!);
+      final diff = (enginePosition - _optimisticSeekPosition!).abs();
+      if (elapsed.inMilliseconds < 350 && diff.inMilliseconds > 400) {
+        return _optimisticSeekPosition!;
+      } else {
+        _optimisticSeekPosition = null;
+        _optimisticSeekTime = null;
+      }
+    }
+    return enginePosition;
+  }
+
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
@@ -956,7 +990,8 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
             final trackWidth = constraints.maxWidth;
             return BlocSelector<PlayerCubit, PlayerState, Duration>(
               selector: (s) => s.position,
-              builder: (context, position) {
+              builder: (context, rawPosition) {
+                final position = _resolveEffectivePosition(rawPosition);
                 final progress = _dragProgress ??
                     (widget.duration.inMilliseconds > 0
                         ? (position.inMilliseconds /
@@ -991,13 +1026,13 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                   value: valueLabel,
                   increasedValue: increasedLabel,
                   decreasedValue: decreasedLabel,
-                  onIncrease: () => widget.onSeek(clampDuration(
+                  onIncrease: () => _recordSeek(clampDuration(
                       currentDuration + const Duration(seconds: 10))),
-                  onDecrease: () => widget.onSeek(clampDuration(
+                  onDecrease: () => _recordSeek(clampDuration(
                       currentDuration - const Duration(seconds: 10))),
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTapDown: (details) {
+                    onTapUp: (details) {
                       if (trackWidth > 0 &&
                           widget.duration.inMilliseconds > 0) {
                         HapticFeedback.selectionClick();
@@ -1006,7 +1041,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                         setState(() => _dragProgress = null);
                         final seekMs =
                             (widget.duration.inMilliseconds * ratio).round();
-                        widget.onSeek(Duration(milliseconds: seekMs));
+                        _recordSeek(Duration(milliseconds: seekMs));
                       }
                     },
                     onHorizontalDragStart: (details) {
@@ -1032,7 +1067,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                         final seekMs =
                             (widget.duration.inMilliseconds * _dragProgress!)
                                 .round();
-                        widget.onSeek(Duration(milliseconds: seekMs));
+                        _recordSeek(Duration(milliseconds: seekMs));
                         setState(() => _dragProgress = null);
                       }
                     },

@@ -152,11 +152,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   }
 
   int _failedCrossfadeClaims = 0;
+  bool _crossfadeStartInFlight = false;
 
   Future<void> _startCrossfade(int nextIndex) async {
     if (nextIndex < 0 || nextIndex >= _songs.length) return;
-    if (_crossfadeManager.isCrossfading) return;
+    if (_crossfadeManager.isCrossfading || _crossfadeStartInFlight) return;
+    _crossfadeStartInFlight = true;
     if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.crossfade)) {
+      _crossfadeStartInFlight = false;
       _failedCrossfadeClaims++;
       if (_failedCrossfadeClaims >= 3) {
         _failedCrossfadeClaims = 0;
@@ -519,6 +522,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         }
       });
     } finally {
+      _crossfadeStartInFlight = false;
       _tripleBufferPipeline.releaseInactive(PlayerClaim.crossfade);
     }
   }

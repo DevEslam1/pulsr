@@ -1,7 +1,6 @@
 // lib/features/player/cubit/controllers/player_transport_controller.dart
 // FIX-A1: Focused PlayerTransportController extracted from PlayerCubit
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/db/app_database.dart';
@@ -98,7 +97,6 @@ class PlayerTransportController {
   }
 
   Future<void> togglePlayPause() async {
-    HapticFeedback.lightImpact();
     final prevState = _getState();
     final state = prevState;
     final enginePlaying = _audioHandler.playbackState.value.playing;

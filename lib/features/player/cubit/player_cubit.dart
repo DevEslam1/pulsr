@@ -87,6 +87,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   // Monotonic counter bumped whenever the queue is mutated; used to invalidate
   // the home-widget "up next" title cache on reorder.
   int _queueVersion = 0;
+  int? _lastScrobbledSongId;
+  int _lastScrobbledPlayGen = -1;
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
   // BUG-2 FIX: replaced the boolean _isSponsorBlockSeeking with a generation
@@ -330,20 +332,55 @@ class PlayerCubit extends PulsrCubit<PlayerState>
                 (settingsCubit.state.crossfadeSeconds * 1000).round()),
       );
       _audioHandler.setGaplessEnabled(settingsCubit.state.gaplessPlayback);
+
+      var prevCrossfadeSeconds = settingsCubit.state.crossfadeSeconds;
+      var prevGapless = settingsCubit.state.gaplessPlayback;
+      var prevReplayGainMode = settingsCubit.state.replayGainMode;
+      var prevPreampWithRg = settingsCubit.state.replayGainPreampWithRg;
+      var prevPreampWithoutRg = settingsCubit.state.replayGainPreampWithoutRg;
+      var prevFollowSampleRate = settingsCubit.state.followTrackSampleRate;
+      var prevBitPerfect = settingsCubit.state.bitPerfectOutput;
+
       autoSub(settingsCubit.stream, (settingsState) {
-        _audioHandler.setCrossfadeDuration(
-          Duration(
-              milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
-        );
-        _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
-        // Re-apply composed gain (ReplayGain, loudness equalization, volume boost) for new settings
-        unawaited(_audioHandler
-            .setVolume(_audioHandler.volume)
-            .catchError((Object e, StackTrace st) {
-          ErrorLogger.log('Re-apply volume on settings change failed',
-              error: e, stackTrace: st, category: 'PlayerCubit');
-        }));
-        if (settingsState.followTrackSampleRate &&
+        final crossfadeChanged =
+            settingsState.crossfadeSeconds != prevCrossfadeSeconds;
+        final gaplessChanged = settingsState.gaplessPlayback != prevGapless;
+        final volumeRelatedChanged =
+            settingsState.replayGainMode != prevReplayGainMode ||
+                settingsState.replayGainPreampWithRg != prevPreampWithRg ||
+                settingsState.replayGainPreampWithoutRg != prevPreampWithoutRg;
+        final sampleRateRelatedChanged =
+            settingsState.followTrackSampleRate != prevFollowSampleRate ||
+                settingsState.bitPerfectOutput != prevBitPerfect;
+
+        prevCrossfadeSeconds = settingsState.crossfadeSeconds;
+        prevGapless = settingsState.gaplessPlayback;
+        prevReplayGainMode = settingsState.replayGainMode;
+        prevPreampWithRg = settingsState.replayGainPreampWithRg;
+        prevPreampWithoutRg = settingsState.replayGainPreampWithoutRg;
+        prevFollowSampleRate = settingsState.followTrackSampleRate;
+        prevBitPerfect = settingsState.bitPerfectOutput;
+
+        if (crossfadeChanged) {
+          _audioHandler.setCrossfadeDuration(
+            Duration(
+                milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
+          );
+        }
+        if (gaplessChanged) {
+          _audioHandler.setGaplessEnabled(settingsState.gaplessPlayback);
+        }
+        if (volumeRelatedChanged) {
+          // Re-apply composed gain (ReplayGain, loudness equalization, volume boost) for new settings
+          unawaited(_audioHandler
+              .setVolume(_audioHandler.volume)
+              .catchError((Object e, StackTrace st) {
+            ErrorLogger.log('Re-apply volume on settings change failed',
+                error: e, stackTrace: st, category: 'PlayerCubit');
+          }));
+        }
+        if (sampleRateRelatedChanged &&
+            settingsState.followTrackSampleRate &&
             settingsState.bitPerfectOutput) {
           final song = state.currentSong;
           if (song != null) {
@@ -390,8 +427,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           // Safety reset: clear the cache and restart the counter. This is a
           // last-resort guard for pathological multi-day sessions.
           _negativeIdValues.removeWhere((v) => v < -1000000001);
-          _remoteIdToNegativeId
-              .removeWhere((_, v) => v < -1000000001);
+          _remoteIdToNegativeId.removeWhere((_, v) => v < -1000000001);
           _nextAssignedNegativeId = -1000000002;
           ErrorLogger.log(
             'Negative ID counter reset after floor guard triggered',
@@ -404,6 +440,34 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     _remoteIdToNegativeId[id] = assigned;
     _negativeIdValues.add(assigned);
     return assigned;
+  }
+
+  Duration _resolveTrackDuration({
+    Duration? engineDuration,
+    int? songDurationMs,
+    Duration? previousDuration,
+    bool isSameSong = false,
+  }) {
+    if (engineDuration != null && engineDuration > Duration.zero) {
+      return engineDuration;
+    }
+    if (songDurationMs != null && songDurationMs > 0) {
+      return Duration(milliseconds: songDurationMs);
+    }
+    if (isSameSong && previousDuration != null) {
+      return previousDuration;
+    }
+    return Duration.zero;
+  }
+
+  void _maybeScrobble(SongsTableData song, Duration position, bool isPlaying) {
+    final currentGen = _audioHandler.playbackState.valueOrNull?.queueIndex ?? 0;
+    if (_lastScrobbledSongId != song.id ||
+        _lastScrobbledPlayGen != currentGen) {
+      _lastScrobbledSongId = song.id;
+      _lastScrobbledPlayGen = currentGen;
+      widgetBridge.scrobble(song, position, isPlaying);
+    }
   }
 
   /// The engine's authoritative current queue index when known and in range for
@@ -424,12 +488,15 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       final songIndex = _engineQueueIndexWithin(state.queue.length) ??
           state.queue.indexWhere((s) => _isSameTrack(s, song));
       final isSameSong = _isSameTrack(state.currentSong, song);
+      final duration = _resolveTrackDuration(
+        songDurationMs: song.durationMs,
+        previousDuration: state.duration,
+        isSameSong: isSameSong,
+      );
       safeEmit(state.copyWith(
         playback: state.playback.copyWith(
           currentSong: song,
-          duration: song.durationMs > 0
-              ? Duration(milliseconds: song.durationMs)
-              : (isSameSong ? state.duration : Duration.zero),
+          duration: duration,
           position: isSameSong ? state.position : Duration.zero,
           errorMessage: null,
         ),
@@ -445,13 +512,34 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       if (!isSameSong) {
         unawaited(metadataController.enrichTrackParallel(song));
         unawaited(dspController.maybeFollowTrackSampleRate(song));
+        widgetBridge.updateWidgetThrottled(state, force: true);
       }
-      widgetBridge.updateWidgetThrottled(state, force: true);
-      widgetBridge.scrobble(song, state.position, state.isPlaying);
+      _maybeScrobble(song, state.position, state.isPlaying);
     });
 
     autoSub(_audioHandler.mediaItem, (item) async {
-      if (item == null || item.id.isEmpty) return;
+      if (item == null || item.id.isEmpty) {
+        if (_audioHandler.playbackState.valueOrNull?.processingState ==
+                AudioProcessingState.idle ||
+            _audioHandler.queue.valueOrNull?.isEmpty == true) {
+          if (state.currentSong != null) {
+            safeEmit(state.copyWith(
+              playback: state.playback.copyWith(
+                currentSong: null,
+                isPlaying: false,
+                position: Duration.zero,
+                duration: Duration.zero,
+              ),
+              lyricsSlice: state.lyricsSlice.copyWith(
+                lyrics: const [],
+                lyricsSource: LyricsSource.none,
+                isLoadingLyrics: false,
+              ),
+            ));
+          }
+        }
+        return;
+      }
       final mediaGen = _mediaItemGuard.next();
       final id = _resolveMediaItemId(item.id);
 
@@ -490,16 +578,21 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         final song = resolvedSong!;
         if (!_mediaItemGuard.isValid(mediaGen) || isClosed) return;
         final isSameSong = _isSameTrack(state.currentSong, song);
-        final duration =
-            (item.duration != null && item.duration! > Duration.zero)
-                ? item.duration!
-                : (song.durationMs > 0
-                    ? Duration(milliseconds: song.durationMs)
-                    : (isSameSong ? state.duration : Duration.zero));
+        final duration = _resolveTrackDuration(
+          engineDuration: item.duration,
+          songDurationMs: song.durationMs,
+          previousDuration: state.duration,
+          isSameSong: isSameSong,
+        );
         final songQueueIndex = _engineQueueIndexWithin(state.queue.length) ??
             state.queue.indexWhere((s) => _isSameTrack(s, song));
         final effectiveIndex =
             songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
+
+        final songChanged = !isSameSong ||
+            state.currentSong?.isFavorite != song.isFavorite ||
+            state.currentSong?.artworkUri != song.artworkUri ||
+            state.currentSong?.remoteArtworkUrl != song.remoteArtworkUrl;
 
         safeEmit(state.copyWith(
           playback: state.playback.copyWith(
@@ -522,13 +615,37 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           unawaited(metadataController.enrichTrackParallel(song));
           unawaited(dspController.maybeFollowTrackSampleRate(song));
         }
-        widgetBridge.updateWidgetThrottled(state, force: true);
-        widgetBridge.scrobble(song, state.position, state.isPlaying);
+        if (songChanged) {
+          widgetBridge.updateWidgetThrottled(state, force: true);
+        }
+        _maybeScrobble(song, state.position, state.isPlaying);
       }
     });
 
     autoSub(_audioHandler.queue, (mediaItems) async {
-      if (mediaItems.isEmpty) return;
+      if (mediaItems.isEmpty) {
+        if (state.queue.isNotEmpty || state.currentSong != null) {
+          safeEmit(state.copyWith(
+            playback: state.playback.copyWith(
+              currentSong: null,
+              isPlaying: false,
+              position: Duration.zero,
+              duration: Duration.zero,
+              errorMessage: null,
+            ),
+            queueSlice: state.queueSlice.copyWith(
+              queue: const [],
+              currentIndex: 0,
+            ),
+            lyricsSlice: state.lyricsSlice.copyWith(
+              lyrics: const [],
+              lyricsSource: LyricsSource.none,
+              isLoadingLyrics: false,
+            ),
+          ));
+        }
+        return;
+      }
       final gen = _queueSyncGuard.next();
       final ids = mediaItems.map((m) => _resolveMediaItemId(m.id)).toList();
       if (ids.isEmpty) return;
@@ -624,13 +741,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       if (!isPlaying &&
           state.isPlaying &&
           !_userPausedIntentionally &&
-          ps.processingState != AudioProcessingState.ready &&
-          ps.processingState != AudioProcessingState.completed) {
+          (ps.processingState == AudioProcessingState.loading ||
+              ps.processingState == AudioProcessingState.buffering)) {
         // Keep the optimistic "playing" through transient non-ready states
-        // (idle/loading/buffering) during a selection/load so the play button
-        // doesn't flicker at track start. NOTE: a genuine programmatic stop
-        // into idle should clear isPlaying at its own source rather than rely
-        // on this override; see player-logic-review follow-up.
+        // (loading/buffering) during a selection/load so the play button
+        // doesn't flicker at track start.
         resolvedPlaying = true;
       }
 
@@ -693,7 +808,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               metadataController.sponsorBlockSkipTarget(pos, isPlaying: true);
           if (skipTarget != null) {
             final myGen = ++_sponsorBlockSeekGen;
-            unawaited(seek(skipTarget).whenComplete(() {
+            unawaited(seek(skipTarget).catchError((Object e, StackTrace st) {
+              ErrorLogger.log('SponsorBlock auto-skip seek failed',
+                  error: e, stackTrace: st, category: 'PlayerCubit');
+            }).whenComplete(() {
               // Only decrement if this is still the active seek generation.
               if (_sponsorBlockSeekGen == myGen) _sponsorBlockSeekGen = 0;
             }));

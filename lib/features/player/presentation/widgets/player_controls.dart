@@ -104,6 +104,7 @@ class PlayerControls extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: Tooltip(
                     message: l10n.previous,
+                    excludeFromSemantics: true,
                     child: InkWell(
                       onTap: hasPrevious
                           ? () {
@@ -238,6 +239,7 @@ class PlayerControls extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: Tooltip(
                     message: l10n.next,
+                    excludeFromSemantics: true,
                     child: InkWell(
                       onTap: hasNext
                           ? () {

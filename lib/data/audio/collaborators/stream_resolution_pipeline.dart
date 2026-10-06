@@ -105,8 +105,7 @@ class StreamResolutionPipeline {
     if (videoId == null || videoId.isEmpty) {
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
     }
-    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId) ||
-        videoId.startsWith('n_')) {
+    if (!RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(videoId)) {
       throw const YtmException('YTM_UNAVAILABLE', 'Invalid video id');
     }
 

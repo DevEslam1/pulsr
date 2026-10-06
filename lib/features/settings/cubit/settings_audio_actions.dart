@@ -128,6 +128,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(SettingsCubit._keyStreamingQuality, quality.name);
+    await prefs.remove('adaptive_runtime_quality');
     await prefs.setString(SettingsCubit._keyDownloadQuality, quality.name);
   }
 

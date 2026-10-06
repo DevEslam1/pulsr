@@ -20,6 +20,7 @@ class PlayerSeekThrottle {
   int _lastSeekMs = -PlayerConstants.seekThrottleMs;
   Timer? _throttleTimer;
   Duration? _pendingSeek;
+  Completer<void>? _pendingCompleter;
 
   PlayerSeekThrottle({
     required PulsrAudioHandler audioHandler,
@@ -46,6 +47,7 @@ class PlayerSeekThrottle {
     final nowMs = _stopwatch.elapsedMilliseconds;
     if (nowMs - _lastSeekMs < PlayerConstants.seekThrottleMs) {
       _pendingSeek = target;
+      final completer = _pendingCompleter ??= Completer<void>();
       _throttleTimer?.cancel();
       _throttleTimer = Timer(
         Duration(
@@ -55,10 +57,14 @@ class PlayerSeekThrottle {
         () {
           if (_isClosed()) {
             _pendingSeek = null;
+            if (!completer.isCompleted) completer.complete();
+            _pendingCompleter = null;
             return;
           }
           final pending = _pendingSeek;
           _pendingSeek = null;
+          final c = _pendingCompleter;
+          _pendingCompleter = null;
           if (pending != null && !_isClosed()) {
             _lastSeekMs = _stopwatch.elapsedMilliseconds;
             _audioHandler.seek(pending).catchError((Object e, StackTrace st) {
@@ -76,14 +82,22 @@ class PlayerSeekThrottle {
                   ),
                 ));
               }
+            }).whenComplete(() {
+              if (c != null && !c.isCompleted) c.complete();
             });
+          } else {
+            if (c != null && !c.isCompleted) c.complete();
           }
         },
       );
-      return Future.value();
+      return completer.future;
     }
 
     _pendingSeek = null;
+    if (_pendingCompleter != null && !_pendingCompleter!.isCompleted) {
+      _pendingCompleter!.complete();
+    }
+    _pendingCompleter = null;
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _lastSeekMs = nowMs;
@@ -110,5 +124,9 @@ class PlayerSeekThrottle {
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _pendingSeek = null;
+    if (_pendingCompleter != null && !_pendingCompleter!.isCompleted) {
+      _pendingCompleter!.complete();
+    }
+    _pendingCompleter = null;
   }
 }
