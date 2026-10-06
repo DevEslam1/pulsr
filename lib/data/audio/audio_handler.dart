@@ -879,6 +879,25 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @visibleForTesting
+  PulsrAudioHandler.forTesting({
+    required IMusicRepository repository,
+    required YtmService ytmService,
+    required AudioPlayer playerA,
+    required AudioPlayer playerB,
+    AudioPlayer? prefetchPlayer,
+    AndroidLoudnessEnhancer? loudnessEnhancerA,
+    AndroidLoudnessEnhancer? loudnessEnhancerB,
+  }) : this._(
+          repository: repository,
+          ytmService: ytmService,
+          playerA: playerA,
+          playerB: playerB,
+          prefetchPlayer: prefetchPlayer,
+          loudnessEnhancerA: loudnessEnhancerA,
+          loudnessEnhancerB: loudnessEnhancerB,
+        );
+
   static MediaItem _songToMediaItem(SongsTableData song, [Uri? artUri]) {
     Uri? finalArtUri = (artUri != null &&
             artUri.hasScheme &&
