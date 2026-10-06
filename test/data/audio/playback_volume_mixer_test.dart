@@ -35,7 +35,8 @@ void main() {
       expect(mixer.calculatedInactiveVolume, 0.0);
     });
 
-    test('2. Ducking factor reduces volume without pre-duck snapshot state', () async {
+    test('2. Ducking factor reduces volume without pre-duck snapshot state',
+        () async {
       mixer.setUserVolume(1.0);
       mixer.setDuckFactor(0.3);
       await mixer.apply();
@@ -48,7 +49,9 @@ void main() {
       expect(playerA.volume, closeTo(1.0, 0.001));
     });
 
-    test('3. Crossfade gains apply proportionally to active and inactive players', () async {
+    test(
+        '3. Crossfade gains apply proportionally to active and inactive players',
+        () async {
       mixer.setUserVolume(1.0);
       mixer.setCrossfadeGains(
         outgoingGain: 0.6,
@@ -67,7 +70,8 @@ void main() {
       expect(playerB.volume, closeTo(0.2, 0.001));
     });
 
-    test('4. Sleep fade factor composes with ducking and user volume', () async {
+    test('4. Sleep fade factor composes with ducking and user volume',
+        () async {
       mixer.setUserVolume(0.8);
       mixer.setDuckFactor(0.5); // 0.4
       mixer.setSleepFadeFactor(0.5); // 0.2
@@ -81,7 +85,8 @@ void main() {
       expect(playerA.volume, closeTo(0.4, 0.001));
     });
 
-    test('5. DVC mode forces effective user volume to 1.0 (handled natively)', () async {
+    test('5. DVC mode forces effective user volume to 1.0 (handled natively)',
+        () async {
       mixer.setUserVolume(0.5);
       mixer.setDvcEnabled(true);
       mixer.setDuckFactor(0.5);

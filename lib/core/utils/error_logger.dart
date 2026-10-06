@@ -117,22 +117,27 @@ class ErrorLogger {
     }
   }
 
-  static final Map<String, ({DateTime lastLog, int count})> _swallowedRateLimits = {};
+  static final Map<String, ({DateTime lastLog, int count})>
+      _swallowedRateLimits = {};
 
   /// Rate-limited logging for swallowed/caught errors (Phase 6).
   /// Logs at most once every 60 seconds per [where] site, accumulating suppressed counts.
-  static void logSwallowed(String where, Object error, [StackTrace? stackTrace]) {
+  static void logSwallowed(String where, Object error,
+      [StackTrace? stackTrace]) {
     final now = DateTime.now();
     final entry = _swallowedRateLimits[where];
-    if (entry == null || now.difference(entry.lastLog) > const Duration(seconds: 60)) {
+    if (entry == null ||
+        now.difference(entry.lastLog) > const Duration(seconds: 60)) {
       final suppressed = entry?.count ?? 0;
       final msg = suppressed > 0
           ? 'Swallowed exception at $where ($suppressed repeats suppressed)'
           : 'Swallowed exception at $where';
       _swallowedRateLimits[where] = (lastLog: now, count: 0);
-      log(msg, error: error, stackTrace: stackTrace, category: 'SwallowedError');
+      log(msg,
+          error: error, stackTrace: stackTrace, category: 'SwallowedError');
     } else {
-      _swallowedRateLimits[where] = (lastLog: entry.lastLog, count: entry.count + 1);
+      _swallowedRateLimits[where] =
+          (lastLog: entry.lastLog, count: entry.count + 1);
     }
   }
 

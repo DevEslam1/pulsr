@@ -15,7 +15,8 @@ class FakeAudioSession {
   Stream<void> get becomingNoisyEventStream => _becomingNoisyController.stream;
   Stream<List<AudioDevice>> get devicesStream => _devicesController.stream;
 
-  void emitInterruption({required bool begin, required AudioInterruptionType type}) {
+  void emitInterruption(
+      {required bool begin, required AudioInterruptionType type}) {
     _interruptionController.add(AudioInterruptionEvent(begin, type));
   }
 

@@ -52,8 +52,7 @@ class PlayerPrefs {
   bool get offlineOnlyMode =>
       _prefs?.getBool(PrefsKeys.offlineOnlyMode) ?? false;
 
-  bool get wifiOnlyMode =>
-      _prefs?.getBool(PrefsKeys.wifiOnlyMode) ?? false;
+  bool get wifiOnlyMode => _prefs?.getBool(PrefsKeys.wifiOnlyMode) ?? false;
 
   bool get audioNormalizationEnabled =>
       _prefs?.getBool(PrefsKeys.audioNormalizationEnabled) ?? false;
@@ -70,9 +69,7 @@ class PlayerPrefs {
   bool get advancedPlaybackSpeed =>
       _prefs?.getBool(PrefsKeys.advancedPlaybackSpeed) ?? false;
 
-  double get playbackSpeed =>
-      _prefs?.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
+  double get playbackSpeed => _prefs?.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
 
-  double get playbackPitch =>
-      _prefs?.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
+  double get playbackPitch => _prefs?.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
 }

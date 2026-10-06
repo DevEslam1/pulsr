@@ -96,7 +96,8 @@ class PlaybackVolumeMixer {
   /// Calculates the final volume to set on the active player.
   double get calculatedActiveVolume {
     final effectiveUser = _dvcEnabled ? 1.0 : _userVolume;
-    final base = (effectiveUser * _targetActiveFactor * _duckFactor * _sleepFadeFactor);
+    final base =
+        (effectiveUser * _targetActiveFactor * _duckFactor * _sleepFadeFactor);
     if (_isCrossfading) {
       return (base * _crossfadeOutgoingGain).clamp(0.0, 1.0);
     }
@@ -107,7 +108,10 @@ class PlaybackVolumeMixer {
   double get calculatedInactiveVolume {
     if (!_isCrossfading) return 0.0;
     final effectiveUser = _dvcEnabled ? 1.0 : _userVolume;
-    final base = (effectiveUser * _targetInactiveFactor * _duckFactor * _sleepFadeFactor);
+    final base = (effectiveUser *
+        _targetInactiveFactor *
+        _duckFactor *
+        _sleepFadeFactor);
     return (base * _crossfadeIncomingGain).clamp(0.0, 1.0);
   }
 
@@ -144,7 +148,8 @@ class PlaybackVolumeMixer {
           }
         }
 
-        if (inactivePlayer != null && (_isCrossfading || _lastAppliedInactive > 0.0)) {
+        if (inactivePlayer != null &&
+            (_isCrossfading || _lastAppliedInactive > 0.0)) {
           try {
             await inactivePlayer.setVolume(targetInactive);
             _lastAppliedInactive = targetInactive;

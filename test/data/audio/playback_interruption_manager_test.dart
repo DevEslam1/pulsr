@@ -13,41 +13,51 @@ void main() {
     });
 
     test('1. (idle, playing: true) x duckBegin -> duck -> (ducked)', () {
-      final decision = manager.onDuckBegin(isPlaying: true, shouldPauseInstead: false);
+      final decision =
+          manager.onDuckBegin(isPlaying: true, shouldPauseInstead: false);
       expect(decision, InterruptionDecision.duck);
       expect(manager.isDucked, isTrue);
 
       // Nested duck
-      final nested = manager.onDuckBegin(isPlaying: true, shouldPauseInstead: false);
+      final nested =
+          manager.onDuckBegin(isPlaying: true, shouldPauseInstead: false);
       expect(nested, InterruptionDecision.ignore);
       expect(manager.isDucked, isTrue);
 
       // Duck end 1
-      final end1 = manager.onDuckEnd(shouldPauseInstead: false, resumeAllowed: true);
+      final end1 =
+          manager.onDuckEnd(shouldPauseInstead: false, resumeAllowed: true);
       expect(end1, InterruptionDecision.ignore);
       expect(manager.isDucked, isTrue);
 
       // Duck end 2 -> unduck
-      final end2 = manager.onDuckEnd(shouldPauseInstead: false, resumeAllowed: true);
+      final end2 =
+          manager.onDuckEnd(shouldPauseInstead: false, resumeAllowed: true);
       expect(end2, InterruptionDecision.unduck);
       expect(manager.isDucked, isFalse);
     });
 
     test('2. (idle, playing: false) x duckBegin -> ignore -> (idle)', () {
-      final decision = manager.onDuckBegin(isPlaying: false, shouldPauseInstead: false);
+      final decision =
+          manager.onDuckBegin(isPlaying: false, shouldPauseInstead: false);
       expect(decision, InterruptionDecision.ignore);
       expect(manager.isDucked, isFalse);
     });
 
-    test('3. duck with shouldPauseInstead -> pause, and duck end -> resume', () {
-      final decision = manager.onDuckBegin(isPlaying: true, shouldPauseInstead: true);
+    test('3. duck with shouldPauseInstead -> pause, and duck end -> resume',
+        () {
+      final decision =
+          manager.onDuckBegin(isPlaying: true, shouldPauseInstead: true);
       expect(decision, InterruptionDecision.pause);
 
-      final end = manager.onDuckEnd(shouldPauseInstead: true, resumeAllowed: true);
+      final end =
+          manager.onDuckEnd(shouldPauseInstead: true, resumeAllowed: true);
       expect(end, InterruptionDecision.resume);
     });
 
-    test('4. Call interruption: pauseBegin -> pause, pauseEnd -> resume iff resumeAllowed', () {
+    test(
+        '4. Call interruption: pauseBegin -> pause, pauseEnd -> resume iff resumeAllowed',
+        () {
       final p1 = manager.onPauseInterruptionBegin(isPlaying: true);
       expect(p1, InterruptionDecision.pause);
       expect(manager.hasActiveInterruption, isTrue);
@@ -113,7 +123,8 @@ void main() {
       expect(manager.isPausedForNoisy, isFalse);
     });
 
-    test('6. User action clears all pending interruptions and auto-resumes', () {
+    test('6. User action clears all pending interruptions and auto-resumes',
+        () {
       manager.onPauseInterruptionBegin(isPlaying: true);
       manager.onBecomingNoisy(isPlaying: true, now: DateTime.now());
       manager.onDuckBegin(isPlaying: true, shouldPauseInstead: false);

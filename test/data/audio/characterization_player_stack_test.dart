@@ -1,5 +1,4 @@
 // test/data/audio/characterization_player_stack_test.dart
-import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/collaborators/playback_volume_controller.dart';
@@ -32,7 +31,9 @@ void main() {
       await playerB.dispose();
     });
 
-    test('1. InterruptionStateMachine: pause begin/end with resumeAfterInterruption', () {
+    test(
+        '1. InterruptionStateMachine: pause begin/end with resumeAfterInterruption',
+        () {
       final machine = InterruptionStateMachine();
 
       // Playback is running, call begins
@@ -91,7 +92,9 @@ void main() {
       expect(crossfadeManager.isCrossfading, isFalse);
     });
 
-    test('4. SleepTimerManager: onFadeFactor reports attenuation without direct overwrite', () {
+    test(
+        '4. SleepTimerManager: onFadeFactor reports attenuation without direct overwrite',
+        () {
       final sleepTimerManager = SleepTimerManager();
       double? receivedFactor;
 
@@ -107,11 +110,11 @@ void main() {
 
     test('5. Becoming-noisy debounce and reconnect window tracking', () {
       final machine = InterruptionStateMachine();
-      var lastNoisy = fakeClock.now;
-      
+      final lastNoisy = fakeClock.now;
+
       // First disconnect
       expect(machine.isActive, isFalse);
-      
+
       // Advance clock by 200ms (< 800ms debounce threshold)
       fakeClock.advance(const Duration(milliseconds: 200));
       final rapidDiff = fakeClock.now.difference(lastNoisy);

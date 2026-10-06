@@ -50,7 +50,8 @@ class PlaybackInterruptionManager {
   }
 
   /// Processes transient duck focus loss event.
-  InterruptionDecision onDuckBegin({required bool isPlaying, required bool shouldPauseInstead}) {
+  InterruptionDecision onDuckBegin(
+      {required bool isPlaying, required bool shouldPauseInstead}) {
     if (shouldPauseInstead) {
       if (isPlaying) {
         _stateMachine.begin(InterruptionKind.duck, playing: true);
@@ -71,7 +72,8 @@ class PlaybackInterruptionManager {
   }
 
   /// Processes duck focus end event.
-  InterruptionDecision onDuckEnd({required bool shouldPauseInstead, required bool resumeAllowed}) {
+  InterruptionDecision onDuckEnd(
+      {required bool shouldPauseInstead, required bool resumeAllowed}) {
     if (shouldPauseInstead) {
       final wasPlaying = _stateMachine.end(InterruptionKind.duck);
       if (wasPlaying && resumeAllowed) {

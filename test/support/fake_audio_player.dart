@@ -186,7 +186,9 @@ class FakeAudioPlayer extends Mock implements AudioPlayer {
   Future<bool> dspClearGainCurve() async => false;
 
   @override
-  Future<bool> dspSetGainCurve(List<double> gains, {int segmentMs = 20}) async => false;
+  Future<bool> dspSetGainCurve(List<double> gains,
+          {int segmentMs = 20}) async =>
+      false;
 
   @override
   Future<void> dispose() async {

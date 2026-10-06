@@ -12,10 +12,12 @@ class PlayerTelemetryCounters {
   static final Map<String, int> autoResumeDecisions = {};
 
   static void incrementStreamResolveFailure(String errorClass) {
-    streamResolveFailures[errorClass] = (streamResolveFailures[errorClass] ?? 0) + 1;
+    streamResolveFailures[errorClass] =
+        (streamResolveFailures[errorClass] ?? 0) + 1;
   }
 
-  static void recordAutoResumeDecision({required bool resumed, required String reason}) {
+  static void recordAutoResumeDecision(
+      {required bool resumed, required String reason}) {
     final key = '${resumed ? "resumed" : "blocked"}:$reason';
     autoResumeDecisions[key] = (autoResumeDecisions[key] ?? 0) + 1;
   }
