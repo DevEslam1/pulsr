@@ -71,6 +71,11 @@ dev_dependencies:
   freezed: ^4.0.1
   flutter_launcher_icons: ^0.14.4
   fake_async: ^1.3.3
+  # Platform-interface packages are referenced directly by tests that install
+  # fake platform implementations (path provider, file picker, webview).
+  cross_file: ^0.3.5
+  plugin_platform_interface: ^2.1.8
+  path_provider_platform_interface: ^2.1.3
 
 flutter:
   uses-material-design: true

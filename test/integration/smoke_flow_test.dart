@@ -37,6 +37,24 @@ class MockGetFavoritesUseCase extends Mock implements GetFavoritesUseCase {}
 
 class MockFolderUseCases extends Mock implements FolderUseCases {}
 
+/// Polls [condition] until it is true or [timeout] elapses. Using a condition
+/// instead of a fixed-duration sleep keeps the smoke journey deterministic when
+/// the suite is run with high test concurrency (many isolates on few cores),
+/// where a fixed 100 ms window can starve the async `LibraryCubit.init()` chain.
+Future<void> _waitUntil(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 15),
+  Duration poll = const Duration(milliseconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      throw StateError('Condition not met within $timeout');
+    }
+    await Future<void>.delayed(poll);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -136,7 +154,7 @@ void main() {
       expect(playerCubit.state.currentSong, isNull);
 
       // Step 2: Library load
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitUntil(() => libraryCubit.state.songs.isNotEmpty);
 
       expect(libraryCubit.state.songs.isNotEmpty, isTrue);
       expect(libraryCubit.state.songs.first.title, 'Flagship Symphony');
@@ -144,7 +162,7 @@ void main() {
       // Step 3: Play song from library
       final selectedSong = libraryCubit.state.songs.first;
       await playerCubit.playSong(selectedSong, queue: libraryCubit.state.songs);
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await _waitUntil(() => playerCubit.state.currentSong != null);
 
       // Step 4: Verify playback state and currentSong
       expect(playerCubit.state.currentSong?.id, 1);

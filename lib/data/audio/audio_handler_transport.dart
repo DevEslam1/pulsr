@@ -598,6 +598,17 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     }
   }
 
+  /// Builds the native concat child for [song] through the exact same pipeline
+  /// [_loadGaplessQueue] uses (lazy YouTube resolve, local-match, cached-file,
+  /// format/DSD/MQA decoder). Runtime queue edits must mirror that pipeline or
+  /// the appended/inserted track is missing from the ExoPlayer playlist and
+  /// playback stops at the previous end of queue.
+  Future<AudioSource> _buildGaplessChildAsync(SongsTableData song) {
+    final art = song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    return _resolveAudioSource(
+        song, PulsrAudioHandler._songToMediaItem(song, art));
+  }
+
   @override
   Future<void> addQueueItem(MediaItem mediaItem) async {
     if (_songs.length >= PulsrAudioHandler.maxQueueSize) {
@@ -618,9 +629,18 @@ mixin PulsrAudioTransport on BaseAudioHandler {
             _songs.any((s) => s.id == song.id)) {
           return;
         }
+        // Resolve the native source BEFORE mutating state: a resolve failure
+        // must leave the queue (Dart model + native playlist) untouched rather
+        // than desync them.
+        final nativeSource = (_gaplessMode && _gaplessLoaded)
+            ? await _buildGaplessChildAsync(song)
+            : null;
         _songs.add(song);
         _streamPreResolver.onTrackEnqueuedOrTapped(song);
         _queueDirty = true;
+        if (nativeSource != null) {
+          await _activePlayer.addAudioSource(nativeSource);
+        }
         queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
         _saveCurrentPosition();
       }
@@ -648,6 +668,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           category: 'AudioHandler');
       return;
     }
+    // Resolve before mutating so a resolve failure leaves the queue untouched.
+    final nativeSource = (_gaplessMode && _gaplessLoaded)
+        ? await _buildGaplessChildAsync(song)
+        : null;
     final insertIdx =
         _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
     // Route through the state machine so _shuffleHistory is reindexed. The
@@ -655,6 +679,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     _queueStateMachine.insertSong(insertIdx, song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
+    if (nativeSource != null) {
+      // Mirror the insert into the ExoPlayer concat at the same slot.
+      await _activePlayer.insertAudioSource(insertIdx, nativeSource);
+    }
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -678,9 +706,16 @@ mixin PulsrAudioTransport on BaseAudioHandler {
           category: 'AudioHandler');
       return;
     }
+    // Resolve before mutating so a resolve failure leaves the queue untouched.
+    final nativeSource = (_gaplessMode && _gaplessLoaded)
+        ? await _buildGaplessChildAsync(song)
+        : null;
     _songs.add(song);
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
     _queueDirty = true;
+    if (nativeSource != null) {
+      await _activePlayer.addAudioSource(nativeSource);
+    }
     queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -889,6 +924,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> _loadGaplessQueue(
       {Duration? initialPosition, bool preload = true});
 
+  Future<AudioSource> _resolveAudioSource(SongsTableData song, MediaItem tag);
+
   Future<void> _loadSongPaused(int index, {Duration? initialPosition});
   bool get _pendingPlaybackStart;
   set _pendingPlaybackStart(bool value);
@@ -915,7 +952,6 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   void _saveCurrentPosition();
 
   Future<void> saveCurrentPositionImmediate();
-
 
   List<SongsTableData> get _songs;
 

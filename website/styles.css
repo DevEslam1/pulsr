@@ -21,7 +21,7 @@
     --accent-pink: #EC4899;
     --text-primary: #F8FAFC;
     --text-secondary: #94A3B8;
-    --text-muted: #64748B;
+    --text-muted: #8493AB;
     --card-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.5);
     --radius-sm: 8px;
     --radius-md: 14px;
@@ -47,7 +47,7 @@
     --accent-pink: #F472B6;
     --text-primary: #FFFFFF;
     --text-secondary: #A1A1AA;
-    --text-muted: #52525B;
+    --text-muted: #8A8A94;
     --card-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.8);
     --radius-sm: 8px;
     --radius-md: 14px;
@@ -218,6 +218,7 @@ a {
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     pointer-events: none;
     z-index: -1;
     overflow: hidden;
@@ -280,7 +281,7 @@ a {
     z-index: 1000;
     padding: 0 20px;
     margin-bottom: 24px;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
 }
 
 .nav {
@@ -429,7 +430,7 @@ a {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
     flex-shrink: 0;
 }
 
@@ -478,7 +479,7 @@ a {
     font-weight: 500;
     text-align: left;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
 .theme-opt:hover {
@@ -513,7 +514,7 @@ a {
     border-radius: var(--radius-full);
     border: 1px solid transparent;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     white-space: nowrap;
 }
 
@@ -639,7 +640,7 @@ a {
     height: 2px;
     background: var(--text-primary);
     border-radius: 2px;
-    transition: all 0.25s ease;
+    transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
 }
 
 .nav-mobile-toggle.open span:nth-child(1) {
@@ -668,6 +669,7 @@ a {
     gap: 8px;
     z-index: 999;
     max-height: calc(100vh - 110px);
+    max-height: calc(100dvh - 110px);
     overflow-y: auto;
 }
 
@@ -683,7 +685,7 @@ a {
     color: var(--text-primary);
     border-radius: var(--radius-md);
     background: rgba(255, 255, 255, 0.03);
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .mobile-link:hover {
@@ -811,7 +813,7 @@ a {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     padding: 14px 12px;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .stat-card:hover {
@@ -840,7 +842,7 @@ a {
     border-radius: var(--radius-xl);
     overflow: hidden;
     box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.7), 0 0 35px var(--accent-glow);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
 }
 
 .cockpit-header {
@@ -972,7 +974,7 @@ a {
     color: #EC4899;
     font-size: 1.1rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .track-fav-btn:hover {
@@ -1053,7 +1055,7 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .transport-btn:hover {
@@ -1100,7 +1102,7 @@ a {
     border-radius: 50%;
     border: 2px solid transparent;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .palette-dot:hover, .palette-dot.active {
@@ -1242,7 +1244,7 @@ a {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
     padding: 32px 28px;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     overflow: hidden;
 }
 
@@ -1546,7 +1548,7 @@ a {
     font-size: 0.78rem;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .enhancer-pill.active {
@@ -1664,7 +1666,7 @@ a {
     cursor: pointer;
     padding: 6px 12px;
     border-radius: var(--radius-sm);
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .lyric-line:hover {
@@ -1711,7 +1713,7 @@ a {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
     padding: 24px;
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
 }
 
 .theme-card.active, .theme-card:hover {
@@ -1879,7 +1881,7 @@ a {
     font-weight: 600;
     font-size: 0.88rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .plat-tab:hover {
@@ -1983,7 +1985,7 @@ a {
     font-size: 0.75rem;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
 .checksum-pill:hover {
@@ -2037,7 +2039,7 @@ a {
     flex-direction: column;
     justify-content: space-between;
     gap: 16px;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .abi-card:hover {
@@ -2163,7 +2165,7 @@ a {
     background: var(--bg-surface-elevated);
     border: 1px solid var(--border-subtle);
     color: var(--text-secondary);
-    transition: all 0.15s ease;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
 .version-apk-btn:hover {
@@ -2503,7 +2505,7 @@ a {
     font-weight: 600;
     text-align: center;
     color: var(--text-primary);
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .social-share-btn:hover {
@@ -2547,7 +2549,7 @@ a {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
     z-index: 3000;
     opacity: 0;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: color 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: none;
 }
 
@@ -2584,7 +2586,7 @@ a {
     z-index: 900;
     opacity: 0;
     transform: translateY(20px);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
 }
 
 .back-to-top.visible {
@@ -2845,3 +2847,76 @@ a {
     }
 }
 
+
+
+/* ==========================================================================
+   QUALITY PASS: focus, motion, anchors
+   ========================================================================== */
+html { scroll-padding-top: 96px; }
+
+:focus-visible {
+    outline: 3px solid var(--accent-cyan);
+    outline-offset: 3px;
+    border-radius: var(--radius-sm);
+}
+.faq-question:focus-visible,
+.btn:focus-visible,
+.nav-link:focus-visible { outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .reveal { opacity: 1 !important; transform: none !important; }
+    .marquee-strip *, .glow-orb { animation: none !important; }
+}
+
+
+/* ==========================================================================
+   REFINEMENT LAYER: rendering, touch, fluid spacing
+   ========================================================================== */
+:root, [data-theme="cyber"], [data-theme="amoled"], [data-theme="emerald"], [data-theme="violet"] { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; text-rendering: optimizeLegibility; }
+::selection { background: var(--primary-color); color: #fff; }
+
+/* Fluid rhythm */
+.container { padding-inline: clamp(16px, 4vw, 32px); }
+.section { padding-block: clamp(56px, 9vw, 104px); }
+
+/* Typographic polish */
+h1, h2, h3, .section-title, .hero-title { text-wrap: balance; }
+p, .section-subtitle, .hero-description { text-wrap: pretty; }
+[class*="time"], [class*="count"], [class*="stat-"], .track-title + *, code, kbd { font-variant-numeric: tabular-nums; }
+
+/* Background: cheaper compositing */
+.ambient-bg { contain: paint; }
+.glow-orb { will-change: transform; transform: translateZ(0); }
+@media (max-width: 768px) {
+    .glow-orb { filter: blur(70px); animation: none; }
+    .orb-3 { display: none; }
+}
+
+/* Hover only where hover exists, so touch screens don't stick */
+@media (hover: none) {
+    .feature-card:hover { transform: none; box-shadow: none; border-color: var(--border-subtle); }
+    .btn:hover { transform: none; }
+}
+
+/* Subtle, themed scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--border-bright) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 999px; border: 2px solid var(--bg-base); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Print: readable, ink-friendly */
+@media print {
+    .ambient-bg, .nav-header, .mobile-menu, .toast-bubble, .marquee-strip { display: none !important; }
+    body { background: #fff; color: #000; }
+}

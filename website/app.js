@@ -302,7 +302,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillRect(i * (barWidth + 2), h - barHeights[i], barWidth, barHeights[i]);
             }
 
-            requestAnimationFrame(drawVisualizer);
+            if (document.hidden) {
+                document.addEventListener('visibilitychange', drawVisualizer, { once: true });
+            } else {
+                requestAnimationFrame(drawVisualizer);
+            }
         }
         drawVisualizer();
     }
@@ -582,10 +586,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    let lastFocus = null;
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && shareModalBackdrop && shareModalBackdrop.classList.contains('open')) hideShareModal();
+    });
+
     function showShareModal() {
         if (shareModalBackdrop) {
             shareModalBackdrop.classList.add('open');
             shareModalBackdrop.setAttribute('aria-hidden', 'false');
+            lastFocus = document.activeElement;
+            const card = shareModalBackdrop.querySelector('.modal-card');
+            if (card) card.focus();
         }
     }
 
@@ -593,6 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shareModalBackdrop) {
             shareModalBackdrop.classList.remove('open');
             shareModalBackdrop.setAttribute('aria-hidden', 'true');
+            if (lastFocus && lastFocus.focus) lastFocus.focus();
         }
     }
 
@@ -620,11 +633,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // 12. --- FAQ ACCORDION ---
     document.querySelectorAll('.faq-item').forEach(item => {
         const questionBtn = item.querySelector('.faq-question');
+        const answer = item.querySelector('.faq-answer');
         if (questionBtn) {
+            const id = 'faq-a-' + Math.random().toString(36).slice(2, 8);
+            if (answer) { answer.id = id; questionBtn.setAttribute('aria-controls', id); }
+            questionBtn.setAttribute('aria-expanded', 'false');
             questionBtn.addEventListener('click', () => {
                 const isOpen = item.classList.contains('open');
-                document.querySelectorAll('.faq-item').forEach(other => other.classList.remove('open'));
-                if (!isOpen) item.classList.add('open');
+                document.querySelectorAll('.faq-item').forEach(other => {
+                    other.classList.remove('open');
+                    const b = other.querySelector('.faq-question');
+                    if (b) b.setAttribute('aria-expanded', 'false');
+                });
+                if (!isOpen) { item.classList.add('open'); questionBtn.setAttribute('aria-expanded', 'true'); }
             });
         }
     });
@@ -637,7 +658,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 const starEl = document.getElementById('githubStars');
                 if (starEl && data.stargazers_count !== undefined) {
-                    starEl.textContent = `★ ${(data.stargazers_count / 1000).toFixed(1)}k`;
+                    const n = data.stargazers_count;
+                    starEl.textContent = n >= 1000 ? `★ ${(n / 1000).toFixed(1)}k` : `★ ${n}`;
                 }
             }
 
