@@ -4,14 +4,18 @@
 //
 // Android's public UsbRequest API has no isochronous transfer support, so this
 // drives the usbfs interface directly (the same approach UAPP/Poweramp use):
-// the Kotlin layer opens the device, force-claims the AudioStreaming interface
-// and selects its alternate setting, then hands the raw usbfs file descriptor
-// and the isochronous OUT endpoint address to this sink.
+// the Kotlin layer opens the device, force-claims the AudioStreaming interface,
+// selects the alternate setting whose FORMAT_TYPE_I matches the requested
+// rate+depth, and programs the DAC sample clock; it then hands the raw usbfs
+// file descriptor and the isochronous OUT endpoint address to this sink.
 //
-// A worker thread keeps a small pool of isochronous URBs submitted; audio
-// frames are converted to interleaved S16_LE and copied from a bounded ring
-// buffer. On underrun the missing frames are emitted as silence so timing never
-// stalls.
+// A worker thread keeps a small pool of isochronous URBs submitted. Audio
+// frames arrive as float [-1,1] and are packed to the DAC's wire format -
+// S16_LE (2-byte subslot), S24_3LE (3-byte) or S32_LE (4-byte) per the selected
+// alt setting - and copied from a bounded ring buffer. On underrun the missing
+// frames are emitted as silence so timing never stalls. If the DAC exposes an
+// asynchronous feedback IN endpoint, the sink reads it and nudges the OUT
+// per-packet sample counts toward the DAC's clock to limit drift.
 //
 // HONEST SCOPE: this is unvalidated against physical hardware. It is only
 // activated by the explicit "USB Bit-Perfect Streaming" action, and any open
@@ -58,8 +62,9 @@ public:
     // Parses supported sample rates from raw configuration descriptors (UAC1 Format Type I).
     static std::vector<int> ParseSupportedRatesFromDescriptors(const uint8_t* desc, size_t len, int targetInterface = -1);
 
-    // Audio-thread call: converts float [-1,1] to interleaved S16_LE and appends
-    // to the ring. Non-blocking; excess data is dropped (never blocks playback).
+    // Audio-thread call: packs float [-1,1] to the configured interleaved wire
+    // format (S16_LE / S24_3LE / S32_LE per bytesPerSample_) and appends to the
+    // ring. Non-blocking; excess data is dropped (never blocks playback).
     void WriteInterleaved(const float* buffer, int frames, int channels);
 
     int sampleRate() const { return sampleRate_; }
@@ -75,6 +80,24 @@ private:
     bool submitAll();
     void releaseResources();
     void drainUrbCompletions();
+
+    // --- Async feedback (anti-drift) support, FIX 2 ---
+    // Reads raw configuration descriptors over usbfs (same request the rate
+    // query uses) so Open can locate the feedback IN endpoint without any extra
+    // JNI plumbing.
+    static std::vector<uint8_t> fetchConfigDescriptor(int fd);
+    // Returns the async feedback IN endpoint address for (interface, alt), or 0
+    // if none; *outPacketSize receives its wMaxPacketSize when found.
+    static int findFeedbackEndpoint(int fd, int interfaceNumber, int altSetting,
+                                    int* outPacketSize);
+    // Allocates and submits the feedback iso-IN URB pool. Best-effort: a failure
+    // leaves OUT streaming running at the nominal rate.
+    bool setupFeedbackUrbs();
+    // Decodes one feedback sample and updates feedbackRatePerSec_ (worker only).
+    void applyFeedback(const uint8_t* data, int len);
+    // Frees the feedback URB buffers/vectors. Callers must have cancelled+reaped
+    // the feedback URBs first (drainUrbCompletions / setup rollback).
+    void freeFeedbackResources();
 
     std::atomic<bool> active_{false};
     std::atomic<bool> running_{false};
@@ -97,6 +120,26 @@ private:
     int packetsPerUrb_ = 8;
     int bytesPerPacket_ = 0;
     int bytesPerUrb_ = 0;
+
+    // Worker-thread-only packet sizing state (FIX 2). frameAccumulator_ carries
+    // the fractional samples-per-packet remainder (e.g. 44.1 kHz -> 44/45 frame
+    // packets); maxFramesPerPacket_ caps a packet so feedback can never overflow
+    // the preallocated URB buffer. feedbackRatePerSec_ is the clamped target
+    // sample rate the feedback endpoint last reported (== sampleRate_ until a
+    // feedback sample arrives).
+    uint32_t frameAccumulator_ = 0;
+    int maxFramesPerPacket_ = 0;
+    int feedbackRatePerSec_ = 0;
+
+    // Async feedback IN endpoint (0 => DAC has no feedback endpoint).
+    int feedbackEndpoint_ = 0;
+    int feedbackPacketSize_ = 0;
+    int feedbackPacketsPerUrb_ = 0;
+    int numFeedbackUrbs_ = 0;
+    std::vector<uint8_t> feedbackUrbStorage_;
+    std::vector<uint8_t*> feedbackBuffers_;
+    std::vector<void*> feedbackUrbs_;
+    size_t feedbackUrbStride_ = 0;
 
     std::thread worker_;
 

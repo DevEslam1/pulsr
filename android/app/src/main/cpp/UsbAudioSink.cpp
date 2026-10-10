@@ -209,12 +209,21 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         }
     }
 
-    // Maximum frames per 1 ms packet (ceil(sampleRate / 1000) for fractional rates like 44.1 kHz).
-    const int maxFramesPerPacket = (sampleRate_ + 999) / 1000;
-    const int maxBytesPerPacket = maxFramesPerPacket * channels_ * bytesPerSample_;
+    // Frames per 1 ms packet is ceil(sampleRate / 1000) for fractional rates
+    // like 44.1 kHz. Reserve ONE extra frame of headroom per packet so a
+    // positive feedback adjustment (FIX 2) can lengthen a packet without ever
+    // overflowing the preallocated URB buffer.
+    maxFramesPerPacket_ = (sampleRate_ + 999) / 1000 + 1;
+    const int maxBytesPerPacket = maxFramesPerPacket_ * channels_ * bytesPerSample_;
     bytesPerPacket_ = maxBytesPerPacket;
     packetsPerUrb_ = kPacketsPerUrb;
     bytesPerUrb_ = maxBytesPerPacket * packetsPerUrb_;
+
+    // Packet-sizing / feedback state consumed by the worker thread.
+    frameAccumulator_ = 0;
+    feedbackRatePerSec_ = sampleRate_;  // nominal until a feedback sample arrives
+    feedbackEndpoint_ = 0;
+    feedbackPacketSize_ = 0;
 
     // Power-of-two ring buffer capacity for mask-based indexing (at least 250ms slack).
     const size_t targetRingBytes = std::max(
@@ -238,7 +247,9 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     urbBuffers_.assign(numUrbs_, nullptr);
     urbs_.assign(numUrbs_, nullptr);
 
-    uint32_t frameAccumulator = 0;
+    // Nominal (feedback-free) initial packet lengths. frameAccumulator_ is a
+    // member so the worker thread continues the same fractional cadence when it
+    // refills URBs (and later feedback-adjusts it).
     const int frameBytes = channels_ * bytesPerSample_;
     for (int i = 0; i < numUrbs_; ++i) {
         auto* urb = reinterpret_cast<struct usbdevfs_urb*>(
@@ -258,9 +269,9 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         urb->usercontext = urb;
         int urbTotalBytes = 0;
         for (int p = 0; p < packetsPerUrb_; ++p) {
-            frameAccumulator += static_cast<uint32_t>(sampleRate_);
-            const int framesInPacket = static_cast<int>(frameAccumulator / 1000);
-            frameAccumulator %= 1000;
+            frameAccumulator_ += static_cast<uint32_t>(sampleRate_);
+            const int framesInPacket = static_cast<int>(frameAccumulator_ / 1000);
+            frameAccumulator_ %= 1000;
             const int pktBytes = framesInPacket * frameBytes;
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktBytes);
             urb->iso_frame_desc[p].actual_length = 0;
@@ -275,6 +286,17 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         lastError_.store(errno, std::memory_order_relaxed);
         releaseResources();
         return UsbStreamResult::SubmitFailed;
+    }
+
+    // FIX 2: if the DAC exposes an async feedback IN endpoint on this alt
+    // setting, start reading it so the worker can track the DAC's clock. This
+    // is best-effort - a failure leaves OUT streaming at the nominal rate.
+    feedbackEndpoint_ = findFeedbackEndpoint(fd_, interfaceNumber_, altSetting_,
+                                             &feedbackPacketSize_);
+    if (feedbackEndpoint_ != 0) {
+        if (!setupFeedbackUrbs()) {
+            feedbackEndpoint_ = 0;  // disable feedback; nominal rate still plays
+        }
     }
 
     running_.store(true, std::memory_order_release);
@@ -305,15 +327,20 @@ void UsbAudioSink::Close() {
 void UsbAudioSink::drainUrbCompletions() {
 #if defined(__linux__) || defined(__ANDROID__)
     if (fd_ < 0) return;
-    // DISCARDURB is asynchronous: ask the kernel to cancel every URB, then reap
-    // until it hands them back (or we time out) so buffers are never freed while
-    // the kernel still owns/DMAs them.
+    // DISCARDURB is asynchronous: ask the kernel to cancel every URB (OUT and
+    // feedback IN), then reap until it hands them back (or we time out) so
+    // buffers are never freed while the kernel still owns/DMAs them.
     for (void* raw : urbs_) {
         if (raw != nullptr) {
             ioctl(fd_, USBDEVFS_DISCARDURB, raw);
         }
     }
-    const int maxUrbs = static_cast<int>(urbs_.size());
+    for (void* raw : feedbackUrbs_) {
+        if (raw != nullptr) {
+            ioctl(fd_, USBDEVFS_DISCARDURB, raw);
+        }
+    }
+    const int maxUrbs = static_cast<int>(urbs_.size() + feedbackUrbs_.size());
     int drained = 0;
     for (int spin = 0; drained < maxUrbs && spin < 200; ++spin) {
         struct usbdevfs_urb* urb = nullptr;
@@ -327,6 +354,98 @@ void UsbAudioSink::drainUrbCompletions() {
         if (urb != nullptr) ++drained;
     }
 #endif
+}
+
+// ---- Async feedback (anti-drift) support, FIX 2 ----
+
+std::vector<uint8_t> UsbAudioSink::fetchConfigDescriptor(int fd) {
+#if defined(__linux__) || defined(__ANDROID__)
+    if (fd < 0) return {};
+    // GET_DESCRIPTOR(CONFIG): first read 4 bytes to learn wTotalLength, then the
+    // whole configuration (same control request QuerySupportedRates uses).
+    uint8_t header[4] = {0};
+    struct usbdevfs_ctrltransfer ctrl {};
+    ctrl.bRequestType = 0x80; // IN | STANDARD | DEVICE
+    ctrl.bRequest = 0x06;     // GET_DESCRIPTOR
+    ctrl.wValue = 0x0200;     // (CONFIG << 8) | index 0
+    ctrl.wIndex = 0;
+    ctrl.wLength = sizeof(header);
+    ctrl.timeout = 1000;
+    ctrl.data = header;
+    if (ioctl(fd, USBDEVFS_CONTROL, &ctrl) < 0) return {};
+
+    uint16_t totalLength = static_cast<uint16_t>(header[2] | (header[3] << 8));
+    if (totalLength < 9 || totalLength > 16384) totalLength = 4096;
+
+    std::vector<uint8_t> cfg(totalLength);
+    ctrl.wLength = totalLength;
+    ctrl.data = cfg.data();
+    int res = ioctl(fd, USBDEVFS_CONTROL, &ctrl);
+    if (res < 0) return {};
+    cfg.resize(static_cast<size_t>(res));
+    return cfg;
+#else
+    (void)fd;
+    return {};
+#endif
+}
+
+int UsbAudioSink::findFeedbackEndpoint(int fd, int interfaceNumber, int altSetting,
+                                       int* outPacketSize) {
+    if (outPacketSize) *outPacketSize = 0;
+    std::vector<uint8_t> cfg = fetchConfigDescriptor(fd);
+    if (cfg.size() < 4) return 0;
+
+    int curIface = -1, curAlt = -1, curClass = 0, curSubclass = 0;
+    size_t i = 0;
+    while (i + 2 <= cfg.size()) {
+        uint8_t bLength = cfg[i];
+        if (bLength < 2 || i + bLength > cfg.size()) break;
+        uint8_t bType = cfg[i + 1];
+        if (bType == 0x04 && bLength >= 9) { // INTERFACE
+            curIface = cfg[i + 2];
+            curAlt = cfg[i + 3];
+            curClass = cfg[i + 5];
+            curSubclass = cfg[i + 6];
+        } else if (bType == 0x05 && bLength >= 7) { // ENDPOINT
+            // Restrict to the operational AudioStreaming interface + alt setting.
+            if (curClass == 0x01 && curSubclass == 0x02 &&
+                curIface == interfaceNumber && curAlt == altSetting) {
+                uint8_t addr = cfg[i + 2];
+                uint8_t attrs = cfg[i + 3];
+                int maxPacket = cfg[i + 4] | (cfg[i + 5] << 8);
+                bool isIso = (attrs & 0x03) == 0x01;
+                bool isIn = (addr & 0x80) != 0;
+                int usage = attrs & 0x30; // 0x10 => feedback usage
+                int synch = attrs & 0x0C; // 0x04 => asynchronous
+                if (isIso && isIn &&
+                    (usage == 0x10 || synch == 0x04 ||
+                     (maxPacket >= 3 && maxPacket <= 8))) {
+                    if (outPacketSize) *outPacketSize = maxPacket;
+                    return addr;
+                }
+            }
+        }
+        i += bLength;
+    }
+    return 0;
+}
+
+void UsbAudioSink::freeFeedbackResources() {
+    for (uint8_t* b : feedbackBuffers_) {
+        delete[] b;
+    }
+    feedbackBuffers_.clear();
+    feedbackBuffers_.shrink_to_fit();
+    feedbackUrbs_.clear();
+    feedbackUrbs_.shrink_to_fit();
+    feedbackUrbStorage_.clear();
+    feedbackUrbStorage_.shrink_to_fit();
+    feedbackUrbStride_ = 0;
+    numFeedbackUrbs_ = 0;
+    feedbackPacketsPerUrb_ = 0;
+    feedbackEndpoint_ = 0;
+    feedbackPacketSize_ = 0;
 }
 
 void UsbAudioSink::releaseResources() {
@@ -361,6 +480,8 @@ void UsbAudioSink::releaseResources() {
     urbBuffers_.shrink_to_fit();
     urbs_.shrink_to_fit();
     urbStorage_.shrink_to_fit();
+    // Feedback URBs were cancelled+reaped by drainUrbCompletions() above.
+    freeFeedbackResources();
     ring_.clear();
     ring_.shrink_to_fit();
     ringMask_ = 0;
@@ -382,6 +503,7 @@ void UsbAudioSink::releaseResources() {
 }
 
 void UsbAudioSink::workerLoop() {
+    const int frameBytes = channels_ * bytesPerSample_;
     while (running_.load(std::memory_order_acquire)) {
         struct usbdevfs_urb* urb = nullptr;
         int r = ioctl(fd_, USBDEVFS_REAPURBNDELAY, &urb);
@@ -396,27 +518,62 @@ void UsbAudioSink::workerLoop() {
         }
         if (urb == nullptr) continue;
 
+        // FIX 2: a reaped IN URB (endpoint bit 7 set) is an async feedback
+        // sample. Decode it to nudge the OUT packet rate, then resubmit it. A
+        // feedback resubmit failure is NON-fatal: OUT playback keeps running at
+        // whatever rate was last decoded (or nominal).
+        if ((urb->endpoint & 0x80) != 0) {
+            uint8_t* fbuf = reinterpret_cast<uint8_t*>(urb->buffer);
+            for (int p = 0; p < urb->number_of_packets; ++p) {
+                const unsigned int got = urb->iso_frame_desc[p].actual_length;
+                if (got >= 3 && feedbackPacketSize_ > 0) {
+                    applyFeedback(fbuf, static_cast<int>(got));
+                }
+                fbuf += feedbackPacketSize_;
+                urb->iso_frame_desc[p].length =
+                    static_cast<unsigned int>(feedbackPacketSize_);
+                urb->iso_frame_desc[p].actual_length = 0;
+                urb->iso_frame_desc[p].status = 0;
+            }
+            urb->buffer_length = feedbackPacketSize_ * urb->number_of_packets;
+            ioctl(fd_, USBDEVFS_SUBMITURB, urb);  // best-effort; ignore errors
+            continue;
+        }
+
+        // OUT URB: recompute every packet length from the fractional sample
+        // accumulator stepped by the current (feedback-adjusted) rate, clamped
+        // to maxFramesPerPacket_ so the preallocated buffer can never overflow.
         uint8_t* buf = reinterpret_cast<uint8_t*>(urb->buffer);
         const size_t mask = ringMask_;
         size_t readPos = ringRead_.load(std::memory_order_relaxed);
         uint8_t* dst = buf;
-        for (int p = 0; p < packetsPerUrb_; ++p) {
-            const size_t pktLen = urb->iso_frame_desc[p].length;
+        int urbTotalBytes = 0;
+        const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
+        for (int p = 0; p < urb->number_of_packets; ++p) {
+            frameAccumulator_ += ratePerSec;
+            int framesInPacket = static_cast<int>(frameAccumulator_ / 1000);
+            frameAccumulator_ %= 1000;
+            if (framesInPacket > maxFramesPerPacket_) framesInPacket = maxFramesPerPacket_;
+            const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
+
             const size_t w = ringWrite_.load(std::memory_order_acquire);
             const size_t avail = (w >= readPos) ? (w - readPos) : 0;
-            if (avail >= pktLen) {
+            if (pktLen > 0 && avail >= pktLen) {
                 for (size_t i = 0; i < pktLen; ++i) {
                     dst[i] = ring_[(readPos + i) & mask];
                 }
                 readPos += pktLen;
-            } else {
+            } else if (pktLen > 0) {
                 std::memset(dst, 0, pktLen);
                 underrunCount_.fetch_add(1, std::memory_order_relaxed);
             }
+            urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktLen);
             urb->iso_frame_desc[p].actual_length = 0;
             urb->iso_frame_desc[p].status = 0;
             dst += pktLen;
+            urbTotalBytes += static_cast<int>(pktLen);
         }
+        urb->buffer_length = urbTotalBytes;
         ringRead_.store(readPos, std::memory_order_release);
 
         if (ioctl(fd_, USBDEVFS_SUBMITURB, urb) < 0) {
@@ -489,6 +646,124 @@ double UsbAudioSink::GetBufferedMs() {
     }
     const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_);
     return ringMs + urbMs;
+}
+
+bool UsbAudioSink::setupFeedbackUrbs() {
+#if defined(__linux__) || defined(__ANDROID__)
+    if (feedbackEndpoint_ == 0 || fd_ < 0) return false;
+    if (feedbackPacketSize_ < 4) feedbackPacketSize_ = 4;    // >= HS 16.16 (4 bytes)
+    if (feedbackPacketSize_ > 64) feedbackPacketSize_ = 64;  // clamp pathological sizes
+    numFeedbackUrbs_ = 2;
+    feedbackPacketsPerUrb_ = 4;
+    feedbackUrbStride_ = sizeof(struct usbdevfs_urb) +
+                         static_cast<size_t>(feedbackPacketsPerUrb_) *
+                             sizeof(struct usbdevfs_iso_packet_desc);
+    feedbackUrbStride_ = (feedbackUrbStride_ + 7u) & ~static_cast<size_t>(7u);
+
+    feedbackUrbStorage_.assign(feedbackUrbStride_ * numFeedbackUrbs_, 0);
+    feedbackBuffers_.assign(numFeedbackUrbs_, nullptr);
+    feedbackUrbs_.assign(numFeedbackUrbs_, nullptr);
+    const int fbBufBytes = feedbackPacketSize_ * feedbackPacketsPerUrb_;
+
+    // Phase 1: allocate + initialize every URB (kernel owns none of them yet).
+    for (int i = 0; i < numFeedbackUrbs_; ++i) {
+        auto* urb = reinterpret_cast<struct usbdevfs_urb*>(
+            feedbackUrbStorage_.data() + static_cast<size_t>(i) * feedbackUrbStride_);
+        feedbackBuffers_[i] = new (std::nothrow) uint8_t[fbBufBytes]();
+        if (!feedbackBuffers_[i]) { freeFeedbackResources(); return false; }
+        std::memset(urb, 0, sizeof(struct usbdevfs_urb));
+        urb->type = USBDEVFS_URB_TYPE_ISO;
+        urb->endpoint = static_cast<unsigned char>(feedbackEndpoint_);
+        urb->flags = USBDEVFS_URB_ISO_ASAP;
+        urb->buffer = feedbackBuffers_[i];
+        urb->number_of_packets = feedbackPacketsPerUrb_;
+        urb->usercontext = urb;
+        for (int p = 0; p < feedbackPacketsPerUrb_; ++p) {
+            urb->iso_frame_desc[p].length = static_cast<unsigned int>(feedbackPacketSize_);
+            urb->iso_frame_desc[p].actual_length = 0;
+            urb->iso_frame_desc[p].status = 0;
+        }
+        urb->buffer_length = fbBufBytes;
+        feedbackUrbs_[i] = urb;
+    }
+    // Phase 2: submit. On failure cancel+reap the already-queued URBs so no
+    // buffer is freed while the kernel still owns it, then disable feedback.
+    for (int i = 0; i < numFeedbackUrbs_; ++i) {
+        if (ioctl(fd_, USBDEVFS_SUBMITURB, feedbackUrbs_[i]) < 0) {
+            for (int j = 0; j < i; ++j) {
+                ioctl(fd_, USBDEVFS_DISCARDURB, feedbackUrbs_[j]);
+            }
+            for (int reaped = 0, spin = 0; reaped < i && spin < 200; ++spin) {
+                struct usbdevfs_urb* done = nullptr;
+                if (ioctl(fd_, USBDEVFS_REAPURBNDELAY, &done) < 0) {
+                    if (errno == EAGAIN || errno == EINPROGRESS) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        continue;
+                    }
+                    break;
+                }
+                if (done != nullptr) ++reaped;
+            }
+            freeFeedbackResources();
+            return false;
+        }
+    }
+    return true;
+#else
+    return false;
+#endif
+}
+
+void UsbAudioSink::applyFeedback(const uint8_t* data, int len) {
+    if (data == nullptr || sampleRate_ <= 0) return;
+
+    // Express the DAC's request as a ratio to nominal, independent of the
+    // frame/microframe time base:
+    //   * 3-byte feedback (full-speed) is Q10.14 samples per 1 ms frame.
+    //   * 4-byte feedback (high-speed) is Q16.16 samples per 125 us microframe.
+    // ratio = reported-samples-per-interval / nominal-samples-per-interval.
+    double ratio;
+    if (len >= 4) {
+        const uint32_t v = static_cast<uint32_t>(data[0]) |
+                           (static_cast<uint32_t>(data[1]) << 8) |
+                           (static_cast<uint32_t>(data[2]) << 16) |
+                           (static_cast<uint32_t>(data[3]) << 24);
+        if (v == 0) return;
+        const double samplesPerMicroframe = static_cast<double>(v) / 65536.0;
+        const double nominalPerMicroframe = static_cast<double>(sampleRate_) / 8000.0;
+        if (nominalPerMicroframe <= 0.0) return;
+        ratio = samplesPerMicroframe / nominalPerMicroframe;
+    } else {
+        const uint32_t v = static_cast<uint32_t>(data[0]) |
+                           (static_cast<uint32_t>(data[1]) << 8) |
+                           (static_cast<uint32_t>(data[2]) << 16);
+        if (v == 0) return;
+        const double samplesPerFrame = static_cast<double>(v) / 16384.0;
+        const double nominalPerFrame = static_cast<double>(sampleRate_) / 1000.0;
+        if (nominalPerFrame <= 0.0) return;
+        ratio = samplesPerFrame / nominalPerFrame;
+    }
+
+    // Reject an implausible decode (buggy device / wrong fixed-point format): a
+    // real async DAC deviates from nominal by only tens of ppm.
+    if (ratio < 0.90 || ratio > 1.10) return;
+
+    double target = static_cast<double>(sampleRate_) * ratio;
+    // Hard safety clamp to +/-0.1% of nominal: far above any real crystal error
+    // yet far below anything that could run the ring away within one session.
+    const double lo = static_cast<double>(sampleRate_) * 0.999;
+    const double hi = static_cast<double>(sampleRate_) * 1.001;
+    if (target < lo) target = lo;
+    if (target > hi) target = hi;
+    feedbackRatePerSec_ = static_cast<int>(target + 0.5);
+
+    // TODO(device-test): the FS(10.14)/HS(16.16) selection and the frame vs
+    // microframe time base here follow the USB spec, but real DACs vary (some
+    // report per-frame values on a high-speed feedback endpoint, etc.). The
+    // ratio form + 0.1% clamp keep this safe regardless, but the correction
+    // loop's gain still needs tuning on hardware. The OUT path also sizes iso
+    // packets as 1 ms units; if the device is high-speed (125 us microframe
+    // packets) that pre-existing assumption must be validated on hardware too.
 }
 
 std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(

@@ -36,8 +36,14 @@ import io.flutter.plugin.common.MethodChannel
  *    interface (the normal case) the claim fails cleanly and audio is left
  *    untouched. We never force-detach the kernel driver, which would silence the
  *    device.
- *  - Raw isochronous UAC2 streaming (true bit-perfect DSD512) is NOT
- *    implemented; playback still goes through Android's audio HAL.
+ *  - Raw isochronous UAC2/UAC1 streaming IS implemented (see the direct
+ *    isochronous sink in UsbAudioSink.cpp): on startStreaming the plugin
+ *    force-claims the AudioStreaming interface, selects the alternate setting
+ *    whose FORMAT_TYPE_I matches the requested rate + bit depth, programs the
+ *    DAC's sample clock (UAC2 Clock-Source SET_CUR / UAC1 endpoint SET_CUR),
+ *    and hands the usbfs fd to the native sink which drives the iso OUT endpoint
+ *    directly. It still requires validation against physical hardware. Native
+ *    DSD512 over DoP flows through the same PCM sink; it is not a separate path.
  */
 class UsbExclusivePlugin(
     private val context: Context,
@@ -68,6 +74,13 @@ class UsbExclusivePlugin(
         private const val SELECTOR_VOLUME = 0x02
         private const val BM_GET = 0xA1 // device-to-host, class, interface
         private const val BM_SET = 0x21 // host-to-device, class, interface
+        private const val BM_SET_ENDPOINT = 0x22 // host-to-device, class, endpoint
+
+        // UAC2 Clock-Source sampling-frequency control selector (wValue high byte
+        // of SET_CUR against the AudioControl interface) and the UAC1 endpoint
+        // sampling-frequency control selector.
+        private const val CS_SAM_FREQ_CONTROL = 0x01
+        private const val UAC1_SAMPLING_FREQ_CONTROL = 0x01
         private const val CTRL_TIMEOUT_MS = 1000
     }
 
@@ -753,21 +766,63 @@ class UsbExclusivePlugin(
             return failure("open_failed")
         }
         val parsed = parseViaRawDescriptors(conn) ?: parseViaInterfaces(device)
-        val ep = parsed.streamingEndpoint ?: run {
-            lastStreamResultCode = 5
-            return failure("no_iso_out_endpoint")
+
+        // FIX 3: choose the alternate setting whose FORMAT_TYPE_I subslot size
+        // matches the requested bit depth (and, for UAC1, the requested rate),
+        // instead of blindly streaming the first iso-OUT endpoint with a
+        // UI-derived sample size. `streamBytes` is the device's actual wire
+        // subslot so the native sink packs the matching byte layout.
+        val requestedBytes = when (bitDepth) {
+            24 -> 3
+            32 -> 4
+            else -> 2
         }
-        if (ep.interfaceNumber < 0) {
-            lastStreamResultCode = 5
-            return failure("no_streaming_interface")
+        val epAddress: Int
+        val epInterface: Int
+        val epAlt: Int
+        val streamBytes: Int
+        val selected = selectStreamingFormat(parsed, sampleRate, requestedBytes)
+        if (selected != null) {
+            epAddress = selected.endpointAddress
+            epInterface = selected.interfaceNumber
+            epAlt = selected.altSetting
+            streamBytes = selected.subslotSize
+            if (selected.subslotSize != requestedBytes) {
+                Log.w(
+                    TAG,
+                    "USB: requested ${requestedBytes * 8}-bit unavailable; using " +
+                        "${selected.subslotSize * 8}-bit container (alt ${selected.altSetting})",
+                )
+            }
+        } else if (parsed.altSettingFormats.isNotEmpty()) {
+            // The DAC advertised Type I formats but none accept this rate+depth.
+            // Reject so the caller can renegotiate a supported combination.
+            lastStreamResultCode = 3
+            return failure("format_unsupported")
+        } else {
+            // Parser found no Type I format descriptors (interface-only fallback
+            // or a non-standard DAC): best-effort using the first iso-OUT
+            // endpoint and the UI-derived sample size.
+            val ep = parsed.streamingEndpoint ?: run {
+                lastStreamResultCode = 5
+                return failure("no_iso_out_endpoint")
+            }
+            if (ep.interfaceNumber < 0) {
+                lastStreamResultCode = 5
+                return failure("no_streaming_interface")
+            }
+            epAddress = ep.address
+            epInterface = ep.interfaceNumber
+            epAlt = ep.altSetting
+            streamBytes = requestedBytes
         }
 
         // Prefer the exact (interface, alternate setting) pair that exposes the
-        // isochronous OUT endpoint.
+        // selected isochronous OUT endpoint.
         var iface: UsbInterface? = null
         for (i in 0 until device.interfaceCount) {
             val c = device.getInterface(i)
-            if (c.id == ep.interfaceNumber && c.alternateSetting == ep.altSetting) {
+            if (c.id == epInterface && c.alternateSetting == epAlt) {
                 iface = c
                 break
             }
@@ -775,7 +830,7 @@ class UsbExclusivePlugin(
         if (iface == null) {
             for (i in 0 until device.interfaceCount) {
                 val c = device.getInterface(i)
-                if (c.id == ep.interfaceNumber) {
+                if (c.id == epInterface) {
                     iface = c
                     break
                 }
@@ -811,6 +866,12 @@ class UsbExclusivePlugin(
         try {
             try { conn.setInterface(iface) } catch (_: Exception) {}
 
+            // FIX 1: program the DAC's sample clock. Previously the alt setting
+            // was selected but the clock was never set, so a multi-rate DAC kept
+            // running at whatever rate it last powered up in -> wrong pitch and
+            // continuous drift. Best-effort: a NAK/STALL here is logged, not fatal.
+            setDacSampleRate(conn, parsed, epAddress, sampleRate)
+
             val fd = try { conn.fileDescriptor } catch (_: Exception) { -1 }
             if (fd < 0) {
                 mainHandler.removeCallbacks(watchdog)
@@ -818,15 +879,10 @@ class UsbExclusivePlugin(
                 lastStreamResultCode = 5
                 return failure("no_fd")
             }
-            val bytesPerSample = when (bitDepth) {
-                24 -> 3
-                32 -> 4
-                else -> 2
-            }
             val resultCode = try {
                 nativeUsbStreamStartWithFormat(
-                    fd, ep.address, ep.interfaceNumber, ep.altSetting,
-                    sampleRate, channels, bytesPerSample,
+                    fd, epAddress, epInterface, epAlt,
+                    sampleRate, channels, streamBytes,
                 )
             } catch (e: Throwable) {
                 Log.w(TAG, "nativeUsbStreamStartWithFormat failed: ${e.message}")
@@ -857,6 +913,128 @@ class UsbExclusivePlugin(
             mainHandler.removeCallbacks(watchdog)
             rebindKernelDriver(conn, iface)
             throw e
+        }
+    }
+
+    /**
+     * FIX 3 helper: pick the AudioStreaming alternate setting whose
+     * FORMAT_TYPE_I best matches the requested rate + bit depth.
+     *
+     * Preference among rate-compatible formats on the streaming interface:
+     * exact subslot match, then the smallest larger subslot (a lossless
+     * container up-fit, e.g. a 24-bit source into a 32-bit slot), then the
+     * device's largest subslot. Returns null when the DAC advertised Type I
+     * formats but none accept the requested rate (caller renegotiates), or when
+     * no formats were parsed at all (caller uses the legacy single-endpoint path).
+     */
+    private fun selectStreamingFormat(
+        parsed: UsbAudioControlParser.Result,
+        sampleRate: Int,
+        requestedBytes: Int,
+    ): UsbAudioControlParser.AltSettingFormat? {
+        val asInterface = parsed.streamingInterface
+        val candidates = parsed.altSettingFormats.filter { fmt ->
+            (asInterface == null || fmt.interfaceNumber == asInterface) &&
+                fmt.subslotSize in 2..4 &&
+                // UAC2 alts carry no rate table (rates live in the clock) -> an
+                // empty list means "any rate the clock supports".
+                (fmt.supportedRates.isEmpty() || fmt.supportedRates.contains(sampleRate))
+        }
+        if (candidates.isEmpty()) return null
+        candidates.firstOrNull { it.subslotSize == requestedBytes }?.let { return it }
+        candidates.filter { it.subslotSize > requestedBytes }
+            .minByOrNull { it.subslotSize }?.let { return it }
+        return candidates.maxByOrNull { it.subslotSize }
+    }
+
+    /**
+     * FIX 1: program the DAC sample clock to [sampleRate] before streaming.
+     *
+     * UAC2 issues a Clock-Source SET_CUR(CS_SAM_FREQ_CONTROL) on the
+     * AudioControl interface; UAC1 issues an endpoint SET_CUR against the
+     * iso-OUT endpoint. The request is skipped when the device exposes a single
+     * fixed rate (UAC2 read-only clock, or exactly one UAC1 rate) because
+     * SET_CUR would be rejected. Any NAK/STALL is logged, never fatal: some
+     * DACs still default to the alt setting's rate.
+     */
+    private fun setDacSampleRate(
+        conn: UsbDeviceConnection,
+        parsed: UsbAudioControlParser.Result,
+        endpointAddress: Int,
+        sampleRate: Int,
+    ) {
+        try {
+            when (parsed.uacVersion) {
+                UsbAudioControlParser.UAC2 -> {
+                    val clock = parsed.clockSource
+                    if (clock == null) {
+                        Log.w(TAG, "USB clock: no UAC2 Clock Source parsed; skipping SET_CUR")
+                        return
+                    }
+                    if (!clock.frequencyProgrammable) {
+                        // Read-only clock => fixed single rate; nothing to program.
+                        Log.i(TAG, "USB clock: fixed-rate UAC2 clock; skipping SET_CUR")
+                        return
+                    }
+                    // 4-byte little-endian dwSampleFreq payload.
+                    val data = byteArrayOf(
+                        (sampleRate and 0xFF).toByte(),
+                        ((sampleRate shr 8) and 0xFF).toByte(),
+                        ((sampleRate shr 16) and 0xFF).toByte(),
+                        ((sampleRate shr 24) and 0xFF).toByte(),
+                    )
+                    // Control transfer parameters (UAC2 Clock Source SET_CUR):
+                    //   bmRequestType = 0x21  host->device | class | interface
+                    //   bRequest      = 0x01  SET_CUR
+                    //   wValue        = CS_SAM_FREQ_CONTROL(0x01) << 8 = 0x0100
+                    //   wIndex        = (bClockID << 8) | AudioControl interface
+                    //   wLength       = 4  (dwSampleFreq, little-endian)
+                    val wValue = CS_SAM_FREQ_CONTROL shl 8
+                    val wIndex = (clock.clockId shl 8) or (clock.controlInterface and 0xFF)
+                    val sent = conn.controlTransfer(
+                        BM_SET, REQ_SET_CUR, wValue, wIndex, data, data.size, CTRL_TIMEOUT_MS,
+                    )
+                    if (sent < 0) {
+                        Log.w(TAG, "USB clock: UAC2 SET_CUR($sampleRate) rejected (clockId=${clock.clockId})")
+                    } else {
+                        Log.i(TAG, "USB clock: UAC2 clock set to $sampleRate Hz (clockId=${clock.clockId})")
+                    }
+                }
+                UsbAudioControlParser.UAC1 -> {
+                    // Guard: a UAC1 device advertising exactly one rate is fixed.
+                    if (parsed.supportedRates.size == 1) {
+                        Log.i(TAG, "USB clock: fixed-rate UAC1 endpoint; skipping SET_CUR")
+                        return
+                    }
+                    // 3-byte little-endian tSampleFreq payload.
+                    val data = byteArrayOf(
+                        (sampleRate and 0xFF).toByte(),
+                        ((sampleRate shr 8) and 0xFF).toByte(),
+                        ((sampleRate shr 16) and 0xFF).toByte(),
+                    )
+                    // Control transfer parameters (UAC1 endpoint SET_CUR):
+                    //   bmRequestType = 0x22  host->device | class | endpoint
+                    //   bRequest      = 0x01  SET_CUR
+                    //   wValue        = SAMPLING_FREQ_CONTROL(0x01) << 8 = 0x0100
+                    //   wIndex        = iso-OUT endpoint address
+                    //   wLength       = 3  (tSampleFreq, little-endian)
+                    val wValue = UAC1_SAMPLING_FREQ_CONTROL shl 8
+                    val wIndex = endpointAddress and 0xFF
+                    val sent = conn.controlTransfer(
+                        BM_SET_ENDPOINT, REQ_SET_CUR, wValue, wIndex, data, data.size, CTRL_TIMEOUT_MS,
+                    )
+                    if (sent < 0) {
+                        Log.w(TAG, "USB clock: UAC1 endpoint SET_CUR($sampleRate) rejected (ep=0x${endpointAddress.toString(16)})")
+                    } else {
+                        Log.i(TAG, "USB clock: UAC1 endpoint rate set to $sampleRate Hz")
+                    }
+                }
+                else -> {
+                    Log.i(TAG, "USB clock: UAC version ${parsed.uacVersion} has no programmable clock path")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "USB clock: SET_CUR threw: ${e.message}")
         }
     }
 
