@@ -1,0 +1,59 @@
+// Copyright (C) 2016 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+if (gradle.ext.has("androidxMediaSettingsDir")) {
+    apply from: "$gradle.ext.androidxMediaSettingsDir/common_library_config.gradle"
+} else {
+    apply plugin: 'com.android.library'
+    android {
+        compileSdk 35
+        defaultConfig {
+            minSdk 21
+            consumerProguardFiles 'proguard-rules.txt'
+        }
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_17
+            targetCompatibility JavaVersion.VERSION_17
+        }
+    }
+}
+
+android {
+    namespace 'androidx.media3.decoder.flac'
+
+    sourceSets {
+        main {
+            jniLibs.srcDir 'src/main/libs'
+            jni.srcDirs = [] // Disable the automatic ndk-build call by Android Studio.
+        }
+    }
+}
+
+dependencies {
+    if (gradle.ext.has("androidxMediaSettingsDir")) {
+        implementation project(modulePrefix + 'lib-decoder')
+        implementation project(modulePrefix + 'lib-exoplayer')
+        implementation 'androidx.annotation:annotation:' + androidxAnnotationVersion
+        compileOnly 'org.checkerframework:checker-qual:' + checkerframeworkVersion
+        compileOnly 'org.jetbrains.kotlin:kotlin-annotations-jvm:' + kotlinAnnotationsVersion
+    } else {
+        def media3Version = '1.4.1'
+        implementation "androidx.media3:media3-decoder:$media3Version"
+        implementation "androidx.media3:media3-exoplayer:$media3Version"
+        implementation "androidx.media3:media3-extractor:$media3Version"
+        implementation "androidx.media3:media3-common:$media3Version"
+        implementation "androidx.annotation:annotation:1.8.0"
+        compileOnly "org.checkerframework:checker-qual:3.42.0"
+    }
+}

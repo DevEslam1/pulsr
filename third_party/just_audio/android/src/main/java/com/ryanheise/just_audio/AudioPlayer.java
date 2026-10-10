@@ -1093,6 +1093,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             // keeps the historical 16-bit-only sink.
             renderersFactoryImpl.setEnableAudioFloatOutput(
                 floatOutputEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
+            renderersFactoryImpl.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER);
             RenderersFactory renderersFactory = (eventHandler, videoListener, audioListener, textOutput, metadataOutput) -> {
                 Renderer[] defaultRenderers = renderersFactoryImpl
                     .createRenderers(eventHandler, videoListener, audioListener, textOutput, metadataOutput);

@@ -52,3 +52,10 @@ app.*.map.json
 *.hprof
 *.exe
 *.o
+
+# Vendored media3: the full upstream clone (~846MB — demos, all libraries, and
+# the ~160MB FFmpeg decoder source that has no prebuilt libs and is not in the
+# build) is kept LOCAL-ONLY. The one module we ship, the FLAC decoder with its
+# prebuilt libflacJNI.so, is relocated to third_party/media3-flac-decoder/ and
+# committed from there.
+third_party/media3/

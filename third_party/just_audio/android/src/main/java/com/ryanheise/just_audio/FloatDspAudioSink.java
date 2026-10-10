@@ -31,6 +31,16 @@ import java.nio.ShortBuffer;
 @androidx.media3.common.util.UnstableApi
 final class FloatDspAudioSink extends ForwardingAudioSink {
     private static final String TAG = "FloatDspAudioSink";
+    // Hi-res truth probe: the decoded PCM encoding/rate/channels of the most
+    // recent configure, so playback code reports the REAL decoded depth instead
+    // of the requested one. FLAC via the libflac extension reports 24/32-bit
+    // here; a silent fallback to the platform FLAC decoder shows 16-bit. Read
+    // these statics from app code (e.g. a method-channel getter) or watch the
+    // TAG log line. (This covers the default float-DSP path; the AAudio-exclusive
+    // path replaces this sink and is not probed here.)
+    public static volatile int lastDecodedPcmEncoding = C.ENCODING_INVALID;
+    public static volatile int lastDecodedSampleRate = 0;
+    public static volatile int lastDecodedChannelCount = 0;
     // Pre-sized so handleBuffer never allocates in steady state.
     private static final int PRESIZE_SAMPLES = 32768;
 
@@ -76,6 +86,14 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         pendingOutput = null;
         pendingInput = null;
         inputEncoding = format.pcmEncoding;
+
+        // Hi-res truth probe (see field docs): record what the DECODER actually
+        // produced for this format, before the supported/bypass branches below.
+        lastDecodedPcmEncoding = format.pcmEncoding;
+        lastDecodedSampleRate = format.sampleRate;
+        lastDecodedChannelCount = format.channelCount;
+        Log.i(TAG, "decoded PCM " + pcmEncodingName(format.pcmEncoding)
+                + " @ " + format.sampleRate + " Hz, " + format.channelCount + "ch");
 
         final int encoding = format.pcmEncoding;
         final boolean supported = encoding == C.ENCODING_PCM_FLOAT
@@ -251,5 +269,16 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         converted = ByteBuffer.allocateDirect(capacitySamples * 4).order(ByteOrder.nativeOrder());
         convertedFloats = converted.asFloatBuffer();
         decodeScratch = new float[capacitySamples];
+    }
+
+    /** Human-readable name for a C.ENCODING_PCM_* value (hi-res truth probe). */
+    static String pcmEncodingName(int encoding) {
+        switch (encoding) {
+            case C.ENCODING_PCM_16BIT: return "16-bit";
+            case C.ENCODING_PCM_24BIT: return "24-bit";
+            case C.ENCODING_PCM_32BIT: return "32-bit";
+            case C.ENCODING_PCM_FLOAT: return "float";
+            default: return "enc#" + encoding;
+        }
     }
 }
