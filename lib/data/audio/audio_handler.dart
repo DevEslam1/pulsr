@@ -1064,7 +1064,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         (prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
     _volumeController?.updateSettings(
       userVolume: _volume,
-      replayGainMode: prefs?.getString(PrefsKeys.replayGainMode) ?? 'track',
+      replayGainMode: prefs?.getString(PrefsKeys.replayGainMode) ?? 'off',
       preampWithRg: prefs?.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
       preampWithoutRg:
           prefs?.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? 0.0,
@@ -1124,7 +1124,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     final dvc = _dvcEnabled;
     var scaled = ReplayGainMath.apply(
-      mode: prefs.getString(PrefsKeys.replayGainMode) ?? 'track',
+      mode: prefs.getString(PrefsKeys.replayGainMode) ?? 'off',
       volume: dvc ? 1.0 : _volume,
       trackGainDb: song.replayGainTrack,
       trackPeak: song.replayGainTrackPeak,
@@ -1221,7 +1221,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       await disableNative();
       return;
     }
-    final mode = prefs.getString(PrefsKeys.replayGainMode) ?? 'track';
+    final mode = prefs.getString(PrefsKeys.replayGainMode) ?? 'off';
     if (mode == 'off') {
       await disableNative();
       return;

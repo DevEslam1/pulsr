@@ -121,6 +121,9 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         bitDepth: song?.bitDepth ?? 0,
       ),
       deviceSupportsBitPerfect: device.isBitPerfectSupported,
+      // No-conflict guard: never auto-engage bit-perfect (which bypasses the
+      // whole DSP chain) while the user has any coloring DSP active.
+      hasActiveDspEffect: _getState().isDspActive,
     );
     try {
       if (plan.preferBitPerfect) {

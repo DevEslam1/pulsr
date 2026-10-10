@@ -313,7 +313,9 @@ class EqualizerManager {
   bool isBitPerfectBypass = false;
 
   /// TPDF dither mirror (native stage; skipped on BT routes automatically).
-  bool isDitherEnabled = false;
+  /// Default ON: it improves the final quantisation to a 16-bit sink and is
+  /// a no-op on paths that do not requantise (and on a bit-perfect bypass).
+  bool isDitherEnabled = true;
   int ditherTargetBitDepth = 16;
 
   /// Whether the current output route is Bluetooth. Updated from the existing
@@ -1413,7 +1415,11 @@ class EqualizerManager {
     _syncPipeline();
   }
 
-  bool autoLoudnessContour = true;
+  // Default OFF so the first-launch chain is strictly neutral at EVERY volume —
+  // nothing auto-applies a tonal change without the user opting in. The loudness
+  // contour is a manual toggle (and, when enabled, is system-volume-driven); set
+  // this true only if auto equal-loudness-at-low-volume is explicitly wanted.
+  bool autoLoudnessContour = false;
   bool _autoLoudnessEngaged = false;
   double autoLoudnessLowThreshold = 0.3;
   double autoLoudnessHighThreshold = 0.5;

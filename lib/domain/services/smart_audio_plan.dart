@@ -86,6 +86,7 @@ SmartAudioPlan resolveSmartAudioPlan({
   String? matchedHeadphoneProfileId,
   bool trackIsHiRes = false,
   bool deviceSupportsBitPerfect = false,
+  bool hasActiveDspEffect = false,
 }) {
   if (mode == SmartAudioMode.manual) {
     return SmartAudioPlan(
@@ -122,10 +123,14 @@ SmartAudioPlan resolveSmartAudioPlan({
   }
 
   // Wired/USB, hi-res track, exclusive output supported, and no correction
-  // requested -> hand over to bit-perfect. If a correction exists, keeping the
-  // DSP chain (and thus the correction) wins over raw bit-perfect output.
+  // requested -> hand over to bit-perfect. If a correction exists OR any user
+  // DSP effect is active, keeping the DSP chain wins over raw bit-perfect
+  // output: bit-perfect bypasses the whole DSP chain, so engaging it would
+  // silently mute the user's active EQ/effects (the no-conflict rule: never
+  // bit-perfect ON together with a DSP effect ON).
   if (deviceSupportsBitPerfect &&
       trackIsHiRes &&
+      !hasActiveDspEffect &&
       matchedHeadphoneProfileId == null &&
       manualHeadphoneProfileId == null) {
     return SmartAudioPlan(

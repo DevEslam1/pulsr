@@ -142,7 +142,9 @@ void main() {
       addTearDown(cubit.close);
       await cubit.preferencesReady;
 
-      expect(cubit.state.replayGainMode, ReplayGainMode.track);
+      // An unknown stored mode now falls back to the neutral default (OFF),
+      // matching the clean first-launch signal path.
+      expect(cubit.state.replayGainMode, ReplayGainMode.off);
       expect(cubit.state.replayGainPreampWithRg, 0.0);
       expect(cubit.state.dsdOutputMode, DsdOutputMode.pcm);
       // Bit-perfect + crossfade > 0 is normalized to 0 and persisted.

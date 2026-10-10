@@ -99,7 +99,10 @@ abstract class SettingsState with _$SettingsState {
     NowPlayingDoubleTapAction nowPlayingDoubleTap,
     @Default(NowPlayingArtworkSwipeAction.nextPrev)
     NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-    @Default(ReplayGainMode.track) ReplayGainMode replayGainMode,
+    // Default OFF for a pure, bit-transparent first-launch signal path:
+    // ReplayGain alters playback level (and, with a preamp, tone). Users who
+    // want consistent loudness can switch it to track/album/auto.
+    @Default(ReplayGainMode.off) ReplayGainMode replayGainMode,
     @Default(0.0) double replayGainPreampWithRg,
     @Default(-3.0) double replayGainPreampWithoutRg,
     @Default(YtmAudioQuality.high) YtmAudioQuality streamingQuality,
@@ -149,7 +152,10 @@ abstract class SettingsState with _$SettingsState {
     @Default(0.20) double reverbWetDry,
     @Default(0.0) double stereoBalance,
     @Default(false) bool monoMix,
-    @Default(true) bool sincResamplerEnabled,
+    // Default OFF: no resampling on the default path, so a track's native rate
+    // is preserved end-to-end (the resampler only engages when the user turns
+    // it on; the native resampler default already matches this).
+    @Default(false) bool sincResamplerEnabled,
     @Default('native') String dspPreference,
     // System audio effects (Dolby Atmos / vendor)
     @Default('auto') String systemEffectsPolicy,

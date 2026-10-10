@@ -74,6 +74,35 @@ void main() {
       expect(plan.preferBitPerfect, isFalse);
     });
 
+    test('an active user DSP effect blocks auto bit-perfect (no-conflict rule)',
+        () {
+      final plan = resolveSmartAudioPlan(
+        mode: SmartAudioMode.auto,
+        device: _device(
+            name: 'USB DAC', type: 'usb', isBluetooth: false, bitPerfect: true),
+        trackIsHiRes: true,
+        deviceSupportsBitPerfect: true,
+        hasActiveDspEffect: true,
+      );
+      expect(plan.decision, SmartAudioDecision.dsp);
+      expect(plan.preferBitPerfect, isFalse);
+      expect(plan.keepDsp, isTrue);
+    });
+
+    test('no active DSP effect still hands a hi-res wired DAC to bit-perfect',
+        () {
+      final plan = resolveSmartAudioPlan(
+        mode: SmartAudioMode.auto,
+        device: _device(
+            name: 'USB DAC', type: 'usb', isBluetooth: false, bitPerfect: true),
+        trackIsHiRes: true,
+        deviceSupportsBitPerfect: true,
+        hasActiveDspEffect: false,
+      );
+      expect(plan.decision, SmartAudioDecision.bitPerfect);
+      expect(plan.preferBitPerfect, isTrue);
+    });
+
     test('a manual profile overrides the auto-matched one', () {
       final plan = resolveSmartAudioPlan(
         mode: SmartAudioMode.auto,

@@ -323,7 +323,7 @@ extension EqualizerRestoreOps on EqualizerManager {
       final bitPerfect = prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false;
       final bypassDsp = prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true;
       isBitPerfectBypass = bitPerfect && bypassDsp;
-      isDitherEnabled = prefs.getBool(PrefsKeys.ditherEnabled) ?? false;
+      isDitherEnabled = prefs.getBool(PrefsKeys.ditherEnabled) ?? true;
       ditherTargetBitDepth = prefs.getInt(PrefsKeys.ditherTargetBitDepth) ?? 16;
       if (ditherTargetBitDepth != 16 &&
           ditherTargetBitDepth != 24 &&

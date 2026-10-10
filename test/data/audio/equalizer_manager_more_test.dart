@@ -162,6 +162,9 @@ void main() {
   test('auto loudness contour engages and disengages with the volume stage',
       () async {
     final manager = await newManager();
+    // Auto equal-loudness is opt-in (default OFF for a neutral first-launch
+    // chain); enable it to exercise the auto engage/disengage behavior.
+    manager.autoLoudnessContour = true;
     await manager.updateLoudnessVolume(0.2);
     expect(manager.isLoudnessContourEnabled, isTrue);
     expect(manager.loudnessContourIntensity, closeTo(0.6, 1e-9));

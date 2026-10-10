@@ -395,10 +395,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   ]) async {
     final current = baseState ?? state;
     final replayGainModeStr =
-        prefs.getString(_keyReplayGainMode) ?? ReplayGainMode.track.name;
+        prefs.getString(_keyReplayGainMode) ?? ReplayGainMode.off.name;
     final replayGainMode = ReplayGainMode.values.firstWhere(
       (e) => e.name == replayGainModeStr,
-      orElse: () => ReplayGainMode.track,
+      orElse: () => ReplayGainMode.off,
     );
     final replayGainPreampWithRgRaw =
         prefs.getDouble(_keyReplayGainPreampWithRg) ?? 0.0;

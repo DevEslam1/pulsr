@@ -29,7 +29,7 @@ class PlayerPrefs {
       _prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true;
 
   String get replayGainMode =>
-      _prefs?.getString(PrefsKeys.replayGainMode) ?? 'track';
+      _prefs?.getString(PrefsKeys.replayGainMode) ?? 'off';
 
   double get replayGainPreampWithRg =>
       _prefs?.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0;
