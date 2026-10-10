@@ -46,6 +46,13 @@ extension EqualizerSnapshotOps on EqualizerManager {
       'eqBandCount': eqBandCount,
       'presetName': currentPreset.name,
       'gains': List<double>.from(currentPreset.gains),
+      // User-customized 10-band center frequencies. The gains above are only
+      // meaningful against the centers they were drawn on, so a snapshot taken
+      // with a moved band layout must carry it; otherwise recall replays the
+      // curve on the default ISO centers (see [applyEffectsState]).
+      'customFrequencies': List<double>.from(customFrequencies),
+      'custom32Frequencies': List<double>.from(custom32Frequencies),
+      'custom64Frequencies': List<double>.from(custom64Frequencies),
       'bassBoost': currentPreset.bassBoost,
       'preampDb': preampDb,
       'volumeBoost': volumeBoost,
@@ -187,6 +194,44 @@ extension EqualizerSnapshotOps on EqualizerManager {
           category: 'EqualizerManager',
         );
       }
+    }
+
+    // Custom band-center frequencies first — BEFORE the band plan and preset
+    // below. setBandMode / setPreset rebuild the curve against
+    // `activeFrequencies` (which, in the 10-band plan, IS `customFrequencies`),
+    // so a snapshot taken with a user-customized layout would otherwise replay
+    // its gains on the default ISO centers. Restore only a non-empty list whose
+    // length matches the 10-band plan; older snapshots lacking the key keep the
+    // current in-memory centers (prior behavior). setCustomFrequencies also
+    // re-validates and persists the restored layout.
+    final capturedFreqs = (m['customFrequencies'] as List?)
+        ?.whereType<num>()
+        .map((e) => e.toDouble())
+        .toList();
+    if (capturedFreqs != null &&
+        isValidCustomFrequencyList(
+            capturedFreqs, EqPreset.centerFrequencies.length)) {
+      await setCustomFrequencies(capturedFreqs);
+    }
+    // Same restore for the 32- and 64-band custom layouts (active when the
+    // recalled plan is 32/64), so a moved dense layout also survives recall.
+    final captured32 = (m['custom32Frequencies'] as List?)
+        ?.whereType<num>()
+        .map((e) => e.toDouble())
+        .toList();
+    if (captured32 != null &&
+        isValidCustomFrequencyList(
+            captured32, EqPreset.iso32BandFrequencies.length)) {
+      await setCustom32Frequencies(captured32);
+    }
+    final captured64 = (m['custom64Frequencies'] as List?)
+        ?.whereType<num>()
+        .map((e) => e.toDouble())
+        .toList();
+    if (captured64 != null &&
+        isValidCustomFrequencyList(
+            captured64, EqPreset.iso64Frequencies.length)) {
+      await setCustom64Frequencies(captured64);
     }
 
     // Band plan first so the curve is interpreted against the right centers.

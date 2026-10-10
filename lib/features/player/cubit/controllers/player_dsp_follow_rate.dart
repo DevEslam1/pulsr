@@ -5,6 +5,11 @@ extension PlayerDspFollowRate on PlayerDspController {
   /// changes) through a mutex so overlapping native output-format switches
   /// apply in strict order instead of racing one another.
   Future<void> maybeFollowTrackSampleRate(SongsTableData song) async {
+    // Track start: re-evaluate codec-aware music compensation (fix #2) so each
+    // new track picks up the current route's codec adaptation (and so a route
+    // whose EQ base changed between tracks is re-merged). Fire-and-forget and
+    // idempotent; no-ops on non-lossy / ultra-HQ / wired routes.
+    unawaited(applyCodecAwareMusicCompensation());
     final service = _hiResAudioService;
     if (service == null || _settingsCubit == null) return;
     await _followSampleRateMutex.protect(() async {

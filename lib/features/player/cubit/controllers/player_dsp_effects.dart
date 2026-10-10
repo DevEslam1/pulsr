@@ -426,6 +426,14 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         feedDb != null ? DspParamRanges.crossfeedFeedDb.clampRaw(feedDb) : null;
     final clampedMode =
         mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : null;
+    // Route-gating (fix #1): crossfeed is a headphone-imaging effect that
+    // collapses the stereo image on speakers / car / HDMI. The user's stored
+    // preference stays in state.isCrossfeedEnabled (never overwritten here);
+    // only the value PUSHED to the engine is gated so it auto-bypasses off a
+    // headphone route and restores on one. onOutputDeviceChanged re-pushes the
+    // gated value on every route change (see reevaluateCrossfeedForRoute).
+    final effective =
+        enabled && PlayerDspController.routeWantsCrossfeed(currentOutputInfo());
     return applyDspEffect(
       featureName: 'Crossfeed',
       guardCondition: enabled,
@@ -435,7 +443,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         crossfeedFeedDb: clampedFeed ?? dsp.crossfeedFeedDb,
         crossfeedMode: clampedMode ?? dsp.crossfeedMode,
       ),
-      applyAudioHandler: () => _audioHandler.setCrossfeed(enabled,
+      applyAudioHandler: () => _audioHandler.setCrossfeed(effective,
           delayUs: clampedDelay, feedDb: clampedFeed, mode: clampedMode),
     );
   }
@@ -545,8 +553,22 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         if (await file.length() > PlayerDspController.maxIrFileSizeBytes) {
           throw Exception('IR WAV file exceeds 25 MB limit');
         }
-        final samples = await IrFileParser.parseWavFile(file);
-        if (await loadCustomImpulseResponse(samples)) {
+        // Parse the IR together with its native sample rate, then reconcile it
+        // to the engine's active output rate BEFORE handing it to native
+        // convolution. The convolution core treats the taps it receives as
+        // already being at the engine rate, so a 44.1 kHz IR pushed unchanged
+        // while the engine runs at 48/96/192 kHz would convolve at the wrong
+        // rate (shifted frequency response + wrong RT60). High-quality
+        // windowed-sinc resampling keeps the room signature intact.
+        // device-validate: exercises real output rates only on hardware.
+        final irData = await IrFileParser.parseWavFileWithInfo(file);
+        final engineRate = _engineActiveSampleRate();
+        final samples = (irData.sampleRate > 0 &&
+                engineRate > 0 &&
+                irData.sampleRate != engineRate)
+            ? IrFileParser.resample(irData.samples, irData.sampleRate, engineRate)
+            : irData.samples;
+        if (samples.isNotEmpty && await loadCustomImpulseResponse(samples)) {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(PrefsKeys.customReverbIrPath, file.path);
         }

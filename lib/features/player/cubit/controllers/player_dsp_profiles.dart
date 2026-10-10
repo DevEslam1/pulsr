@@ -3,6 +3,14 @@ part of 'player_dsp_controller.dart';
 
 extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> onOutputDeviceChanged(AudioOutputInfo device) async {
+    if (_isClosed()) return;
+    // Route-aware DSP that must track EVERY device/codec change, independent of
+    // the device-profile auto-switch services below (fix #1 crossfeed gating +
+    // fix #2 codec-aware music compensation). Runs before the dedup/early
+    // returns so a codec switch on the same device still re-gates.
+    await reevaluateCrossfeedForRoute(device);
+    if (_isClosed()) return;
+    await applyCodecAwareMusicCompensation();
     final service = _deviceProfileService;
     final profilesService = _settingsProfilesService;
     if (service == null || profilesService == null || _isClosed()) return;
@@ -272,5 +280,156 @@ extension PlayerDspProfilesExtension on PlayerDspController {
         errorMessage: 'Failed to apply profile — reverted to previous settings',
       ),
     ));
+  }
+
+  /// Re-pushes the route-gated crossfeed value to the engine on a route change
+  /// WITHOUT touching the stored user preference (fix #1). The preference lives
+  /// in state.isCrossfeedEnabled; only the engine value is gated so crossfeed
+  /// auto-bypasses on speaker/car/HDMI and restores on headphones/BT.
+  Future<void> reevaluateCrossfeedForRoute(AudioOutputInfo device) async {
+    if (_isClosed()) return;
+    final s = _getState();
+    if (s.isQuranModeEnabled) return; // Quran owns its own chain
+    if (dspBlockedReason() != null) return; // bit-perfect owns the chain
+    final effective =
+        s.isCrossfeedEnabled && PlayerDspController.routeWantsCrossfeed(device);
+    // Avoid a redundant native round-trip when the engine already matches.
+    if (effective == _audioHandler.isCrossfeedEnabled) return;
+    try {
+      await _audioHandler.setCrossfeed(effective,
+          delayUs: s.crossfeedDelayUs,
+          feedDb: s.crossfeedFeedDb,
+          mode: s.crossfeedMode);
+    } catch (e, st) {
+      ErrorLogger.log('Crossfeed route re-evaluation failed',
+          error: e, stackTrace: st, category: 'PlayerDspController');
+    }
+  }
+
+  /// Route/codec-aware DSP for NORMAL music (fix #2). Mirrors the earbud
+  /// adaptation Quran Mode already uses: for lossy Bluetooth (SBC/AAC) it
+  /// overlays a gentle HF/presence lift and trims active reverb; for
+  /// LDAC/aptX-HD/aptX-Adaptive (ultra-high-quality) and all wired/USB routes
+  /// it applies nothing (and reverses anything previously applied). The overlay
+  /// is merged on top of the user's current EQ/reverb (never replacing it) and
+  /// is fully reversible via the _appliedMusicEqComp / _appliedMusicReverbScale
+  /// trackers, so it never fights explicit user EQ or double-applies.
+  ///
+  /// device-validate: codec identity comes from the platform A2DP report; only
+  /// the merge/subtract math is unit-tested here.
+  Future<void> applyCodecAwareMusicCompensation() async {
+    if (_isClosed()) return;
+    final state = _getState();
+    // Quran Mode owns its own codec adaptation (player_playback_options_quran).
+    if (state.isQuranModeEnabled) return;
+    // While a bit-perfect bypass owns the chain the engine ignores DSP writes;
+    // drop tracking so a later unblocked pass recomputes from the true base.
+    if (dspBlockedReason() != null) {
+      _appliedMusicEqComp = null;
+      _appliedMusicReverbScale = 1.0;
+      _musicForcedEqEnabled = false;
+      return;
+    }
+
+    final caps = _earbudService.detect(currentOutputInfo());
+    final wantComp = caps.isLossyBluetooth && !caps.codec.isUltraHighQuality;
+
+    await _applyMusicEqCompensation(caps, wantComp);
+    if (_isClosed()) return;
+    await _applyMusicReverbTrim(caps, wantComp);
+  }
+
+  Future<void> _applyMusicEqCompensation(
+      EarbudCapabilities caps, bool wantComp) async {
+    final state = _getState();
+    final gains = List<double>.from(state.eqPreset.gains);
+    final bandCount = EqPreset.centerFrequencies.length;
+    // The compensation vector is defined on the standard 10-band graphic EQ;
+    // skip (and reverse) in 32-band mode where band indices map to other freqs.
+    final mappable = gains.length == bandCount;
+    final oldComp = _appliedMusicEqComp;
+
+    final newComp = (wantComp && mappable)
+        ? _earbudService.eqCompensation(caps)
+        : List<double>.filled(bandCount, 0.0);
+    final newIsZero = newComp.every((g) => g == 0.0);
+    if (oldComp == null && newIsZero) return; // already clean, nothing to do
+
+    final n = gains.length;
+    // Recover the user's base by removing the comp folded in last time, then
+    // add the new comp. Any user edits since last pass survive as the new base.
+    final effective = List<double>.generate(n, (i) {
+      final old = (oldComp != null && i < oldComp.length) ? oldComp[i] : 0.0;
+      final add = i < newComp.length ? newComp[i] : 0.0;
+      return (gains[i] - old + add).clamp(-15.0, 15.0).toDouble();
+    });
+
+    final activating = !newIsZero;
+    final wasEqEnabled = state.isEqEnabled;
+    bool eqEnabledAfter = wasEqEnabled;
+    try {
+      if (activating && !wasEqEnabled && !_musicForcedEqEnabled) {
+        // Enable EQ so the overlay is audible; remember WE forced it so the
+        // reverse path can restore the user's "EQ off" state.
+        await _audioHandler.setEqualizerEnabled(true);
+        _musicForcedEqEnabled = true;
+      }
+
+      for (var i = 0; i < n; i++) {
+        if ((effective[i] - gains[i]).abs() > 1e-6) {
+          await _audioHandler.setBandGain(i, effective[i]);
+        }
+      }
+
+      if (activating) {
+        eqEnabledAfter = true;
+      } else if (_musicForcedEqEnabled) {
+        await _audioHandler.setEqualizerEnabled(false);
+        _musicForcedEqEnabled = false;
+        eqEnabledAfter = false;
+      }
+
+      if (_isClosed()) return;
+      _appliedMusicEqComp = newIsZero ? null : List<double>.from(newComp);
+      final cur = _getState();
+      _emit(cur.copyWith(
+        dsp: cur.dsp.copyWith(
+          isEqEnabled: eqEnabledAfter,
+          eqPreset: cur.eqPreset.copyWith(gains: effective),
+        ),
+      ));
+    } catch (e, st) {
+      ErrorLogger.log('Codec-aware music EQ compensation failed',
+          error: e, stackTrace: st, category: 'PlayerDspController');
+    }
+  }
+
+  Future<void> _applyMusicReverbTrim(
+      EarbudCapabilities caps, bool wantComp) async {
+    final state = _getState();
+    // Only trim reverb that is actually running; a user who has no reverb is
+    // left untouched. reverbScale is 1.0 (no change) off a lossy-BT route.
+    final newScale = wantComp ? caps.reverbScale.clamp(0.1, 1.0) : 1.0;
+    if (!state.isReverbEnabled) {
+      _appliedMusicReverbScale = 1.0;
+      return;
+    }
+    if ((newScale - _appliedMusicReverbScale).abs() < 1e-6) return;
+    final currentWet = state.reverbWetDry;
+    final baseWet = _appliedMusicReverbScale > 0
+        ? currentWet / _appliedMusicReverbScale
+        : currentWet;
+    final targetWet = (baseWet * newScale).clamp(0.0, 1.0).toDouble();
+    try {
+      await _audioHandler.setReverb(true,
+          preset: state.reverbPreset, wetDry: targetWet);
+      if (_isClosed()) return;
+      _appliedMusicReverbScale = newScale;
+      final cur = _getState();
+      _emit(cur.copyWith(dsp: cur.dsp.copyWith(reverbWetDry: targetWet)));
+    } catch (e, st) {
+      ErrorLogger.log('Codec-aware music reverb trim failed',
+          error: e, stackTrace: st, category: 'PlayerDspController');
+    }
   }
 }

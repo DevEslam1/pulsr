@@ -452,6 +452,54 @@ void main() {
     expect(manager.isSaturationEnabled, isTrue);
   });
 
+  test('snapshot round-trips user-customized band-center frequencies',
+      () async {
+    final manager = await newManager();
+    // Non-standard but valid 10-band centers (finite, > 0), distinct from the
+    // default ISO layout so a replay on default centers would be observable.
+    final custom = List<double>.generate(10, (i) => 25.0 * (i + 1));
+    await manager.setCustomFrequencies(custom);
+    expect(manager.customFrequencies, custom);
+    await manager.setBandGain(2, 6.0); // make the curve non-flat
+
+    final snapshot = manager.captureEffectsState();
+    expect(snapshot['customFrequencies'], custom);
+
+    // Move the live centers back to the default ISO layout, then recall: the
+    // snapshot must put the captured centers back, not replay on ISO.
+    await manager.setCustomFrequencies(
+      List<double>.from(EqPreset.centerFrequencies),
+    );
+    expect(manager.customFrequencies, isNot(equals(custom)));
+
+    await manager.applyEffectsState(snapshot);
+    expect(manager.customFrequencies, custom);
+    // In the 10-band plan the active curve is interpreted against these.
+    expect(manager.activeFrequencies, custom);
+  });
+
+  test('snapshot without the customFrequencies key keeps current centers',
+      () async {
+    final manager = await newManager();
+    final custom = List<double>.generate(10, (i) => 40.0 * (i + 1));
+    await manager.setCustomFrequencies(custom);
+    // Simulate an older snapshot that never captured the key.
+    final legacy = manager.captureEffectsState()..remove('customFrequencies');
+    await manager.applyEffectsState(legacy);
+    expect(manager.customFrequencies, custom);
+  });
+
+  test('snapshot ignores an invalid customFrequencies payload', () async {
+    final manager = await newManager();
+    final custom = List<double>.generate(10, (i) => 55.0 * (i + 1));
+    await manager.setCustomFrequencies(custom);
+    final snapshot = manager.captureEffectsState();
+    // Corrupt the captured layout (wrong length) — recall must not apply it.
+    snapshot['customFrequencies'] = const [1.0, 2.0, 3.0];
+    await manager.applyEffectsState(snapshot);
+    expect(manager.customFrequencies, custom);
+  });
+
   test('degrade to essentials and restore', () async {
     final manager = await newManager();
     await manager.setReverb(true);

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/services/device_profile_service.dart';
+import '../../../../core/services/earbud_optimization_service.dart';
 import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/room_correction_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
@@ -66,6 +67,22 @@ class PlayerDspController {
 
   StreamSubscription<AudioOutputInfo>? _deviceSub;
   DspSlice? _dspSnapshot;
+
+  /// Pure, route-based DSP compensation (crossfeed gating + codec-aware music
+  /// EQ/reverb) runs through [EarbudOptimizationService.detect], whose methods
+  /// are side-effect-free. Constructed directly (same pattern as the
+  /// UsbExclusiveService use in the follow-rate path) because the cubit does
+  /// not inject it into this controller.
+  final EarbudOptimizationService _earbudService = EarbudOptimizationService();
+
+  /// Codec-aware music compensation tracking (fix #2). The compensation is a
+  /// small, reversible overlay merged on top of the user's active EQ/reverb;
+  /// these fields remember exactly what was folded in so a later route/track
+  /// change can recover the true base (subtract-old / add-new) without ever
+  /// double-applying or clobbering the user's own EQ edits.
+  List<double>? _appliedMusicEqComp;
+  bool _musicForcedEqEnabled = false;
+  double _appliedMusicReverbScale = 1.0;
   EqPreset? globalEqBackup;
   HeadphoneProfile? globalHeadphoneProfileBackup;
   bool perSongOverrideActive = false;
@@ -140,6 +157,67 @@ class PlayerDspController {
       device: s.currentOutputDevice,
       aaudioEnabled: s.aaudioOutputEnabled,
     );
+  }
+
+  /// The current output route, preferring the settings cubit's cached device
+  /// (updated on every route change) and falling back to the Hi-Res service's
+  /// last snapshot. Null when neither is available yet.
+  AudioOutputInfo? currentOutputInfo() =>
+      _settingsCubit?.state.currentOutputDevice ??
+      _hiResAudioService?.currentOutputInfo;
+
+  /// The engine's active output sample rate (Hz). Custom impulse responses must
+  /// be resampled to this before native convolution. Falls back to the
+  /// platform native rate, then 48 kHz, and is clamped to a sane range.
+  int _engineActiveSampleRate() {
+    final info = currentOutputInfo();
+    int rate = info?.sampleRate ?? 0;
+    if (rate <= 0) rate = info?.nativeSampleRate ?? 0;
+    if (rate <= 0) rate = 48000;
+    return rate.clamp(8000, IrFileParser.maxSampleRate);
+  }
+
+  /// Crossfeed (headphone imaging) only makes sense on headphone / earbud
+  /// routes; on built-in speakers, car head units and HDMI it collapses the
+  /// stereo image, so it must be bypassed there. Pure + static so it can be
+  /// unit-tested directly (fix #1).
+  ///
+  /// device-validate: route classification relies on the platform-reported
+  /// [AudioOutputInfo.activeDeviceType]; car head units reached over A2DP
+  /// report as `bluetooth` and are treated as headphone-like here.
+  static bool routeWantsCrossfeed(AudioOutputInfo? info) {
+    if (info == null) {
+      // Unknown route: honour the user's preference rather than silently
+      // bypassing. The next concrete device event re-evaluates.
+      return true;
+    }
+    // Explicit headphone/earbud-style transports always want crossfeed.
+    if (info.isBluetooth || info.isLeAudio || info.isUsbDac) return true;
+    final type = info.activeDeviceType.toLowerCase();
+    const speakerLike = <String>[
+      'builtin',
+      'speaker',
+      'hdmi',
+      'car',
+      'automotive',
+      'bus',
+      'aux',
+      'line',
+      'dock',
+    ];
+    if (speakerLike.any(type.contains)) return false;
+    const headphoneLike = <String>[
+      'head', // headphone / headset
+      'wired',
+      'usb',
+      'blue',
+      'ble',
+      'hearing',
+      'bt',
+    ];
+    if (headphoneLike.any(type.contains)) return true;
+    // Unrecognised route: honour the preference (do not silently disable).
+    return true;
   }
 
   /// Rate-specific reason (speed/pitch) so the player can refuse resampling on
