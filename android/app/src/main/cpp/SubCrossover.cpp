@@ -29,7 +29,11 @@ void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGa
     cornerHz_ = newCorner;
     slopeDbPerOct_ = newCascade ? 24.0 : 12.0;
     cascade_ = newCascade;
-    targetSubGain_ = std::clamp(subGain, 0.0, 1.5);
+    // Match the engine sanitizer's ceiling (SanitizeSnapshot clamps subGain to
+    // [0,2.0]) so a sanitized value is never silently re-capped here. The Dart
+    // UI exposes a narrower [0,1.0]; non-UI paths (snapshot restore / direct
+    // JNI) may legitimately present up to 2.0.
+    targetSubGain_ = std::clamp(subGain, 0.0, 2.0);
     subGain_ = targetSubGain_;   // FIX M-5: keep getter in sync
     bassMono_ = bassMono;
     antiPop_ = antiPop;

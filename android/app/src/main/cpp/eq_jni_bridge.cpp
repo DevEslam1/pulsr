@@ -166,6 +166,13 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
             snap.eq.bands[i].q = vQs[i];
             snap.eq.bands[i].type = toFilterType(vTypes[i]);
             snap.eq.bands[i].enabled = true;
+            // A bulk push defines a whole preset's band set but carries no
+            // solo/mute arrays, so reset both. Otherwise a solo or mute left
+            // active by a previously loaded preset silently persists and keeps
+            // muting the freshly loaded one. Per-band type and Q from Dart are
+            // still honored above.
+            snap.eq.bands[i].solo = false;
+            snap.eq.bands[i].mute = false;
         }
     });
 }
@@ -938,6 +945,17 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDitherBluetooth(
         JNIEnv* /* env */, jobject /* thiz */, jboolean isBluetooth) {
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.dither.isBluetooth = isBluetooth;
+    });
+}
+
+// Bluetooth Hi-Res opt-in: permit the dither stage to run on a BT route. Kept
+// separate from nativeSetDitherBluetooth (which only reports the route) so the
+// historical "skip dither on BT" default is preserved unless the user opts in.
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDitherBluetoothAllowed(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean allowed) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.dither.bluetoothEnabled = allowed;
     });
 }
 

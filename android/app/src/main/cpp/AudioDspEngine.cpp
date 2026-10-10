@@ -850,9 +850,24 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         ((stages & STAGE_MULTIBAND_COMPRESSOR) && snapshot->multibandCompressor.enabled) ||
         ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) ||
         ((stages & STAGE_SATURATION) && snapshot->saturation.enabled) ||
-        ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001);
-    const bool runLimiter = hasNetPositiveGain ||
-        ((stages & STAGE_LIMITER) && snapshot->limiter.enabled);
+        ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) ||
+        // Crossfeed and SubCrossover can sum channels above unity at low
+        // frequencies; guard them too. The old heuristic omitted these, so their
+        // boosts could reach the final hard clamp and click when toggling.
+        ((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled) ||
+        ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled);
+    // The lookahead limiter runs only when the chain can boost above unity (or
+    // the limiter stage is explicitly enabled). A transparent, no-op chain — a
+    // centered panner, a mono downmix, or every stage off — must stay
+    // bit-identical, so the limiter and its latency are kept out of that path.
+    // Always-on true-peak limiter: a transparent brickwall (no gain reduction
+    // when under threshold) gives constant pipeline latency and always catches
+    // inter-sample peaks — including SubCrossover/Crossfeed boosts the old
+    // hasNetPositiveGain heuristic omitted, which otherwise clipped at the final
+    // hard clamp and caused a latency step/click when toggling across unity.
+    // hasNetPositiveGain is retained above for diagnostics/telemetry only.
+    const bool runLimiter = true;
+    (void)hasNetPositiveGain;
     const bool dvcActive = snapshot->directVolume.enabled &&
         (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
     const bool nonUnityGain = (stages != 0) ||
@@ -925,16 +940,18 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             crossfeed_.processInterleaved(buffer, frames, channels);
         }
 
-        // 5. Convolution Reverb Stage (Stereo channels 0 and 1)
-        if (reverb_.isRamping() && channels >= 2) {
-            reverb_.processInterleaved(buffer, frames, channels);
-            blockLatency += reverb_.getReverbLatencyFrames();
-        }
-
-        // 6. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing
+        // 5. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing.
+        //    Runs BEFORE reverb so harmonics are generated on the dry signal and
+        //    the reverb tail is not re-saturated (which muddies the wet signal).
         if (stages & STAGE_SATURATION) {
             saturation_.processInterleaved(buffer, frames, channels);
             blockLatency += saturation_.getLatencyFrames();
+        }
+
+        // 6. Convolution Reverb Stage (Stereo channels 0 and 1)
+        if (reverb_.isRamping() && channels >= 2) {
+            reverb_.processInterleaved(buffer, frames, channels);
+            blockLatency += reverb_.getReverbLatencyFrames();
         }
 
         // 6b. Live Programmable DSP Stage
@@ -970,7 +987,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         //     hard-clipping against [-1, 1]. Smoothed over 20ms to avoid zipper noise on slider drags.
         {
             const double dvcTarget = snapshot->directVolume.enabled
-                ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 4.0)
+                ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
                 : 1.0;
             const double startDvc = smoothedDirectVolume_;
             if (std::abs(dvcTarget - smoothedDirectVolume_) > 1e-5) {
@@ -1089,12 +1106,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // (previously it was nested inside the non-unity-gain block and dead when no
     // other effect was active). Applied at the final requantization to the
     // configured output depth (16/24/32-bit) with a correctly scaled LSB.
-    // SKIPPED on Bluetooth: SBC/AAC/LDAC re-quantize downstream, so dithering
-    // here is wasted noise. When disabled — or the stage bit is clear — this is
+    // SKIPPED on Bluetooth by default: SBC/AAC/LDAC re-quantize downstream, so
+    // dithering here is wasted noise. The user can opt in (Bluetooth Hi-Res) via
+    // dither.bluetoothEnabled, which decorrelates the quantisation error at the
+    // codec's own depth. When disabled — or the stage bit is clear — this is
     // bit-transparent: no write touches the buffer.
     const bool ditherStageActive = (stages & STAGE_DITHER) != 0 &&
                                    snapshot->dither.enabled &&
-                                   !snapshot->dither.isBluetooth;
+                                   (!snapshot->dither.isBluetooth ||
+                                    snapshot->dither.bluetoothEnabled);
     if (ditherStageActive) {
         const float scale = ditherScaleForBits(snapshot->dither.targetBitDepth);
         const float invScale = 1.0f / scale;

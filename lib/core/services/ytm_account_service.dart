@@ -2997,11 +2997,15 @@ class YtmAccountService {
           final renderer =
               node['playlistVideoRenderer'] as Map<String, dynamic>;
           final videoId = renderer['videoId'] as String?;
-          final title = renderer['title']?['runs']?[0]?['text'] as String? ??
-              'Unknown Title';
-          final artist =
-              renderer['shortBylineText']?['runs']?[0]?['text'] as String? ??
-                  'Unknown Artist';
+          final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
+          final title = titleRuns?.isNotEmpty == true
+              ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
+              : 'Unknown Title';
+          final bylineRuns =
+              renderer['shortBylineText']?['runs'] as List<dynamic>?;
+          final artist = bylineRuns?.isNotEmpty == true
+              ? bylineRuns![0]['text'] as String? ?? 'Unknown Artist'
+              : 'Unknown Artist';
           final lengthSeconds =
               int.tryParse(renderer['lengthSeconds']?.toString() ?? '0') ?? 0;
           final thumbnails =

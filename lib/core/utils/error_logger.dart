@@ -65,7 +65,8 @@ class ErrorLogger {
       // instead of an opaque runtime type.
       final classified = resolveAppError(error, stackTrace);
       final errorType = classified.runtimeType.toString();
-      debugPrint('[Pulsr.Error][$category] $sanitizedMessage: $error');
+      debugPrint(
+          '[Pulsr.Error][$category] $sanitizedMessage: ${redactPii(error.toString())}');
       onCrashReported?.call(error, stackTrace, category);
       if (Sentry.isEnabled) {
         Sentry.captureException(

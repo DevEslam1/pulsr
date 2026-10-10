@@ -157,6 +157,10 @@ abstract class SettingsState with _$SettingsState {
     @Default(<String>[]) List<String> systemEffectsBundles,
     // Bluetooth quality & sync
     @Default(150) int bluetoothLatencyOffsetMs,
+    // Bluetooth Hi-Res (best-effort): keeps the app's float path on BT, permits
+    // the native dither stage at the codec depth and aligns the codec rate to
+    // the track. Not bit-perfect — Bluetooth is a lossy codec link.
+    @Default(false) bool bluetoothHiResEnabled,
     // F3/F4/F7/F8/F9/F10
     @Default(true) bool hedgedResolutionEnabled,
     @Default(true) bool adaptiveQualityEnabled,

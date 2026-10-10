@@ -171,9 +171,9 @@ String resolveUiErrorMessage(BuildContext context, String message) {
       message.startsWith('HTTP 401')) {
     return l10n.downloadErrorBotChallenge;
   }
-  if (message.startsWith('This track is unavailable')) {
-    return l10n.downloadErrorUnavailable;
-  }
+  // Note: 'This track is unavailable' is resolved to errYtmUnavailable above;
+  // there is no download context flag here to distinguish the two, so a
+  // download-specific branch would be unreachable dead code.
   if (message.startsWith('Download canceled') ||
       message.startsWith('Download cancelled')) {
     return l10n.downloadErrorInterrupted;

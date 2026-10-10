@@ -2,12 +2,19 @@
 //
 // DoP (DSD over PCM) framing per the DoP Open Standard v1.1.
 //
-// Input : interleaved stereo 1-bit DSD bytes (L0, R0, L1, R1, ...). Every
-//         output DoP stereo frame consumes 2 DSD bytes per channel, so the
-//         input byte length must be divisible by 4.
-// Output: packed 24-bit PCM samples (3 bytes each, little-endian in memory:
-//         DSD0, DSD1, marker) laid out per stereo frame as
-//         [L0, L1, marker, R0, R1, marker] = 6 bytes.
+// Input : interleaved stereo 1-bit DSD bytes, two bytes per channel per frame
+//         laid out as [L_older, L_newer, R_older, R_newer, ...]. The first byte
+//         of each channel pair is temporally OLDER than the second. Every output
+//         DoP stereo frame consumes 2 DSD bytes per channel, so the input byte
+//         length must be divisible by 4.
+// Output: packed 24-bit PCM samples (3 bytes each). Per DoP v1.1 the 24-bit word
+//         is [marker | older DSD byte | newer DSD byte] with the marker in the
+//         MSB and the oldest DSD bit as the MSB of the audio bits. Stored
+//         little-endian in memory that is [newer, older, marker], so each stereo
+//         frame is [L_newer, L_older, marker, R_newer, R_older, marker] = 6 bytes.
+//         This matches the Dart DopEncoder (dop_encoder.dart). The earlier
+//         [older, newer, marker] layout swapped the two DSD bytes in every word,
+//         which a DoP-capable DAC decodes as noise.
 // Markers alternate 0x05 / 0xFA per sample, per the standard. `firstMarker`
 // lets a caller continue an existing alternating stream across buffers.
 //
@@ -43,12 +50,12 @@ inline bool FrameDopInterleaved(const uint8_t* dsd, size_t dsdBytes,
         const uint8_t marker = (i % 2 == 0) ? firstMarker : markerFlip;
         const size_t in = i * 4;
         const size_t on = i * 6;
-        out[on + 0] = dsd[in + 0];   // L DSD0
-        out[on + 1] = dsd[in + 1];   // L DSD1
-        out[on + 2] = marker;
-        out[on + 3] = dsd[in + 2];   // R DSD0
-        out[on + 4] = dsd[in + 3];   // R DSD1
-        out[on + 5] = marker;
+        out[on + 0] = dsd[in + 1];   // L newer DSD byte -> LSB
+        out[on + 1] = dsd[in + 0];   // L older DSD byte -> middle
+        out[on + 2] = marker;        // marker -> MSB
+        out[on + 3] = dsd[in + 3];   // R newer DSD byte -> LSB
+        out[on + 4] = dsd[in + 2];   // R older DSD byte -> middle
+        out[on + 5] = marker;        // marker -> MSB
     }
     *outBytes = needed;
     return true;

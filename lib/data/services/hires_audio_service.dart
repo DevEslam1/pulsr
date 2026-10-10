@@ -427,6 +427,24 @@ class HiResAudioService {
     }
   }
 
+  /// Opens the platform screen where the Bluetooth audio codec can be changed
+  /// (Bluetooth settings first, then Developer Options). Returns true when a
+  /// settings screen was opened. Retail builds cannot write the codec directly
+  /// (SystemApi), so this deep-link is the sanctioned way to reach the control.
+  Future<bool> openBluetoothCodecSettings() async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final bool? ok = await _methodChannel
+          .invokeMethod<bool>('openBluetoothCodecSettings')
+          .timeout(const Duration(seconds: 5));
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('openBluetoothCodecSettings failed',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
   // -- Bluetooth codec control --
 
   Future<bool> setBluetoothCodec(String codec) async {

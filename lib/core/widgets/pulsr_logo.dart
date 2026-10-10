@@ -49,10 +49,19 @@ class _PulsrLogoState extends State<PulsrLogo>
     super.didUpdateWidget(oldWidget);
     if (widget.animate != oldWidget.animate) {
       if (widget.animate) {
-        _controller ??= AnimationController(
+        final c = _controller ??= AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 2400),
-        )..repeat();
+          duration: context.motionMs(2400),
+        );
+        // didChangeDependencies does not fire on a prop-only change, so honor
+        // reduce-motion here instead of unconditionally repeating.
+        if (context.motionEnabled) {
+          c.repeat();
+        } else {
+          c
+            ..stop()
+            ..value = 0;
+        }
       } else {
         _controller?.stop();
       }

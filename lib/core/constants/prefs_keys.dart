@@ -223,6 +223,10 @@ class PrefsKeys {
       'setting_dsp_preference'; // 'native' | 'oem' | 'auto'
   static const String ditherEnabled = 'setting_dither_enabled';
   static const String ditherTargetBitDepth = 'setting_dither_target_bit_depth';
+  // Bluetooth Hi-Res (best-effort): keeps the float path on BT, permits the
+  // native dither stage at the codec depth, and aligns the codec rate to the
+  // track when the codec advertises it. Never bit-perfect (BT is lossy).
+  static const String bluetoothHiResEnabled = 'setting_bluetooth_hires_enabled';
   static const String mqaDecodingEnabled = 'setting_mqa_decoding_enabled';
   static const String customReverbIrPath = 'setting_custom_reverb_ir_path';
   // Snapshot of the user's DSP state captured when Quran Mode is enabled, so

@@ -204,6 +204,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var isDitherEnabled = false
     @Volatile private var ditherTargetBitDepth = 16
     @Volatile private var isBluetoothRoute = false
+    // Bluetooth Hi-Res opt-in: when true the dither stage is permitted on a BT
+    // route (otherwise it is skipped, since the lossy codec re-quantises).
+    @Volatile private var isBluetoothDitherAllowed = false
     @Volatile private var isDopActive = false
     @Volatile private var isReplayGainEnabled = false
 
@@ -419,6 +422,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     )
     private external fun nativeSetDitherParams(enabled: Boolean, targetBitDepth: Int, isBluetooth: Boolean)
     private external fun nativeSetDitherBluetooth(isBluetooth: Boolean)
+    private external fun nativeSetDitherBluetoothAllowed(allowed: Boolean)
     private external fun nativeSetBitPerfectParams(enabled: Boolean, isDop: Boolean)
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
@@ -1360,6 +1364,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // C++ early-return and BT dither-skip match the restored route.
         try { nativeSetBitPerfectParams(false, isDopActive) } catch (_: Exception) {}
         try { nativeSetDitherParams(isDitherEnabled, ditherTargetBitDepth, isBluetoothRoute) } catch (_: Exception) {}
+        try { nativeSetDitherBluetoothAllowed(isBluetoothDitherAllowed) } catch (_: Exception) {}
         recalculateActiveStages()
     }
 
@@ -3150,8 +3155,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     val targetBitDepth = (call.argument<Int>("targetBitDepth") ?: 16).coerceIn(16, 32)
                     val isBt = call.argument<Boolean>("isBluetooth") ?: isBluetoothRoute
+                    val allowBt = call.argument<Boolean>("allowBluetoothDither") ?: isBluetoothDitherAllowed
                     isDitherEnabled = enabled
                     ditherTargetBitDepth = if (targetBitDepth == 24 || targetBitDepth == 32) targetBitDepth else 16
+                    isBluetoothDitherAllowed = allowBt
                     // Dither owns STAGE_DITHER in the mask; refresh it so a lone
                     // dither toggle actually reaches the native stage.
                     recalculateActiveStages()
@@ -3161,6 +3168,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                     try {
                         nativeSetDitherParams(enabled, ditherTargetBitDepth, isBt)
+                        nativeSetDitherBluetoothAllowed(allowBt)
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetDitherParams failed: ${e.message}")

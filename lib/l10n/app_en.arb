@@ -3792,6 +3792,28 @@
   "settingsBitPerfectBtUnavailable": "Unavailable: Bluetooth transcodes — use USB / wired DAC",
   "settingsBitPerfectUsb": "Bit-Perfect USB Pass-Through",
   "settingsBitPerfectUsbDesc": "Direct hardware streaming to USB / wired DACs (bypasses Android resampler)",
+  "settingsBluetoothCodecTitle": "Bluetooth Codec",
+  "settingsBluetoothCodecFallback": "Standard Bluetooth Audio",
+  "settingsBluetoothCodecUnknown": "Codec details unavailable",
+  "settingsBluetoothCodecHigh": "High-quality codec: {codec}",
+  "@settingsBluetoothCodecHigh": {
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBluetoothCodecLow": "{codec} — for best quality use LDAC, aptX HD/Adaptive or LE Audio",
+  "@settingsBluetoothCodecLow": {
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBluetoothLeAudio": "LE Audio",
+  "settingsBluetoothHiRes": "Bluetooth Hi-Res (best-effort)",
+  "settingsBluetoothHiResDesc": "Keeps the float path on, dithers at the codec depth and matches the codec rate. Improves quality, but Bluetooth is lossy and can never be bit-perfect",
   "settingsBpmSyncCrossfade": "BPM-Synced Crossfade",
   "settingsBpmSyncCrossfadeDesc": "Aligns the crossfade duration to the nearest 2/4/8/16/32 beats of the incoming track when its BPM is known (set per track in Song Info); otherwise the configured duration is used",
   "settingsBypassDspBitPerfect": "Bypass DSP in Bit-Perfect Mode",

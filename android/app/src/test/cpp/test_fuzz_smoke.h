@@ -46,7 +46,7 @@ inline void runFuzzHarnessSmokeTest() {
         float buf[512] = {0.25f};
         eq.processInterleaved(buf, 256, 2);
     }
-    std::cout << "  ✓ GraphicEq: 3/3 corpus seeds parsed and processed through 512-tap linear-phase FIR." << std::endl;
+    std::cout << "  ✓ GraphicEq: 3/3 corpus seeds parsed and processed through the linear-phase FIR." << std::endl;
 
     // 2. ViperDdc Seeds
     const std::vector<std::string> vdcSeeds = {

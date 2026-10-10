@@ -225,16 +225,23 @@ class FileIntentHandler {
         }
       }
 
+      // 2. Determine whether this is a proxy/text payload (only relevant when
+      // it isn't a recognized audio file).
+      final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
+          cleanPath.toLowerCase().endsWith('.list') ||
+          cleanPath.toLowerCase().endsWith('.conf') ||
+          cleanPath.toLowerCase().endsWith('.csv');
+      // Android's VIEW/SEND intent filters only route audio/* content:// URIs
+      // here, and such URIs frequently carry no file extension in their last
+      // path segment. Treat an extension-less (non-text) content URI as audio
+      // instead of rejecting it as "format not supported".
+      final isContentUri = uriOrPath.startsWith('content://');
+
       // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
-      if (AudioFormats.isSupportedExtension(cleanPath)) {
+      if (AudioFormats.isSupportedExtension(cleanPath) ||
+          (isContentUri && !isTextExt)) {
         // Proceed directly to audio handling below
       } else {
-        // 2. Only check for proxy/text files if NOT audio
-        final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
-            cleanPath.toLowerCase().endsWith('.list') ||
-            cleanPath.toLowerCase().endsWith('.conf') ||
-            cleanPath.toLowerCase().endsWith('.csv');
-
         if (isTextExt) {
           try {
             final file = File(cleanPath);

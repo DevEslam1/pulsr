@@ -163,6 +163,9 @@ class RadioStationStore {
     final existing = _stations.map((s) => s.url).toSet();
     var added = 0;
     for (final s in curatedDirectory()) {
+      // Respect the same cap as add()/load so importing onto a near-full
+      // user list can't push the store past maxEntries.
+      if (_stations.length >= maxEntries) break;
       if (!existing.contains(s.url)) {
         _stations.add(s);
         added++;

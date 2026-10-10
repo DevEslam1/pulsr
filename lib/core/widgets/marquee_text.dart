@@ -172,6 +172,7 @@ class _MarqueeTextState extends State<MarqueeText> {
         )..layout();
 
         final textWidth = textPainter.width;
+        textPainter.dispose();
         final availableWidth = constraints.maxWidth;
 
         // If text fits, display static text

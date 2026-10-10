@@ -4811,6 +4811,36 @@ class AppLocalizationsEs extends AppLocalizations {
       'Streaming directo a USB / DAC con cable (omite el remuestreador de Android)';
 
   @override
+  String get settingsBluetoothCodecTitle => 'Códec Bluetooth';
+
+  @override
+  String get settingsBluetoothCodecFallback => 'Audio Bluetooth estándar';
+
+  @override
+  String get settingsBluetoothCodecUnknown =>
+      'Detalles del códec no disponibles';
+
+  @override
+  String settingsBluetoothCodecHigh(String codec) {
+    return 'Códec de alta calidad: $codec';
+  }
+
+  @override
+  String settingsBluetoothCodecLow(String codec) {
+    return '$codec — para la mejor calidad usa LDAC, aptX HD/Adaptive o LE Audio';
+  }
+
+  @override
+  String get settingsBluetoothLeAudio => 'LE Audio';
+
+  @override
+  String get settingsBluetoothHiRes => 'Bluetooth Hi-Res (mejor esfuerzo)';
+
+  @override
+  String get settingsBluetoothHiResDesc =>
+      'Mantiene la ruta float activa, aplica dither a la profundidad del códec y ajusta la tasa del códec. Mejora la calidad, pero Bluetooth es con pérdida y nunca puede ser bit-perfect';
+
+  @override
   String get settingsBpmSyncCrossfade => 'Fundido sincronizado por BPM';
 
   @override

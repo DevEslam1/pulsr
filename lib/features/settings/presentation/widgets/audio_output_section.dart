@@ -530,8 +530,8 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
           // ════════════ BLUETOOTH BRANCH ════════════
           SettingsNavTile(
             Icons.bluetooth_audio_rounded,
-            'Bluetooth Codec',
-            dev?.btCodecName ?? 'Standard Bluetooth Audio',
+            context.l10n.settingsBluetoothCodecTitle,
+            dev?.btCodecName ?? context.l10n.settingsBluetoothCodecFallback,
             trailing: Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
@@ -540,7 +540,9 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 borderRadius: AppRadii.r4All,
               ),
               child: Text(
-                dev?.btCodecName ?? 'BT',
+                (dev?.isLeAudio ?? false)
+                    ? 'LE'
+                    : (dev?.btCodecName ?? 'BT'),
                 style: TextStyle(
                   color: p.accent,
                   fontSize: AppFontSize.caption,
@@ -548,7 +550,17 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 ),
               ),
             ),
-            onTap: null,
+            onTap: isAndroid ? () => cubit.openBluetoothCodecSettings() : null,
+          ),
+          _BluetoothQualityHint(device: dev),
+          settingsCardDivider(p),
+          SettingsSwitchTile(
+            Icons.high_quality_rounded,
+            context.l10n.settingsBluetoothHiRes,
+            context.l10n.settingsBluetoothHiResDesc,
+            value: isAndroid && state.bluetoothHiResEnabled,
+            disabledReason: isAndroid ? null : unsupported,
+            onChanged: isAndroid ? cubit.setBluetoothHiResEnabled : (v) {},
           ),
           settingsCardDivider(p),
           SettingsNavTile(
@@ -637,6 +649,62 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
           const BatteryOptimizationCard(),
         ],
       ],
+    );
+  }
+}
+
+/// Compact one-line summary of the active Bluetooth link (items 2/4): codec,
+/// LE Audio, negotiated rate/depth, and whether it is a high-quality codec.
+/// Purely informational — Bluetooth is lossy and can never be bit-perfect.
+class _BluetoothQualityHint extends StatelessWidget {
+  const _BluetoothQualityHint({required this.device});
+
+  final AudioOutputInfo? device;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = device;
+    if (d == null) return const SizedBox.shrink();
+    final p = context.palette;
+    final tier = bluetoothCodecTier(d.btCodecName);
+    final isLe = d.isLeAudio ||
+        (d.btCodecName ?? '').toUpperCase().replaceAll('-', ' ').trim() ==
+            'LC3';
+    final high = tier == BluetoothCodecTier.high;
+    final parts = <String>[
+      if (d.btCodecName != null && d.btCodecName!.isNotEmpty) d.btCodecName!,
+      if (isLe) context.l10n.settingsBluetoothLeAudio,
+      if (d.btSampleRateHz != null)
+        '${(d.btSampleRateHz! / 1000).round()} kHz',
+      if (d.btBitDepth != null) '${d.btBitDepth}-bit',
+    ];
+    final text = parts.isEmpty
+        ? context.l10n.settingsBluetoothCodecUnknown
+        : (high
+            ? context.l10n.settingsBluetoothCodecHigh(parts.join(' · '))
+            : context.l10n.settingsBluetoothCodecLow(parts.join(' · ')));
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            high ? Icons.verified_rounded : Icons.info_outline_rounded,
+            size: 16,
+            color: high ? p.accent : p.textSecondary,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.caption,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1748,8 +1748,9 @@ class AudioEffectsChannel {
   // --- DITHER (TPDF) + BIT-PERFECT SNAPSHOT ---
 
   /// Returns true when the native dither stage accepted the params. Dither is
-  /// intentionally skipped on BT routes by the native side (still "applied").
-  /// Returns false off Android, where there is no native DSP stage.
+  /// skipped on BT routes by the native side unless [allowBluetoothDither] is
+  /// true (the Bluetooth Hi-Res opt-in). Returns false off Android, where there
+  /// is no native DSP stage.
   ///
   /// This is the single reachable dither entry point: it carries the enable
   /// flag, target depth and route together. The old enable-only
@@ -1758,6 +1759,7 @@ class AudioEffectsChannel {
     required bool enabled,
     required int targetBitDepth,
     required bool isBluetooth,
+    bool allowBluetoothDither = false,
   }) async {
     if (!_isAndroid) return false;
     try {
@@ -1766,6 +1768,7 @@ class AudioEffectsChannel {
         'enabled': enabled,
         'targetBitDepth': targetBitDepth,
         'isBluetooth': isBluetooth,
+        'allowBluetoothDither': allowBluetoothDither,
       }).timeout(const Duration(seconds: 2));
       return applied ?? true;
     } catch (e, st) {

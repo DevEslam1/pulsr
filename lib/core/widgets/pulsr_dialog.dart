@@ -48,16 +48,20 @@ class PulsrDialogHelper {
     bool useRootNavigator = true,
     bool barrierDismissible = true,
   }) {
-    PulsrModalTracker.push();
+    // The root PulsrModalObserver (installed on the root navigator) already
+    // counts DialogRoutes via didPush/didPop. Only track manually for a
+    // non-root navigator it can't observe, otherwise the dialog is counted
+    // twice.
+    final trackManually = !useRootNavigator;
+    if (trackManually) PulsrModalTracker.push();
     final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
-    return navigator
-        .push<T>(DialogRoute<T>(
-          context: context,
-          barrierDismissible: barrierDismissible,
-          barrierColor: AppColors.scrimAt(0.55),
-          builder: builder,
-        ))
-        .whenComplete(PulsrModalTracker.pop);
+    final future = navigator.push<T>(DialogRoute<T>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      barrierColor: AppColors.scrimAt(0.55),
+      builder: builder,
+    ));
+    return trackManually ? future.whenComplete(PulsrModalTracker.pop) : future;
   }
 
   /// Premium confirmation dialog (e.g. Delete, Reset, Confirm Action).

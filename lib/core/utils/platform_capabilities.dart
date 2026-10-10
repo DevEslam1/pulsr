@@ -77,9 +77,14 @@ class PlatformCapabilities {
   /// failures fall back to the platform defaults below.
   static Future<void> ensureLoaded() async {
     if (_nativeCache != null || !isAndroid) return;
-    try {
-      _nativeCache = await queryCapabilities();
-    } catch (_) {}
+    // Only cache a genuine native result. A failed/absent query returns null
+    // and leaves _nativeCache == null, so the getters keep applying the
+    // isAndroid platform-default fallback instead of latching all-false for
+    // the rest of the session on a transient MethodChannel failure.
+    final caps = await _queryNativeCapabilitiesOrNull();
+    if (caps != null) {
+      _nativeCache = caps;
+    }
   }
 
   static bool get hasEqualizer => _nativeCache?.hasEqualizer ?? isAndroid;
@@ -95,7 +100,16 @@ class PlatformCapabilities {
     if (!isAndroid) {
       return const AudioCapabilities();
     }
+    // Preserves the historical contract: never throws, falls back to the
+    // all-default capabilities when the native query fails or returns nothing.
+    return await _queryNativeCapabilitiesOrNull() ?? const AudioCapabilities();
+  }
 
+  /// Returns the native capabilities, or null when the platform channel call
+  /// fails or the host returns no data. Lets callers distinguish a genuine
+  /// all-false native result from a transient failure.
+  static Future<AudioCapabilities?> _queryNativeCapabilitiesOrNull() async {
+    if (!isAndroid) return null;
     try {
       const channel = MethodChannel(PulsrChannels.audioEffects);
       final caps =
@@ -104,8 +118,7 @@ class PlatformCapabilities {
         return AudioCapabilities.fromMap(caps);
       }
     } catch (_) {}
-
-    return const AudioCapabilities();
+    return null;
   }
 
   static Future<Map<String, bool>> queryNativeCapabilities() async {

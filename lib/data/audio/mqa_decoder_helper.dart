@@ -147,6 +147,49 @@ class MqaDecoderHelper {
     return outBytes;
   }
 
+  /// Extracts the frame-aligned 24-bit **stereo PCM** payload from a WAV
+  /// container so [coreUnfoldPcm24] operates on real samples. Feeding the whole
+  /// file instead would misread the 44-byte header (44 % 6 != 0) or treat a
+  /// compressed FLAC/ALAC container as PCM — both produce noise. Throws
+  /// [MqaUnsupportedException] for anything that is not decodable 24-bit stereo
+  /// PCM WAV, so the caller falls back to normal playback instead of garbage.
+  static Uint8List _extractPcm24StereoPayload(Uint8List bytes) {
+    if (bytes.length < 44 ||
+        String.fromCharCodes(bytes.sublist(0, 4)) != 'RIFF' ||
+        String.fromCharCodes(bytes.sublist(8, 12)) != 'WAVE') {
+      throw const MqaUnsupportedException(
+        'MQA unfold needs an uncompressed 24-bit WAV payload; this container '
+        'cannot be unfolded in-app — playing it directly instead.',
+      );
+    }
+    final bd = ByteData.sublistView(bytes);
+    int pos = 12;
+    int channels = 2;
+    int bits = 24;
+    int dataOffset = -1;
+    int dataLength = -1;
+    while (pos + 8 <= bytes.length) {
+      final id = String.fromCharCodes(bytes.sublist(pos, pos + 4));
+      final size = bd.getUint32(pos + 4, Endian.little);
+      if (id == 'fmt ') {
+        channels = bd.getUint16(pos + 10, Endian.little);
+        bits = bd.getUint16(pos + 22, Endian.little);
+      } else if (id == 'data') {
+        dataOffset = pos + 8;
+        dataLength = size.clamp(0, bytes.length - dataOffset);
+        break;
+      }
+      pos += 8 + size + (size.isOdd ? 1 : 0);
+    }
+    if (dataOffset < 0 || dataLength <= 0 || bits != 24 || channels != 2) {
+      throw const MqaUnsupportedException(
+        'MQA unfold supports only 24-bit stereo PCM WAV content.',
+      );
+    }
+    final aligned = dataLength - (dataLength % 6); // whole stereo frames
+    return Uint8List.sublistView(bytes, dataOffset, dataOffset + aligned);
+  }
+
   /// Maximum allowed file size for in-memory MQA decoding (300 MB) (Bug 6 & 18).
   static const int kMaxInMemoryDecodeBytes = 300 * 1024 * 1024;
 
@@ -197,7 +240,8 @@ class MqaDecoderHelper {
       final res = await testUnfold!(bytes, originalRate: inputRate);
       unfolded = res ?? bytes;
     } else {
-      unfolded = coreUnfoldPcm24(pcm24Bytes: bytes, inputSampleRate: inputRate);
+      final pcm = _extractPcm24StereoPayload(bytes);
+      unfolded = coreUnfoldPcm24(pcm24Bytes: pcm, inputSampleRate: inputRate);
     }
 
     final wavHeader = buildWavHeader(

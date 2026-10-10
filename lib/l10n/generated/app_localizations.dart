@@ -8615,6 +8615,54 @@ abstract class AppLocalizations {
   /// **'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)'**
   String get settingsBitPerfectUsbDesc;
 
+  /// No description provided for @settingsBluetoothCodecTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Codec'**
+  String get settingsBluetoothCodecTitle;
+
+  /// No description provided for @settingsBluetoothCodecFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Bluetooth Audio'**
+  String get settingsBluetoothCodecFallback;
+
+  /// No description provided for @settingsBluetoothCodecUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Codec details unavailable'**
+  String get settingsBluetoothCodecUnknown;
+
+  /// No description provided for @settingsBluetoothCodecHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High-quality codec: {codec}'**
+  String settingsBluetoothCodecHigh(String codec);
+
+  /// No description provided for @settingsBluetoothCodecLow.
+  ///
+  /// In en, this message translates to:
+  /// **'{codec} — for best quality use LDAC, aptX HD/Adaptive or LE Audio'**
+  String settingsBluetoothCodecLow(String codec);
+
+  /// No description provided for @settingsBluetoothLeAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'LE Audio'**
+  String get settingsBluetoothLeAudio;
+
+  /// No description provided for @settingsBluetoothHiRes.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Hi-Res (best-effort)'**
+  String get settingsBluetoothHiRes;
+
+  /// No description provided for @settingsBluetoothHiResDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps the float path on, dithers at the codec depth and matches the codec rate. Improves quality, but Bluetooth is lossy and can never be bit-perfect'**
+  String get settingsBluetoothHiResDesc;
+
   /// No description provided for @settingsBpmSyncCrossfade.
   ///
   /// In en, this message translates to:

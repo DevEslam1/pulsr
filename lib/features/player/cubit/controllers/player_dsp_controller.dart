@@ -12,6 +12,7 @@ import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
+import '../../../../data/audio/bluetooth_quality_policy.dart';
 import '../../../../data/audio/comparison_slot.dart';
 import '../../../../data/audio/dsp_param_ranges.dart';
 import '../../../../data/audio/gain_staging_budget.dart';
@@ -126,6 +127,9 @@ class PlayerDspController {
   int? _lastFollowedSampleRate;
   int? _lastFollowedBitDepth;
   String? _lastFollowedRoute;
+  // Last codec rate requested by the Bluetooth Hi-Res alignment, so a track
+  // that already matches the codec does not trigger a redundant switch.
+  int? _lastFollowedBtCodecRate;
 
   String? dspBlockedReason() {
     final s = _settingsCubit?.state;

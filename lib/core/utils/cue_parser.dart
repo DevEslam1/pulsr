@@ -21,7 +21,7 @@ class CueParser {
     final trackRegex =
         RegExp(r'^\s*TRACK\s+(\d+)\s+AUDIO', caseSensitive: false);
     final titleRegex = RegExp(r'^\s*TITLE\s+"?([^"]+)"?', caseSensitive: false);
-    final indexRegex = RegExp(r'^\s*INDEX\s+01\s+(\d{2}):(\d{2}):(\d{2})',
+    final indexRegex = RegExp(r'^\s*INDEX\s+01\s+(\d{2,}):(\d{2}):(\d{2})',
         caseSensitive: false);
 
     void savePrevious() {

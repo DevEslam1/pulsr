@@ -10,17 +10,24 @@
 
 class ArbitraryResponseEq {
 public:
-    static constexpr int FIR_TAPS = 512;
-    static constexpr int FFT_SIZE = FIR_TAPS * 2; // 1024
+    // 1024 taps / 2048-pt FFT gives ~23 Hz bins for better sub-150 Hz accuracy
+    // than the old 512/1024. FIR_TAPS stays a multiple of 8 for the SIMD stride.
+    static constexpr int FIR_TAPS = 1024;
+    static constexpr int FFT_SIZE = FIR_TAPS * 2; // 2048
     static constexpr int MAX_NODES = 1024;
 
     ArbitraryResponseEq();
     void setSampleRate(double sampleRate, bool resynthesize = true);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
-    // The symmetric 512-tap FIR has a 255.5-frame group delay; integer
-    // transport reports round up so compensation never underestimates it.
-    int getLatencyFrames() const { return enabled_ && hasResponse_ ? FIR_TAPS / 2 : 0; }
+    // Linear-phase mode uses a symmetric FIR with an (FIR_TAPS-1)/2 ≈ FIR_TAPS/2
+    // group delay; integer transport reports round up so compensation never
+    // underestimates it. Minimum-phase mode (the AutoEQ import default) front-
+    // loads its energy at n=0 and is effectively zero-latency, so it reports 0.
+    int getLatencyFrames() const {
+        if (!enabled_ || !hasResponse_) return 0;
+        return linearPhase_ ? (FIR_TAPS / 2) : 0;
+    }
     void applyParams(const ArbitraryEqParamSet& params);
     void reset();
 
@@ -69,4 +76,8 @@ private:
     double firSynthesizedRate_ = 0.0;
 
     void synthesizeFir();
+    // Both run only on the control-thread applyParams path (never in process())
+    // and reuse spectrumScratch_/firFilter_ in place, so neither allocates.
+    void synthesizeLinearPhaseFir();
+    void synthesizeMinPhaseFir();
 };

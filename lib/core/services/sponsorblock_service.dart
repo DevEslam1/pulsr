@@ -123,7 +123,11 @@ class SponsorBlockService {
         '/api/skipSegments',
         {
           'videoID': cleanId,
-          'category': jsonEncode(_enabledCategories.toList()),
+          // A JSON array of categories must be passed via the PLURAL
+          // `categories` param; the singular `category` only accepts a plain
+          // string value and rejects a JSON array with HTTP 400, which would
+          // make every lookup fail and silently disable auto-skip.
+          'categories': jsonEncode(_enabledCategories.toList()),
           'actionType': 'skip',
         },
       );
@@ -145,8 +149,14 @@ class SponsorBlockService {
             final rawSegment = item['segment'];
             if (rawSegment is! List || rawSegment.length < 2) continue;
 
-            final startSec = (rawSegment[0] as num).toDouble();
-            final endSec = (rawSegment[1] as num).toDouble();
+            // Tolerate a single malformed element: skip just this segment
+            // rather than letting a bad cast throw and discard every segment
+            // for the video (the outer try/catch returns an empty list).
+            final startRaw = rawSegment[0];
+            final endRaw = rawSegment[1];
+            if (startRaw is! num || endRaw is! num) continue;
+            final startSec = startRaw.toDouble();
+            final endSec = endRaw.toDouble();
             if (endSec <= startSec) continue;
 
             segments.add(

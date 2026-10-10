@@ -66,7 +66,9 @@ class InputSanitizer {
   static bool isValidCookie(String cookie) {
     final trimmed = cookie.trim();
     if (trimmed.isEmpty || trimmed.length > 32768) return false;
-    if (trimmed.contains('\x00')) return false;
+    // Reject NUL and other control characters (incl. CR/LF) to prevent header
+    // injection when the cookie is later written into a raw request header.
+    if (RegExp(r'[\x00-\x1F\x7F]').hasMatch(trimmed)) return false;
     // Cookie string must contain at least key=value
     return trimmed.contains('=');
   }

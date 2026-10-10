@@ -4776,6 +4776,35 @@ class AppLocalizationsAr extends AppLocalizations {
       'بث مباشر إلى USB / DAC سلكي (يتجاوز مُعيد أخذ العينات في أندرويد)';
 
   @override
+  String get settingsBluetoothCodecTitle => 'ترميز البلوتوث';
+
+  @override
+  String get settingsBluetoothCodecFallback => 'صوت بلوتوث قياسي';
+
+  @override
+  String get settingsBluetoothCodecUnknown => 'تفاصيل الترميز غير متاحة';
+
+  @override
+  String settingsBluetoothCodecHigh(String codec) {
+    return 'ترميز عالي الجودة: $codec';
+  }
+
+  @override
+  String settingsBluetoothCodecLow(String codec) {
+    return '$codec — لأفضل جودة استخدم LDAC أو aptX HD/Adaptive أو LE Audio';
+  }
+
+  @override
+  String get settingsBluetoothLeAudio => 'صوت LE';
+
+  @override
+  String get settingsBluetoothHiRes => 'بلوتوث عالي الدقة (أفضل جهد)';
+
+  @override
+  String get settingsBluetoothHiResDesc =>
+      'يبقي مسار float مُفعّلاً، ويطبّق الـ dither بعمق الترميز، ويطابق معدل الترميز. يحسّن الجودة، لكن البلوتوث ضاغط ولا يمكن أن يكون مطابقًا بتًا ببت';
+
+  @override
   String get settingsBpmSyncCrossfade => 'انتقال متزامن مع BPM';
 
   @override

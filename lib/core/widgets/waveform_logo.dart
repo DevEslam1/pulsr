@@ -44,10 +44,15 @@ class _WaveformLogoState extends State<WaveformLogo>
     super.didUpdateWidget(oldWidget);
     if (widget.animate != oldWidget.animate) {
       if (widget.animate && _controller == null && !_isTestEnv) {
-        _controller = AnimationController(
+        final c = _controller = AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 800),
-        )..repeat(reverse: true);
+          duration: context.motionMs(800),
+        );
+        // didChangeDependencies does not fire on a prop-only change, so honor
+        // reduce-motion here instead of unconditionally repeating.
+        if (context.motionEnabled) {
+          c.repeat(reverse: true);
+        }
       } else if (!widget.animate) {
         _controller?.dispose();
         _controller = null;

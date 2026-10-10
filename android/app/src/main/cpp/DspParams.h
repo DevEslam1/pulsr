@@ -235,6 +235,11 @@ struct DitherParamSet {
     bool enabled = false;
     int targetBitDepth = 16;  // 16, 24, 32
     bool isBluetooth = false;
+    // Opt-in: permit the dither stage on a Bluetooth route. Default false keeps
+    // the historical behaviour (dither skipped on BT, since the lossy codec
+    // re-quantises downstream). Set true only when the user enables Bluetooth
+    // Hi-Res, so the quantisation error at the codec depth is decorrelated.
+    bool bluetoothEnabled = false;
 };
 
 struct BitPerfectParamSet {

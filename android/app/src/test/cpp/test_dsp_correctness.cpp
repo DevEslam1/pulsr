@@ -84,6 +84,8 @@ void runArbitraryEqResponseTest() {
     eq.setEnabled(true);
     const bool ok = eq.loadGraphicEqString("GraphicEq: 100 0; 1000 6; 10000 0", false);
     assert(ok);
+    // linearPhase=false is the AutoEQ default: minimum phase, so zero latency.
+    assert(eq.getLatencyFrames() == 0);
 
     const int n = 32768;
     auto rmsAt = [&](double freq) -> double {

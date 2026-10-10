@@ -4818,6 +4818,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)';
 
   @override
+  String get settingsBluetoothCodecTitle => 'Bluetooth Codec';
+
+  @override
+  String get settingsBluetoothCodecFallback => 'Standard Bluetooth Audio';
+
+  @override
+  String get settingsBluetoothCodecUnknown => 'Codec details unavailable';
+
+  @override
+  String settingsBluetoothCodecHigh(String codec) {
+    return 'High-quality codec: $codec';
+  }
+
+  @override
+  String settingsBluetoothCodecLow(String codec) {
+    return '$codec — for best quality use LDAC, aptX HD/Adaptive or LE Audio';
+  }
+
+  @override
+  String get settingsBluetoothLeAudio => 'LE Audio';
+
+  @override
+  String get settingsBluetoothHiRes => 'Bluetooth Hi-Res (best-effort)';
+
+  @override
+  String get settingsBluetoothHiResDesc =>
+      'Keeps the float path on, dithers at the codec depth and matches the codec rate. Improves quality, but Bluetooth is lossy and can never be bit-perfect';
+
+  @override
   String get settingsBpmSyncCrossfade => 'BPM-Synced Crossfade';
 
   @override

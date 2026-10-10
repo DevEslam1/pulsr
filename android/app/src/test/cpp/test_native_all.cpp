@@ -1094,6 +1094,110 @@ void runEngineSubCrossoverRampOutTest() {
     std::cout << "  ✓ Engine successfully ramped SubCrossover even when STAGE_CROSSOVER bit was dropped." << std::endl;
 }
 
+// ParametricEQ: a disable must fade out (symmetric to the enable ramp) instead of
+// instantly bypassing (level jump / click), and freq automation must sweep the
+// biquad smoothly with preserved state (no click). Verifies both.
+void runParametricEqSmoothTransitionsTest() {
+    std::cout << "\n=== [TEST] ParametricEQ Click-Free Disable Fade & Freq Sweep ===" << std::endl;
+    const double sr = 48000.0;
+    const int block = 256;
+    const double freqHz = 100.0;
+    const float amp = 0.2f;
+
+    auto genBlock = [&](std::vector<float>& b, long long startFrame) {
+        for (int i = 0; i < block; ++i) {
+            float s = amp * static_cast<float>(std::sin(2.0 * M_PI * freqHz *
+                               static_cast<double>(startFrame + i) / sr));
+            b[i * 2] = s; b[i * 2 + 1] = s;
+        }
+    };
+    auto rmsL = [&](const float* buf) {
+        double sum = 0.0;
+        for (int i = 0; i < block; ++i) sum += double(buf[i * 2]) * buf[i * 2];
+        return std::sqrt(sum / block);
+    };
+
+    ParametricEQ eq;
+    eq.setSampleRate(sr);
+    eq.setBandCount(1);
+    eq.setBand(0, freqHz, 12.0, 2.0, FilterType::Peaking, true); // big boost at the tone freq
+    eq.setPreamp(0.0);
+    eq.setEnabled(true);
+    eq.reset();
+
+    std::vector<float> buf(block * 2);
+    long long fr = 0;
+    for (int b = 0; b < 60; ++b) { genBlock(buf, fr); eq.processInterleaved(buf.data(), block, 2); fr += block; }
+    genBlock(buf, fr); eq.processInterleaved(buf.data(), block, 2); fr += block;
+    const double wetRms = rmsL(buf.data());
+
+    // Disable: must fade, not instantly drop to dry.
+    eq.setEnabled(false);
+    assert(!eq.isEnabled());
+    genBlock(buf, fr); eq.processInterleaved(buf.data(), block, 2); fr += block;
+    const double afterRms = rmsL(buf.data());
+    for (int i = 0; i < block * 2; ++i) assert(std::isfinite(buf[i]) && std::abs(buf[i]) < 2.0f);
+    // An instant bypass would read ~dry (wetRms/~4) here; the fade keeps it high.
+    assert(afterRms > 0.5 * wetRms);
+
+    // Let the ~100 ms fade finish, then confirm the stage is a true bypass.
+    for (int b = 0; b < 60; ++b) { genBlock(buf, fr); eq.processInterleaved(buf.data(), block, 2); fr += block; }
+    genBlock(buf, fr);
+    std::vector<float> dry = buf;
+    eq.processInterleaved(buf.data(), block, 2);
+    float maxDryErr = 0.0f;
+    for (int i = 0; i < block * 2; ++i) maxDryErr = std::max(maxDryErr, std::abs(buf[i] - dry[i]));
+    assert(maxDryErr < 1e-6f);
+    std::cout << "  ✓ Disable fades out (first post-disable RMS " << afterRms
+              << " vs wet " << wetRms << ") then settles to exact bypass (err " << maxDryErr << ")." << std::endl;
+
+    // Part B: a frequency automation sweep must stay smooth, bounded and finite
+    // with the filter state preserved (the old code cleared state + swapped
+    // coeffs instantly on every freq step, re-ringing the resonant filter).
+    ParametricEQ eq2;
+    eq2.setSampleRate(sr);
+    EqParamSet p;
+    p.enabled = true;
+    p.preampDb = 0.0;
+    p.bandCount = 1;
+    p.bands[0].gainDb = 15.0;
+    p.bands[0].q = 3.0;
+    p.bands[0].type = FilterType::Peaking;
+    p.bands[0].enabled = true;
+    p.bands[0].frequency = 300.0;
+    eq2.applyParams(p);
+    eq2.reset();
+
+    const double toneHz = 300.0;
+    long long fr2 = 0;
+    float sweepMaxStep = 0.0f, sweepMaxAbs = 0.0f, prev = 0.0f;
+    bool havePrev = false;
+    for (int b = 0; b < 120; ++b) {
+        p.bands[0].frequency = 300.0 + (3000.0 - 300.0) * (static_cast<double>(b) / 119.0);
+        eq2.applyParams(p);
+        for (int i = 0; i < block; ++i) {
+            float s = 0.2f * static_cast<float>(std::sin(2.0 * M_PI * toneHz *
+                               static_cast<double>(fr2 + i) / sr));
+            buf[i * 2] = s; buf[i * 2 + 1] = s;
+        }
+        eq2.processInterleaved(buf.data(), block, 2);
+        for (int i = 0; i < block; ++i) {
+            float v = buf[i * 2];
+            assert(std::isfinite(v));
+            sweepMaxAbs = std::max(sweepMaxAbs, std::abs(v));
+            // Skip block 0: that step is the reset()-induced ring-up, not the
+            // sweep. From block 1 on, state is preserved so steps stay tiny.
+            if (b >= 1 && havePrev) sweepMaxStep = std::max(sweepMaxStep, std::abs(v - prev));
+            prev = v; havePrev = true;
+        }
+        fr2 += block;
+    }
+    assert(sweepMaxAbs < 2.0f);   // bounded: no instability from retained state
+    assert(sweepMaxStep < 0.15f); // no gross click across the whole sweep
+    std::cout << "  ✓ Frequency sweep stayed smooth and bounded (max step "
+              << sweepMaxStep << " < 0.15, peak " << sweepMaxAbs << " < 2.0)." << std::endl;
+}
+
 #include "test_engine_contracts.h"
 
 int main() {
@@ -1131,6 +1235,7 @@ int main() {
     runLiveProgTernaryTest();
     runDvcLimiterHeadroomTest();
     runSubCrossoverSmoothDisableTest();
+    runParametricEqSmoothTransitionsTest();
 
     // Feature 5: Golden-Vector Precision & Regression Suite
     runGoldenVectorDsdBitOrderTest();
@@ -1138,6 +1243,7 @@ int main() {
     runGoldenVectorTruePeakTest();
     runGoldenVectorVdcSanitizerTest();
     runGoldenVectorLinearPhaseFirTest();
+    runGoldenVectorMinPhaseFirTest();
     runGoldenVectorLimiterCeilingTest();
     runGoldenVectorRateChangeTrackingTest();
 

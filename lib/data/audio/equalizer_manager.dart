@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show ValueNotifier, listEquals;
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,6 +31,47 @@ part 'equalizer_preset_ops.dart';
 part 'equalizer_snapshot_ops.dart';
 part 'equalizer_effect_ops.dart';
 part 'equalizer_restore_ops.dart';
+
+/// Per-band Q for a graphic EQ, derived from the band spacing so adjacent
+/// peaking filters sum to (approximately) the drawn curve instead of piling up.
+///
+/// A fixed Q=1.414 is only correct for octave spacing (10-band). For the dense
+/// 32/64-band curves (~1/3- and ~1/6-octave) a Q of 1.414 makes each ~1-octave-
+/// wide filter overlap 3-6 neighbours, so a flat set of boosts overshoots the
+/// target by ~3-6x and pushes the downstream true-peak limiter into pumping.
+///
+/// Q = 2^(b/2) / (2^b - 1), where b is the local spacing in octaves — the
+/// classic constant-Q graphic-EQ relation (b=1 -> 1.414, b=1/3 -> ~4.3,
+/// b=1/6 -> ~8.7). Edge bands use their single neighbour; interior bands use
+/// the average of both neighbours. Result is clamped to a sane filter range.
+List<double> graphicEqQs(List<double> freqs) {
+  final n = freqs.length;
+  if (n == 0) return const <double>[];
+  if (n == 1) return <double>[1.414];
+  double octaves(double fLo, double fHi) =>
+      (fLo > 0 && fHi > 0) ? (math.log(fHi / fLo) / math.ln2) : 1.0;
+  double qForOctaves(double b) {
+    if (!b.isFinite || b <= 0) return 1.414;
+    final twoB = math.pow(2.0, b).toDouble();
+    if (twoB <= 1.0) return 1.414;
+    final q = math.pow(2.0, b / 2).toDouble() / (twoB - 1.0);
+    return q.clamp(0.3, 12.0).toDouble();
+  }
+
+  final qs = <double>[];
+  for (var i = 0; i < n; i++) {
+    final double b;
+    if (i == 0) {
+      b = octaves(freqs[0], freqs[1]);
+    } else if (i == n - 1) {
+      b = octaves(freqs[n - 2], freqs[n - 1]);
+    } else {
+      b = 0.5 * octaves(freqs[i - 1], freqs[i + 1]);
+    }
+    qs.add(qForOctaves(b));
+  }
+  return qs;
+}
 
 /// Numeric DSP-parameter sanitation lives in `dsp_param_ranges.dart`:
 /// [DspParamRanges] is the single source of truth for every parameter's valid
@@ -278,6 +320,10 @@ class EqualizerManager {
   /// route-change hook so dither pushes stop claiming a wired route while a BT
   /// device is active (the native side uses this to skip dithering).
   bool isBluetoothRoute = false;
+
+  /// Bluetooth Hi-Res opt-in: when true the native dither stage is permitted on
+  /// a BT route (otherwise it is skipped, since the lossy codec re-quantises).
+  bool isBluetoothDitherEnabled = false;
 
   bool get isVirtualizerSupported => _effectsChannel.isVirtualizerSupported;
   bool get isDynamicsSupported => _effectsChannel.isDynamicsSupported;
@@ -638,7 +684,7 @@ class EqualizerManager {
               i,
               targetFreqs[i],
               currentPreset.gains[i],
-              1.414,
+              graphicEqQs(targetFreqs)[i],
             ),
           );
           if (futures.length >= 8) {
@@ -768,7 +814,7 @@ class EqualizerManager {
                 entry.key,
                 targetFreqs[entry.key],
                 entry.value,
-                1.414,
+                graphicEqQs(targetFreqs)[entry.key],
               );
               if (!ok) nativeOk = false;
             }
@@ -788,7 +834,7 @@ class EqualizerManager {
                 entry.key,
                 targetFreqs[entry.key],
                 entry.value,
-                1.414,
+                graphicEqQs(targetFreqs)[entry.key],
               );
             }
           }
@@ -830,6 +876,7 @@ class EqualizerManager {
     return _effectsChannel.setNativeEqBandsBulk(
       frequencies: targetFreqs,
       gains: currentPreset.gains,
+      qs: graphicEqQs(targetFreqs),
     );
   }
 
@@ -873,7 +920,7 @@ class EqualizerManager {
               i,
               targetFreqs[i],
               currentPreset.gains[i],
-              1.414,
+              graphicEqQs(targetFreqs)[i],
             ),
           );
           if (futures.length >= 8) {
@@ -893,7 +940,7 @@ class EqualizerManager {
               i,
               targetFreqs[i],
               currentPreset.gains[i],
-              1.414,
+              graphicEqQs(targetFreqs)[i],
             ),
           );
           if (futures2.length >= 8) {
@@ -1715,8 +1762,10 @@ class EqualizerManager {
     _syncPipeline();
   }
 
-  /// TPDF dither toggle (native stage; auto-skipped on BT routes).
-  Future<void> setDither(bool enabled, {int? targetBitDepth}) async {
+  /// TPDF dither toggle (native stage; auto-skipped on BT routes unless
+  /// [allowBluetoothDither] is set by the Bluetooth Hi-Res opt-in).
+  Future<void> setDither(bool enabled,
+      {int? targetBitDepth, bool? allowBluetoothDither}) async {
     isDitherEnabled = enabled;
     if (targetBitDepth != null &&
         (targetBitDepth == 16 ||
@@ -1724,11 +1773,15 @@ class EqualizerManager {
             targetBitDepth == 32)) {
       ditherTargetBitDepth = targetBitDepth;
     }
+    if (allowBluetoothDither != null) {
+      isBluetoothDitherEnabled = allowBluetoothDither;
+    }
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setDitherParams(
         enabled: isDitherEnabled,
         targetBitDepth: ditherTargetBitDepth,
         isBluetooth: isBluetoothRoute,
+        allowBluetoothDither: isBluetoothDitherEnabled,
       );
     }
     _debouncedSavePreferences();
@@ -1939,6 +1992,7 @@ class EqualizerManager {
         enabled: isDitherEnabled,
         targetBitDepth: ditherTargetBitDepth,
         isBluetooth: isBluetoothRoute,
+        allowBluetoothDither: isBluetoothDitherEnabled,
       );
     } catch (e, st) {
       ErrorLogger.log(

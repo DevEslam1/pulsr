@@ -24,6 +24,12 @@ class WaveformService {
   static const int _maxMemCacheSize = 100;
 
   final LinkedHashMap<String, List<double>> _memCache = LinkedHashMap();
+
+  /// Mem-cache keys whose value is a synthetic placeholder (seeded by
+  /// [getInstantWaveform]) rather than a real decode. [getWaveform] must not
+  /// treat such an entry as a finished result, otherwise the instant preview
+  /// permanently shadows the accurate native PCM decode under the same key.
+  final Set<String> _syntheticMemKeys = {};
   Directory? _cacheDir;
 
   /// Returns cached or instant synthetic waveform samples synchronously (0ms latency),
@@ -45,6 +51,7 @@ class WaveformService {
       count: count,
     );
     _putMem(memKey, instant);
+    _syntheticMemKeys.add(memKey);
     return instant;
   }
 
@@ -54,16 +61,21 @@ class WaveformService {
     int count = 60,
   }) async {
     final memKey = '${songId}_$count';
+    final wasSynthetic = _syntheticMemKeys.contains(memKey);
     final cached = _memCache.remove(memKey);
-    if (cached != null) {
+    // A synthetic placeholder seeded by [getInstantWaveform] must not satisfy
+    // this call: only a real decoded entry short-circuits here.
+    if (cached != null && !wasSynthetic) {
       _memCache[memKey] = cached; // refresh LRU position
       return cached;
     }
+    _syntheticMemKeys.remove(memKey);
 
     List<double>? samples;
     if (_isLocalFile(filePath)) {
       samples = await _loadFromDiskOrDecode(filePath!, count);
     }
+    final isSynthetic = samples == null;
     samples ??= WaveformGenerator().generateWaveformSync(
       songId: songId,
       filePath: filePath,
@@ -71,6 +83,7 @@ class WaveformService {
     );
 
     _putMem(memKey, samples);
+    if (isSynthetic) _syntheticMemKeys.add(memKey);
     return samples;
   }
 
@@ -82,11 +95,14 @@ class WaveformService {
 
   void clearMemoryCache() {
     _memCache.clear();
+    _syntheticMemKeys.clear();
   }
 
   void _putMem(String key, List<double> value) {
     if (_memCache.length >= _maxMemCacheSize) {
-      _memCache.remove(_memCache.keys.first);
+      final evicted = _memCache.keys.first;
+      _memCache.remove(evicted);
+      _syntheticMemKeys.remove(evicted);
     }
     _memCache[key] = value;
   }

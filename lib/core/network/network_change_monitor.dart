@@ -48,6 +48,11 @@ class NetworkChangeMonitor {
     // into one invalidation + one re-resolve.
     _debounce?.cancel();
     _debounce = Timer(const Duration(seconds: 1), () {
+      // Guard against the start()/dispose() race: start() subscribes after an
+      // `await checkConnectivity()`, so dispose() can close the controller in
+      // that window. A later event would then add onto a closed controller and
+      // throw an uncaught StateError.
+      if (_controller.isClosed) return;
       debugPrint('[NetworkChangeMonitor] Path changed: $prev -> $results');
       _controller.add(null);
     });

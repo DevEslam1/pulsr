@@ -9,6 +9,15 @@ extension PlayerDspFollowRate on PlayerDspController {
     if (service == null || _settingsCubit == null) return;
     await _followSampleRateMutex.protect(() async {
       final settings = _settingsCubit!.state;
+      // Bluetooth Hi-Res: the A2DP link owns the format, so exclusive
+      // bit-perfect is impossible, but when the codec advertises the track's
+      // native rate we can ask it to switch — avoiding an unnecessary platform
+      // resample. Never claims bit-perfect (BT is lossy).
+      if (settings.bluetoothHiResEnabled &&
+          settings.currentOutputDevice?.isBluetooth == true) {
+        await _maybeAlignBluetoothCodecRate(song);
+        return;
+      }
       // The native side only accepts a target output format while exclusive
       // Bit-Perfect is requested. Without it the call is a guaranteed failure
       // plus a device refresh, so skip the whole round-trip (this is the
@@ -97,5 +106,47 @@ extension PlayerDspFollowRate on PlayerDspController {
             category: 'PlayerDspController');
       }
     });
+  }
+
+  /// Bluetooth Hi-Res item 3: ask the A2DP codec to run at the track's native
+  /// rate when it advertises that rate, so the platform does not resample.
+  /// Best-effort — a refused request is logged, never surfaced as an error.
+  Future<void> _maybeAlignBluetoothCodecRate(SongsTableData song) async {
+    final service = _hiResAudioService;
+    final settingsCubit = _settingsCubit;
+    if (service == null || settingsCubit == null) return;
+    final device = settingsCubit.state.currentOutputDevice;
+    final trackRate = song.sampleRate ?? 0;
+    if (trackRate <= 0) return;
+    final plan = resolveBluetoothQualityPlan(
+      bluetoothHiResEnabled: true,
+      ditherEnabled: false,
+      codecName: device?.btCodecName,
+      codecSampleRateHz: device?.btSampleRateHz,
+      codecBitDepth: device?.btBitDepth,
+      isLeAudio: device?.isLeAudio ?? false,
+      trackSampleRate: trackRate,
+      trackBitDepth: song.bitDepth ?? 0,
+      codecSelectableSampleRates: device?.btSelectableSampleRates ?? const [],
+      codecSelectableBitDepths: device?.btSelectableBitDepths ?? const [],
+    );
+    final target = plan.alignCodecSampleRateTo;
+    if (target == null || target == _lastFollowedBtCodecRate) return;
+    try {
+      final ok = await service.setBluetoothSampleRate(target);
+      if (ok) {
+        _lastFollowedBtCodecRate = target;
+        await settingsCubit.refreshOutputDevice();
+      } else {
+        _lastFollowedBtCodecRate = null;
+      }
+    } catch (e, st) {
+      _lastFollowedBtCodecRate = null;
+      ErrorLogger.log(
+          'Bluetooth codec rate alignment failed ($target)',
+          error: e,
+          stackTrace: st,
+          category: 'PlayerDspController');
+    }
   }
 }

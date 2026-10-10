@@ -3423,6 +3423,28 @@
   "settingsBitPerfectBtUnavailable": "No disponible: Bluetooth recodifica — usa USB / DAC con cable",
   "settingsBitPerfectUsb": "Passthrough USB bit-perfect",
   "settingsBitPerfectUsbDesc": "Streaming directo a USB / DAC con cable (omite el remuestreador de Android)",
+  "settingsBluetoothCodecTitle": "Códec Bluetooth",
+  "settingsBluetoothCodecFallback": "Audio Bluetooth estándar",
+  "settingsBluetoothCodecUnknown": "Detalles del códec no disponibles",
+  "settingsBluetoothCodecHigh": "Códec de alta calidad: {codec}",
+  "@settingsBluetoothCodecHigh": {
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBluetoothCodecLow": "{codec} — para la mejor calidad usa LDAC, aptX HD/Adaptive o LE Audio",
+  "@settingsBluetoothCodecLow": {
+    "placeholders": {
+      "codec": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBluetoothLeAudio": "LE Audio",
+  "settingsBluetoothHiRes": "Bluetooth Hi-Res (mejor esfuerzo)",
+  "settingsBluetoothHiResDesc": "Mantiene la ruta float activa, aplica dither a la profundidad del códec y ajusta la tasa del códec. Mejora la calidad, pero Bluetooth es con pérdida y nunca puede ser bit-perfect",
   "settingsBpmSyncCrossfade": "Fundido sincronizado por BPM",
   "settingsBpmSyncCrossfadeDesc": "Alinea la duración del fundido a los 2/4/8/16/32 tiempos más cercanos de la pista entrante cuando se conoce su BPM (configúralo por pista en Información de la canción); de lo contrario se usa la duración configurada",
   "settingsBypassDspBitPerfect": "Omitir DSP en modo bit-perfect",

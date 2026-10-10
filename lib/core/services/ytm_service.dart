@@ -223,6 +223,21 @@ class YtmService {
   final Map<String, List<DateTime>> _videoFailures = {};
   final Map<String, DateTime> _videoCooldownUntil = {};
 
+  /// Caps the per-video failure/cooldown maps so a long session with many
+  /// distinct failing videoIds can't grow them without bound. Entries with no
+  /// failure in the last 60s (or an already-expired cooldown) are evicted once
+  /// the map crosses the cap.
+  static const int _maxVideoFailureKeys = 256;
+  void _pruneVideoFailureMaps(DateTime now) {
+    if (_videoFailures.length > _maxVideoFailureKeys) {
+      _videoFailures.removeWhere((_, times) =>
+          times.isEmpty || now.difference(times.last).inSeconds > 60);
+    }
+    if (_videoCooldownUntil.length > _maxVideoFailureKeys) {
+      _videoCooldownUntil.removeWhere((_, until) => !now.isBefore(until));
+    }
+  }
+
   /// Per-signal breaker + metrics. Existing bot/video cooldowns stay as the
   /// fast path; the breaker adds bounded per-signal windows and observability.
   final YtmCircuitBreaker breaker = YtmCircuitBreaker();
@@ -248,6 +263,7 @@ class YtmService {
     } else {
       // Non-bot failures track per-video without tripping a global bot challenge
       final now = DateTime.now();
+      _pruneVideoFailureMaps(now);
       final failures = _videoFailures.putIfAbsent(videoId, () => []);
       failures.removeWhere((t) => now.difference(t).inSeconds > 60);
       failures.add(now);
@@ -269,6 +285,7 @@ class YtmService {
 
     // FIX-C01: Key circuit breaker per videoId (3 failures within 60s)
     if (videoId != null && videoId.isNotEmpty) {
+      _pruneVideoFailureMaps(now);
       final failures = _videoFailures.putIfAbsent(videoId, () => []);
       failures.removeWhere((t) => now.difference(t).inSeconds > 60);
       failures.add(now);

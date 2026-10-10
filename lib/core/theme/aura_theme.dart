@@ -183,8 +183,11 @@ class AuraTheme {
       Color accent, Brightness brightness, bool isAmoled,
       {bool dimWhitePoint = false}) {
     final isDark = brightness == Brightness.dark;
+    // WCAG-correct black/white decision point (~0.179), matching [textOnAccent].
+    // The old 0.5 threshold picked white text on mid-luminance accents where
+    // dark text has higher contrast, dropping onPrimary/button labels below AA.
     final onAccent =
-        accent.computeLuminance() > 0.5 ? AppColors.onBright : Colors.white;
+        accent.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
 
     if (!isDark) {
       return PulsrPalette(

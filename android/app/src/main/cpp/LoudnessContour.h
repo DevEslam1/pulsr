@@ -24,7 +24,13 @@ public:
     void setSampleRate(double sampleRate);
     // intensity: 0..1 user amount; volumeLinear: current volume-stage value 0..1.
     void configure(double intensity, double volumeLinear);
-    void setEnabled(bool enabled) { enabled_ = enabled; }
+    // Recompute targets on toggle: updateTargetGains() zeros them when disabled
+    // so a direct setEnabled(false) ramps back to flat (isRamping stays true
+    // until the current gains reach 0) instead of latching the last lift.
+    void setEnabled(bool enabled) {
+        enabled_ = enabled;
+        updateTargetGains();
+    }
     bool isEnabled() const { return enabled_; }
     bool isRamping() const { return !enabled_ && (std::abs(currentBassDb_) >= 1e-4 || std::abs(currentTrebleDb_) >= 1e-4); }
     void applyParams(const LoudnessContourParamSet& params);

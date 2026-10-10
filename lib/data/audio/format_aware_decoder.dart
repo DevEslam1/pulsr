@@ -59,7 +59,11 @@ class FormatAwareDecoder {
           final isMqa = await MqaDecoderHelper.isMqaFile(song.path);
           if (isMqa) {
             MqaDecoderHelper.markMqaPath(song.path);
-            if (MqaDecoderHelper.isMqaEnabled?.call() ?? true) {
+            // Default OFF: the in-app "unfold" is only an approximate, un-
+            // authenticated 2x interpolation (no real added resolution), and is
+            // only safe for genuine 24-bit stereo PCM WAV. Require an explicit
+            // opt-in via the wired isMqaEnabled callback.
+            if (MqaDecoderHelper.isMqaEnabled?.call() ?? false) {
               return await MqaDecoderHelper.decodeMqaFile(song, tag);
             }
           }

@@ -150,7 +150,16 @@ void ArbitraryResponseEq::applyPreparedNodes(
     bool linearPhase) {
     if (!nodes) return;
     if (nodes == preparedNodesRef_ && std::abs(firSynthesizedRate_ - sampleRate_) < 0.5) {
-        linearPhase_ = linearPhase;
+        // Same nodes and rate: only re-synthesize if the phase MODE flipped.
+        // Linear- and minimum-phase now produce genuinely different kernels, so a
+        // bare flag update (as before) would leave the old kernel in place.
+        if (linearPhase != linearPhase_ && hasResponse_) {
+            linearPhase_ = linearPhase;
+            synthesizeFir();
+            reset();
+        } else {
+            linearPhase_ = linearPhase;
+        }
         return;
     }
     preparedNodesRef_ = nodes;
@@ -172,12 +181,29 @@ void ArbitraryResponseEq::synthesizeFir() {
         return;
     }
 
-    // Always synthesize a linear-phase (symmetric) impulse response centred at
-    // (FIR_TAPS-1)/2. Previously the non-linear-phase path used delay = 0,
-    // which yields an even IR centred at n = 0; keeping only samples [0, 511]
-    // then discarded the negative-time half and produced a magnitude/phase that
-    // did not match the target. Centring the impulse makes the first 512
-    // samples a complete symmetric kernel (h[m] == h[511-m]) for both modes.
+    // firFilter_ is already FIR_TAPS long after construction; this resize is a
+    // no-op in steady state and never allocates here.
+    if (static_cast<int>(firFilter_.size()) != FIR_TAPS) {
+        firFilter_.assign(FIR_TAPS, 0.0f);
+    }
+
+    // Both synthesis paths run on the control-thread applyParams path and work
+    // entirely in the pre-sized spectrumScratch_ (FFT_SIZE) and firFilter_
+    // (FIR_TAPS); the FftUtil transforms are in-place, so neither allocates.
+    if (linearPhase_) {
+        synthesizeLinearPhaseFir();
+    } else {
+        synthesizeMinPhaseFir();
+    }
+
+    hasResponse_ = true;
+    firSynthesizedRate_ = sampleRate_;
+}
+
+void ArbitraryResponseEq::synthesizeLinearPhaseFir() {
+    // Linear-phase (symmetric) impulse response centred at (FIR_TAPS-1)/2. The
+    // first FIR_TAPS samples form a complete symmetric kernel (h[m]==h[N-1-m]),
+    // giving exact linear phase at the cost of an FIR_TAPS/2 group delay.
     const double delay = static_cast<double>(FIR_TAPS - 1) * 0.5;
     const int half = FFT_SIZE / 2;
 
@@ -194,8 +220,6 @@ void ArbitraryResponseEq::synthesizeFir() {
         } else {
             // FftUtil's inverse transform computes h[n] = (1/N) Σ X[k] e^{-j2πkn/N},
             // so a POSITIVE phase term e^{+j2πkd/N} places the impulse at n = d.
-            // (The previous negative phase placed it at n = N-d, so keeping the
-            // first FIR_TAPS samples captured the wrapped tail, not the kernel.)
             double phase = 2.0 * M_PI * static_cast<double>(k) * delay / static_cast<double>(FFT_SIZE);
             spectrum[k] = FftUtil::Complex(
                 mag * static_cast<float>(std::cos(phase)),
@@ -209,19 +233,87 @@ void ArbitraryResponseEq::synthesizeFir() {
 
     FftUtil::fft(spectrumScratch_, true); // IFFT
 
-    // firFilter_ is already FIR_TAPS long after construction; resize is a no-op
-    // in steady state and never allocates here.
-    if (static_cast<int>(firFilter_.size()) != FIR_TAPS) {
-        firFilter_.assign(FIR_TAPS, 0.0f);
-    }
     for (int i = 0; i < FIR_TAPS; ++i) {
         // Hann window tapering to avoid Gibbs phenomenon ringing
         float w = 0.5f * (1.0f - std::cos(2.0f * static_cast<float>(M_PI) * i / (FIR_TAPS - 1)));
         float tap = spectrum[i].real() * w;
         firFilter_[i] = std::isfinite(tap) ? tap : 0.0f;
     }
-    hasResponse_ = true;
-    firSynthesizedRate_ = sampleRate_;
+}
+
+void ArbitraryResponseEq::synthesizeMinPhaseFir() {
+    // True minimum-phase synthesis via the real-cepstrum (homomorphic) method:
+    //   1. log|H(k)| on the full FFT grid (magnitude is even, so log is real/even)
+    //   2. IFFT  -> real cepstrum c[n]
+    //   3. causal "lifter": double n>0, keep n=0 and Nyquist, zero the n<0 half
+    //      (the wrapped tail n in (N/2, N)) -> complex cepstrum of a min-phase seq
+    //   4. FFT   -> complex log spectrum (Re = log|H|, Im = min-phase phase)
+    //   5. exp   -> H_min(k) (Hermitian-symmetric, so its IFFT is real)
+    //   6. IFFT  -> causal, front-loaded impulse response; keep the first FIR_TAPS
+    // This matches |H| exactly (|H_min| == |H|) but removes the linear-phase
+    // pre-ringing and the FIR_TAPS/2 latency of the symmetric kernel.
+    const int half = FFT_SIZE / 2;
+    FftUtil::Complex* spectrum = spectrumScratch_.data();
+
+    // Step 1: even-symmetric log-magnitude across all FFT_SIZE bins.
+    for (int k = 0; k <= half; ++k) {
+        double f = static_cast<double>(k) * sampleRate_ / static_cast<double>(FFT_SIZE);
+        double gainDb = clampGainDb(interpolateGain(nodes_, f));
+        double mag = std::pow(10.0, gainDb / 20.0);
+        // Gains are clamped to ±30 dB so mag never approaches 0, but floor it
+        // anyway so a pathological value can never produce log(0) = -inf.
+        if (!std::isfinite(mag) || mag < 1e-9) mag = 1e-9;
+        float logMag = static_cast<float>(std::log(mag));
+        spectrum[k] = FftUtil::Complex(logMag, 0.0f);
+        if (k > 0 && k < half) {
+            spectrum[FFT_SIZE - k] = FftUtil::Complex(logMag, 0.0f);
+        }
+    }
+
+    // Step 2: IFFT -> real cepstrum.
+    FftUtil::fft(spectrumScratch_, true);
+
+    // Step 3: fold to the minimum-phase (causal) cepstrum. Zero the imaginary
+    // residue so the subsequent exp()/IFFT stay numerically clean.
+    spectrum[0] = FftUtil::Complex(spectrum[0].real(), 0.0f);
+    for (int n = 1; n < half; ++n) {
+        spectrum[n] = FftUtil::Complex(spectrum[n].real() * 2.0f, 0.0f);
+    }
+    spectrum[half] = FftUtil::Complex(spectrum[half].real(), 0.0f);
+    for (int n = half + 1; n < FFT_SIZE; ++n) {
+        spectrum[n] = FftUtil::Complex(0.0f, 0.0f);
+    }
+
+    // Step 4: FFT -> complex log spectrum.
+    FftUtil::fft(spectrumScratch_, false);
+
+    // Step 5: exponentiate. Re stays log|H| so exp(Re) restores the magnitude;
+    // Im carries the minimum phase. Hermitian symmetry is preserved by exp().
+    for (int k = 0; k < FFT_SIZE; ++k) {
+        float re = spectrum[k].real();
+        float im = spectrum[k].imag();
+        float m = std::exp(re);
+        if (!std::isfinite(m)) m = 1.0f;
+        spectrum[k] = FftUtil::Complex(m * std::cos(im), m * std::sin(im));
+    }
+
+    // Step 6: IFFT -> causal impulse response; keep the leading FIR_TAPS taps.
+    FftUtil::fft(spectrumScratch_, true);
+
+    // Energy is concentrated near n=0, so no symmetric window (it would zero the
+    // dominant first tap). Taper only the final eighth so the hard truncation at
+    // FIR_TAPS introduces no step, leaving the response-defining head untouched.
+    const int fadeStart = FIR_TAPS - FIR_TAPS / 8;
+    for (int i = 0; i < FIR_TAPS; ++i) {
+        double w = 1.0;
+        if (i >= fadeStart) {
+            double t = static_cast<double>(i - fadeStart) /
+                       static_cast<double>(FIR_TAPS - fadeStart);
+            w = 0.5 * (1.0 + std::cos(M_PI * t)); // 1 -> 0
+        }
+        float tap = static_cast<float>(spectrum[i].real() * w);
+        firFilter_[i] = std::isfinite(tap) ? tap : 0.0f;
+    }
 }
 
 void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
@@ -230,10 +322,14 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     // setter (see nativeLoadArbitraryEq), so applyParams performs no parsing
     // and no heap allocation.
     if (params.parsedNodes) {
-        if (params.parsedNodes != preparedNodesRef_ || std::abs(firSynthesizedRate_ - sampleRate_) >= 0.5) {
+        if (params.parsedNodes != preparedNodesRef_ ||
+            params.linearPhase != linearPhase_ ||
+            std::abs(firSynthesizedRate_ - sampleRate_) >= 0.5) {
             // Do not copy params.graphicEqString here: this is the audio thread
             // and std::string assignment can allocate. The string is only needed
-            // by the (control-thread) parse fallback below.
+            // by the (control-thread) parse fallback below. A phase-mode flip
+            // alone must re-synthesize (min- vs linear-phase differ), so it is
+            // part of the trigger condition.
             applyPreparedNodes(params.parsedNodes, params.linearPhase);
         }
         return;
@@ -245,7 +341,7 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
 }
 
 namespace {
-inline void convolve512Stereo(
+inline void convolveFirStereo(
     const float* h,
     const float* ptrL,
     const float* ptrR,
@@ -357,7 +453,7 @@ void ArbitraryResponseEq::process(float* L, float* R, int frames) {
 
         float outL = 0.0f;
         float outR = 0.0f;
-        convolve512Stereo(h, ptrL, ptrR, outL, outR);
+        convolveFirStereo(h, ptrL, ptrR, outL, outR);
 
         historyIdx_ = historyIdx_ + 1;
         if (historyIdx_ >= taps) historyIdx_ = 0;
@@ -390,7 +486,7 @@ void ArbitraryResponseEq::processInterleaved(float* buffer, int frames, int chan
 
         float outL = 0.0f;
         float outR = 0.0f;
-        convolve512Stereo(h, ptrL, ptrR, outL, outR);
+        convolveFirStereo(h, ptrL, ptrR, outL, outR);
 
         historyIdx_ = historyIdx_ + 1;
         if (historyIdx_ >= taps) historyIdx_ = 0;

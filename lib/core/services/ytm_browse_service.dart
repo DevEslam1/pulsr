@@ -79,7 +79,7 @@ class YtmBrowseService {
       }
     }
     if (_pendingFeed != null) return _pendingFeed!.future;
-    _pendingFeed = Completer<List<YtmBrowseSection>>();
+    final completer = _pendingFeed = Completer<List<YtmBrowseSection>>();
     try {
       // Curated diverse showcase when offline/initial load with dynamic
       // fallback. Fire all three requests concurrently: they are independent
@@ -115,15 +115,18 @@ class YtmBrowseService {
         _cachedSections = sections;
         _lastFetchTime = DateTime.now();
       }
-      _pendingFeed?.complete(sections);
-      _pendingFeed = null;
+      // Complete the completer captured at fetch start, not the field: if
+      // clearCache() (or a later getHomeFeed) swapped _pendingFeed meanwhile,
+      // completing the field would resolve a successor with this stale result.
+      if (!completer.isCompleted) completer.complete(sections);
+      if (identical(_pendingFeed, completer)) _pendingFeed = null;
       return sections;
     } catch (e, st) {
       ErrorLogger.log('Failed to fetch YTM home feed',
           error: e, stackTrace: st, category: 'YtmBrowseService');
       final fallback = _cachedSections ?? [];
-      _pendingFeed?.complete(fallback);
-      _pendingFeed = null;
+      if (!completer.isCompleted) completer.complete(fallback);
+      if (identical(_pendingFeed, completer)) _pendingFeed = null;
       return fallback;
     }
   }

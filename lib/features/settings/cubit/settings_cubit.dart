@@ -511,6 +511,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       bluetoothLatencyOffsetMs:
           prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs) ??
               current.bluetoothLatencyOffsetMs,
+      bluetoothHiResEnabled:
+          prefs.getBool(PrefsKeys.bluetoothHiResEnabled) ?? false,
       hedgedResolutionEnabled:
           prefs.getBool(PrefsKeys.hedgedResolutionEnabled) ?? true,
       adaptiveQualityEnabled:
@@ -955,6 +957,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         if (reconciledDirty.contains('bluetoothLatencyOffsetMs')) {
           loadedState = loadedState.copyWith(
               bluetoothLatencyOffsetMs: previous.bluetoothLatencyOffsetMs);
+        }
+        if (reconciledDirty.contains('bluetoothHiResEnabled')) {
+          loadedState = loadedState.copyWith(
+              bluetoothHiResEnabled: previous.bluetoothHiResEnabled);
         }
         if (reconciledDirty.contains('hedgedResolutionEnabled')) {
           loadedState = loadedState.copyWith(

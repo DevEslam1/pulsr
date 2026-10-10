@@ -22,7 +22,9 @@ static const double kDefaultQ[10] = {
 ParametricEQ::ParametricEQ() {
     for (int i = 0; i < 10; ++i) {
         bands_[i].frequency = kDefaultFrequencies[i];
+        bands_[i].smoothedFrequency = kDefaultFrequencies[i];
         bands_[i].q = kDefaultQ[i];
+        bands_[i].smoothedQ = kDefaultQ[i];
         bands_[i].targetGainDb = 0.0;
         bands_[i].smoothedGainDb = 0.0;
         bands_[i].type = (i == 0) ? FilterType::LowShelf : (i == 9 ? FilterType::HighShelf : FilterType::Peaking);
@@ -66,7 +68,9 @@ void ParametricEQ::setDynamicBands(int count, const double* freqs, const double*
     bandCount_ = std::clamp(count, 1, MAX_BANDS);
     for (int i = 0; i < bandCount_; ++i) {
         bands_[i].frequency = freqs[i];
+        bands_[i].smoothedFrequency = freqs[i];
         bands_[i].q = qs ? qs[i] : 1.414;
+        bands_[i].smoothedQ = bands_[i].q;
         bands_[i].targetGainDb = 0.0;
         bands_[i].smoothedGainDb = 0.0;
         bands_[i].type = FilterType::Peaking;
@@ -85,6 +89,10 @@ void ParametricEQ::setBand(int idx, double freq, double gainDb, double q, Filter
     bands_[idx].frequency = std::clamp(freq, 10.0, sampleRate_ * 0.499);
     bands_[idx].targetGainDb = std::clamp(gainDb, -30.0, 30.0);
     bands_[idx].q = std::clamp(q, 0.05, 30.0);
+    // Direct programmatic set: snap the smoothed freq/Q so coeffs reflect the new
+    // band immediately (the snapshot/applyParams path is what sweeps click-free).
+    bands_[idx].smoothedFrequency = bands_[idx].frequency;
+    bands_[idx].smoothedQ = bands_[idx].q;
     bands_[idx].type = type;
     bands_[idx].enabled = enabled;
     computeCoeffs(bands_[idx], bands_[idx].smoothedGainDb);
@@ -114,12 +122,30 @@ void ParametricEQ::beginEnableRamp() {
     preampLinear_ = 1.0;
     for (int i = 0; i < bandCount_; ++i) {
         bands_[i].smoothedGainDb = 0.0;
+        // Only gain fades in on enable; freq/Q start at target (no sweep).
+        bands_[i].smoothedFrequency = bands_[i].frequency;
+        bands_[i].smoothedQ = bands_[i].q;
         computeCoeffs(bands_[i], 0.0);
     }
 }
 
+void ParametricEQ::beginDisableRamp() {
+    // Symmetric to beginEnableRamp: don't clear state or jump to bypass. process()
+    // keeps running (see fadeOutActive_) with every gain/preamp smoothing toward
+    // unity, then hard-bypasses once the ramp has settled. Settle over ~5 of the
+    // 20 ms smoothing time constants (~100 ms) so the gains are within ~0.7% of
+    // unity before the stage drops out, which keeps the transition click-free.
+    fadeOutActive_ = true;
+    fadeOutFrames_ = static_cast<long long>(std::ceil(sampleRate_ * 0.100));
+}
+
 void ParametricEQ::setEnabled(bool enabled) {
-    if (enabled && !enabled_) beginEnableRamp();
+    if (enabled && !enabled_) {
+        fadeOutActive_ = false; // cancel any in-flight disable fade
+        beginEnableRamp();
+    } else if (!enabled && enabled_) {
+        beginDisableRamp();
+    }
     enabled_ = enabled;
 }
 
@@ -140,6 +166,7 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         std::memset(s2_, 0, sizeof(s2_));
     }
     const bool turningOn = params.enabled && !enabled_;
+    const bool turningOff = !params.enabled && enabled_;
     enabled_ = params.enabled;
     targetPreampDb_ = std::clamp(params.preampDb, -30.0, 30.0);
     bandCount_ = newBandCount;
@@ -148,37 +175,44 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         const auto& p = params.bands[i];
         const double newFreq = std::clamp(p.frequency, 10.0, sampleRate_ * 0.499);
         const double newQ = std::clamp(p.q, 0.05, 30.0);
-        // Clear filter state when the structure changes (frequency, Q, type,
-        // enable or mute), not just frequency: a type/Q switch with retained
-        // state otherwise leaves stale registers and clicks. Only re-derive
-        // coefficients when something structural moved; a pure gain change is
-        // applied through the per-block smoothed-gain path in process(), which
-        // avoids recomputing every band's transcendentals on every parameter
-        // generation.
-        const bool structureChanged =
+        // Only DISCRETE changes (type/enable/mute, or a rate change) clear state
+        // and recompute instantly: those cannot be coefficient-interpolated. A
+        // freq/Q change is NOT treated as structural here — clearing state and
+        // snapping coeffs on every automation step is exactly what clicks. Instead
+        // we just move the smoothing TARGET (bands_[i].frequency / .q) and let the
+        // per-block smoother in process() sweep smoothedFrequency/smoothedQ toward
+        // it with the filter state preserved, so freq/Q sweeps stay click-free.
+        const bool discreteChanged =
             rateStale ||
-            std::abs(newFreq - bands_[i].frequency) > 1.0 ||
-            std::abs(newQ - bands_[i].q) > 1e-6 ||
             p.type != bands_[i].type ||
             p.enabled != bands_[i].enabled ||
             p.mute != bands_[i].mute;
-        if (structureChanged) {
+        if (discreteChanged) {
             for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
                 s1_[ch][i] = s2_[ch][i] = 0.0;
             }
         }
-        bands_[i].frequency = newFreq;
+        bands_[i].frequency = newFreq;              // smoothing target
         bands_[i].targetGainDb = std::clamp(p.gainDb, -30.0, 30.0);
-        bands_[i].q = newQ;
+        bands_[i].q = newQ;                          // smoothing target
         bands_[i].type = p.type;
         bands_[i].enabled = p.enabled;
         bands_[i].solo = p.solo;
         bands_[i].mute = p.mute;
-        if (structureChanged) {
+        if (discreteChanged) {
+            // A discrete switch has no meaningful coefficient interpolation
+            // (e.g. peaking<->shelf), so start from the new freq/Q directly.
+            bands_[i].smoothedFrequency = newFreq;
+            bands_[i].smoothedQ = newQ;
             computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
         }
     }
-    if (turningOn) beginEnableRamp();
+    if (turningOn) {
+        fadeOutActive_ = false;
+        beginEnableRamp();
+    } else if (turningOff) {
+        beginDisableRamp();
+    }
 }
 
 void ParametricEQ::reset() {
@@ -186,10 +220,14 @@ void ParametricEQ::reset() {
     std::memset(s2_, 0, sizeof(s2_));
     std::memset(soloSkipped_, 0, sizeof(soloSkipped_));
     coeffsStale_ = false;
+    fadeOutActive_ = false;
+    fadeOutFrames_ = 0;
     smoothedPreampDb_ = targetPreampDb_;
     preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     for (int i = 0; i < bandCount_; ++i) {
         bands_[i].smoothedGainDb = bands_[i].targetGainDb;
+        bands_[i].smoothedFrequency = bands_[i].frequency;
+        bands_[i].smoothedQ = bands_[i].q;
         computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
     }
 }
@@ -212,12 +250,15 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     }
     band.bypass = false;
 
-    const double f0 = std::clamp(band.frequency, 10.0, sampleRate_ * 0.499);
+    // Coefficients are derived from the per-block SMOOTHED freq/Q (not the raw
+    // targets) so freq/Q automation sweeps the biquad continuously instead of
+    // jumping. The smoother in process() advances these toward band.frequency/q.
+    const double f0 = std::clamp(band.smoothedFrequency, 10.0, sampleRate_ * 0.499);
     const double w0 = 2.0 * M_PI * f0 / sampleRate_;
     const double cosW = std::cos(w0);
     const double sinW = std::sin(w0);
     const double A = std::pow(10.0, gainDb / 40.0);
-    const double q = std::max(band.q, 0.05);
+    const double q = std::max(band.smoothedQ, 0.05);
     const double alpha = sinW / (2.0 * q);
 
     double b0 = 1.0, b1 = 0.0, b2 = 0.0, a0 = 1.0, a1 = 0.0, a2 = 0.0;
@@ -320,8 +361,9 @@ void ParametricEQ::process(const float* in, float* out, int frames, int channels
 
 void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // A disabled EQ is a true bypass: the preamp is part of the EQ and must not
-    // leak gain while the stage is off.
-    if (!enabled_) return;
+    // leak gain while the stage is off. While a disable fade-out is still in
+    // flight (fadeOutActive_) we keep processing so the gains can ramp to unity.
+    if (!enabled_ && !fadeOutActive_) return;
 
     // Keep the real interleave stride; clamp only how many channels we process.
     // Clamping the stride itself garbles any stream wider than MAX_CHANNELS.
@@ -332,12 +374,17 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     const double tau = 0.020;
     const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * tau));
 
+    // During a disable fade-out every gain/preamp target is unity (0 dB) so the
+    // EQ smoothly approaches dry before it hard-bypasses (see fade countdown
+    // below); otherwise they track the user's requested values.
+    const double preampTarget = fadeOutActive_ ? 0.0 : targetPreampDb_;
+
     // Smooth preamp gain
-    if (std::abs(smoothedPreampDb_ - targetPreampDb_) > 1e-4) {
-        smoothedPreampDb_ += smoothFactor * (targetPreampDb_ - smoothedPreampDb_);
+    if (std::abs(smoothedPreampDb_ - preampTarget) > 1e-4) {
+        smoothedPreampDb_ += smoothFactor * (preampTarget - smoothedPreampDb_);
         preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     } else {
-        smoothedPreampDb_ = targetPreampDb_;
+        smoothedPreampDb_ = preampTarget;
         preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     }
 
@@ -380,11 +427,38 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
         }
 
         const bool wasBypass = band.bypass;
-        if (std::abs(band.smoothedGainDb - band.targetGainDb) > 1e-4) {
-            band.smoothedGainDb += smoothFactor * (band.targetGainDb - band.smoothedGainDb);
-            computeCoeffs(band, band.smoothedGainDb);
-        } else if (band.smoothedGainDb != band.targetGainDb) {
-            band.smoothedGainDb = band.targetGainDb;
+        // Smooth gain, frequency and Q together so freq/Q automation sweeps the
+        // biquad continuously (click-free) just like the gain path. During a
+        // disable fade-out the gain target is forced to unity so the band ramps
+        // to bypass. Any of the three moving requires a coefficient recompute.
+        const double gainTarget = fadeOutActive_ ? 0.0 : band.targetGainDb;
+        bool recompute = false;
+
+        if (std::abs(band.smoothedGainDb - gainTarget) > 1e-4) {
+            band.smoothedGainDb += smoothFactor * (gainTarget - band.smoothedGainDb);
+            recompute = true;
+        } else if (band.smoothedGainDb != gainTarget) {
+            band.smoothedGainDb = gainTarget;
+            recompute = true;
+        }
+
+        if (std::abs(band.smoothedFrequency - band.frequency) > 1e-3) {
+            band.smoothedFrequency += smoothFactor * (band.frequency - band.smoothedFrequency);
+            recompute = true;
+        } else if (band.smoothedFrequency != band.frequency) {
+            band.smoothedFrequency = band.frequency;
+            recompute = true;
+        }
+
+        if (std::abs(band.smoothedQ - band.q) > 1e-6) {
+            band.smoothedQ += smoothFactor * (band.q - band.smoothedQ);
+            recompute = true;
+        } else if (band.smoothedQ != band.q) {
+            band.smoothedQ = band.q;
+            recompute = true;
+        }
+
+        if (recompute) {
             computeCoeffs(band, band.smoothedGainDb);
         }
 
@@ -626,6 +700,18 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                 s1_[ch][b] = s1;
                 s2_[ch][b] = s2;
             }
+        }
+    }
+
+    // Disable fade-out countdown. The gains above have been ramping toward unity
+    // for this block; once enough frames have elapsed for the exponential ramp to
+    // settle, drop the stage into true bypass. By then output ≈ dry, so the
+    // hard-bypass on the next block introduces no click.
+    if (fadeOutActive_) {
+        fadeOutFrames_ -= frames;
+        if (fadeOutFrames_ <= 0) {
+            fadeOutActive_ = false;
+            fadeOutFrames_ = 0;
         }
     }
 }

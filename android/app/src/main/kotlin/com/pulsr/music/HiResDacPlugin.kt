@@ -321,6 +321,31 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     }
                 }
             }
+            // Opens the screen where the user can change the Bluetooth audio
+            // codec. Retail builds cannot write codec preferences (SystemApi),
+            // so this is the sanctioned deep-link: Bluetooth settings first
+            // (where "HD audio"/codec is exposed on most ROMs), then Developer
+            // Options (the Bluetooth Audio Codec page), then general settings.
+            "openBluetoothCodecSettings" -> {
+                val candidates = listOf(
+                    android.provider.Settings.ACTION_BLUETOOTH_SETTINGS,
+                    android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS,
+                    android.provider.Settings.ACTION_SETTINGS,
+                )
+                var opened = false
+                for (action in candidates) {
+                    try {
+                        val intent = android.content.Intent(action)
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        opened = true
+                        break
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not open $action: ${e.message}")
+                    }
+                }
+                result.success(opened)
+            }
             // ────────────────────────────────────────────────────────────────
             "setOutputDevice" -> {
                 val deviceId = call.argument<Int>("deviceId")

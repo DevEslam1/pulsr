@@ -16,10 +16,12 @@ struct BiquadCoeffs {
 };
 
 struct EQBandState {
-    double frequency = 1000.0;
+    double frequency = 1000.0;        // smoothing target frequency
+    double smoothedFrequency = 1000.0; // per-block interpolated frequency used for coeffs
     double targetGainDb = 0.0;
     double smoothedGainDb = 0.0;
-    double q = 1.0;
+    double q = 1.0;                   // smoothing target Q
+    double smoothedQ = 1.0;           // per-block interpolated Q used for coeffs
     FilterType type = FilterType::Peaking;
     bool enabled = true;
     bool solo = false;
@@ -55,6 +57,10 @@ private:
     // Off->on transition: clear stale filter memory and restart preamp/band
     // gains from flat so the smoother fades the EQ in instead of clicking.
     void beginEnableRamp();
+    // On->off transition: keep processing while the preamp and every band gain
+    // ramp down to unity, then hard-bypass, so disable fades out symmetrically
+    // with beginEnableRamp instead of clicking / jumping level.
+    void beginDisableRamp();
 
     EQBandState bands_[MAX_BANDS];
     int bandCount_ = 10;
@@ -63,6 +69,13 @@ private:
     double smoothedPreampDb_ = 0.0;
     double preampLinear_ = 1.0;
     bool enabled_ = true;
+
+    // Disable fade-out state (symmetric to beginEnableRamp). While fadeOutActive_
+    // is set, process() keeps running with every gain/preamp smoothing toward
+    // unity even though enabled_ is already false; after fadeOutFrames_ frames
+    // (several smoothing time constants) the stage hard-bypasses click-free.
+    bool fadeOutActive_ = false;
+    long long fadeOutFrames_ = 0;
 
     // Set when the sample rate changes so applyParams() force-recomputes every
     // band in the incoming snapshot at the new rate, including bands that were

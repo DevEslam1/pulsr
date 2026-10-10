@@ -330,6 +330,10 @@ extension EqualizerRestoreOps on EqualizerManager {
           ditherTargetBitDepth != 32) {
         ditherTargetBitDepth = 16;
       }
+      // Bluetooth Hi-Res opt-in mirrors into the dither-on-BT permission so a
+      // restored session keeps dithering on BT only when the user asked for it.
+      isBluetoothDitherEnabled =
+          prefs.getBool(PrefsKeys.bluetoothHiResEnabled) ?? false;
       _sanitizeRestoredState();
       // Hydrate stored dynamic-EQ bands and the selected headphone profile into
       // memory BEFORE the bit-perfect early-return. These only populate
@@ -382,6 +386,7 @@ extension EqualizerRestoreOps on EqualizerManager {
             enabled: true,
             targetBitDepth: ditherTargetBitDepth,
             isBluetooth: isBluetoothRoute,
+            allowBluetoothDither: isBluetoothDitherEnabled,
           );
         }
       }

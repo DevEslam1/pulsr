@@ -464,6 +464,7 @@ class ScrobblerService {
     required String album,
     required int durationSec,
     required DateTime timestamp,
+    List<String>? services,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -481,6 +482,9 @@ class ScrobblerService {
         'album': album,
         'durationSec': durationSec,
         'timestamp': timestamp.millisecondsSinceEpoch,
+        // When set, limits later delivery to the services that still need this
+        // scrobble so flushOfflineQueue can't double-send to delivered ones.
+        if (services != null) 'services': services,
       });
       final trimmed =
           list.length > 200 ? list.sublist(list.length - 200) : list;
@@ -541,17 +545,14 @@ class ScrobblerService {
       return; // Already scrobbled within 5 minutes
     }
 
-    bool anyFailure = false;
+    final pending = <String>{};
+    bool anyServiceEnabled = false;
 
     // 1. Last.fm Scrobble
     if (prefs.getBool(keyLastFmEnabled) == true) {
+      anyServiceEnabled = true;
       if (!_canScrobbleService('lastfm')) {
-        await _enqueueOfflineScrobble(
-            artist: artist,
-            track: track,
-            album: album,
-            durationSec: durationSec,
-            timestamp: timestamp);
+        pending.add('lastfm');
       } else {
         final apiKey =
             await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
@@ -585,7 +586,7 @@ class ScrobblerService {
           if (ok) {
             _recordServiceScrobble('lastfm');
           } else {
-            anyFailure = true;
+            pending.add('lastfm');
           }
         }
       }
@@ -593,13 +594,9 @@ class ScrobblerService {
 
     // 2. Libre.fm Scrobble
     if (prefs.getBool(keyLibreFmEnabled) == true) {
+      anyServiceEnabled = true;
       if (!_canScrobbleService('librefm')) {
-        await _enqueueOfflineScrobble(
-            artist: artist,
-            track: track,
-            album: album,
-            durationSec: durationSec,
-            timestamp: timestamp);
+        pending.add('librefm');
       } else {
         final sessionKey = await _getSecureOrMigrate(
             keyLibreFmSessionKeySecure, keyLibreFmSessionKey);
@@ -621,7 +618,7 @@ class ScrobblerService {
           if (ok) {
             _recordServiceScrobble('librefm');
           } else {
-            anyFailure = true;
+            pending.add('librefm');
           }
         }
       }
@@ -629,13 +626,9 @@ class ScrobblerService {
 
     // 3. Custom Webhook Scrobble
     if (prefs.getBool(keyCustomWebhookEnabled) == true) {
+      anyServiceEnabled = true;
       if (!_canScrobbleService('webhook')) {
-        await _enqueueOfflineScrobble(
-            artist: artist,
-            track: track,
-            album: album,
-            durationSec: durationSec,
-            timestamp: timestamp);
+        pending.add('webhook');
       } else {
         final webhookUrl = prefs.getString(keyCustomWebhookUrl);
         if (webhookUrl != null && webhookUrl.isNotEmpty) {
@@ -655,7 +648,7 @@ class ScrobblerService {
           if (ok) {
             _recordServiceScrobble('webhook');
           } else {
-            anyFailure = true;
+            pending.add('webhook');
           }
         }
       }
@@ -663,13 +656,9 @@ class ScrobblerService {
 
     // 4. ListenBrainz Single Listen Scrobble
     if (prefs.getBool(keyListenBrainzEnabled) == true) {
+      anyServiceEnabled = true;
       if (!_canScrobbleService('listenbrainz')) {
-        await _enqueueOfflineScrobble(
-            artist: artist,
-            track: track,
-            album: album,
-            durationSec: durationSec,
-            timestamp: timestamp);
+        pending.add('listenbrainz');
       } else {
         final token = await _getSecureOrMigrate(
             keyListenBrainzTokenSecure, keyListenBrainzToken);
@@ -704,25 +693,34 @@ class ScrobblerService {
           if (ok) {
             _recordServiceScrobble('listenbrainz');
           } else {
-            anyFailure = true;
+            pending.add('listenbrainz');
           }
         }
       }
     }
 
-    if (anyFailure) {
+    if (pending.isNotEmpty) {
       await _enqueueOfflineScrobble(
         artist: artist,
         track: track,
         album: album,
         durationSec: durationSec,
         timestamp: timestamp,
+        services: pending.toList(),
       );
-    } else {
+    }
+    // Mark the real-time dedup guard whenever a service was enabled, so the same
+    // track can't be re-scrobbled within 5 minutes. Only count stats on a full
+    // delivery; still-pending services are counted when flushOfflineQueue
+    // delivers them from the per-service queue entry.
+    if (anyServiceEnabled) {
       await prefs.setString('last_scrobble_key', dedupKey);
       await prefs.setInt('last_scrobble_time', now);
       await prefs.setInt('last_scrobbled_timestamp', now);
-      await _recordSuccessfulScrobble(prefs, timestamp.millisecondsSinceEpoch);
+      if (pending.isEmpty) {
+        await _recordSuccessfulScrobble(
+            prefs, timestamp.millisecondsSinceEpoch);
+      }
     }
   }
 
@@ -797,18 +795,25 @@ class ScrobblerService {
           final durationSec = item['durationSec'] as int? ?? 0;
           final tsMillis = item['timestamp'] as int? ??
               DateTime.now().millisecondsSinceEpoch;
+          final rawServices = item['services'];
+          final services = rawServices is List
+              ? rawServices.whereType<String>().toList()
+              : null;
 
           if (artist != null && track != null) {
-            final delivered = await _submitScrobbleDirect(
+            final stillPending = await _submitScrobbleDirect(
               artist: artist,
               track: track,
               album: album,
               durationSec: durationSec,
               timestamp: DateTime.fromMillisecondsSinceEpoch(tsMillis),
+              requestedServices: services,
             );
-            // Keep the entry queued when no service accepted it, so a flush
-            // performed while offline retries later instead of dropping it.
-            return delivered ? null : item;
+            // Fully delivered (or nothing left that can receive it): drop.
+            if (stillPending.isEmpty) return null;
+            // Otherwise keep the entry but narrow it to the services that still
+            // need it, so a later flush won't re-send to delivered ones.
+            return <String, dynamic>{...item, 'services': stillPending};
           }
           return null;
         }));
@@ -847,20 +852,26 @@ class ScrobblerService {
     return md5.convert(utf8.encode(buffer.toString())).toString();
   }
 
-  /// Submit scrobble without re-enqueueing on failure (used by flushOfflineQueue).
-  /// Returns true when the entry may be dropped from the queue: either a service
-  /// accepted it, the duplicate window already covered it, or no service is
-  /// configured to receive it.
+  /// Submits a queued scrobble to the services that still need it, without
+  /// re-enqueueing on failure (used by [flushOfflineQueue]). Returns the
+  /// services STILL pending after this attempt: an empty list means the entry
+  /// is fully handled (delivered, or no enabled/configured service can receive
+  /// it) and may be dropped from the queue.
+  ///
+  /// [requestedServices] limits delivery to the services recorded on the queue
+  /// entry; null targets every enabled service (legacy entries written before
+  /// per-service tracking existed).
   ///
   /// Serialized: a flush batch submits in parallel, and every submission
   /// read-modifies the shared dedup keys and stats counters, so unsynchronized
   /// runs could double-count or drop dedup.
-  Future<bool> _submitScrobbleDirect({
+  Future<List<String>> _submitScrobbleDirect({
     required String artist,
     required String track,
     required String album,
     required int durationSec,
     required DateTime timestamp,
+    List<String>? requestedServices,
   }) {
     return _submitMutex.run(() => _submitScrobbleDirectLocked(
           artist: artist,
@@ -868,32 +879,42 @@ class ScrobblerService {
           album: album,
           durationSec: durationSec,
           timestamp: timestamp,
+          requestedServices: requestedServices,
         ));
   }
 
-  Future<bool> _submitScrobbleDirectLocked({
+  Future<List<String>> _submitScrobbleDirectLocked({
     required String artist,
     required String track,
     required String album,
     required int durationSec,
     required DateTime timestamp,
+    List<String>? requestedServices,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
     final dedupKey = '${artist}_$track';
-    final lastScrobbledKey = prefs.getString('last_scrobble_key');
-    final lastScrobbledTime = prefs.getInt('last_scrobble_time') ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    if (lastScrobbledKey == dedupKey && (now - lastScrobbledTime) < 300000) {
-      return true;
+    // Legacy entries (no explicit service list) predate per-service tracking
+    // and may duplicate a scrobble already delivered in real time, so keep the
+    // original 5-minute dedup guard for them. Entries written with an explicit
+    // service set deliver only to those services and skip this guard.
+    if (requestedServices == null) {
+      final lastScrobbledKey = prefs.getString('last_scrobble_key');
+      final lastScrobbledTime = prefs.getInt('last_scrobble_time') ?? 0;
+      if (lastScrobbledKey == dedupKey && (now - lastScrobbledTime) < 300000) {
+        return const [];
+      }
     }
 
-    bool anySuccess = false;
-    bool anyServiceEnabled = false;
+    bool wants(String service) =>
+        requestedServices == null || requestedServices.contains(service);
 
-    if (prefs.getBool(keyLastFmEnabled) == true) {
-      anyServiceEnabled = true;
+    final pending = <String>{};
+    bool anySuccess = false;
+
+    if (wants('lastfm') && prefs.getBool(keyLastFmEnabled) == true) {
       final apiKey =
           await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
       final secret =
@@ -922,11 +943,59 @@ class ScrobblerService {
             Uri.parse('https://ws.audioscrobbler.com/2.0/'),
             body: params)) {
           anySuccess = true;
+        } else {
+          pending.add('lastfm');
         }
       }
     }
 
-    if (prefs.getBool(keyListenBrainzEnabled) == true) {
+    if (wants('librefm') && prefs.getBool(keyLibreFmEnabled) == true) {
+      final sessionKey = await _getSecureOrMigrate(
+          keyLibreFmSessionKeySecure, keyLibreFmSessionKey);
+      if (sessionKey != null && sessionKey.isNotEmpty) {
+        final params = <String, String>{
+          'method': 'track.scrobble',
+          'artist': artist,
+          'track': track,
+          if (album.isNotEmpty) 'album': album,
+          'duration': durationSec.toString(),
+          'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
+          'sk': sessionKey,
+          'format': 'json',
+        };
+        if (await _postWithRetry(Uri.parse('https://libre.fm/2.0/'),
+            body: params)) {
+          anySuccess = true;
+        } else {
+          pending.add('librefm');
+        }
+      }
+    }
+
+    if (wants('webhook') && prefs.getBool(keyCustomWebhookEnabled) == true) {
+      final webhookUrl = prefs.getString(keyCustomWebhookUrl);
+      if (webhookUrl != null && webhookUrl.isNotEmpty) {
+        if (await _postWithRetry(
+          Uri.parse(webhookUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'event': 'scrobble',
+            'artist': artist,
+            'track': track,
+            'album': album,
+            'durationSec': durationSec,
+            'timestamp': timestamp.toIso8601String(),
+          }),
+        )) {
+          anySuccess = true;
+        } else {
+          pending.add('webhook');
+        }
+      }
+    }
+
+    if (wants('listenbrainz') &&
+        prefs.getBool(keyListenBrainzEnabled) == true) {
       final token = await _getSecureOrMigrate(
           keyListenBrainzTokenSecure, keyListenBrainzToken);
       if (token != null && token.isNotEmpty) {
@@ -957,6 +1026,8 @@ class ScrobblerService {
           body: jsonEncode(payload),
         )) {
           anySuccess = true;
+        } else {
+          pending.add('listenbrainz');
         }
       }
     }
@@ -966,8 +1037,9 @@ class ScrobblerService {
       await prefs.setInt('last_scrobble_time', now);
       await _recordSuccessfulScrobble(prefs, timestamp.millisecondsSinceEpoch);
     }
-    // With no scrobbling service configured there is nothing to retry, so the
-    // entry is safe to drop; otherwise retain it unless it was delivered.
-    return anySuccess || !anyServiceEnabled;
+    // Services requested but no longer enabled/configured can't receive the
+    // scrobble and drop out of `pending`; only services that actively failed
+    // this attempt remain, to be retried on a later flush.
+    return pending.toList();
   }
 }

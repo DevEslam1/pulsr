@@ -171,6 +171,9 @@ inline void runGoldenVectorLinearPhaseFirTest() {
     const auto& fir = arbEq.getFirFilter();
     assert(fir.size() == ArbitraryResponseEq::FIR_TAPS);
 
+    // Linear-phase reports a FIR_TAPS/2 group delay for latency compensation.
+    assert(arbEq.getLatencyFrames() == ArbitraryResponseEq::FIR_TAPS / 2);
+
     // Verify strict symmetry: fir[i] == fir[FIR_TAPS - 1 - i]
     float maxAsymmetry = 0.0f;
     for (size_t i = 0; i < fir.size() / 2; ++i) {
@@ -179,8 +182,69 @@ inline void runGoldenVectorLinearPhaseFirTest() {
     }
 
     assert(maxAsymmetry < 0.005f);
-    std::cout << "  ✓ 512-tap Linear-phase FIR kernel is strictly Hermitian symmetric (max asymmetry: "
-              << maxAsymmetry << " < 0.005)." << std::endl;
+    std::cout << "  ✓ " << ArbitraryResponseEq::FIR_TAPS
+              << "-tap linear-phase FIR kernel is strictly Hermitian symmetric (max asymmetry: "
+              << maxAsymmetry << " < 0.005), latency " << arbEq.getLatencyFrames() << " frames." << std::endl;
+}
+
+// 5b. ArbitraryResponseEq minimum-phase impulse test. The AutoEQ import default
+// (linearPhase=false) must synthesize a causal, front-loaded, zero-latency FIR
+// whose MAGNITUDE still matches the requested curve (no pre-ringing / latency).
+inline void runGoldenVectorMinPhaseFirTest() {
+    std::cout << "\n=== [GOLDEN 5b/7] ArbitraryResponseEq Minimum-Phase FIR Test ===" << std::endl;
+    const int taps = ArbitraryResponseEq::FIR_TAPS;
+    const std::string eqStr = "GraphicEq: 20 6.0; 100 -3.0; 1000 5.0; 10000 -4.0; 20000 0.0";
+
+    ArbitraryResponseEq minEq;
+    minEq.setSampleRate(48000.0);
+    minEq.setEnabled(true);
+    assert(minEq.loadGraphicEqString(eqStr, false)); // linearPhase = false => min-phase
+
+    // Minimum phase is effectively zero-latency.
+    assert(minEq.getLatencyFrames() == 0);
+
+    const auto& minFir = minEq.getFirFilter();
+    assert(static_cast<int>(minFir.size()) == taps);
+
+    // The dominant tap must sit near n=0 (front-loaded / causal), not at the
+    // centre like a symmetric linear-phase kernel.
+    int peakIdx = 0;
+    float peakAbs = 0.0f;
+    for (int i = 0; i < taps; ++i) {
+        assert(std::isfinite(minFir[i]));
+        if (std::abs(minFir[i]) > peakAbs) { peakAbs = std::abs(minFir[i]); peakIdx = i; }
+    }
+    assert(peakIdx < taps / 4);
+
+    // ... and the kernel is clearly NOT symmetric (that was the linear-phase bug).
+    float maxAsymmetry = 0.0f;
+    for (int i = 0; i < taps / 2; ++i) {
+        maxAsymmetry = std::max(maxAsymmetry, std::abs(minFir[i] - minFir[taps - 1 - i]));
+    }
+    assert(maxAsymmetry > 0.01f);
+
+    // Magnitude: minimum phase must still realize the requested +5 dB boost at
+    // 1 kHz (|H_min| == |H|). Compare steady-state RMS of a 1 kHz tone to the dry
+    // reference; the phase differs from linear, but the magnitude must not.
+    const int n = 16384;
+    const double dryRms = 0.3 / std::sqrt(2.0);
+    std::vector<float> buf(n * 2);
+    for (int i = 0; i < n; ++i) {
+        float s = 0.3f * std::sin(2.0f * static_cast<float>(M_PI) * 1000.0f *
+                                  static_cast<float>(i) / 48000.0f);
+        buf[i * 2] = s; buf[i * 2 + 1] = s;
+    }
+    minEq.reset();
+    minEq.processInterleaved(buf.data(), n, 2);
+    double sum = 0.0; int cnt = 0;
+    for (int i = n / 2; i < n; ++i) { sum += double(buf[i * 2]) * buf[i * 2]; ++cnt; }
+    const double rMin = std::sqrt(sum / cnt);
+    // Clear boost over dry (+5 dB target ≈ ×1.78); conservative lower bound.
+    assert(rMin > dryRms * 1.3);
+
+    std::cout << "  ✓ Min-phase FIR is causal (peak tap @" << peakIdx << " < " << (taps / 4)
+              << "), asymmetric (" << maxAsymmetry << " > 0.01), zero-latency, and realizes the "
+              << "1 kHz boost (RMS " << rMin << " vs dry " << dryRms << ")." << std::endl;
 }
 
 // 6. Limiter ceiling invariant test

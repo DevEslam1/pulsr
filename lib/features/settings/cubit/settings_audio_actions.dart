@@ -578,6 +578,45 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await _hiResAudioService.openBluetoothDevOptions();
   }
 
+  /// Opens the platform screen where the Bluetooth audio codec can be changed
+  /// (Bluetooth settings first, then Developer Options). Retail builds cannot
+  /// write the codec directly, so this is the sanctioned deep-link.
+  Future<bool> openBluetoothCodecSettings() async {
+    final opened = await _hiResAudioService.openBluetoothCodecSettings();
+    if (!opened) {
+      safeEmit(state.copyWith(
+          errorMessage: 'Could not open Bluetooth codec settings.'));
+    }
+    return opened;
+  }
+
+  /// Opt-in Bluetooth Hi-Res (best-effort). Bluetooth is a lossy codec link, so
+  /// this can never be bit-perfect; it stops the app from making the link worse:
+  ///   * item 1 - keeps the float DSP path on so 24/32-bit samples are not
+  ///     truncated to 16-bit in-app before the codec encoder;
+  ///   * item 5 - permits the native TPDF dither stage on BT at the codec depth;
+  ///   * item 3 - the per-track codec-rate alignment is driven by the player
+  ///     (see PlayerDspController.maybeFollowTrackSampleRate).
+  Future<void> setBluetoothHiResEnabled(bool enabled) async {
+    markDirty('bluetoothHiResEnabled');
+    safeEmit(state.copyWith(bluetoothHiResEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.bluetoothHiResEnabled, enabled);
+    // Item 1: never truncate to 16-bit before the codec encoder.
+    if (enabled && !state.floatOutputEnabled) {
+      await setFloatOutputEnabled(true);
+    }
+    // Item 5: mirror the dither-on-BT permission into the effects layer so every
+    // later dither push (and route resync) carries it.
+    if (getIt.isRegistered<EqualizerManager>()) {
+      final eq = getIt<EqualizerManager>();
+      eq.isBluetoothDitherEnabled = enabled;
+      if (eq.isDitherEnabled) {
+        await eq.setDither(true, allowBluetoothDither: enabled);
+      }
+    }
+  }
+
   /// Probes the native DoP capability and stores the single [dop] gate in state.
   /// Used by the device-change listener; [refreshOutputDevice] folds the same
   /// probe into its emit.

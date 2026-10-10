@@ -26,7 +26,8 @@ int main() {
     std::cout << "[TEST] Running DoP Framer Tests..." << std::endl;
     int failures = 0;
 
-    // 1. Basic framing: one stereo frame -> [L0,L1,0x05,R0,R1,0x05]
+    // 1. Basic framing: one stereo frame. DoP v1.1 word (LE) = [newer, older,
+    //    marker], so [L_newer,L_older,0x05,R_newer,R_older,0x05].
     {
         const uint8_t in[4] = {0xAA, 0xBB, 0xCC, 0xDD};
         std::vector<uint8_t> out(6, 0);
@@ -35,10 +36,10 @@ int main() {
         if (!ok || n != 6) {
             std::cout << "  FAIL basic framing returned ok=" << ok << " n=" << n << std::endl;
             ++failures;
-        } else if (!ExpectBytes(out, {0xAA, 0xBB, 0x05, 0xCC, 0xDD, 0x05}, "basic frame")) {
+        } else if (!ExpectBytes(out, {0xBB, 0xAA, 0x05, 0xDD, 0xCC, 0x05}, "basic frame")) {
             ++failures;
         } else {
-            std::cout << "  OK basic framing produces [L0,L1,mk,R0,R1,mk]" << std::endl;
+            std::cout << "  OK basic framing produces [Lnew,Lold,mk,Rnew,Rold,mk]" << std::endl;
         }
     }
 
@@ -49,8 +50,8 @@ int main() {
         size_t n = 0;
         const bool ok = pulsr::FrameDopInterleaved(in, 8, out.data(), out.size(), &n);
         const std::vector<uint8_t> want = {
-            0x01, 0x02, 0x05, 0x03, 0x04, 0x05,
-            0x05, 0x06, 0xFA, 0x07, 0x08, 0xFA,
+            0x02, 0x01, 0x05, 0x04, 0x03, 0x05,
+            0x06, 0x05, 0xFA, 0x08, 0x07, 0xFA,
         };
         if (!ok || !ExpectBytes(out, want, "marker alternation")) {
             ++failures;
@@ -66,7 +67,7 @@ int main() {
         size_t n = 0;
         pulsr::FrameDopInterleaved(in, 4, out.data(), out.size(), &n,
                                    pulsr::kDopMarkerB);
-        if (!ExpectBytes(out, {0x11, 0x22, 0xFA, 0x33, 0x44, 0xFA},
+        if (!ExpectBytes(out, {0x22, 0x11, 0xFA, 0x44, 0x33, 0xFA},
                          "firstMarker=0xFA")) {
             ++failures;
         } else {

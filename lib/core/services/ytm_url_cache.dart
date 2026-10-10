@@ -193,7 +193,11 @@ class YtmUrlCache {
       for (final e in _cache.entries) {
         final entry = e.value;
         if (entry.cookies != null && entry.cookies!.isNotEmpty) continue;
-        final sep = e.key.lastIndexOf(':');
+        // Quality is everything after the FIRST ':' — a videoId never contains
+        // one, but a quality can (`high:m4a`), so lastIndexOf dropped the
+        // leading segment and re-keyed restored m4a entries as `videoId:m4a`,
+        // which the `high:m4a` lookup then never found.
+        final sep = e.key.indexOf(':');
         final quality = sep >= 0 ? e.key.substring(sep + 1) : 'high';
         final s = entry.stream;
         list.add({

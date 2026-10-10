@@ -203,6 +203,7 @@ class PulsrViewport {
           isShortHeight == other.isShortHeight &&
           isUltraWide == other.isUltraWide &&
           hasHinge == other.hasHinge &&
+          hinge == other.hinge &&
           textScale == other.textScale;
 
   @override
@@ -215,6 +216,7 @@ class PulsrViewport {
         isShortHeight,
         isUltraWide,
         hasHinge,
+        hinge,
         textScale,
       );
 }
@@ -260,6 +262,6 @@ class PulsrViewportScopeBuilder extends StatelessWidget {
 }
 
 /// Convenient extension for accessing [PulsrViewport] anywhere from [BuildContext].
-extension PulsrResponsiveX on BuildContext {
+extension PulsrViewportX on BuildContext {
   PulsrViewport get viewport => PulsrViewport.of(this);
 }
