@@ -859,15 +859,13 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     // The lookahead limiter runs only when the chain can boost above unity (or
     // the limiter stage is explicitly enabled). A transparent, no-op chain — a
     // centered panner, a mono downmix, or every stage off — must stay
-    // bit-identical, so the limiter and its latency are kept out of that path.
-    // Always-on true-peak limiter: a transparent brickwall (no gain reduction
-    // when under threshold) gives constant pipeline latency and always catches
-    // inter-sample peaks — including SubCrossover/Crossfeed boosts the old
-    // hasNetPositiveGain heuristic omitted, which otherwise clipped at the final
-    // hard clamp and caused a latency step/click when toggling across unity.
-    // hasNetPositiveGain is retained above for diagnostics/telemetry only.
-    const bool runLimiter = true;
-    (void)hasNetPositiveGain;
+    // bit-identical (test_bypass_transparency / test_engine_contracts), so the
+    // limiter and its ~5 ms lookahead latency are kept out of that path. The
+    // clipping bug the audit flagged is fixed by adding CROSSFEED/CROSSOVER to
+    // hasNetPositiveGain above — NOT by forcing the limiter always-on, which
+    // added latency to neutral chains and broke bit-exact bypass.
+    const bool runLimiter = hasNetPositiveGain ||
+        ((stages & STAGE_LIMITER) && snapshot->limiter.enabled);
     const bool dvcActive = snapshot->directVolume.enabled &&
         (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
     const bool nonUnityGain = (stages != 0) ||
