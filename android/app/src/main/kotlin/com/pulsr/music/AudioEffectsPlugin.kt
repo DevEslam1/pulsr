@@ -1100,6 +1100,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var audioDeviceCallback: Any? = null
     private var systemAudioEffectsController: SystemAudioEffectsController? = null
 
+    // --- SYSTEM (STREAM_MUSIC) VOLUME OBSERVER -------------------------------
+    // Drives the equal-loudness contour from the ANDROID hardware media volume
+    // instead of the in-app software slider (which defaults to 100%, leaving
+    // the lift inert for most users). A ContentObserver on Settings.System
+    // fires for many unrelated settings, so onChange recomputes the
+    // STREAM_MUSIC ratio and only forwards an actual change (deduped) to
+    // Flutter, debounced through mainHandler exactly like onRouteChanged.
+    private var volumeContentObserver: android.database.ContentObserver? = null
+    private var pendingVolumeChangeRunnable: Runnable? = null
+    @Volatile private var lastSystemVolumeRatio: Double = -1.0
+
     fun initPlugin(appContext: Context, messenger: io.flutter.plugin.common.BinaryMessenger) {
         context = appContext
         systemAudioEffectsController = SystemAudioEffectsController(appContext)
@@ -1148,6 +1159,63 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 audioManager.registerAudioDeviceCallback(callback, mainHandler)
                 audioDeviceCallback = callback
             }
+        }
+
+        registerSystemVolumeObserver(appContext)
+    }
+
+    // Registers a ContentObserver that forwards hardware STREAM_MUSIC volume
+    // changes to Flutter as `onSystemVolumeChanged` (a 0..1 ratio). Public API
+    // on every SDK level, so there is no version gate; guarded by `disposed`
+    // and unregistered in [cleanup].
+    private fun registerSystemVolumeObserver(appContext: Context) {
+        if (volumeContentObserver != null) return
+        try {
+            val observer = object : android.database.ContentObserver(mainHandler) {
+                override fun onChange(selfChange: Boolean) {
+                    if (disposed.get()) return
+                    // Debounce + coalesce bursts (volume-key repeats) through
+                    // mainHandler, mirroring the route-change path.
+                    pendingVolumeChangeRunnable?.let { mainHandler.removeCallbacks(it) }
+                    val r = Runnable {
+                        if (disposed.get()) return@Runnable
+                        val ratio = computeSystemMusicVolumeRatio()
+                        // Settings.System also fires for brightness, rotation,
+                        // etc.; only forward a real STREAM_MUSIC level change.
+                        if (abs(ratio - lastSystemVolumeRatio) < 1e-6) return@Runnable
+                        lastSystemVolumeRatio = ratio
+                        try {
+                            methodChannel.invokeMethod("onSystemVolumeChanged", ratio)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to send onSystemVolumeChanged to Flutter: ${e.message}")
+                        }
+                    }
+                    pendingVolumeChangeRunnable = r
+                    mainHandler.postDelayed(r, 60L)
+                }
+            }
+            appContext.contentResolver.registerContentObserver(
+                android.provider.Settings.System.CONTENT_URI, true, observer
+            )
+            volumeContentObserver = observer
+            lastSystemVolumeRatio = computeSystemMusicVolumeRatio()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register system volume observer: ${e.message}")
+        }
+    }
+
+    // Current ANDROID STREAM_MUSIC volume as a 0..1 ratio
+    // (getStreamVolume / getStreamMaxVolume). Returns 1.0 when unavailable so
+    // the loudness contour defaults to "full volume = no lift".
+    private fun computeSystemMusicVolumeRatio(): Double {
+        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return 1.0
+        return try {
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            if (max <= 0) return 1.0
+            val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+            (cur.toDouble() / max.toDouble()).coerceIn(0.0, 1.0)
+        } catch (e: Exception) {
+            1.0
         }
     }
 
@@ -1231,6 +1299,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
         }
         audioDeviceCallback = null
+        volumeContentObserver?.let { obs ->
+            try { context?.contentResolver?.unregisterContentObserver(obs) } catch (_: Exception) {}
+        }
+        volumeContentObserver = null
+        pendingVolumeChangeRunnable = null
+        lastSystemVolumeRatio = -1.0
         context?.let { unregisterThermalListener(it) }
         stopRtfGovernor()
         systemAudioEffectsController?.release()
@@ -2851,6 +2925,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "isOffloadAllowed" -> {
                     result.success(!hasActiveEffects() && !dvcEnabled && !dvcActive)
+                }
+
+                "getSystemMusicVolume" -> {
+                    // Hardware STREAM_MUSIC level as a 0..1 ratio for the
+                    // equal-loudness contour. KNOWN CAVEAT: while DVC /
+                    // hearing-safety pin STREAM_MUSIC to device max, this reads
+                    // ~1.0, so the contour stays off even though DVC attenuates
+                    // digitally — accepted tradeoff.
+                    result.success(computeSystemMusicVolumeRatio())
                 }
 
                 "getCapabilities" -> {

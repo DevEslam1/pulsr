@@ -633,6 +633,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         _equalizerManager.syncNativeLatency(assumedOutputSampleRate);
         _currentAudioSessionId = sessionId;
         _audioSessionIdSubject.add(sessionId);
+        // Track start: re-seed the loudness contour from the hardware volume
+        // (no-op / software fallback when the contour is disabled).
+        unawaited(_refreshLoudnessContourFromSystemVolume());
       },
       onRouteChanged: () {
         _syncBluetoothRouteFromCache();
@@ -988,6 +991,54 @@ class PulsrAudioHandler extends BaseAudioHandler
   double _volume = 1.0;
   double get volume => _volume;
 
+  /// Most recent ANDROID system STREAM_MUSIC volume ratio (0..1), fed by the
+  /// [AudioEffectsChannel.onSystemVolumeChanged] stream and the explicit
+  /// queries below. Null until the first reading. Lets the hot [setVolume]
+  /// path drive the loudness contour from the hardware level without a
+  /// per-call platform round-trip.
+  double? _lastSystemVolumeRatio;
+
+  /// Feeds the equal-loudness contour its driving volume. When the contour is
+  /// engaged on Android it tracks the hardware STREAM_MUSIC volume so the lift
+  /// actually responds to the phone's volume keys instead of the in-app
+  /// software slider (default 100%, which left the lift inert). Falls back to
+  /// the software [_volume] when the contour is off, off-Android, or no valid
+  /// system reading is available yet.
+  Future<void> _feedLoudnessContourVolume() async {
+    double ratio = _volume; // software fallback
+    if (Platform.isAndroid && _equalizerManager.isLoudnessContourEnabled) {
+      final sys = _lastSystemVolumeRatio;
+      if (sys != null && sys.isFinite && sys >= 0.0) {
+        ratio = sys;
+      }
+    }
+    try {
+      await _equalizerManager.updateLoudnessVolume(ratio);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to feed loudness contour volume',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
+  /// Queries the ANDROID system STREAM_MUSIC volume once and feeds it to the
+  /// loudness contour (used on cold start and track start). Only queries while
+  /// the contour is engaged on Android; otherwise defers to the software
+  /// fallback in [_feedLoudnessContourVolume].
+  Future<void> _refreshLoudnessContourFromSystemVolume() async {
+    if (Platform.isAndroid && _equalizerManager.isLoudnessContourEnabled) {
+      try {
+        final sys = await AudioEffectsChannel().getSystemMusicVolume();
+        if (sys.isFinite && sys >= 0.0) {
+          _lastSystemVolumeRatio = sys.clamp(0.0, 1.0);
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to query system music volume for loudness',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+    }
+    await _feedLoudnessContourVolume();
+  }
+
   /// Direct Volume Control: when true the composed gain is applied in the
   /// native float DSP path and player volume stays at unity.
   bool _dvcEnabled = false;
@@ -1225,7 +1276,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     final target = _calculateReplayGainVolume(song);
     _volumeController?.updateSettings(userVolume: _volume);
     try {
-      await _equalizerManager.updateLoudnessVolume(_volume);
+      // Loudness contour tracks the hardware (system) volume when engaged;
+      // this feeds it the system ratio (or the software [_volume] as fallback).
+      await _feedLoudnessContourVolume();
     } catch (e, st) {
       ErrorLogger.log('Failed to update loudness volume in setVolume',
           error: e, stackTrace: st, category: 'AudioHandler');
@@ -2322,6 +2375,20 @@ class PulsrAudioHandler extends BaseAudioHandler
       }),
     );
 
+    // Drive the loudness contour live from the ANDROID hardware media volume.
+    // While the contour is off we only cache the latest ratio; the
+    // software-volume path (setVolume) still owns the value in that case.
+    _subscriptions.add(
+      AudioEffectsChannel().onSystemVolumeChanged.listen((ratio) {
+        if (ratio.isFinite && ratio >= 0.0) {
+          _lastSystemVolumeRatio = ratio.clamp(0.0, 1.0);
+        }
+        if (_equalizerManager.isLoudnessContourEnabled) {
+          unawaited(_feedLoudnessContourVolume());
+        }
+      }),
+    );
+
     // Initialize audio effects & equalizer preferences
     try {
       // Seed the BT mirror before effects init so the cold-start dither push
@@ -2335,7 +2402,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
       unawaited(_refreshBluetoothRoute());
       try {
-        await _equalizerManager.updateLoudnessVolume(_volume);
+        // Query the system STREAM_MUSIC volume once at cold start so a restored
+        // (enabled) loudness contour engages against the hardware level.
+        await _refreshLoudnessContourFromSystemVolume();
       } catch (e, st) {
         ErrorLogger.log('Update loudness volume failed',
             error: e, stackTrace: st, category: 'AudioHandler');

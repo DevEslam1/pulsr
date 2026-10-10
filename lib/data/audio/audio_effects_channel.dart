@@ -53,11 +53,30 @@ class AudioEffectsChannel {
   /// Stream emitting whenever the native audio route changes (earpods/headphones connected/disconnected).
   Stream<void> get onRouteChanged => _routeChangedController.stream;
 
+  final StreamController<double> _systemVolumeController =
+      StreamController<double>.broadcast();
+
+  /// Stream emitting the Android STREAM_MUSIC volume as a 0..1 ratio whenever
+  /// the user changes the hardware media volume. Used to drive the loudness
+  /// contour from the system volume instead of the in-app software slider.
+  /// Off-Android this never emits (the native observer only exists there).
+  Stream<double> get onSystemVolumeChanged => _systemVolumeController.stream;
+
   Future<dynamic> _handleNativeCall(MethodCall call) async {
     if (call.method == 'onRouteChanged') {
       if (!_routeChangedController.isClosed) {
         _routeChangedController.add(null);
       }
+      return;
+    }
+    if (call.method == 'onSystemVolumeChanged') {
+      final dynamic args = call.arguments;
+      if (args is num &&
+          args.isFinite &&
+          !_systemVolumeController.isClosed) {
+        _systemVolumeController.add(args.toDouble().clamp(0.0, 1.0));
+      }
+      return;
     }
   }
 
@@ -92,6 +111,9 @@ class AudioEffectsChannel {
   void dispose() {
     if (!_routeChangedController.isClosed) {
       _routeChangedController.close();
+    }
+    if (!_systemVolumeController.isClosed) {
+      _systemVolumeController.close();
     }
     if (!_autoDegradeStreamController.isClosed) {
       _autoDegradeStreamController.close();
@@ -1276,6 +1298,33 @@ class AudioEffectsChannel {
   }
 
   // --- PHASE 1 DSP EXPANSION: LOUDNESS CONTOUR (FLETCHER-MUNSON) ---
+
+  /// Reads the Android STREAM_MUSIC volume as a 0..1 ratio
+  /// (getStreamVolume / getStreamMaxVolume). Returns 1.0 off-Android or when
+  /// the value is unavailable (so the loudness contour defaults to "full
+  /// volume = no lift" rather than engaging spuriously). Live changes are also
+  /// pushed over [onSystemVolumeChanged]; this is the one-shot query used on
+  /// loudness-enable / track start.
+  Future<double> getSystemMusicVolume() async {
+    if (!_isAndroid) return 1.0;
+    try {
+      final dynamic ratio = await _channel
+          .invokeMethod<dynamic>('getSystemMusicVolume')
+          .timeout(const Duration(seconds: 2));
+      if (ratio is num && ratio.isFinite) {
+        return ratio.toDouble().clamp(0.0, 1.0);
+      }
+      return 1.0;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to get system music volume',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 1.0;
+    }
+  }
 
   Future<void> setLoudnessContourEnabled(bool enabled) async {
     if (!_isAndroid) return;

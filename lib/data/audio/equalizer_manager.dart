@@ -1369,10 +1369,37 @@ class EqualizerManager {
   /// Sets the loudness contour. The contour lift is computed against
   /// [loudnessVolumeLinear], which is kept in sync with the playback volume
   /// stage via [updateLoudnessVolume].
+  ///
+  /// On a genuine OFF->ON transition the driving volume is seeded from the
+  /// ANDROID system STREAM_MUSIC volume so the equal-loudness lift engages
+  /// against the hardware level, not the in-app software slider (which
+  /// defaults to 100% and left the contour inert). The audio handler keeps it
+  /// in sync afterwards from the onSystemVolumeChanged stream.
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {
+    final wasEnabled = isLoudnessContourEnabled;
     if (intensity != null) {
       loudnessContourIntensity =
           DspParamRanges.loudnessContourIntensity.clampRaw(intensity);
+    }
+    if (enabled && !wasEnabled && PlatformCapabilities.isAndroid) {
+      // Query once on enable. getSystemMusicVolume returns 1.0 when
+      // unavailable, which gates the lift off (the safe default); the previous
+      // software-fed [loudnessVolumeLinear] is only overwritten with a finite
+      // in-range reading, so an error leaves the existing value as fallback.
+      try {
+        final sysRatio = await _effectsChannel.getSystemMusicVolume();
+        if (sysRatio.isFinite && sysRatio >= 0.0) {
+          loudnessVolumeLinear =
+              DspParamRanges.volumeLinear.clampRaw(sysRatio);
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to seed loudness contour from system volume',
+          error: e,
+          stackTrace: st,
+          category: 'EqualizerManager',
+        );
+      }
     }
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLoudnessContourParams(
