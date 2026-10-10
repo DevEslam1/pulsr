@@ -59,6 +59,35 @@ void main() {
       expect(plan.decision, SmartAudioDecision.bitPerfect);
       expect(plan.preferBitPerfect, isTrue);
       expect(plan.keepDsp, isFalse);
+      expect(plan.reason, 'auto-bitperfect-hires');
+    });
+
+    test(
+        '16-bit/44.1 wired DAC also hands over to bit-perfect (not gated on hi-res)',
+        () {
+      final plan = resolveSmartAudioPlan(
+        mode: SmartAudioMode.auto,
+        device: _device(
+            name: 'USB DAC', type: 'usb', isBluetooth: false, bitPerfect: true),
+        trackIsHiRes: false,
+        deviceSupportsBitPerfect: true,
+      );
+      expect(plan.decision, SmartAudioDecision.bitPerfect);
+      expect(plan.preferBitPerfect, isTrue);
+      expect(plan.keepDsp, isFalse);
+      expect(plan.reason, 'auto-bitperfect');
+    });
+
+    test('a non-bit-perfect-capable DAC stays on the DSP path', () {
+      final plan = resolveSmartAudioPlan(
+        mode: SmartAudioMode.auto,
+        device: _device(
+            name: 'USB DAC', type: 'usb', isBluetooth: false, bitPerfect: false),
+        trackIsHiRes: false,
+        deviceSupportsBitPerfect: false,
+      );
+      expect(plan.decision, SmartAudioDecision.dsp);
+      expect(plan.preferBitPerfect, isFalse);
     });
 
     test('a correction keeps the DSP path even on a bit-perfect DAC', () {

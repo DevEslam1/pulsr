@@ -120,16 +120,22 @@ abstract class SettingsState with _$SettingsState {
     @Default('localhost, 127.0.0.1') String proxyBypassHosts,
     @Default([]) List<ProxyEntry> proxyList,
     @Default(false) bool isTestingAllProxies,
-    // Audiophile & Hi-Res Output
+    // Audiophile & Hi-Res Output.
+    // Bit-Perfect stays OFF globally by default; Smart Audio (auto) engages it
+    // opportunistically on a capable wired/USB DAC with no active DSP, so a
+    // default install never silently locks out EQ/crossfade/ReplayGain. Turning
+    // it on here would make those modes unreachable out of the box.
     @Default(false) bool bitPerfectOutput,
     @Default(true) bool bypassDspOnBitPerfect,
     // T2: reconfigure the output to each track's native sample rate.
     @Default(true) bool followTrackSampleRate,
-    // T3: strict bit-perfect (no resample). Forces Bit-Perfect + DSP bypass and
-    // surfaces the EQ/ReplayGain/effects/crossfade conflict card.
+    // T3: strict bit-perfect (no resample). Opt-in; forces Bit-Perfect + DSP
+    // bypass and surfaces the EQ/ReplayGain/effects/crossfade conflict card.
     @Default(false) bool strictBitPerfect,
-    // T4: DSD output transport (default PCM; DoP only with a detected USB DAC).
-    @Default(DsdOutputMode.pcm) DsdOutputMode dsdOutputMode,
+    // T4: DSD output transport. DoP is preferred (native DSD over PCM on a
+    // capable USB DAC); it is gated at playback by the native DoP probe, so a
+    // route without DoP falls back to PCM decode rather than failing.
+    @Default(DsdOutputMode.dop) DsdOutputMode dsdOutputMode,
     // Overall complexity level. Defaults to Normal so first-time users get the
     // curated, smart experience; advanced controls are revealed in Professional.
     @Default(ExperienceMode.normal) ExperienceMode experienceMode,
@@ -165,8 +171,9 @@ abstract class SettingsState with _$SettingsState {
     @Default(150) int bluetoothLatencyOffsetMs,
     // Bluetooth Hi-Res (best-effort): keeps the app's float path on BT, permits
     // the native dither stage at the codec depth and aligns the codec rate to
-    // the track. Not bit-perfect — Bluetooth is a lossy codec link.
-    @Default(false) bool bluetoothHiResEnabled,
+    // the track. Not bit-perfect — Bluetooth is a lossy codec link — but ON by
+    // default so the lossy link is never made worse than it must be.
+    @Default(true) bool bluetoothHiResEnabled,
     // F3/F4/F7/F8/F9/F10
     @Default(true) bool hedgedResolutionEnabled,
     @Default(true) bool adaptiveQualityEnabled,

@@ -1,14 +1,17 @@
 // test/features/settings/first_launch_audio_defaults_test.dart
 //
-// Locks the first-launch (fresh install) audio/DSP default state to a clean,
-// neutral, bit-transparent-as-possible signal path:
+// Locks the first-launch (fresh install) audio/DSP default state to the
+// highest-quality path for every route:
 //   * every coloring/effect DSP stage OFF, EQ disabled on a Flat preset,
-//     preamp 0 dB, no boosts;
+//     preamp 0 dB, no boosts (the path stays bit-transparent by default);
 //   * highest-precision internal path (float output ON, dither ON,
 //     resampler OFF);
-//   * bit-perfect OFF globally but correctly coupled to the DSP bypass;
-//   * Smart Audio ON (auto) so capable devices opportunistically engage the
-//     best path with no user tuning;
+//   * Bit-Perfect / Strict Bit-Perfect OFF globally but coupled to the DSP
+//     bypass, so an install does not lock out EQ/crossfade/ReplayGain;
+//   * Bluetooth Hi-Res ON so the lossy link is never made worse;
+//   * DSD output prefers DoP (native DSD over PCM) on a capable USB DAC;
+//   * Smart Audio ON (auto) so capable devices engage the best path with no
+//     user tuning;
 //   * streaming + download quality at the highest tier.
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,14 +43,19 @@ void main() {
       expect(s.outputFormatNegotiationEnabled, isTrue);
     });
 
-    test('bit-perfect is OFF globally but coupled to the DSP bypass', () {
+    test('bit-perfect stays opt-in; BT Hi-Res ON; DSD prefers DoP', () {
       expect(s.bitPerfectOutput, isFalse);
       expect(s.strictBitPerfect, isFalse);
       expect(s.bypassDspOnBitPerfect, isTrue);
+      // Bluetooth Hi-Res is ON: it never makes the lossy link worse and has no
+      // DSP-conflict cost.
+      expect(s.bluetoothHiResEnabled, isTrue);
+      // AAudio Direct is an alternate exclusive path that conflicts with the
+      // Bit-Perfect direct-USB tee, so it stays opt-in.
       expect(s.aaudioOutputEnabled, isFalse);
       expect(s.dvcEnabled, isFalse);
       expect(s.usbHardwareVolumeEnabled, isFalse);
-      expect(s.dsdOutputMode, DsdOutputMode.pcm);
+      expect(s.dsdOutputMode, DsdOutputMode.dop);
     });
 
     test('ReplayGain is OFF (pure level/tone by default)', () {

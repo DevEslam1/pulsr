@@ -286,9 +286,10 @@ class PrefsKeys {
   // path that reports exclusive bit-perfect support.
   static const String strictBitPerfect = 'setting_strict_bit_perfect';
 
-  // T4: DSD (DSF/DFF) output transport. 'pcm' (default, safe: decode to PCM)
-  // or 'dop' (frame as DSD over PCM for a compatible USB DAC). Never
-  // auto-enabled — DoP requires an explicit user choice plus a detected DAC.
+  // T4: DSD (DSF/DFF) output transport. 'dop' (default, frame as DSD over PCM
+  // for a compatible USB DAC) or 'pcm' (decode to PCM). The DoP path is gated
+  // at playback by the native probe, so it silently falls back to PCM on a
+  // route that cannot carry it rather than failing.
   static const String dsdOutputMode = 'setting_dsd_output_mode';
   // DoP PCM container width: 24 (standard DoP packing) or 32 (zero-padded
   // 32-bit containers for DACs that require 32-bit frames). Only used when

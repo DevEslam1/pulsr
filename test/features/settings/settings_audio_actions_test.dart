@@ -170,11 +170,13 @@ void main() {
       final cubit = makeCubit();
       addTearDown(cubit.close);
 
-      await cubit.setDsdOutputMode(DsdOutputMode.dop);
-      expect(cubit.state.errorMessage, isNotNull);
+      // Start from the explicit safe PCM transport, then confirm DoP cannot be
+      // selected while no DoP-capable USB DAC is present.
+      await cubit.setDsdOutputMode(DsdOutputMode.pcm);
       expect(cubit.state.dsdOutputMode, DsdOutputMode.pcm);
 
-      await cubit.setDsdOutputMode(DsdOutputMode.pcm);
+      await cubit.setDsdOutputMode(DsdOutputMode.dop);
+      expect(cubit.state.errorMessage, isNotNull);
       expect(cubit.state.dsdOutputMode, DsdOutputMode.pcm);
     });
 

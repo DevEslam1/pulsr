@@ -122,14 +122,22 @@ SmartAudioPlan resolveSmartAudioPlan({
     );
   }
 
-  // Wired/USB, hi-res track, exclusive output supported, and no correction
-  // requested -> hand over to bit-perfect. If a correction exists OR any user
-  // DSP effect is active, keeping the DSP chain wins over raw bit-perfect
-  // output: bit-perfect bypasses the whole DSP chain, so engaging it would
-  // silently mute the user's active EQ/effects (the no-conflict rule: never
-  // bit-perfect ON together with a DSP effect ON).
+  // Wired/USB with exclusive output supported and no correction requested ->
+  // hand over to bit-perfect for ANY sample rate / bit depth, not just hi-res.
+  // Bit-perfect runs the DAC at the track's exact native rate and bypasses the
+  // OS resampler, so even 16-bit/44.1 "CD" content is delivered bit-exact
+  // instead of being resampled to the mixer rate on the shared DSP path — this
+  // is the maximum fidelity a capable DAC can produce. If a correction exists
+  // OR any user DSP effect is active, keeping the DSP chain wins over raw
+  // bit-perfect output: bit-perfect bypasses the whole DSP chain, so engaging
+  // it would silently mute the user's active EQ/effects (the no-conflict rule:
+  // never bit-perfect ON together with a DSP effect ON).
+  //
+  // Trade-off accepted for fidelity: the DAC re-locks its clock whenever a
+  // track's rate differs from the previous one, which some DACs flag with a
+  // brief mute/relock gap. [trackIsHiRes] no longer gates the decision; it only
+  // annotates the reason for telemetry.
   if (deviceSupportsBitPerfect &&
-      trackIsHiRes &&
       !hasActiveDspEffect &&
       matchedHeadphoneProfileId == null &&
       manualHeadphoneProfileId == null) {
@@ -138,7 +146,7 @@ SmartAudioPlan resolveSmartAudioPlan({
       decision: SmartAudioDecision.bitPerfect,
       keepDsp: false,
       preferBitPerfect: true,
-      reason: 'auto-bitperfect',
+      reason: trackIsHiRes ? 'auto-bitperfect-hires' : 'auto-bitperfect',
     );
   }
 
@@ -151,7 +159,8 @@ SmartAudioPlan resolveSmartAudioPlan({
 }
 
 /// Heuristic: a track is "hi-res" when its native rate exceeds 48 kHz or its
-/// bit depth exceeds 16-bit. Unknown (0) values are treated as not hi-res so a
-/// missing tag never promotes bit-perfect output.
+/// bit depth exceeds 16-bit. Unknown (0) values are treated as not hi-res.
+/// This no longer gates bit-perfect handover (any rate on a capable DAC now
+/// qualifies); it is kept to tag the arbitration reason for telemetry.
 bool smartAudioTrackIsHiRes({int sampleRate = 0, int bitDepth = 0}) =>
     sampleRate > 48000 || bitDepth > 16;

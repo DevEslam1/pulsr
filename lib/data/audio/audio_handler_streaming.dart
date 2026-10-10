@@ -177,7 +177,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         // by the file format or by an absent/failed probe.
         final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
         final wantDop =
-            (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm') == 'dop';
+            (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'dop') == 'dop';
         DsdDacCapabilities? caps;
         if (wantDop) {
           caps = await DsdDecoderHelper.probeDopCapabilities();

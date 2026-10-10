@@ -142,11 +142,11 @@ void main() {
       addTearDown(cubit.close);
       await cubit.preferencesReady;
 
-      // An unknown stored mode now falls back to the neutral default (OFF),
-      // matching the clean first-launch signal path.
+      // An unknown stored mode falls back to the first-launch default: DoP is
+      // the preferred DSD transport (gated at playback by the native probe).
       expect(cubit.state.replayGainMode, ReplayGainMode.off);
       expect(cubit.state.replayGainPreampWithRg, 0.0);
-      expect(cubit.state.dsdOutputMode, DsdOutputMode.pcm);
+      expect(cubit.state.dsdOutputMode, DsdOutputMode.dop);
       // Bit-perfect + crossfade > 0 is normalized to 0 and persisted.
       expect(cubit.state.crossfadeSeconds, 0.0);
       // The stubbed native layer refuses exclusive mode, so it must be off.

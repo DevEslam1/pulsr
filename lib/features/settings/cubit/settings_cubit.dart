@@ -411,13 +411,16 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         ? replayGainPreampWithoutRgRaw.clamp(-12.0, 12.0)
         : -3.0;
 
+    // Max-quality first launch: BT Hi-Res defaults ON and DSD prefers DoP. Each
+    // is gated by the native probe, so an incapable route degrades instead of
+    // breaking. Bit-Perfect/Strict stay opt-in (see SettingsState).
     final strictBitPerfectLoaded =
         prefs.getBool(PrefsKeys.strictBitPerfect) ?? false;
     final followTrackSampleRateLoaded =
         prefs.getBool(PrefsKeys.followTrackSampleRate) ?? true;
     final dsdOutputModeLoaded = DsdOutputMode.values.firstWhere(
-      (e) => e.name == (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'pcm'),
-      orElse: () => DsdOutputMode.pcm,
+      (e) => e.name == (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'dop'),
+      orElse: () => DsdOutputMode.dop,
     );
     final experienceModeLoaded = ExperienceMode.fromName(
       prefs.getString(PrefsKeys.experienceMode),
@@ -512,7 +515,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs) ??
               current.bluetoothLatencyOffsetMs,
       bluetoothHiResEnabled:
-          prefs.getBool(PrefsKeys.bluetoothHiResEnabled) ?? false,
+          prefs.getBool(PrefsKeys.bluetoothHiResEnabled) ?? true,
       hedgedResolutionEnabled:
           prefs.getBool(PrefsKeys.hedgedResolutionEnabled) ?? true,
       adaptiveQualityEnabled:
